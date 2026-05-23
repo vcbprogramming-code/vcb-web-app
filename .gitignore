@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# env
+.env
+.env.local
+.env.*.local
+*.env
+
+# build output
+dist/
+build/
+frontend/dist/
+backend/dist/
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# supabase
+supabase/.temp/
+supabase/.branches/
+
+# misc
+coverage/
+*.local

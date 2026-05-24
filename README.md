@@ -21,6 +21,12 @@ HR Operations, E-Approval & Onboarding System — สำหรับ **บริ
        frontend/                              backend/                         supabase/
 ```
 
+**Deploy target: Railway.** Frontend + backend Express both deploy to Railway.
+The backend runs as a normal long-running Express server (no serverless
+restructure needed). Scheduled/long work (email auto-log, monthly rollups,
+interest recompute) runs as a Railway cron service or an in-process scheduler —
+no per-request timeout limits.
+
 - **Frontend** (`frontend/`): Vite + React + Tailwind CSS. คุยกับ backend ผ่าน REST `/api`
 - **Backend** (`backend/`): Node.js + Express เป็น API หลัก ถือ business logic/workflow ทั้งหมด
   เชื่อม Supabase ด้วย `service_role` key (ฝั่งเซิร์ฟเวอร์เท่านั้น)

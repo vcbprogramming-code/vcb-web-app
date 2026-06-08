@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { ememoApi, STATUS_META, formatThaiDate } from '../lib/ememo.js';
+import {
+  ememoApi,
+  STATUS_META,
+  formatThaiDate,
+  formatThaiLongDate,
+  formatThaiDateTime,
+} from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
-
-function StatCard({ label, value, accent }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className={`text-3xl font-bold mt-1 ${accent || 'text-slate-800'}`}>{value}</div>
-    </div>
-  );
-}
+import { StatCard, PageHeader } from '../components/ui/index.js';
 
 // the order + which statuses get their own headline card
 const STATUS_ORDER = ['pending', 'approved', 'returned', 'rejected'];
@@ -30,11 +28,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          สวัสดี, {profile?.full_name || user?.email}
-        </h1>
-      </div>
+      <PageHeader
+        title={`สวัสดี, ${profile?.full_name || user?.email}`}
+        subtitle="ภาพรวมระบบบันทึกข้อความและการอนุมัติ (E-Memo)"
+        right={
+          <>
+            <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
+              <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(new Date())}
+            </span>
+            <span className="chip bg-brand/10 text-brand">{formatThaiLongDate(new Date())}</span>
+          </>
+        }
+      />
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
@@ -54,7 +59,7 @@ export default function Dashboard() {
             {/* LEFT (2 cols): status breakdown + by project */}
             <div className="lg:col-span-2 space-y-5">
               {/* status breakdown */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="card">
                 <h3 className="font-bold text-slate-800 mb-4">สถานะเอกสาร</h3>
                 <div className="space-y-3">
                   {STATUS_ORDER.map((st) => {
@@ -85,7 +90,7 @@ export default function Dashboard() {
               </div>
 
               {/* by project */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="card">
                 <h3 className="font-bold text-slate-800 mb-4">เอกสารแยกตามโครงการ</h3>
                 <div className="flex flex-wrap gap-3">
                   {s.byProject.map((p) => (
@@ -98,7 +103,7 @@ export default function Dashboard() {
               </div>
 
               {/* recent documents */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-slate-800">เอกสารล่าสุด</h3>
                   <button onClick={() => navigate('/memos')} className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
@@ -128,7 +133,7 @@ export default function Dashboard() {
             </div>
 
             {/* RIGHT: pending approval queue */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="card">
               <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-800">
                 <Icon name="inbox" className="h-5 w-5 text-amber-500" />
                 รออนุมัติ ({s.byStatus.pending || 0})

@@ -97,7 +97,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }
   };
 
-  const field = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200';
+  const field = 'field';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
@@ -222,7 +222,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 onDragLeave={() => setDragOver(false)}
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0]); }}
                 className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed py-8 cursor-pointer transition-colors ${
-                  dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
+                  dragOver ? 'border-brand bg-brand/5' : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <Icon name="download" className="h-7 w-7 text-slate-400" />
@@ -236,8 +236,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
-            <button type="submit" disabled={submitting} className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">
+            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+            <button type="submit" disabled={submitting} className="btn-primary">
               {submitting ? 'กำลังบันทึก…' : 'บันทึกเอกสาร'}
             </button>
           </div>

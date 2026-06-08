@@ -33,7 +33,7 @@ export default function SubmitApprovalModal({ documentId, onClose, onSubmitted }
     }
   };
 
-  const field = 'px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200';
+  const field = 'field';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
@@ -64,8 +64,8 @@ export default function SubmitApprovalModal({ documentId, onClose, onSubmitted }
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
-            <button type="submit" disabled={submitting} className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">
+            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+            <button type="submit" disabled={submitting} className="btn-primary">
               {submitting ? 'กำลังส่ง…' : 'ส่งอนุมัติ'}
             </button>
           </div>

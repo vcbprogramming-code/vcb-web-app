@@ -35,13 +35,13 @@ export default function DocTypesTab() {
     catch (err) { setError(err.message); }
   };
 
-  const field = 'px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200';
+  const field = 'field';
 
   return (
     <div className="space-y-4 max-w-2xl">
       <form onSubmit={add} className="flex gap-2">
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="ชื่อประเภทเอกสารใหม่" className={`${field} flex-1`} />
-        <button type="submit" disabled={busy} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">+ เพิ่ม</button>
+        <button type="submit" disabled={busy} className="btn-primary">+ เพิ่ม</button>
       </form>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 

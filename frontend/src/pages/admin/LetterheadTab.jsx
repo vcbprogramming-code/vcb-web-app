@@ -52,7 +52,7 @@ export default function LetterheadTab() {
     finally { setBusy(false); }
   };
 
-  const field = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200';
+  const field = 'field';
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -116,7 +116,7 @@ export default function LetterheadTab() {
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" disabled={busy} className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+            <button type="submit" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
             {saved && (
               <span className="inline-flex items-center gap-1 text-emerald-600 text-sm">
                 <Icon name="check" className="h-4 w-4" /> บันทึกแล้ว

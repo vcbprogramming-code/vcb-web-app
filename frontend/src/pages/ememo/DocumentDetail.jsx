@@ -77,7 +77,7 @@ export default function DocumentDetail() {
       </button>
 
       {/* header card (full width) */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="card">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -104,7 +104,7 @@ export default function DocumentDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         {/* LEFT: document info + attachments (wider) */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="card">
             <h3 className="font-bold text-slate-800 mb-3">ข้อมูลเอกสาร</h3>
             <Row label="วันที่รับ">{formatThaiDate(doc.date_received)}</Row>
             {doc.recipient && <Row label="เรียน">{doc.recipient}</Row>}
@@ -125,7 +125,7 @@ export default function DocumentDetail() {
           </div>
 
           {/* document versions: original + approved */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="card">
             <h3 className="font-bold text-slate-800 mb-3">เอกสาร</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* ฉบับต้นฉบับ */}
@@ -160,7 +160,7 @@ export default function DocumentDetail() {
           </div>
 
           {/* supplementary files (เอกสารประกอบ) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-slate-800">ไฟล์ประกอบ</h3>
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm transition hover:bg-slate-50">
@@ -192,7 +192,7 @@ export default function DocumentDetail() {
         {/* RIGHT: approval chain + audit trail */}
         <div className="space-y-5">
           {doc.approval_steps.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="card">
               <h3 className="font-bold text-slate-800 mb-3">สายอนุมัติ</h3>
               <ol className="space-y-3">
                 {doc.approval_steps.map((s) => {
@@ -213,7 +213,7 @@ export default function DocumentDetail() {
           )}
 
           {doc.audit?.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="card">
               <h3 className="font-bold text-slate-800 mb-3">ประวัติการดำเนินการ (Audit Trail)</h3>
               <ul className="space-y-3 text-sm">
                 {doc.audit.map((a, i) => (

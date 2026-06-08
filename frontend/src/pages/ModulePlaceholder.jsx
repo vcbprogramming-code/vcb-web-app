@@ -1,4 +1,5 @@
 import Icon from '../components/Icon.jsx';
+import { PageHeader } from '../components/ui/index.js';
 
 /**
  * Temporary landing page for each module before it is built out.
@@ -7,10 +8,8 @@ import Icon from '../components/Icon.jsx';
 export default function ModulePlaceholder({ title, moduleNo, features = [] }) {
   return (
     <div className="space-y-6">
-      <div>
-        <div className="text-sm font-medium text-brand">โมดูลที่ {moduleNo}</div>
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-      </div>
+      <PageHeader title={title} subtitle={`โมดูลที่ ${moduleNo}`} />
+
 
       <div className="card">
         <div className="mb-3 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">

@@ -29,7 +29,7 @@ function ProjectModal({ project, onClose, onSaved }) {
     }
   };
 
-  const field = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200';
+  const field = 'field';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
@@ -68,8 +68,8 @@ function ProjectModal({ project, onClose, onSaved }) {
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
-            <button type="submit" disabled={busy} className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+            <button type="submit" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
           </div>
         </form>
       </div>
@@ -93,33 +93,33 @@ export default function ProjectsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setEdit(null)} className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">+ เพิ่มโครงการ</button>
+        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มโครงการ</button>
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card !p-0 overflow-hidden">
+        <table className="tbl">
           <thead>
-            <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <th className="px-5 py-3 font-semibold">โครงการ</th>
-              <th className="px-5 py-3 font-semibold">ชื่อ</th>
-              <th className="px-5 py-3 font-semibold">Prefix</th>
-              <th className="px-5 py-3 font-semibold">สถานะ</th>
-              <th className="px-5 py-3 font-semibold text-right">จัดการ</th>
+            <tr className="tbl-head">
+              <th className="tbl-th">โครงการ</th>
+              <th className="tbl-th">ชื่อ</th>
+              <th className="tbl-th">Prefix</th>
+              <th className="tbl-th">สถานะ</th>
+              <th className="tbl-th text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {projects.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="px-5 py-3">
+              <tr key={p.id} className="tbl-row">
+                <td className="tbl-td">
                   <span className="px-2.5 py-1 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: p.color || '#64748b' }}>{p.code}</span>
                 </td>
-                <td className="px-5 py-3 text-slate-700">{p.name}</td>
-                <td className="px-5 py-3 text-slate-600">{p.doc_prefix}</td>
-                <td className="px-5 py-3">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${p.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{p.is_active ? 'ใช้งาน' : 'ปิด'}</span>
+                <td className="tbl-td text-slate-700">{p.name}</td>
+                <td className="tbl-td text-slate-600">{p.doc_prefix}</td>
+                <td className="tbl-td">
+                  <span className={`chip ${p.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{p.is_active ? 'ใช้งาน' : 'ปิด'}</span>
                 </td>
-                <td className="px-5 py-3 text-right whitespace-nowrap">
+                <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setEdit(p)} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
                   <button onClick={() => toggleActive(p)} className="text-slate-500 hover:underline text-sm">{p.is_active ? 'ปิด' : 'เปิด'}</button>
                 </td>

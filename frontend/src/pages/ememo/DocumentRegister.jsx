@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
+import { PageHeader, Avatar } from '../../components/ui/index.js';
 
 function ProjectChip({ code, color, active, onClick }) {
   return (
@@ -10,7 +11,7 @@ function ProjectChip({ code, color, active, onClick }) {
       onClick={onClick}
       className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
         active
-          ? 'bg-slate-900 text-white border-slate-900'
+          ? 'bg-brand text-white border-brand'
           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
       }`}
       style={active && color ? { backgroundColor: color, borderColor: color } : undefined}
@@ -99,25 +100,19 @@ export default function DocumentRegister() {
 
   return (
     <div className="space-y-5">
-      {/* header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">ทะเบียนเอกสาร · E-Memo</h2>
-          <p className="text-sm text-slate-500">
-            ติดตามสถานะเอกสารภายใน · กลุ่มวิจิตรภัณฑ์ก่อสร้าง
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-light"
-        >
-          <Icon name="plus" className="h-4 w-4" />
-          เพิ่มเอกสาร
-        </button>
-      </div>
+      <PageHeader
+        title="ทะเบียนเอกสาร · E-Memo"
+        subtitle="ติดตามสถานะเอกสารภายใน · กลุ่มวิจิตรภัณฑ์ก่อสร้าง"
+        right={
+          <button onClick={() => setShowAdd(true)} className="btn-primary">
+            <Icon name="plus" className="h-4 w-4" />
+            เพิ่มเอกสาร
+          </button>
+        }
+      />
 
       {/* filter bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-4">
+      <div className="card-sm space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[220px] flex-1">
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -125,19 +120,22 @@ export default function DocumentRegister() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหาเอกสาร / เลขที่ / เรื่อง"
-              className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-4 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="field pl-9"
             />
           </div>
           <select
             value={docTypeId}
             onChange={(e) => setDocTypeId(e.target.value)}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+            className="field !w-auto bg-white"
           >
             <option value="">ทุกประเภทเอกสาร</option>
             {docTypes.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
+          <button type="button" className="btn-outline" title="ส่งออก (เร็วๆ นี้)">
+            <Icon name="download" className="h-4 w-4" /> Export
+          </button>
         </div>
 
         {/* project chips */}
@@ -175,55 +173,60 @@ export default function DocumentRegister() {
       )}
 
       {/* table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 text-sm text-slate-500 border-b border-slate-100">
-          แสดง {docs.length} จาก {total} เอกสาร
+      <div className="card !p-0 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <h3 className="font-bold text-slate-800">รายการเอกสาร</h3>
+          <span className="text-sm text-slate-400">แสดง {docs.length} จาก {total} เอกสาร</span>
         </div>
-        <table className="w-full text-sm">
+        <table className="tbl">
           <thead>
-            <tr className="bg-slate-900 text-white text-left text-xs uppercase tracking-wide">
-              <th className="px-5 py-3 font-semibold w-12">#</th>
-              <th className="px-5 py-3 font-semibold">วันที่</th>
-              <th className="px-5 py-3 font-semibold">โครงการ</th>
-              <th className="px-5 py-3 font-semibold">รหัส</th>
-              <th className="px-5 py-3 font-semibold">เอกสาร</th>
-              <th className="px-5 py-3 font-semibold">สถานะ</th>
-              <th className="px-5 py-3 font-semibold text-right">จัดการ</th>
+            <tr className="tbl-head">
+              <th className="tbl-th w-12">#</th>
+              <th className="tbl-th">วันที่</th>
+              <th className="tbl-th">เอกสาร</th>
+              <th className="tbl-th">รหัส</th>
+              <th className="tbl-th">สถานะ</th>
+              <th className="tbl-th text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
             ) : docs.length === 0 ? (
-              <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
             ) : (
               docs.map((d, i) => (
-                <tr key={d.id} onClick={() => navigate(`/memos/${d.id}`)} className="hover:bg-blue-50 cursor-pointer">
-                  <td className="px-5 py-4 text-slate-400">{(page - 1) * pageSize + i + 1}</td>
-                  <td className="px-5 py-4 text-slate-600 whitespace-nowrap">{formatThaiDate(d.date_received)}</td>
-                  <td className="px-5 py-4">
-                    <span
-                      className="px-2.5 py-1 rounded-md text-xs font-semibold text-white"
-                      style={{ backgroundColor: d.project_color || '#64748b' }}
-                    >
-                      {d.project_code}
-                    </span>
+                <tr key={d.id} onClick={() => navigate(`/memos/${d.id}`)} className="tbl-row cursor-pointer">
+                  <td className="tbl-td text-slate-400">{(page - 1) * pageSize + i + 1}</td>
+                  <td className="tbl-td whitespace-nowrap text-slate-600">{formatThaiDate(d.date_received)}</td>
+                  <td className="tbl-td">
+                    <div className="flex items-center gap-3">
+                      <Avatar icon="document" color="bg-brand/10 text-brand" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
+                            style={{ backgroundColor: d.project_color || '#64748b' }}
+                          >
+                            {d.project_code}
+                          </span>
+                          <span className="font-semibold text-slate-800">{d.doc_number}</span>
+                        </div>
+                        <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-5 py-4 text-slate-600">{d.doc_code}</td>
-                  <td className="px-5 py-4">
-                    <div className="font-semibold text-slate-800">{d.doc_number}</div>
-                    <div className="text-slate-500 line-clamp-1">{d.subject}</div>
-                  </td>
-                  <td className="px-5 py-4"><StatusBadge status={d.status} /></td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="tbl-td text-slate-600">{d.doc_code}</td>
+                  <td className="tbl-td"><StatusBadge status={d.status} /></td>
+                  <td className="tbl-td text-right">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/memos/${d.id}`);
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 whitespace-nowrap"
+                      className="btn-detail"
                     >
-                      ดูรายละเอียด
+                      <Icon name="eye" className="h-4 w-4" /> ดูรายละเอียด
                     </button>
                   </td>
                 </tr>

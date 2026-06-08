@@ -132,6 +132,38 @@ const PATHS = {
       <path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z" />
     </>
   ),
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="M12 2 2 7l10 5 10-5-10-5z" />
+      <path d="m2 12 10 5 10-5" />
+      <path d="m2 17 10 5 10-5" />
+    </>
+  ),
+  people: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 5.5a3.5 3.5 0 0 1 0 6.8" />
+      <path d="M18 14a6.5 6.5 0 0 1 3.5 6" />
+    </>
+  ),
+  chat: (
+    <>
+      <path d="M21 12a8 8 0 0 1-11.3 7.3L3 21l1.7-6.7A8 8 0 1 1 21 12z" />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </>
+  ),
 };
 
 export default function Icon({ name, className = 'w-5 h-5', strokeWidth = 1.8, ...rest }) {

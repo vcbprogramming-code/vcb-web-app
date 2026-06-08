@@ -4,11 +4,17 @@ import AppLayout from './components/AppLayout.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
+import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
+import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
+import ApprovalAction from './pages/ememo/ApprovalAction.jsx';
+import Settings from './pages/admin/Settings.jsx';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* public approval page — reached from the email link, no login */}
+      <Route path="/approve/:token" element={<ApprovalAction />} />
 
       <Route
         element={
@@ -19,23 +25,8 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
 
-        <Route
-          path="memos"
-          element={
-            <ModulePlaceholder
-              moduleNo={1}
-              title="ระบบบันทึกข้อความและอนุมัติอิเล็กทรอนิกส์"
-              features={[
-                'แบบฟอร์มขออนุมัติสำเร็จรูป (ทั่วไป / OT / จัดซื้อ-เบิกจ่าย)',
-                'ออกเลขที่เอกสารอัตโนมัติ พร้อมแนบไฟล์',
-                'เส้นทางอนุมัติแบบลำดับขั้น (ผู้ขอ → อนุมัติ 1 → 2 → …)',
-                'แจ้งเตือนทางอีเมล พร้อมปุ่มอนุมัติ/ไม่อนุมัติ/ส่งกลับแก้ไข',
-                'ลายเซ็นอิเล็กทรอนิกส์ + ตราเวลา',
-                'Audit Trail และจัดเก็บเป็น PDF ค้นย้อนหลังได้',
-              ]}
-            />
-          }
-        />
+        <Route path="memos" element={<DocumentRegister />} />
+        <Route path="memos/:id" element={<DocumentDetail />} />
 
         <Route
           path="performance"
@@ -95,15 +86,7 @@ export default function App() {
           path="admin"
           element={
             <ProtectedRoute roles={['admin']}>
-              <ModulePlaceholder
-                moduleNo={0}
-                title="ตั้งค่าระบบ"
-                features={[
-                  'จัดการผู้ใช้และสิทธิ์การเข้าถึง',
-                  'จัดการหน่วยงาน / แผนก / ตำแหน่ง',
-                  'ตั้งค่าเส้นทางการอนุมัติ',
-                ]}
-              />
+              <Settings />
             </ProtectedRoute>
           }
         />

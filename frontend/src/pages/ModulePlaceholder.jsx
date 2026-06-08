@@ -1,3 +1,5 @@
+import Icon from '../components/Icon.jsx';
+
 /**
  * Temporary landing page for each module before it is built out.
  * Lists the planned capabilities (from the proposal) so the structure is clear.
@@ -18,7 +20,7 @@ export default function ModulePlaceholder({ title, moduleNo, features = [] }) {
         <ul className="space-y-2">
           {features.map((f) => (
             <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-              <span className="mt-0.5 text-brand">✓</span>
+              <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
               <span>{f}</span>
             </li>
           ))}

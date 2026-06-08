@@ -7,18 +7,27 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "migrate": "node scripts/db.mjs migrate",
+    "create-admin": "node scripts/db.mjs create-admin",
+    "list-users": "node scripts/db.mjs list-users"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@aws-sdk/client-s3": "^3.1057.0",
+    "@aws-sdk/s3-request-presigner": "^3.1057.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
+    "nodemailer": "^8.0.10",
+    "pdfkit": "^0.18.0",
+    "pg": "^8.21.0",
     "zod": "^3.23.8"
   }
 }

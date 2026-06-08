@@ -29,9 +29,10 @@ no per-request timeout limits.
 
 - **Frontend** (`frontend/`): Vite + React + Tailwind CSS. คุยกับ backend ผ่าน REST `/api`
 - **Backend** (`backend/`): Node.js + Express เป็น API หลัก ถือ business logic/workflow ทั้งหมด
-  เชื่อม Supabase ด้วย `service_role` key (ฝั่งเซิร์ฟเวอร์เท่านั้น)
-- **Auth**: Supabase Auth (อีเมล + รหัสผ่าน) — backend ตรวจ token และโหลด profile (role + unit)
-- **Database**: Supabase (PostgreSQL) — schema/seed อยู่ใน `supabase/`
+  เชื่อมต่อ PostgreSQL ตรงด้วย connection string (`pg` pool) — ไม่ใช้ Supabase API/keys
+- **Auth**: จัดการเองในฝั่ง backend — อีเมล + รหัสผ่าน (bcrypt) แลกเป็น JWT,
+  middleware ตรวจ token แล้วโหลด profile (role + unit) จากตาราง `profiles`
+- **Database**: PostgreSQL (โฮสต์บน Supabase หรือที่ไหนก็ได้) — schema/seed อยู่ใน `supabase/`
 
 ## โครงสร้างโฟลเดอร์
 
@@ -39,12 +40,13 @@ no per-request timeout limits.
 hr-system/
 ├── backend/
 │   ├── src/
-│   │   ├── config/       env.js, supabase.js (admin + per-user clients)
+│   │   ├── config/       env.js, db.js (pg connection pool)
 │   │   ├── middleware/   auth.js (requireAuth/requireRole), errorHandler.js
 │   │   ├── routes/       auth.routes.js, org.routes.js, index.js
-│   │   ├── utils/        asyncHandler.js
+│   │   ├── utils/        asyncHandler.js, auth.js (JWT + bcrypt helpers)
 │   │   ├── app.js        Express app (helmet, cors, json, routes)
 │   │   └── server.js     entrypoint
+│   ├── scripts/         db.mjs (migrate / create-admin / list-users)
 │   └── .env.example
 ├── frontend/
 │   ├── src/
@@ -73,45 +75,46 @@ hr-system/
 
 ## การติดตั้ง (Setup)
 
-### 1) สร้าง Supabase project
-1. สมัคร/ล็อกอินที่ https://supabase.com แล้วสร้าง project ใหม่
-2. ไปที่ **Project Settings → API** เพื่อคัดลอก:
-   - `Project URL`
-   - `anon public` key
-   - `service_role` key (เก็บเป็นความลับ ใช้ฝั่ง backend เท่านั้น)
+### 1) เตรียมฐานข้อมูล PostgreSQL
+ใช้ PostgreSQL ที่ไหนก็ได้ (Supabase, Railway, เครื่อง local ฯลฯ) แล้วคัดลอก
+**connection string** มา เช่น
+`postgresql://USER:PASSWORD@HOST:5432/postgres`
+(บน Supabase อยู่ที่ **Project Settings → Database → Connection string → URI**)
 
-### 2) สร้างตารางในฐานข้อมูล
-เปิด **SQL Editor** ใน Supabase แล้วรันไฟล์ตามลำดับ:
-1. `supabase/migrations/0001_core_org_and_auth.sql`
-2. `supabase/seed.sql` (ข้อมูลตัวอย่าง 5 หน่วยงาน — แก้ชื่อให้ตรงองค์กรจริงได้)
-
-> หรือใช้ Supabase CLI: `supabase db push` (ต้อง `supabase link` กับ project ก่อน)
-
-### 3) สร้างผู้ใช้คนแรก (admin)
-1. ที่ Supabase ไปที่ **Authentication → Users → Add user** สร้างอีเมล/รหัสผ่าน
-2. คัดลอก user id (UUID) แล้วรันใน SQL Editor:
-   ```sql
-   insert into profiles (id, full_name, role, is_active)
-   values ('<USER_UUID>', 'ผู้ดูแลระบบ', 'admin', true);
-   ```
-
-### 4) ตั้งค่า backend
+### 2) ตั้งค่า backend
 ```bash
 cd backend
-cp .env.example .env       # ใส่ค่า SUPABASE_URL / ANON / SERVICE_ROLE
+cp .env.example .env       # ใส่ DATABASE_URL และ JWT_SECRET
 npm install
-npm run dev                # http://localhost:4000
 ```
-
-### 5) ตั้งค่า frontend
+สร้าง `JWT_SECRET` แบบสุ่ม:
 ```bash
-cd frontend
-cp .env.example .env       # ปล่อย VITE_API_BASE_URL=/api ไว้ (ใช้ proxy)
-npm install
-npm run dev                # http://localhost:5173
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-เปิด http://localhost:5173 แล้วล็อกอินด้วยผู้ใช้ที่สร้างในขั้นตอนที่ 3
+### 3) สร้างตาราง + ข้อมูลตัวอย่าง
+```bash
+cd backend
+npm run migrate                       # รันทุกไฟล์ใน supabase/migrations ตามลำดับ
+node scripts/db.mjs migrate           # (เทียบเท่า — ปลอดภัยที่จะรันซ้ำ)
+```
+> seed (5 หน่วยงานตัวอย่าง) อยู่ใน `supabase/seed.sql` — รันครั้งเดียวผ่าน SQL client
+> หรือ paste ใน Supabase SQL Editor ก็ได้
+
+### 4) สร้างผู้ใช้คนแรก (admin)
+```bash
+cd backend
+npm run create-admin -- admin@vcb.local 'รหัสผ่านที่ต้องการ' "ผู้ดูแลระบบ"
+```
+รหัสผ่านจะถูก hash ด้วย bcrypt อัตโนมัติ ตรวจรายชื่อผู้ใช้ด้วย `npm run list-users`
+
+### 5) รัน backend + frontend
+```bash
+cd backend  && npm run dev   # http://localhost:4000
+cd frontend && npm install && npm run dev   # http://localhost:5173
+```
+
+เปิด http://localhost:5173 แล้วล็อกอินด้วยผู้ใช้ admin ที่สร้างในขั้นตอนที่ 4
 
 ## ตรวจสุขภาพระบบ
 
@@ -120,6 +123,8 @@ npm run dev                # http://localhost:5173
 
 ## หมายเหตุความปลอดภัย
 
-- `service_role` key มีสิทธิ์เต็ม (ข้าม RLS) — **ห้าม** ใส่ในฝั่ง frontend หรือ commit ขึ้น git
-- ตารางเปิด Row Level Security ไว้เป็น defence-in-depth แม้ API จะเขียนผ่าน service_role
+- `DATABASE_URL` และ `JWT_SECRET` เป็นความลับ — **ห้าม** ใส่ในฝั่ง frontend หรือ commit ขึ้น git
+- backend ต่อ Postgres ตรงในฐานะ superuser-ish role จึงข้าม RLS — การควบคุมสิทธิ์ทั้งหมด
+  อยู่ที่ชั้น API (`requireAuth` / `requireRole`) ไม่ใช่ที่ database
+- รหัสผ่านเก็บเป็น bcrypt hash เท่านั้น (ไม่เก็บ plaintext); JWT เซ็นด้วย `JWT_SECRET`
 - `.env` ถูก ignore ใน git แล้ว

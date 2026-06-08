@@ -1,36 +1,36 @@
 // Central navigation definition. `roles` (when present) limits visibility.
 // Keep route paths in sync with the <Route> definitions in App.jsx.
 export const navItems = [
-  { to: '/', label: 'ภาพรวม', icon: '📊', end: true },
+  { to: '/', label: 'ภาพรวม', icon: 'dashboard', end: true },
   {
     to: '/memos',
     label: 'บันทึก & อนุมัติ (E-Memo)',
-    icon: '📝',
+    icon: 'document',
     module: 1,
   },
   {
     to: '/performance',
     label: 'รายงานการปฏิบัติงาน',
-    icon: '📈',
+    icon: 'chart',
     module: 2,
   },
   {
     to: '/credit',
     label: 'วงเงินสินเชื่อโครงการ',
-    icon: '💳',
+    icon: 'card',
     module: 3,
     roles: ['admin', 'executive'], // financial data — restricted
   },
   {
     to: '/onboarding',
     label: 'แนะแนวพนักงานใหม่',
-    icon: '🎓',
+    icon: 'cap',
     module: 4,
   },
   {
     to: '/admin',
     label: 'ตั้งค่าระบบ',
-    icon: '⚙️',
+    icon: 'settings',
     roles: ['admin'],
   },
 ];

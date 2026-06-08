@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../config/supabase.js';
+import { query } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -11,12 +11,10 @@ router.use(requireAuth);
 router.get(
   '/units',
   asyncHandler(async (req, res) => {
-    const { data, error } = await supabaseAdmin
-      .from('units')
-      .select('id, name, code')
-      .order('name');
-    if (error) throw error;
-    res.json({ data });
+    const { rows } = await query(
+      `select id, name, code from units order by name`
+    );
+    res.json({ data: rows });
   })
 );
 
@@ -27,14 +25,17 @@ router.get(
 router.get(
   '/departments',
   asyncHandler(async (req, res) => {
-    let query = supabaseAdmin
-      .from('departments')
-      .select('id, name, unit_id')
-      .order('name');
-    if (req.query.unitId) query = query.eq('unit_id', req.query.unitId);
-    const { data, error } = await query;
-    if (error) throw error;
-    res.json({ data });
+    const { unitId } = req.query;
+    const { rows } = unitId
+      ? await query(
+          `select id, name, unit_id from departments
+            where unit_id = $1 order by name`,
+          [unitId]
+        )
+      : await query(
+          `select id, name, unit_id from departments order by name`
+        );
+    res.json({ data: rows });
   })
 );
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { navItems, roleLabels } from '../config/nav.js';
+import Icon from './Icon.jsx';
 
 export default function AppLayout() {
   const { profile, user, logout } = useAuth();
@@ -26,8 +27,14 @@ export default function AppLayout() {
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex h-16 items-center gap-2 border-b border-white/10 px-5">
-          <span className="text-lg font-bold">HR System</span>
+        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+            <Icon name="building" className="h-5 w-5 text-white" />
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm font-bold">วิจิตรภัณฑ์ก่อสร้าง</div>
+            <div className="text-[11px] text-white/55">ระบบงานภายใน</div>
+          </div>
         </div>
         <nav className="space-y-1 p-3">
           {visibleItems.map((item) => (
@@ -37,12 +44,14 @@ export default function AppLayout() {
               end={item.end}
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
-                  isActive ? 'bg-white/15 font-medium' : 'text-white/80 hover:bg-white/10'
+                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                  isActive
+                    ? 'bg-white/15 font-semibold text-white'
+                    : 'text-white/75 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
-              <span aria-hidden>{item.icon}</span>
+              <Icon name={item.icon} className="h-5 w-5 shrink-0" />
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -65,7 +74,7 @@ export default function AppLayout() {
             onClick={() => setOpen(true)}
             aria-label="เปิดเมนู"
           >
-            ☰
+            <Icon name="menu" className="h-5 w-5" />
           </button>
           <div className="ml-auto flex items-center gap-3">
             <div className="text-right">

@@ -84,25 +84,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         dateReceived,
       });
 
-      // upload the supplementary file (if any) to S3 via a presigned PUT
+      // upload the supplementary file (if any) — streamed into GridFS via the API
       if (file) {
-        const { data: up } = await ememoApi.attachmentUploadUrl(
-          doc.id,
-          file.name,
-          file.type || 'application/octet-stream'
-        );
-        const put = await fetch(up.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
-          body: file,
-        });
-        if (!put.ok) throw new Error('อัปโหลดไฟล์แนบไม่สำเร็จ');
-        await ememoApi.confirmAttachment(doc.id, {
-          storageKey: up.storageKey,
-          fileName: file.name,
-          contentType: file.type,
-          sizeBytes: file.size,
-        });
+        await ememoApi.uploadAttachment(doc.id, file);
       }
 
       onCreated();

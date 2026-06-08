@@ -31,7 +31,9 @@ export default function DocumentDetail() {
     setBusy(true);
     try {
       const { data } = await ememoApi.generatePdf(id);
-      window.open(data.url, '_blank');
+      // open the freshly generated PDF via the streaming download endpoint
+      const url = await ememoApi.attachmentBlobUrl(id, data.id);
+      window.open(url, '_blank');
       load();
     } catch (e) {
       setError(e.message);
@@ -41,27 +43,19 @@ export default function DocumentDetail() {
   };
 
   const openAttachment = async (attId) => {
-    const { data } = await ememoApi.attachmentUrl(id, attId);
-    window.open(data.url, '_blank');
+    try {
+      const url = await ememoApi.attachmentBlobUrl(id, attId);
+      window.open(url, '_blank');
+    } catch (e) {
+      setError(e.message);
+    }
   };
 
   const uploadFile = async (file) => {
     if (!file) return;
     setBusy(true);
     try {
-      const { data } = await ememoApi.attachmentUploadUrl(id, file.name, file.type || 'application/octet-stream');
-      const put = await fetch(data.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
-      if (!put.ok) throw new Error('อัปโหลดไฟล์ไม่สำเร็จ');
-      await ememoApi.confirmAttachment(id, {
-        storageKey: data.storageKey,
-        fileName: file.name,
-        contentType: file.type,
-        sizeBytes: file.size,
-      });
+      await ememoApi.uploadAttachment(id, file);
       load();
     } catch (e) {
       setError(e.message);

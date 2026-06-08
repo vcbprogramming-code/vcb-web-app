@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, apiUpload, apiBlobUrl } from './api.js';
 
 /** Build a querystring from an object, skipping empty values. */
 function qs(params) {
@@ -22,15 +22,14 @@ export const ememoApi = {
     api(`/documents/next-number${qs({ projectId, docCode })}`),
   createDocument: (body) => api('/documents', { method: 'POST', body }),
 
-  // letterhead PDF
+  // letterhead PDF — generate, then open the resulting attachment via /download
   generatePdf: (id) => api(`/documents/${id}/generate-pdf`, { method: 'POST' }),
 
-  // attachments
-  attachmentUploadUrl: (id, fileName, contentType) =>
-    api(`/documents/${id}/attachments/upload-url`, { method: 'POST', body: { fileName, contentType } }),
-  confirmAttachment: (id, body) =>
-    api(`/documents/${id}/attachments`, { method: 'POST', body }),
-  attachmentUrl: (id, attId) => api(`/documents/${id}/attachments/${attId}/url`),
+  // attachments (files stored in GridFS; streamed through the API)
+  uploadAttachment: (id, file) => apiUpload(`/documents/${id}/attachments`, file),
+  // returns a blob object URL the browser can open/preview
+  attachmentBlobUrl: (id, attId) =>
+    apiBlobUrl(`/documents/${id}/attachments/${attId}/download`),
   deleteAttachment: (id, attId) =>
     api(`/documents/${id}/attachments/${attId}`, { method: 'DELETE' }),
 

@@ -31,3 +31,42 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
   }
   return data;
 }
+
+/**
+ * Upload a file via multipart/form-data. Does NOT set Content-Type — the
+ * browser sets the multipart boundary itself. Returns the parsed JSON.
+ */
+export async function apiUpload(path, file, { field = 'file' } = {}) {
+  const headers = {};
+  const token = tokenStore.get();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append(field, file);
+
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `Upload failed (${res.status})`);
+  }
+  return data;
+}
+
+/**
+ * Fetch a file (with auth) and return an object URL the browser can open.
+ * GridFS has no presigned URLs, so downloads stream through the API; window.open
+ * can't send a Bearer header, hence this blob-fetch helper.
+ */
+export async function apiBlobUrl(path) {
+  const headers = {};
+  const token = tokenStore.get();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}${path}`, { headers });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Download failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}

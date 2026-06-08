@@ -17,8 +17,8 @@ HR Operations, E-Approval & Onboarding System — สำหรับ **บริ
 ## สถาปัตยกรรม
 
 ```
-[ React (Vite + Tailwind) ]  ──HTTP──>  [ Node.js / Express API ]  ──>  [ Supabase (Postgres + Auth) ]
-       frontend/                              backend/                         supabase/
+[ React (Vite + Tailwind) ]  ──HTTP──>  [ Node.js / Express API ]  ──>  [ MongoDB Atlas (Mongoose + GridFS) ]
+       frontend/                              backend/                         backend/src/models/
 ```
 
 **Deploy target: Railway.** Frontend + backend Express both deploy to Railway.
@@ -29,10 +29,11 @@ no per-request timeout limits.
 
 - **Frontend** (`frontend/`): Vite + React + Tailwind CSS. คุยกับ backend ผ่าน REST `/api`
 - **Backend** (`backend/`): Node.js + Express เป็น API หลัก ถือ business logic/workflow ทั้งหมด
-  เชื่อมต่อ PostgreSQL ตรงด้วย connection string (`pg` pool) — ไม่ใช้ Supabase API/keys
+  เชื่อมต่อ MongoDB ด้วย **Mongoose** (connection string เดียว) — ไฟล์แนบ/PDF เก็บใน **GridFS**
 - **Auth**: จัดการเองในฝั่ง backend — อีเมล + รหัสผ่าน (bcrypt) แลกเป็น JWT,
-  middleware ตรวจ token แล้วโหลด profile (role + unit) จากตาราง `profiles`
-- **Database**: PostgreSQL (โฮสต์บน Supabase หรือที่ไหนก็ได้) — schema/seed อยู่ใน `supabase/`
+  middleware ตรวจ token แล้วโหลด profile (role + unit) จาก collection `profiles`
+- **Database**: MongoDB (โฮสต์บน Atlas หรือที่ไหนก็ได้) — Mongoose models อยู่ใน `backend/src/models/`,
+  seed ข้อมูลอ้างอิงผ่าน `npm run seed`
 
 ## โครงสร้างโฟลเดอร์
 
@@ -40,26 +41,28 @@ no per-request timeout limits.
 hr-system/
 ├── backend/
 │   ├── src/
-│   │   ├── config/       env.js, db.js (pg connection pool)
+│   │   ├── config/       env.js, db.js (Mongoose connect), storage.js (GridFS)
+│   │   ├── models/       Mongoose schemas (Profile, Project, Document, …)
 │   │   ├── middleware/   auth.js (requireAuth/requireRole), errorHandler.js
-│   │   ├── routes/       auth.routes.js, org.routes.js, index.js
-│   │   ├── utils/        asyncHandler.js, auth.js (JWT + bcrypt helpers)
+│   │   ├── routes/       auth/org/projects/documents/approvals/admin.routes.js
+│   │   ├── services/     docNumber, approval, pdfDoc, letterhead, email
+│   │   ├── utils/        asyncHandler.js, auth.js (JWT+bcrypt), serialize.js
 │   │   ├── app.js        Express app (helmet, cors, json, routes)
-│   │   └── server.js     entrypoint
-│   ├── scripts/         db.mjs (migrate / create-admin / list-users)
+│   │   └── server.js     entrypoint (connect + syncIndexes + listen)
+│   ├── scripts/         db.mjs (seed / create-admin / list-users), verify-*.mjs
 │   └── .env.example
 ├── frontend/
 │   ├── src/
 │   │   ├── auth/         AuthContext.jsx, ProtectedRoute.jsx
 │   │   ├── components/   AppLayout.jsx (sidebar + header)
 │   │   ├── config/       nav.js (เมนู + สิทธิ์ตามบทบาท)
-│   │   ├── lib/          api.js (fetch wrapper), supabase.js
-│   │   ├── pages/        Login, Dashboard, ModulePlaceholder
+│   │   ├── lib/          api.js (fetch + multipart/blob helpers), ememo.js
+│   │   ├── pages/        Login, Dashboard, ememo/*, admin/*
 │   │   ├── App.jsx       routes
 │   │   └── main.jsx
 │   └── .env.example
-└── supabase/
-    ├── migrations/0001_core_org_and_auth.sql
+└── supabase/             (legacy Postgres SQL — kept for reference only)
+    ├── migrations/*.sql
     └── seed.sql
 ```
 
@@ -75,16 +78,16 @@ hr-system/
 
 ## การติดตั้ง (Setup)
 
-### 1) เตรียมฐานข้อมูล PostgreSQL
-ใช้ PostgreSQL ที่ไหนก็ได้ (Supabase, Railway, เครื่อง local ฯลฯ) แล้วคัดลอก
-**connection string** มา เช่น
-`postgresql://USER:PASSWORD@HOST:5432/postgres`
-(บน Supabase อยู่ที่ **Project Settings → Database → Connection string → URI**)
+### 1) เตรียมฐานข้อมูล MongoDB
+
+ใช้ MongoDB ที่ไหนก็ได้ (Atlas, เครื่อง local ฯลฯ) แล้วคัดลอก **connection string** มา เช่น
+`mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/hr_system?retryWrites=true&w=majority`
+(บน Atlas อยู่ที่ **Cluster → Connect → Drivers**)
 
 ### 2) ตั้งค่า backend
 ```bash
 cd backend
-cp .env.example .env       # ใส่ DATABASE_URL และ JWT_SECRET
+cp .env.example .env       # ใส่ MONGODB_URI และ JWT_SECRET
 npm install
 ```
 สร้าง `JWT_SECRET` แบบสุ่ม:
@@ -92,14 +95,12 @@ npm install
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-### 3) สร้างตาราง + ข้อมูลตัวอย่าง
+### 3) seed ข้อมูลอ้างอิง (idempotent — รันซ้ำได้)
+
 ```bash
 cd backend
-npm run migrate                       # รันทุกไฟล์ใน supabase/migrations ตามลำดับ
-node scripts/db.mjs migrate           # (เทียบเท่า — ปลอดภัยที่จะรันซ้ำ)
+npm run seed                          # โครงการ + doc-code mapping + ประเภทเอกสาร + counters
 ```
-> seed (5 หน่วยงานตัวอย่าง) อยู่ใน `supabase/seed.sql` — รันครั้งเดียวผ่าน SQL client
-> หรือ paste ใน Supabase SQL Editor ก็ได้
 
 ### 4) สร้างผู้ใช้คนแรก (admin)
 ```bash
@@ -120,11 +121,13 @@ cd frontend && npm install && npm run dev   # http://localhost:5173
 
 - API health: `GET http://localhost:4000/api/health` → `{ "status": "ok" }`
 - Frontend build: `cd frontend && npm run build`
+- End-to-end (in-memory MongoDB, no external services):
+  `cd backend && node scripts/verify-e2e.mjs` และ `node scripts/verify-concurrency.mjs`
 
 ## หมายเหตุความปลอดภัย
 
-- `DATABASE_URL` และ `JWT_SECRET` เป็นความลับ — **ห้าม** ใส่ในฝั่ง frontend หรือ commit ขึ้น git
-- backend ต่อ Postgres ตรงในฐานะ superuser-ish role จึงข้าม RLS — การควบคุมสิทธิ์ทั้งหมด
-  อยู่ที่ชั้น API (`requireAuth` / `requireRole`) ไม่ใช่ที่ database
+- `MONGODB_URI` และ `JWT_SECRET` เป็นความลับ — **ห้าม** ใส่ในฝั่ง frontend หรือ commit ขึ้น git
+- การควบคุมสิทธิ์ทั้งหมดอยู่ที่ชั้น API (`requireAuth` / `requireRole`) ไม่ใช่ที่ database
+- ไฟล์แนบ/PDF เก็บใน GridFS และสตรีมผ่าน API ที่ต้องมี token (ไม่มี public/presigned URL)
 - รหัสผ่านเก็บเป็น bcrypt hash เท่านั้น (ไม่เก็บ plaintext); JWT เซ็นด้วย `JWT_SECRET`
 - `.env` ถูก ignore ใน git แล้ว

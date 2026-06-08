@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { Document, Profile } from '../models/index.js';
 import { sendApprovalRequest } from './email.js';
 
 /** A random URL-safe token for a one-time approval link. */
@@ -6,138 +7,146 @@ function makeToken() {
   return crypto.randomBytes(24).toString('base64url');
 }
 
-/** Token lifetime: 14 days from now (ISO string). */
+/** Token lifetime: 14 days from now (Date). */
 function tokenExpiry() {
-  return new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString();
+  return new Date(Date.now() + 14 * 24 * 3600 * 1000);
+}
+
+/** Shape a stored approval step for the caller (e.g. to email it). */
+function stepView(s) {
+  return {
+    id: String(s._id),
+    step_no: s.stepNo,
+    approver_name: s.approverName,
+    approver_email: s.approverEmail,
+    action_token: s.actionToken,
+  };
 }
 
 /**
- * Create the approval chain for a document and kick off step 1.
- * `approvers` is an ordered array of { name, email }.
- * Runs inside the given transaction client. Sets document status to 'pending'.
- * Returns the first step (so the caller can email it after commit).
+ * Create the approval chain for a document and arm step 1.
+ * `approvers` is an ordered array of { name, email }. Rebuilds the embedded
+ * chain (clearing any previous one), sets status to 'pending', appends an
+ * audit entry. Returns the first step so the caller can email it.
  */
-export async function createApprovalChain(client, { documentId, approvers, actorLabel, actorId }) {
+export async function createApprovalChain({ documentId, approvers, actorLabel, actorId }) {
   if (!approvers?.length) throw new Error('At least one approver is required');
 
-  // Clear any previous chain (e.g. when re-submitting a returned doc).
-  await client.query('delete from approval_steps where document_id = $1', [documentId]);
+  const steps = approvers.map((a, i) => ({
+    stepNo: i + 1,
+    approverName: a.name || null,
+    approverEmail: a.email,
+    action: 'pending',
+    // only the active (first) step gets a live token; later steps get theirs
+    // when the chain advances to them
+    actionToken: i === 0 ? makeToken() : null,
+    tokenExpiresAt: i === 0 ? tokenExpiry() : null,
+  }));
 
-  const created = [];
-  for (let i = 0; i < approvers.length; i++) {
-    const a = approvers[i];
-    const isFirst = i === 0;
-    const { rows } = await client.query(
-      `insert into approval_steps
-         (document_id, step_no, approver_name, approver_email, action,
-          action_token, token_expires_at)
-       values ($1,$2,$3,$4,'pending',$5,$6)
-       returning id, step_no, approver_name, approver_email, action_token`,
-      [
-        documentId,
-        i + 1,
-        a.name || null,
-        a.email,
-        // only the active (first) step gets a live token; later steps get theirs
-        // when the chain advances to them
-        isFirst ? makeToken() : null,
-        isFirst ? tokenExpiry() : null,
-      ]
-    );
-    created.push(rows[0]);
-  }
-
-  await client.query(`update documents set status = 'pending' where id = $1`, [documentId]);
-
-  await client.query(
-    `insert into audit_log (document_id, actor_id, actor_label, action, detail)
-     values ($1,$2,$3,'submitted',$4)`,
-    [documentId, actorId || null, actorLabel || null, JSON.stringify({ steps: approvers.length })]
+  const doc = await Document.findByIdAndUpdate(
+    documentId,
+    {
+      $set: { approvalSteps: steps, status: 'pending' },
+      $push: {
+        audit: {
+          actorId: actorId || null,
+          actorLabel: actorLabel || null,
+          action: 'submitted',
+          detail: { steps: approvers.length },
+          createdAt: new Date(),
+        },
+      },
+    },
+    { new: true }
   );
+  if (!doc) throw new Error('Document not found');
 
-  return created[0];
+  return stepView(doc.approvalSteps[0]);
 }
 
 /**
  * Apply an approval action coming from a tokenised email link.
  * action ∈ 'approved' | 'rejected' | 'returned'.
  *
- * - approved: mark step done. If more steps remain, activate the next step
- *   (issue its token) and return it so the caller can email it. If it was the
- *   last step, set the document to 'approved'.
- * - rejected / returned: mark step + document accordingly; chain stops.
+ * The step is consumed atomically: the update matches the exact step that still
+ * holds this token AND is still 'pending'. If a concurrent request already
+ * consumed it, the update matches nothing and we report 'already_actioned'.
  *
- * Runs inside a transaction. Returns { document, step, nextStep|null, doc }.
+ * Returns { step, nextStep|null, document, finalized } or { error }.
  */
-export async function applyApprovalAction(client, { token, action, comment, signatureUrl }) {
+export async function applyApprovalAction({ token, action, comment, signatureUrl }) {
   if (!['approved', 'rejected', 'returned'].includes(action)) {
     throw new Error('Invalid action');
   }
 
-  const { rows: steps } = await client.query(
-    `select s.*, d.doc_number, d.subject
-       from approval_steps s join documents d on d.id = s.document_id
-      where s.action_token = $1
-      for update`,
-    [token]
-  );
-  const step = steps[0];
+  // Locate the document + step for validation / signature resolution.
+  const current = await Document.findOne({ 'approvalSteps.actionToken': token }).lean();
+  if (!current) return { error: 'invalid_token' };
+  const step = current.approvalSteps.find((s) => s.actionToken === token);
   if (!step) return { error: 'invalid_token' };
-  if (step.action !== 'pending') return { error: 'already_actioned', step };
-  if (step.token_expires_at && new Date(step.token_expires_at) < new Date()) {
+  if (step.tokenExpiresAt && new Date(step.tokenExpiresAt) < new Date()) {
     return { error: 'expired', step };
   }
 
   // Resolve the signature image: prefer one supplied now, else the approver's
   // stored profile signature (if they have an account).
   let sigUrl = signatureUrl || null;
-  if (!sigUrl && step.approver_id) {
-    const { rows: pr } = await client.query(
-      'select signature_url from profiles where id = $1',
-      [step.approver_id]
-    );
-    sigUrl = pr[0]?.signature_url || null;
+  if (!sigUrl && step.approverId) {
+    const pr = await Profile.findById(step.approverId).select('signatureUrl').lean();
+    sigUrl = pr?.signatureUrl || null;
   }
 
-  // Record this step's action; consume its token; store the signature.
-  await client.query(
-    `update approval_steps
-        set action = $1, comment = $2, acted_at = now(), action_token = null,
-            signature_url = coalesce($4, signature_url)
-      where id = $3`,
-    [action, comment || null, step.id, sigUrl]
+  // Atomic consume: flip exactly the step that still has this token & is pending.
+  const set = {
+    'approvalSteps.$[s].action': action,
+    'approvalSteps.$[s].comment': comment || null,
+    'approvalSteps.$[s].actedAt': new Date(),
+    'approvalSteps.$[s].actionToken': null,
+  };
+  if (sigUrl) set['approvalSteps.$[s].signatureUrl'] = sigUrl;
+
+  const consumed = await Document.findOneAndUpdate(
+    { 'approvalSteps.actionToken': token },
+    {
+      $set: set,
+      $push: {
+        audit: {
+          actorLabel: step.approverName || step.approverEmail,
+          action,
+          detail: { step_no: step.stepNo, comment: comment || null },
+          createdAt: new Date(),
+        },
+      },
+    },
+    {
+      arrayFilters: [{ 's.actionToken': token, 's.action': 'pending' }],
+      new: true,
+    }
   );
 
-  await client.query(
-    `insert into audit_log (document_id, actor_label, action, detail)
-     values ($1,$2,$3,$4)`,
-    [
-      step.document_id,
-      step.approver_name || step.approver_email,
-      action,
-      JSON.stringify({ step_no: step.step_no, comment: comment || null }),
-    ]
-  );
+  // Nothing matched the array filter → the token was already consumed.
+  if (!consumed) return { error: 'already_actioned', step };
 
   let nextStep = null;
   let docStatus;
 
   if (action === 'approved') {
-    const { rows: next } = await client.query(
-      `select id from approval_steps
-        where document_id = $1 and step_no = $2`,
-      [step.document_id, step.step_no + 1]
-    );
-    if (next[0]) {
+    const next = consumed.approvalSteps.find((s) => s.stepNo === step.stepNo + 1);
+    if (next) {
       // activate the next step: issue its token
-      const { rows: activated } = await client.query(
-        `update approval_steps
-            set action_token = $1, token_expires_at = $2
-          where id = $3
-          returning id, step_no, approver_name, approver_email, action_token`,
-        [makeToken(), tokenExpiry(), next[0].id]
+      const newToken = makeToken();
+      const activated = await Document.findOneAndUpdate(
+        { _id: consumed._id },
+        {
+          $set: {
+            'approvalSteps.$[n].actionToken': newToken,
+            'approvalSteps.$[n].tokenExpiresAt': tokenExpiry(),
+          },
+        },
+        { arrayFilters: [{ 'n.stepNo': next.stepNo }], new: true }
       );
-      nextStep = activated[0];
+      const activatedStep = activated.approvalSteps.find((s) => s.stepNo === next.stepNo);
+      nextStep = stepView(activatedStep);
       docStatus = 'pending';
     } else {
       docStatus = 'approved';
@@ -147,15 +156,25 @@ export async function applyApprovalAction(client, { token, action, comment, sign
     docStatus = action; // 'rejected' | 'returned'
   }
 
-  await client.query(`update documents set status = $1 where id = $2`, [docStatus, step.document_id]);
+  const finalDoc = await Document.findByIdAndUpdate(
+    consumed._id,
+    { $set: { status: docStatus } },
+    { new: true }
+  ).lean();
 
-  const { rows: docRows } = await client.query(
-    `select id, doc_number, subject, status from documents where id = $1`,
-    [step.document_id]
-  );
+  const document = {
+    id: String(finalDoc._id),
+    doc_number: finalDoc.docNumber,
+    subject: finalDoc.subject,
+    status: finalDoc.status,
+  };
 
-  // finalized = the whole chain approved (document is now 'approved').
-  return { step, nextStep, document: docRows[0], finalized: docStatus === 'approved' };
+  return {
+    step: stepView(step),
+    nextStep,
+    document,
+    finalized: docStatus === 'approved',
+  };
 }
 
 export { sendApprovalRequest };

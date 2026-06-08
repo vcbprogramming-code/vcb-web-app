@@ -25,9 +25,9 @@ function thaiLongDate(iso) {
  *
  * @param {object} doc    document row: doc_number, subject, recipient, body,
  *                        date_received, work_unit, enclosures[]
- * @param {object} letter project_letterhead row: company_name, company_name_en,
- *                        address, logo_url, phone, telex, fax,
- *                        signatory_name, signatory_title, closing_line
+ * @param {object} letter embedded letterhead: companyName, companyNameEn,
+ *                        address, logoUrl, phone, telex, fax,
+ *                        signatoryName, signatoryTitle, closingLine
  */
 export function generateLetterPdf(doc, letter = {}, opts = {}) {
   return new Promise((resolvePromise, reject) => {
@@ -47,9 +47,9 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // ---- Header: logo + company name (left) | contact block (right) ----
     const headerTop = pdf.y;
     let textX = left;
-    if (letter.logo_url && existsSync(letter.logo_url)) {
+    if (letter.logoUrl && existsSync(letter.logoUrl)) {
       try {
-        pdf.image(letter.logo_url, left, headerTop, { width: 64, height: 64 });
+        pdf.image(letter.logoUrl, left, headerTop, { width: 64, height: 64 });
         textX = left + 76;
       } catch { /* ignore bad logo */ }
     } else if (existsSync(LOGO_PATH)) {
@@ -78,10 +78,10 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // company name (between logo and contact block)
     const nameW = contactX - textX - 10;
     pdf.font('th-bold').fontSize(19).fillColor('#000')
-      .text(letter.company_name || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 6, { width: nameW });
-    if (letter.company_name_en) {
+      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 6, { width: nameW });
+    if (letter.companyNameEn) {
       pdf.font('th-bold').fontSize(15).fillColor('#000')
-        .text(letter.company_name_en, textX, pdf.y, { width: nameW });
+        .text(letter.companyNameEn, textX, pdf.y, { width: nameW });
     }
 
     // move below the tallest of: logo(64), company name, contact block
@@ -110,7 +110,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     pdf.text(doc.subject || '', left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
     pdf.moveDown(0.4);
 
-    const recipient = doc.recipient || letter.default_recipient;
+    const recipient = doc.recipient || letter.defaultRecipient;
     if (recipient) {
       pdf.text('เรียน', left, pdf.y);
       pdf.text(recipient, left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
@@ -141,7 +141,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     pdf.moveDown(1.2);
 
     // ---- closing line, indented to the right area ----
-    const closing = letter.closing_line || 'ขอแสดงความนับถือ';
+    const closing = letter.closingLine || 'ขอแสดงความนับถือ';
     pdf.font('th').fontSize(13.5)
       .text(closing, left + contentW * 0.52, pdf.y, { width: contentW * 0.48, align: 'center' });
 
@@ -175,8 +175,8 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     if (signatures && signatures.length) {
       signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
     } else {
-      const defImg = letter.signature_url && existsSync(letter.signature_url) ? letter.signature_url : null;
-      drawSignature({ image: defImg, name: letter.signatory_name, title: letter.signatory_title });
+      const defImg = letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null;
+      drawSignature({ image: defImg, name: letter.signatoryName, title: letter.signatoryTitle });
     }
 
     pdf.end();

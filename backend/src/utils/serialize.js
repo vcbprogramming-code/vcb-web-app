@@ -13,6 +13,7 @@ export function profileOut(p) {
     email: p.email,
     role: p.role,
     unit_id: id(p.unitId),
+    unit_ids: (p.unitIds || []).map((u) => id(u)),
     is_active: p.isActive,
     created_at: p.createdAt,
     signature_url: p.signatureUrl ?? null,

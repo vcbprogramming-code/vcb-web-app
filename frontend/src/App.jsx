@@ -3,11 +3,13 @@ import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import ModulePlaceholder from './pages/ModulePlaceholder.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
 import ApprovalAction from './pages/ememo/ApprovalAction.jsx';
 import Settings from './pages/admin/Settings.jsx';
+import Performance from './pages/performance/Performance.jsx';
+import CreditFacility from './pages/credit/CreditFacility.jsx';
+import Onboarding from './pages/onboarding/Onboarding.jsx';
 
 export default function App() {
   return (
@@ -28,59 +30,21 @@ export default function App() {
         <Route path="memos" element={<DocumentRegister />} />
         <Route path="memos/:id" element={<DocumentDetail />} />
 
-        <Route
-          path="performance"
-          element={
-            <ModulePlaceholder
-              moduleNo={2}
-              title="ระบบรายงานและวิเคราะห์การปฏิบัติงาน"
-              features={[
-                'ทะเบียนหลัก: หน่วยงาน / แผนก / ตำแหน่ง / พนักงาน',
-                'บันทึกการปฏิบัติงานรายวัน + ข้อมูล OT (ชม./อัตรา/เงิน/เหตุผล)',
-                'โหมดกรอกเร็ว: หลายคน / คัดลอกวันก่อน / นำเข้า Excel',
-                'แจ้งเตือนวันที่ยังไม่บันทึก และสถานะความครบถ้วน',
-                'Dashboard รายเดือน เปรียบเทียบ 5 หน่วยงาน + กราฟ',
-                'ส่งออกรายงาน Excel / PDF',
-              ]}
-            />
-          }
-        />
+        {/* Module 2: Performance reporting & OT */}
+        <Route path="performance" element={<Performance />} />
 
+        {/* Module 3: Credit facility — financial data, restricted */}
         <Route
           path="credit"
           element={
             <ProtectedRoute roles={['admin', 'executive']}>
-              <ModulePlaceholder
-                moduleNo={3}
-                title="ระบบบันทึกข้อมูลวงเงินสินเชื่อโครงการ"
-                features={[
-                  'ทะเบียนโครงการ',
-                  'วงเงินสินเชื่อรายโครงการ (หลายวงเงิน/หลายสถาบัน)',
-                  'ติดตามการเบิกใช้ (Drawdown) และการชำระคืน',
-                  'คำนวณวงเงินคงเหลืออัตโนมัติ',
-                  'Audit Trail การแก้ไขข้อมูล',
-                  'ควบคุมสิทธิ์การเข้าถึงข้อมูลการเงิน',
-                ]}
-              />
+              <CreditFacility />
             </ProtectedRoute>
           }
         />
 
-        <Route
-          path="onboarding"
-          element={
-            <ModulePlaceholder
-              moduleNo={4}
-              title="ระบบแนะแนวและติดตามพนักงานใหม่ 90 วัน"
-              features={[
-                'คลังข้อมูลพนักงานใหม่ (นโยบาย/สวัสดิการ/คู่มือ/เอกสารลงนาม)',
-                'แผนแนะแนว 30-60-90 วัน',
-                'ติดตามผลความคืบหน้า',
-                'แบบประเมินทดลองงาน',
-              ]}
-            />
-          }
-        />
+        {/* Module 4: Onboarding 90 days */}
+        <Route path="onboarding" element={<Onboarding />} />
 
         <Route
           path="admin"

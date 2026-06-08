@@ -36,13 +36,16 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
  * Upload a file via multipart/form-data. Does NOT set Content-Type — the
  * browser sets the multipart boundary itself. Returns the parsed JSON.
  */
-export async function apiUpload(path, file, { field = 'file' } = {}) {
+export async function apiUpload(path, file, { field = 'file', extra = {} } = {}) {
   const headers = {};
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const form = new FormData();
-  form.append(field, file);
+  if (file) form.append(field, file);
+  for (const [k, v] of Object.entries(extra)) {
+    if (v !== undefined && v !== null) form.append(k, v);
+  }
 
   const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: form });
   const data = await res.json().catch(() => ({}));

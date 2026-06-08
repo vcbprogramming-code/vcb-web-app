@@ -69,9 +69,48 @@ const DOC_TYPES = [
   { name: 'อื่นๆ', sortOrder: 99 },
 ];
 
+// Module 2: sites (units). Real examples from the client; admin-managed/flexible.
+const UNITS = [
+  { name: 'โครงการพุทธมณฑล', code: 'PTM', company: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', color: '#2563eb', lockDays: 3 },
+  { name: 'โครงการบางวัว', code: 'BWA', company: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', color: '#ea580c', lockDays: 3 },
+  { name: 'โรงงานสุพรรณบุรี', code: 'SPB', company: 'ชวนา เอ็นจิเนียริ่ง จำกัด', color: '#7c3aed', lockDays: 3 },
+  { name: 'โครงการบางเตย-บ้านพร้าว', code: 'BTBP', company: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', color: '#16a34a', lockDays: 3 },
+  { name: 'โครงการบ้านแพ้ว', code: 'BPW', company: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', color: '#0891b2', lockDays: 3 },
+  { name: 'ศูนย์ซ่อมฯ สาย 5', code: 'S5', company: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', color: '#d97706', lockDays: 3 },
+];
+
+// Module 2: work-type master index (operation daily log picker).
+const WORK_TYPES = [
+  { name: 'งานโครงสร้าง', category: 'ก่อสร้าง', sortOrder: 1 },
+  { name: 'งานคอนกรีต', category: 'ก่อสร้าง', sortOrder: 2 },
+  { name: 'งานเหล็ก', category: 'ก่อสร้าง', sortOrder: 3 },
+  { name: 'งานระบบไฟฟ้า', category: 'งานระบบ', sortOrder: 4 },
+  { name: 'งานระบบประปา', category: 'งานระบบ', sortOrder: 5 },
+  { name: 'ควบคุมเครื่องจักร', category: 'เครื่องจักร', sortOrder: 6 },
+  { name: 'ซ่อมบำรุงเครื่องจักร', category: 'เครื่องจักร', sortOrder: 7 },
+  { name: 'ขนส่ง/ขับรถ', category: 'สนับสนุน', sortOrder: 8 },
+  { name: 'งานทั่วไป', category: 'ทั่วไป', sortOrder: 9 },
+];
+
+// Module 4: 30-60-90 onboarding plan templates.
+const ONBOARDING_TEMPLATES = [
+  { phase: 30, title: 'ปฐมนิเทศและรับรู้นโยบายบริษัท', owner: 'HR', sortOrder: 1 },
+  { phase: 30, title: 'รับอุปกรณ์และเข้าถึงระบบที่จำเป็น', owner: 'IT/HR', sortOrder: 2 },
+  { phase: 30, title: 'ลงนามเอกสารจ้างงานและสวัสดิการ', owner: 'HR', sortOrder: 3 },
+  { phase: 30, title: 'เรียนรู้ขั้นตอนการทำงานในตำแหน่ง', owner: 'หัวหน้างาน', sortOrder: 4 },
+  { phase: 60, title: 'ประเมินความเข้าใจงานเบื้องต้น', owner: 'หัวหน้างาน', sortOrder: 1 },
+  { phase: 60, title: 'มอบหมายงานจริงและติดตามผล', owner: 'หัวหน้างาน', sortOrder: 2 },
+  { phase: 60, title: 'พบ HR เพื่อรับฟังปัญหา/ปรับตัว', owner: 'HR', sortOrder: 3 },
+  { phase: 90, title: 'ประเมินผลทดลองงานครบ 90 วัน', owner: 'หัวหน้างาน/HR', sortOrder: 1 },
+  { phase: 90, title: 'สรุปผลและวางแผนพัฒนาต่อเนื่อง', owner: 'HR', sortOrder: 2 },
+];
+
 async function seed() {
   await connect();
-  const { Project, DocCodeDepartment, DocumentType, Counter, Document, syncIndexes } = await models();
+  const {
+    Project, DocCodeDepartment, DocumentType, Counter, Document,
+    Unit, WorkType, OnboardingPlanTemplate, syncIndexes,
+  } = await models();
 
   await syncIndexes();
   console.log('🔑 Indexes synced');
@@ -112,6 +151,26 @@ async function seed() {
     await Counter.updateOne({ _id: String(p._id) }, { $max: { seq: max } }, { upsert: true });
   }
   console.log(`🔢 Counters seeded for ${projects.length} project(s)`);
+
+  // Module 2: sites (units) + work-type master index
+  for (const u of UNITS) {
+    await Unit.updateOne({ code: u.code }, { $setOnInsert: u }, { upsert: true });
+  }
+  console.log(`🏗️  Units/sites: ${UNITS.length} ensured`);
+  for (const w of WORK_TYPES) {
+    await WorkType.updateOne({ name: w.name }, { $setOnInsert: w }, { upsert: true });
+  }
+  console.log(`🧰 Work types: ${WORK_TYPES.length} ensured`);
+
+  // Module 4: 30-60-90 onboarding plan templates
+  for (const t of ONBOARDING_TEMPLATES) {
+    await OnboardingPlanTemplate.updateOne(
+      { phase: t.phase, title: t.title },
+      { $setOnInsert: t },
+      { upsert: true }
+    );
+  }
+  console.log(`🎓 Onboarding templates: ${ONBOARDING_TEMPLATES.length} ensured`);
 
   console.log('\n✅ Seed complete.');
   await mongoose.disconnect();

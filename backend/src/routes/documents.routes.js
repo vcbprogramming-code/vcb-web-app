@@ -98,27 +98,28 @@ router.get(
 router.get(
   '/stats',
   asyncHandler(async (req, res) => {
-    const byStatusAgg = await Document.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } },
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // run all 6 reads concurrently instead of one-after-another
+    const [byStatusAgg, projects, perProject, recentRows, pendingRows, thisMonth] = await Promise.all([
+      Document.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Project.find().sort({ sortOrder: 1 }).lean(),
+      Document.aggregate([{ $group: { _id: '$projectId', count: { $sum: 1 } } }]),
+      Document.find().sort({ createdAt: -1 }).limit(5).populate('projectId', 'code color').lean(),
+      Document.find({ status: 'pending' }).sort({ dateReceived: 1 }).limit(5).populate('projectId', 'code color').lean(),
+      Document.countDocuments({ dateReceived: { $gte: monthStart, $lt: nextMonth } }),
     ]);
+
     const statusMap = Object.fromEntries(byStatusAgg.map((r) => [r._id, r.count]));
     const total = byStatusAgg.reduce((s, r) => s + r.count, 0);
 
-    // count per project, including projects with zero documents
-    const projects = await Project.find().sort({ sortOrder: 1 }).lean();
-    const perProject = await Document.aggregate([
-      { $group: { _id: '$projectId', count: { $sum: 1 } } },
-    ]);
     const countByProject = Object.fromEntries(perProject.map((r) => [String(r._id), r.count]));
     const byProject = projects
       .map((p) => ({ code: p.code, color: p.color ?? null, count: countByProject[String(p._id)] || 0 }))
       .sort((a, b) => b.count - a.count);
 
-    const recentRows = await Document.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('projectId', 'code color')
-      .lean();
     const recent = recentRows.map((d) => ({
       id: String(d._id),
       doc_number: d.docNumber,
@@ -129,11 +130,6 @@ router.get(
       project_color: d.projectId?.color ?? null,
     }));
 
-    const pendingRows = await Document.find({ status: 'pending' })
-      .sort({ dateReceived: 1 })
-      .limit(5)
-      .populate('projectId', 'code color')
-      .lean();
     const pending = pendingRows.map((d) => ({
       id: String(d._id),
       doc_number: d.docNumber,
@@ -142,13 +138,6 @@ router.get(
       project_code: d.projectId?.code ?? null,
       project_color: d.projectId?.color ?? null,
     }));
-
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const thisMonth = await Document.countDocuments({
-      dateReceived: { $gte: monthStart, $lt: nextMonth },
-    });
 
     res.json({
       data: { total, thisMonth, byStatus: statusMap, byProject, recent, pending },

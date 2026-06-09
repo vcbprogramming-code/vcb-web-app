@@ -17,11 +17,37 @@ export async function usedForFacility(facilityId) {
   return rows.reduce((s, r) => s + (r.amount || 0), 0);
 }
 
-/** Build a facility view with computed used/available. */
+/**
+ * Sum of authorized ledger amounts per facility, for MANY facilities at once
+ * (one aggregation instead of one query per facility). Returns a Map
+ * facilityId(string) → authorized total.
+ */
+export async function authorizedUsedMap(facilityIds) {
+  if (!facilityIds?.length) return new Map();
+  const rows = await CreditLedger.aggregate([
+    { $match: { facilityId: { $in: facilityIds }, status: { $in: AUTHORIZED_STATUSES } } },
+    { $group: { _id: '$facilityId', total: { $sum: '$amount' } } },
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r.total]));
+}
+
+/** Build a facility view from a precomputed authorized-used amount (no query). */
+export function facilityViewWith(facility, authorizedUsed = 0) {
+  const baseline = facility.usedBaseline || 0;
+  const used = baseline + authorizedUsed;
+  const limit = facility.limit || 0;
+  return facilityShape(facility, used, limit);
+}
+
+/** Build a facility view with computed used/available (single facility). */
 export async function facilityView(facility) {
   const baseline = facility.usedBaseline || 0;
   const used = baseline + (await usedForFacility(facility._id));
   const limit = facility.limit || 0;
+  return facilityShape(facility, used, limit);
+}
+
+function facilityShape(facility, used, limit) {
   return {
     id: String(facility._id),
     project_id: String(facility.projectId),

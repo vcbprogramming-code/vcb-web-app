@@ -15,7 +15,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import {
   facilityView,
-  usedForFacility,
+  facilityViewWith,
+  authorizedUsedMap,
   dueBucket,
   overdueInterest,
   writeAudit,
@@ -85,7 +86,9 @@ router.get(
     if (projectId) filter.projectId = projectId;
     if (type) filter.type = type;
     const rows = await Facility.find(filter).sort({ createdAt: 1 }).lean();
-    let views = await Promise.all(rows.map(facilityView));
+    // one aggregation for all facilities' used amounts (no per-facility query)
+    const usedMap = await authorizedUsedMap(rows.map((r) => r._id));
+    let views = rows.map((f) => facilityViewWith(f, usedMap.get(String(f._id)) || 0));
     if (search) {
       const rx = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       views = views.filter((v) => rx.test(v.facility_no || '') || rx.test(v.bank || '') || rx.test(v.company || ''));
@@ -368,21 +371,29 @@ router.post(
 router.get(
   '/overview',
   asyncHandler(async (req, res) => {
-    const facilities = await Facility.find({ isActive: true }).lean();
+    // facilities + all authorized ledger items in parallel (2 queries)
+    const [facilities, authorized] = await Promise.all([
+      Facility.find({ isActive: true }).lean(),
+      CreditLedger.find({ status: 'อนุมัติแล้ว' }).lean(),
+    ]);
     const rateByFacility = Object.fromEntries(facilities.map((f) => [String(f._id), f.interestRate]));
+
+    // sum authorized ledger per facility in memory (no extra queries)
+    const usedMap = new Map();
+    for (const item of authorized) {
+      const k = String(item.facilityId);
+      usedMap.set(k, (usedMap.get(k) || 0) + (item.amount || 0));
+    }
 
     // totals by type (limit/used)
     const byType = {};
     for (const f of facilities) {
-      const v = await facilityView(f);
+      const v = facilityViewWith(f, usedMap.get(String(f._id)) || 0);
       const t = byType[f.type] || { type: f.type, limit: 0, used: 0 };
       t.limit += v.limit;
       t.used += v.used;
       byType[f.type] = t;
     }
-
-    // authorized ledger items → due buckets + overdue interest
-    const authorized = await CreditLedger.find({ status: 'อนุมัติแล้ว' }).lean();
     const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 }, later: { count: 0, amount: 0 } };
     let overdueInterestTotal = 0;
     for (const item of authorized) {
@@ -392,9 +403,11 @@ router.get(
       overdueInterestTotal += overdueInterest(item, rateByFacility[String(item.facilityId)]);
     }
 
-    // request totals
-    const pending = await CreditRequest.find({ status: 'อยู่ระหว่างเสนออนุมัติ' }).lean();
-    const approved = await CreditRequest.countDocuments({ status: 'อนุมัติ' });
+    // request totals (parallel)
+    const [pending, approved] = await Promise.all([
+      CreditRequest.find({ status: 'อยู่ระหว่างเสนออนุมัติ' }).lean(),
+      CreditRequest.countDocuments({ status: 'อนุมัติ' }),
+    ]);
 
     res.json({
       data: {

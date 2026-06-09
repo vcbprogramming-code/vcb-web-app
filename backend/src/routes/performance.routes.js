@@ -1,7 +1,11 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { Unit, Employee, WorkType, WorkLog, EMPLOYEE_KINDS } from '../models/index.js';
+
+/** Cast an id string to ObjectId for use inside aggregation $match. */
+const toObjId = (id) => new mongoose.Types.ObjectId(String(id));
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -104,36 +108,45 @@ router.get(
 
     const scoped = await scopedUnitIds(req.profile);
     const unitFilter = scoped ? { _id: { $in: scoped } } : {};
-    const units = await Unit.find(unitFilter).sort({ name: 1 }).lean();
 
-    const cards = [];
-    for (const u of units) {
-      const employees = await Employee.find({ unitId: u._id, isActive: true }).lean();
-      const opCount = employees.filter((e) => e.kind === 'operation').length;
-      const supCount = employees.filter((e) => e.kind === 'support').length;
+    const today = new Date();
+    const lastDay = (Y === today.getFullYear() && M === today.getMonth() + 1)
+      ? today.getDate()
+      : dim;
 
-      // count filled cells up to today within the month
-      const today = new Date();
-      const lastDay = (Y === today.getFullYear() && M === today.getMonth() + 1)
-        ? today.getDate()
-        : dim;
-      const expected = employees.length * lastDay;
-      const filled = await WorkLog.countDocuments({
-        unitId: u._id,
-        ymd: { $gte: monthPrefix + '01', $lte: monthPrefix + pad(lastDay) },
-      });
-      const pct = expected ? Math.round((filled / expected) * 100) : 0;
+    // 3 queries total (instead of 2× per unit): units, employee counts grouped
+    // by unit, and filled-log counts grouped by unit — run in parallel.
+    const [units, empAgg, logAgg] = await Promise.all([
+      Unit.find(unitFilter).sort({ name: 1 }).lean(),
+      Employee.aggregate([
+        { $match: { ...(scoped ? { unitId: { $in: scoped.map(toObjId) } } : {}), isActive: true } },
+        { $group: { _id: '$unitId', total: { $sum: 1 }, op: { $sum: { $cond: [{ $eq: ['$kind', 'operation'] }, 1, 0] } } } },
+      ]),
+      WorkLog.aggregate([
+        { $match: { ...(scoped ? { unitId: { $in: scoped.map(toObjId) } } : {}), ymd: { $gte: monthPrefix + '01', $lte: monthPrefix + pad(lastDay) } } },
+        { $group: { _id: '$unitId', filled: { $sum: 1 } } },
+      ]),
+    ]);
 
-      cards.push({
+    const empByUnit = Object.fromEntries(empAgg.map((e) => [String(e._id), e]));
+    const filledByUnit = Object.fromEntries(logAgg.map((l) => [String(l._id), l.filled]));
+
+    const cards = units.map((u) => {
+      const e = empByUnit[String(u._id)] || { total: 0, op: 0 };
+      const employees = e.total;
+      const filled = filledByUnit[String(u._id)] || 0;
+      const expected = employees * lastDay;
+      return {
         ...unitOut(u),
-        employees: employees.length,
-        op_count: opCount,
-        sup_count: supCount,
+        employees,
+        op_count: e.op,
+        sup_count: employees - e.op,
         filled,
         expected,
-        pct,
-      });
-    }
+        pct: expected ? Math.round((filled / expected) * 100) : 0,
+      };
+    });
+
     res.json({ data: { month, cards } });
   })
 );

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext.jsx';
 import {
   ememoApi,
   STATUS_META,
@@ -9,13 +8,12 @@ import {
   formatThaiDateTime,
 } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
-import { StatCard, PageHeader } from '../components/ui/index.js';
+import { StatCard } from '../components/ui/index.js';
 
 // the order + which statuses get their own headline card
 const STATUS_ORDER = ['pending', 'approved', 'returned', 'rejected'];
 
 export default function Dashboard() {
-  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
@@ -28,18 +26,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`สวัสดี, ${profile?.full_name || user?.email}`}
-        subtitle="ภาพรวมระบบบันทึกข้อความและการอนุมัติ (E-Memo)"
-        right={
-          <>
-            <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
-              <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(new Date())}
-            </span>
-            <span className="chip bg-brand/10 text-brand">{formatThaiLongDate(new Date())}</span>
-          </>
-        }
-      />
+      <div className="flex items-center justify-end gap-3">
+        <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
+          <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(new Date())}
+        </span>
+        <span className="chip bg-brand/10 text-brand">{formatThaiLongDate(new Date())}</span>
+      </div>
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 

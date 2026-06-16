@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AppLayout from './components/AppLayout.jsx';
+import ModuleShell from './components/ModuleShell.jsx';
 import Login from './pages/Login.jsx';
+import Portal from './pages/Portal.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
@@ -25,35 +27,38 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
+        {/* Portal landing (no sidebar) — its own full header */}
+        <Route index element={<Portal />} />
 
-        <Route path="memos" element={<DocumentRegister />} />
-        <Route path="memos/:id" element={<DocumentDetail />} />
+        {/* Module pages share a slim header with "back to Portal" */}
+        <Route element={<ModuleShell />}>
+          <Route path="dashboard" element={<Dashboard />} />
 
-        {/* Module 2: Performance reporting & OT */}
-        <Route path="performance" element={<Performance />} />
+          <Route path="memos" element={<DocumentRegister />} />
+          <Route path="memos/:id" element={<DocumentDetail />} />
 
-        {/* Module 3: Credit facility — financial data, restricted */}
-        <Route
-          path="credit"
-          element={
-            <ProtectedRoute roles={['admin', 'executive']}>
-              <CreditFacility />
-            </ProtectedRoute>
-          }
-        />
+          <Route path="performance" element={<Performance />} />
 
-        {/* Module 4: Onboarding 90 days */}
-        <Route path="onboarding" element={<Onboarding />} />
+          <Route
+            path="credit"
+            element={
+              <ProtectedRoute roles={['admin', 'executive']}>
+                <CreditFacility />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="admin"
-          element={
-            <ProtectedRoute roles={['admin']}>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
+          <Route path="onboarding" element={<Onboarding />} />
+
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

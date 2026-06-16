@@ -98,6 +98,18 @@ export default function DocumentRegister() {
     setTo(iso(today));
   };
 
+  const handleExport = async () => {
+    try {
+      const url = await ememoApi.exportUrl({ projectId, docTypeId, search, from, to });
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'documents-register.xlsx';
+      a.click();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -133,7 +145,7 @@ export default function DocumentRegister() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-          <button type="button" className="btn-outline" title="ส่งออก (เร็วๆ นี้)">
+          <button type="button" className="btn-outline" onClick={handleExport} title="ส่งออกเป็น Excel ตามตัวกรองปัจจุบัน">
             <Icon name="download" className="h-4 w-4" /> Export
           </button>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { ememoApi, APPROVAL_META, STATUS_META } from '../../lib/ememo.js';
+import { ememoApi, APPROVAL_META, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import SignaturePad from '../../components/SignaturePad.jsx';
 import Icon from '../../components/Icon.jsx';
 
@@ -103,6 +103,9 @@ export default function ApprovalAction() {
         <div><span className="text-slate-500">เลขที่: </span><b>{info.doc_number}</b></div>
         <div><span className="text-slate-500">เรื่อง: </span>{info.subject}</div>
         {info.recipient && <div><span className="text-slate-500">เรียน: </span>{info.recipient}</div>}
+        {info.token_expires_at && (
+          <div><span className="text-slate-500">ลิงก์หมดอายุ: </span>{formatThaiDate(info.token_expires_at)}</div>
+        )}
       </div>
 
       <textarea

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import multer from 'multer';
+import ExcelJS from 'exceljs';
 import { Document, Project } from '../models/index.js';
 import { docListItem, docDetail, attachmentOut } from '../utils/serialize.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -31,27 +32,37 @@ const upload = multer({
  * Filters: ?projectId= &status= &docTypeId= &from= &to= &search= &page= &pageSize=
  * Returns { data, total, page, pageSize }.
  */
+/** Build the Mongo filter from register query params (shared by list + export). */
+function buildFilter(q) {
+  const { projectId, status, docTypeId, from, to, search } = q;
+  const filter = {};
+  if (projectId) filter.projectId = projectId;
+  if (status) filter.status = status;
+  if (docTypeId) filter.docTypeId = docTypeId;
+  if (from || to) {
+    filter.dateReceived = {};
+    if (from) filter.dateReceived.$gte = new Date(from);
+    if (to) filter.dateReceived.$lte = new Date(to);
+  }
+  if (search) {
+    const rx = new RegExp(escapeRegExp(String(search)), 'i');
+    filter.$or = [{ subject: rx }, { docNumber: rx }, { recipient: rx }, { remarks: rx }];
+  }
+  return filter;
+}
+
+const STATUS_TH = {
+  draft: 'ฉบับร่าง', pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว',
+  rejected: 'ไม่อนุมัติ', returned: 'ตีกลับ', cancelled: 'ยกเลิก',
+};
+
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { projectId, status, docTypeId, from, to, search } = req.query;
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
 
-    const filter = {};
-    if (projectId) filter.projectId = projectId;
-    if (status) filter.status = status;
-    if (docTypeId) filter.docTypeId = docTypeId;
-    if (from || to) {
-      filter.dateReceived = {};
-      if (from) filter.dateReceived.$gte = new Date(from);
-      if (to) filter.dateReceived.$lte = new Date(to);
-    }
-    if (search) {
-      const rx = new RegExp(escapeRegExp(String(search)), 'i');
-      filter.$or = [{ subject: rx }, { docNumber: rx }, { recipient: rx }, { remarks: rx }];
-    }
-
+    const filter = buildFilter(req.query);
     const total = await Document.countDocuments(filter);
     const rows = await Document.find(filter)
       .sort({ dateReceived: -1, createdAt: -1 })
@@ -62,6 +73,44 @@ router.get(
       .lean();
 
     res.json({ data: rows.map(docListItem), total, page, pageSize });
+  })
+);
+
+/**
+ * GET /api/documents/export — the register (honoring the same filters) as .xlsx.
+ */
+router.get(
+  '/export',
+  asyncHandler(async (req, res) => {
+    const filter = buildFilter(req.query);
+    const rows = await Document.find(filter)
+      .sort({ dateReceived: -1, createdAt: -1 })
+      .populate('projectId', 'code')
+      .populate('docTypeId', 'name')
+      .lean();
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('ทะเบียนเอกสาร');
+    ws.addRow(['เลขที่', 'วันที่รับ', 'โครงการ', 'เรื่อง', 'เรียน', 'ประเภท', 'สถานะ', 'หมายเหตุ']);
+    for (const d of rows) {
+      ws.addRow([
+        d.docNumber,
+        d.dateReceived ? new Date(d.dateReceived).toISOString().slice(0, 10) : '',
+        d.projectId?.code || '',
+        d.subject || '',
+        d.recipient || '',
+        d.docTypeId?.name || '',
+        STATUS_TH[d.status] || d.status,
+        d.remarks || '',
+      ]);
+    }
+    ws.getRow(1).font = { bold: true };
+    ws.columns.forEach((c) => { c.width = 18; });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="documents-register.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
   })
 );
 
@@ -233,6 +282,118 @@ router.post(
         date_received: created.dateReceived,
       },
     });
+  })
+);
+
+const editSchema = z.object({
+  subject: z.string().min(1).optional(),
+  recipient: z.string().optional().nullable(),
+  body: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
+  docTypeId: z.string().optional().nullable(),
+  dateReceived: z.string().optional(),
+  workUnit: z.string().optional().nullable(),
+  enclosures: z
+    .array(z.object({ name: z.string(), qty: z.number().optional(), unit: z.string().optional() }))
+    .optional(),
+});
+
+/**
+ * PATCH /api/documents/:id — edit a document's content. Allowed while the doc
+ * is draft / pending / returned (not after it's approved/rejected/cancelled).
+ * The doc number, project and run number are immutable. Appends an audit entry.
+ */
+router.patch(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const parsed = editSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const doc = await Document.findById(req.params.id);
+    if (!doc) throw new ApiError(404, 'Document not found');
+    if (!['draft', 'pending', 'returned'].includes(doc.status)) {
+      throw new ApiError(409, 'แก้ไขได้เฉพาะเอกสารที่ยังไม่อนุมัติ/ปิดเรื่อง');
+    }
+    const f = parsed.data;
+    const set = {};
+    for (const k of ['subject', 'recipient', 'body', 'remarks', 'workUnit']) {
+      if (f[k] !== undefined) set[k] = f[k] || null;
+    }
+    if (f.docTypeId !== undefined) set.docTypeId = f.docTypeId || null;
+    if (f.dateReceived !== undefined) set.dateReceived = f.dateReceived ? new Date(f.dateReceived) : new Date();
+    if (f.enclosures !== undefined) set.enclosures = f.enclosures;
+
+    const updated = await Document.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: set,
+        $push: {
+          audit: {
+            actorId: req.profile.id,
+            actorLabel: req.profile.full_name || req.profile.email,
+            action: 'edited',
+            detail: { fields: Object.keys(set) },
+            createdAt: new Date(),
+          },
+        },
+      },
+      { new: true }
+    )
+      .populate('projectId', 'code color')
+      .populate('docTypeId', 'name')
+      .lean();
+    res.json({ data: docDetail(updated) });
+  })
+);
+
+/**
+ * POST /api/documents/:id/cancel — soft-cancel a document (status='cancelled').
+ * Cannot cancel an already-approved doc.
+ */
+router.post(
+  '/:id/cancel',
+  asyncHandler(async (req, res) => {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) throw new ApiError(404, 'Document not found');
+    if (doc.status === 'approved') throw new ApiError(409, 'เอกสารที่อนุมัติแล้วยกเลิกไม่ได้');
+    if (doc.status === 'cancelled') return res.json({ data: { cancelled: true } });
+    await Document.findByIdAndUpdate(req.params.id, {
+      $set: { status: 'cancelled', 'approvalSteps.$[].actionToken': null },
+      $push: {
+        audit: {
+          actorId: req.profile.id,
+          actorLabel: req.profile.full_name || req.profile.email,
+          action: 'cancelled',
+          detail: { reason: req.body?.reason || null },
+          createdAt: new Date(),
+        },
+      },
+    });
+    res.json({ data: { cancelled: true } });
+  })
+);
+
+/**
+ * POST /api/documents/:id/resend-approval — re-email the current pending
+ * approver (the active step that still holds a live token).
+ */
+router.post(
+  '/:id/resend-approval',
+  asyncHandler(async (req, res) => {
+    const doc = await Document.findById(req.params.id).lean();
+    if (!doc) throw new ApiError(404, 'Document not found');
+    const step = (doc.approvalSteps || []).find((s) => s.action === 'pending' && s.actionToken);
+    if (!step) throw new ApiError(409, 'ไม่มีขั้นที่รออนุมัติอยู่');
+    await sendApprovalRequest({
+      step: {
+        id: String(step._id),
+        step_no: step.stepNo,
+        approver_name: step.approverName,
+        approver_email: step.approverEmail,
+        action_token: step.actionToken,
+      },
+      doc: { doc_number: doc.docNumber, subject: doc.subject },
+    }).catch((e) => console.error('resend approval email failed:', e.message));
+    res.json({ data: { resent: true, to: step.approverEmail } });
   })
 );
 

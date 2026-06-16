@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate } from '../../lib/ememo.js';
 import SubmitApprovalModal from './SubmitApprovalModal.jsx';
+import EditDocumentModal from './EditDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
 function Row({ label, children }) {
@@ -20,12 +21,38 @@ export default function DocumentDetail() {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
   }, [id]);
 
   useEffect(load, [load]);
+
+  const cancelDoc = async () => {
+    if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
+    setBusy(true);
+    try {
+      await ememoApi.cancelDocument(id);
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendApproval = async () => {
+    setBusy(true);
+    try {
+      const { data } = await ememoApi.resendApproval(id);
+      window.alert(`ส่งอีเมลอนุมัติซ้ำไปที่ ${data.to} แล้ว`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const generatePdf = async () => {
     setBusy(true);
@@ -68,7 +95,11 @@ export default function DocumentDetail() {
   if (!doc) return <div className="text-slate-400">กำลังโหลด…</div>;
 
   const status = STATUS_META[doc.status] || STATUS_META.pending;
-  const canSubmit = ['draft', 'pending', 'returned'].includes(doc.status);
+  const editable = ['draft', 'pending', 'returned'].includes(doc.status);
+  const canSubmit = editable;
+  const canCancel = doc.status !== 'approved' && doc.status !== 'cancelled';
+  const hasPendingStep = (doc.approval_steps || []).some((s) => s.action === 'pending');
+  const canResend = doc.status === 'pending' && hasPendingStep;
 
   return (
     <div className="space-y-5">
@@ -87,12 +118,27 @@ export default function DocumentDetail() {
             <h2 className="text-lg font-bold text-slate-800">{doc.doc_number}</h2>
             <p className="text-slate-600">{doc.subject}</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={generatePdf} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium transition hover:bg-slate-50 disabled:opacity-50">
+          <div className="flex flex-wrap justify-end gap-2">
+            {editable && (
+              <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
+                <Icon name="edit" className="h-4 w-4" /> แก้ไข
+              </button>
+            )}
+            <button onClick={generatePdf} disabled={busy} className="btn-outline">
               <Icon name="file" className="h-4 w-4" /> สร้าง PDF หนังสือ
             </button>
+            {canResend && (
+              <button onClick={resendApproval} disabled={busy} className="btn-outline">
+                <Icon name="undo" className="h-4 w-4" /> ส่งเมลซ้ำ
+              </button>
+            )}
+            {canCancel && (
+              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
+                <Icon name="x" className="h-4 w-4" /> ยกเลิก
+              </button>
+            )}
             {canSubmit && (
-              <button onClick={() => setShowSubmit(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-light">
+              <button onClick={() => setShowSubmit(true)} className="btn-primary">
                 <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
               </button>
             )}
@@ -233,6 +279,14 @@ export default function DocumentDetail() {
           documentId={id}
           onClose={() => setShowSubmit(false)}
           onSubmitted={() => { setShowSubmit(false); load(); }}
+        />
+      )}
+
+      {showEdit && (
+        <EditDocumentModal
+          doc={doc}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => { setShowEdit(false); load(); }}
         />
       )}
     </div>

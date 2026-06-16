@@ -21,6 +21,10 @@ export const ememoApi = {
   nextNumber: (projectId, docCode) =>
     api(`/documents/next-number${qs({ projectId, docCode })}`),
   createDocument: (body) => api('/documents', { method: 'POST', body }),
+  updateDocument: (id, body) => api(`/documents/${id}`, { method: 'PATCH', body }),
+  cancelDocument: (id, reason) => api(`/documents/${id}/cancel`, { method: 'POST', body: { reason } }),
+  resendApproval: (id) => api(`/documents/${id}/resend-approval`, { method: 'POST' }),
+  exportUrl: (filters = {}) => apiBlobUrl(`/documents/export${qs(filters)}`),
 
   // letterhead PDF — generate, then open the resulting attachment via /download
   generatePdf: (id) => api(`/documents/${id}/generate-pdf`, { method: 'POST' }),

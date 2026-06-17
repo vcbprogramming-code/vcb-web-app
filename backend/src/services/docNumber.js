@@ -1,28 +1,38 @@
-import { Counter, DocCodeDepartment } from '../models/index.js';
+import { queryOne } from '../config/db.js';
 
 /**
  * Look up the department label for a document code (e.g. '02B' → 'วิศวะ').
  * Falls back to 'วิศวะ' when the code isn't mapped, per the client's rule.
  */
 export async function departmentForDocCode(docCode) {
-  const row = await DocCodeDepartment.findById(docCode).lean();
+  const row = await queryOne(
+    `select department from doc_code_departments where code = $1`,
+    [docCode]
+  );
   return row?.department ?? 'วิศวะ';
 }
 
 /** The default recipient title ("เรียน") configured for a doc code, or null. */
 export async function recipientTitleForDocCode(docCode) {
-  const row = await DocCodeDepartment.findById(docCode).lean();
-  return row?.recipientTitle ?? null;
+  const row = await queryOne(
+    `select recipient_title from doc_code_departments where code = $1`,
+    [docCode]
+  );
+  return row?.recipient_title ?? null;
 }
 
 /**
- * Preview the next per-project running number WITHOUT allocating it.
- * Best-effort (the real allocation may race ahead under concurrency, same as
- * the old MAX(run_no)+1 peek).
+ * Compute the next per-project running number for a project.
+ * Each project keeps its own series, so we take MAX(run_no)+1 within the project.
+ * NOTE: for the actual insert, allocation happens inside a transaction with a
+ * row lock (see allocateDocNumber) to avoid two concurrent creates colliding.
  */
-export async function peekNextRunNo(projectId) {
-  const c = await Counter.findById(String(projectId)).lean();
-  return (c?.seq ?? 0) + 1;
+export async function peekNextRunNo(client, projectId) {
+  const { rows } = await client.query(
+    `select coalesce(max(run_no), 0) + 1 as next from documents where project_id = $1`,
+    [projectId]
+  );
+  return rows[0].next;
 }
 
 /**
@@ -36,26 +46,26 @@ export function formatDocNumber({ prefix, department, docCode, runNo }) {
 }
 
 /**
- * Atomically allocate the next run number + full doc number for a project.
- * Uses an atomic $inc on a per-project counter document — race-safe at the
- * database level, replacing the Postgres SELECT ... FOR UPDATE approach.
+ * Atomically allocate the next run number + full doc number for a project,
+ * within an existing transaction. Locks the project's existing rows so two
+ * concurrent inserts can't grab the same run_no.
  *
- * `project` must have { _id|id, docPrefix }.
  * Returns { runNo, docNumber, department }.
  */
-export async function allocateDocNumber({ project, docCode }) {
+export async function allocateDocNumber(client, { project, docCode }) {
   const department = await departmentForDocCode(docCode);
 
-  const projectId = String(project._id ?? project.id);
-  const counter = await Counter.findByIdAndUpdate(
-    projectId,
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+  // Serialize allocation per project: lock the project row.
+  await client.query('select id from projects where id = $1 for update', [project.id]);
+
+  const { rows } = await client.query(
+    `select coalesce(max(run_no), 0) + 1 as next from documents where project_id = $1`,
+    [project.id]
   );
-  const runNo = counter.seq;
+  const runNo = rows[0].next;
 
   const docNumber = formatDocNumber({
-    prefix: project.docPrefix,
+    prefix: project.doc_prefix,
     department,
     docCode,
     runNo,

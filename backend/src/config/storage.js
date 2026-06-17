@@ -1,93 +1,90 @@
-import mongoose from 'mongoose';
-import { GridFSBucket } from 'mongodb';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { env } from './env.js';
 
 /**
- * GridFS-backed object storage facade. Keeps the same function names the rest
- * of the app already uses (putObject / getObjectBuffer / deleteObject) so that
- * services barely change. The logical object "key" is stored as the GridFS
- * file `filename`, so existing keys like `documents/<id>/original-3.pdf` and
- * `signatures/<token>-<uuid>.png` map 1:1 to a GridFS file.
+ * S3 client pointed at Supabase Storage's S3-compatible endpoint.
+ * forcePathStyle is required for Supabase (and most non-AWS S3 services).
  */
+export const s3 = new S3Client({
+  endpoint: env.s3.endpoint,
+  region: env.s3.region,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: env.s3.accessKeyId,
+    secretAccessKey: env.s3.secretAccessKey,
+  },
+});
 
-const BUCKET_NAME = 'attachments';
-let _bucket = null;
+const BUCKET = env.s3.bucket;
 
-function bucket() {
-  if (!_bucket) {
-    if (!mongoose.connection?.db) {
-      throw new Error('Storage used before MongoDB connection is open');
-    }
-    _bucket = new GridFSBucket(mongoose.connection.db, { bucketName: BUCKET_NAME });
+/** Ensure the bucket exists (idempotent). Call once at startup. */
+export async function ensureBucket() {
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: BUCKET }));
+  } catch {
+    await s3.send(new CreateBucketCommand({ Bucket: BUCKET }));
   }
-  return _bucket;
 }
 
-/** Find the most recent GridFS file matching a logical key (filename). */
-async function findFile(key) {
-  const files = await bucket()
-    .find({ filename: key })
-    .sort({ uploadDate: -1 })
-    .limit(1)
-    .toArray();
-  return files[0] || null;
-}
-
-/**
- * Upload a Buffer under `key`. Emulates S3 last-writer-wins overwrite: if files
- * with this key already exist, they're deleted first (important for the
- * deterministic generated-PDF keys like `original-<runNo>.pdf`).
- */
+/** Upload a Buffer to S3 under the given key. */
 export async function putObject(key, body, contentType) {
-  // delete any existing versions of this key
-  const existing = await bucket().find({ filename: key }).toArray();
-  for (const f of existing) {
-    await bucket().delete(f._id).catch(() => {});
-  }
-
-  await new Promise((resolvePromise, reject) => {
-    const upload = bucket().openUploadStream(key, {
-      contentType: contentType || 'application/octet-stream',
-    });
-    upload.on('error', reject);
-    upload.on('finish', resolvePromise);
-    upload.end(body);
-  });
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
   return key;
 }
 
-/** Fetch an object's bytes as a Buffer. Throws if the key is missing. */
+/** Fetch an object's bytes as a Buffer. */
 export async function getObjectBuffer(key) {
-  const file = await findFile(key);
-  if (!file) throw new Error(`Object not found: ${key}`);
-  const chunks = [];
-  await new Promise((resolvePromise, reject) => {
-    const dl = bucket().openDownloadStream(file._id);
-    dl.on('data', (c) => chunks.push(c));
-    dl.on('error', reject);
-    dl.on('end', resolvePromise);
-  });
-  return Buffer.concat(chunks);
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  return Buffer.from(await res.Body.transformToByteArray());
 }
 
 /**
- * Open a readable stream for an object (for piping to an HTTP response without
+ * Open a readable stream for an object (to pipe to an HTTP response without
  * buffering the whole file). Returns null if the object is missing.
  */
 export async function openDownloadStream(key) {
-  const file = await findFile(key);
-  if (!file) return null;
-  return {
-    stream: bucket().openDownloadStream(file._id),
-    contentType: file.contentType || 'application/octet-stream',
-    length: file.length,
-    filename: file.filename,
-  };
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+    return {
+      stream: res.Body, // a Node Readable stream
+      contentType: res.ContentType || 'application/octet-stream',
+      length: res.ContentLength ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
-/** Delete all GridFS files for a key. Silently ignores "not found". */
+/** Delete an object. */
 export async function deleteObject(key) {
-  const files = await bucket().find({ filename: key }).toArray();
-  for (const f of files) {
-    await bucket().delete(f._id).catch(() => {});
-  }
+  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+/** Presigned URL to download/view an object directly (default 1 hour). */
+export function presignedGetUrl(key, expiresIn = 3600) {
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn });
+}
+
+/** Presigned URL the browser can PUT a file to directly (default 5 min). */
+export function presignedPutUrl(key, contentType, expiresIn = 300) {
+  return getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    { expiresIn }
+  );
 }

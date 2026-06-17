@@ -1,21 +1,15 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
-import { connectDb } from './config/db.js';
-import { syncIndexes } from './models/index.js';
+import { ensureBucket } from './config/storage.js';
 
-async function start() {
-  await connectDb();
-  console.log('🗄️  Connected to MongoDB');
-  await syncIndexes();
-  console.log('🔑 Indexes ready');
+const app = createApp();
 
-  const app = createApp();
-  app.listen(env.port, () => {
-    console.log(`🚀 HR System API listening on http://localhost:${env.port} (${env.nodeEnv})`);
-  });
-}
-
-start().catch((err) => {
-  console.error('❌ Failed to start server:', err);
-  process.exit(1);
+app.listen(env.port, async () => {
+  console.log(`🚀 HR System API listening on http://localhost:${env.port} (${env.nodeEnv})`);
+  try {
+    await ensureBucket();
+    console.log(`📦 Storage bucket "${env.s3.bucket}" ready`);
+  } catch (err) {
+    console.error('⚠️  Could not ensure storage bucket (it may already exist):', err.message);
+  }
 });

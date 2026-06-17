@@ -1,74 +1,34 @@
-import {
-  Facility,
-  CreditLedger,
-  CreditAudit,
-} from '../models/index.js';
-import { AUTHORIZED_STATUSES } from '../models/CreditLedger.js';
+import { query, queryOne } from '../config/db.js';
 
-/**
- * Compute the "Used" amount for one facility: baseline + sum of authorized
- * ledger amounts (status = อนุมัติแล้ว). Settled/new/pending/void do not count.
- */
-export async function usedForFacility(facilityId) {
-  const rows = await CreditLedger.find({
-    facilityId,
-    status: { $in: AUTHORIZED_STATUSES },
-  }).lean();
-  return rows.reduce((s, r) => s + (r.amount || 0), 0);
-}
+export const AUTHORIZED_STATUSES = ['อนุมัติแล้ว'];
 
-/**
- * Sum of authorized ledger amounts per facility, for MANY facilities at once
- * (one aggregation instead of one query per facility). Returns a Map
- * facilityId(string) → authorized total.
- */
+/** Authorized-used total per facility, for many facilities at once. Map(id→sum). */
 export async function authorizedUsedMap(facilityIds) {
   if (!facilityIds?.length) return new Map();
-  const rows = await CreditLedger.aggregate([
-    { $match: { facilityId: { $in: facilityIds }, status: { $in: AUTHORIZED_STATUSES } } },
-    { $group: { _id: '$facilityId', total: { $sum: '$amount' } } },
-  ]);
-  return new Map(rows.map((r) => [String(r._id), r.total]));
+  const { rows } = await query(
+    `select facility_id, coalesce(sum(amount),0)::float8 total
+       from credit_ledger where status = 'อนุมัติแล้ว' and facility_id = any($1)
+      group by facility_id`,
+    [facilityIds]
+  );
+  return new Map(rows.map((r) => [r.facility_id, r.total]));
 }
 
-/** Build a facility view from a precomputed authorized-used amount (no query). */
-export function facilityViewWith(facility, authorizedUsed = 0) {
-  const baseline = facility.usedBaseline || 0;
-  const used = baseline + authorizedUsed;
-  const limit = facility.limit || 0;
-  return facilityShape(facility, used, limit);
-}
-
-/** Build a facility view with computed used/available (single facility). */
-export async function facilityView(facility) {
-  const baseline = facility.usedBaseline || 0;
-  const used = baseline + (await usedForFacility(facility._id));
-  const limit = facility.limit || 0;
-  return facilityShape(facility, used, limit);
-}
-
-function facilityShape(facility, used, limit) {
+/** Build a facility view from a precomputed authorized-used amount. */
+export function facilityView(f, authorizedUsed = 0) {
+  const used = Number(f.used_baseline || 0) + Number(authorizedUsed || 0);
+  const limit = Number(f.limit || 0);
   return {
-    id: String(facility._id),
-    project_id: String(facility.projectId),
-    company: facility.company ?? null,
-    bank: facility.bank ?? null,
-    facility_no: facility.facilityNo ?? null,
-    type: facility.type,
-    limit,
-    used,
-    available: limit - used,
+    id: f.id, project_id: f.project_id, company: f.company, bank: f.bank,
+    facility_no: f.facility_no, type: f.type, limit, used, available: limit - used,
     pct: limit ? Math.round((used / limit) * 100) : 0,
-    interest_rate: facility.interestRate ?? null,
-    fee_rate: facility.feeRate ?? null,
-    approved_date: facility.approvedDate ?? null,
-    due_date: facility.dueDate ?? null,
-    notes: facility.notes ?? null,
-    is_active: facility.isActive,
+    interest_rate: f.interest_rate != null ? Number(f.interest_rate) : null,
+    fee_rate: f.fee_rate != null ? Number(f.fee_rate) : null,
+    approved_date: f.approved_date, due_date: f.due_date, notes: f.notes, is_active: f.is_active,
   };
 }
 
-/** Which maturity bucket a date falls into. */
+/** Maturity bucket for a due date. */
 export function dueBucket(dueDate, now = new Date()) {
   if (!dueDate) return 'later';
   const d = new Date(dueDate);
@@ -81,39 +41,32 @@ export function dueBucket(dueDate, now = new Date()) {
   return 'later';
 }
 
-/**
- * Overdue interest for an authorized ledger item past its due date:
- * amount × rate% × days/365. rate falls back to the facility rate.
- */
+/** Overdue interest for an authorized item past due: amount × rate% × days/365. */
 export function overdueInterest(item, facilityRate, now = new Date()) {
-  if (!item.dueDate) return 0;
-  const due = new Date(item.dueDate);
+  if (!item.due_date) return 0;
+  const due = new Date(item.due_date);
   if (due >= now) return 0;
   if (!AUTHORIZED_STATUSES.includes(item.status)) return 0;
-  const rate = item.interestRate ?? facilityRate ?? 0;
+  const rate = item.interest_rate ?? facilityRate ?? 0;
   const days = Math.floor((now - due) / 86400000);
-  return (item.amount || 0) * (rate / 100) * (days / 365);
+  return Number(item.amount || 0) * (Number(rate) / 100) * (days / 365);
 }
 
 /** Write an audit row. NEVER throws — audit must not block the real write. */
 export async function writeAudit({ actor, action, target, targetId, changes, note }) {
   try {
-    await CreditAudit.create({
-      actorId: actor?.id || null,
-      actorLabel: actor?.full_name || actor?.email || null,
-      action,
-      target,
-      targetId: targetId ? String(targetId) : null,
-      changes: changes || null,
-      note: note || null,
-      createdAt: new Date(),
-    });
+    await query(
+      `insert into credit_audit (actor_id, actor_label, action, target, target_id, changes, note)
+       values ($1,$2,$3,$4,$5,$6,$7)`,
+      [actor?.id || null, actor?.full_name || actor?.email || null, action, target,
+       targetId != null ? String(targetId) : null, changes ? JSON.stringify(changes) : null, note || null]
+    );
   } catch (e) {
     console.error('audit write failed (non-fatal):', e.message);
   }
 }
 
-/** Field-level diff between two plain objects (before/after). */
+/** Field diff between two row objects. */
 export function diff(before, after, fields) {
   const out = {};
   for (const f of fields) {
@@ -123,5 +76,3 @@ export function diff(before, after, fields) {
   }
   return Object.keys(out).length ? out : null;
 }
-
-export { Facility, CreditLedger };

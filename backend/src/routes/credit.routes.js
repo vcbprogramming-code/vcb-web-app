@@ -1,572 +1,347 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
-import {
-  Project,
-  Facility,
-  CreditLedger,
-  CreditRequest,
-  CashPlan,
-  CreditAudit,
-} from '../models/index.js';
-import { FACILITY_TYPES } from '../models/Facility.js';
+import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import {
-  facilityView,
-  facilityViewWith,
-  authorizedUsedMap,
-  dueBucket,
-  overdueInterest,
-  writeAudit,
-  diff,
-} from '../services/credit.js';
+import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff } from '../services/credit.js';
 
-// Financial data — restricted to admin + executive only.
+const FACILITY_TYPES = ['L/G (BG)', 'LGM (L/G)', 'T/L', 'B/E (AVAL)', 'P/N'];
+
+// Financial data — admin + executive only.
 const router = Router();
 router.use(requireAuth, requireRole('admin', 'executive'));
 
+const num = (v) => (v != null ? Number(v) : null);
 const ledgerOut = (l) => ({
-  id: String(l._id),
-  facility_id: String(l.facilityId),
-  project_id: String(l.projectId),
-  amount: l.amount,
-  status: l.status,
-  start_date: l.startDate ?? null,
-  due_date: l.dueDate ?? null,
-  settled_date: l.settledDate ?? null,
-  ref: l.ref ?? null,
-  source: l.source ?? null,
-  doc_from: l.docFrom ?? null,
-  doc_to: l.docTo ?? null,
-  interest_rate: l.interestRate ?? null,
-  note: l.note ?? null,
-  request_id: l.requestId ? String(l.requestId) : null,
+  id: l.id, facility_id: l.facility_id, project_id: l.project_id, amount: Number(l.amount), status: l.status,
+  start_date: l.start_date, due_date: l.due_date, settled_date: l.settled_date, ref: l.ref, source: l.source,
+  doc_from: l.doc_from, doc_to: l.doc_to, interest_rate: num(l.interest_rate), note: l.note, request_id: l.request_id,
 });
 const requestOut = (r) => ({
-  id: String(r._id),
-  facility_id: String(r.facilityId),
-  project_id: String(r.projectId),
-  amount: r.amount,
-  start_date: r.startDate ?? null,
-  due_date: r.dueDate ?? null,
-  ref: r.ref ?? null,
-  note: r.note ?? null,
-  status: r.status,
-  decided_at: r.decidedAt ?? null,
-  decision_note: r.decisionNote ?? null,
-  ledger_id: r.ledgerId ? String(r.ledgerId) : null,
+  id: r.id, facility_id: r.facility_id, project_id: r.project_id, amount: Number(r.amount),
+  start_date: r.start_date, due_date: r.due_date, ref: r.ref, note: r.note, status: r.status,
+  decided_at: r.decided_at, decision_note: r.decision_note, ledger_id: r.ledger_id,
 });
 const cashPlanOut = (c) => ({
-  id: String(c._id),
-  project_id: String(c.projectId),
-  month: c.month,
-  period: c.period,
-  income: c.income,
-  paid_ids: (c.paidIds || []).map(String),
-  new_pn: c.newPN,
-  deductions: c.deductions,
-  income_breakdown: c.incomeBreakdown ?? null,
-  available: c.available,
-  note: c.note ?? null,
+  id: c.id, project_id: c.project_id, month: c.month, period: c.period, income: Number(c.income),
+  new_pn: Number(c.new_pn), deductions: Number(c.deductions), income_breakdown: c.income_breakdown,
+  available: Number(c.available), note: c.note, paid_ids: c.paid_ids || [],
 });
 
-// ── facilities ──────────────────────────────────────────────────────────────
-
-/**
- * GET /api/credit/facilities — facilities with computed used/available.
- * Filters: ?projectId= &type= &search=
- */
-router.get(
-  '/facilities',
-  asyncHandler(async (req, res) => {
-    const { projectId, type, search } = req.query;
-    const filter = {};
-    if (projectId) filter.projectId = projectId;
-    if (type) filter.type = type;
-    const rows = await Facility.find(filter).sort({ createdAt: 1 }).lean();
-    // one aggregation for all facilities' used amounts (no per-facility query)
-    const usedMap = await authorizedUsedMap(rows.map((r) => r._id));
-    let views = rows.map((f) => facilityViewWith(f, usedMap.get(String(f._id)) || 0));
-    if (search) {
-      const rx = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      views = views.filter((v) => rx.test(v.facility_no || '') || rx.test(v.bank || '') || rx.test(v.company || ''));
-    }
-    res.json({ data: views });
-  })
-);
+// ── facilities ──────────────────────────────────────────────────────────
+router.get('/facilities', asyncHandler(async (req, res) => {
+  const { projectId, type, search } = req.query;
+  const where = []; const params = [];
+  const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
+  if (projectId) add('project_id = $$', projectId);
+  if (type) add('type = $$', type);
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const { rows } = await query(`select * from facilities ${whereSql} order by created_at`, params);
+  const usedMap = await authorizedUsedMap(rows.map((r) => r.id));
+  let views = rows.map((f) => facilityView(f, usedMap.get(f.id) || 0));
+  if (search) {
+    const rx = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    views = views.filter((v) => rx.test(v.facility_no || '') || rx.test(v.bank || '') || rx.test(v.company || ''));
+  }
+  res.json({ data: views });
+}));
 
 const facilitySchema = z.object({
-  projectId: z.string().min(1),
-  company: z.string().optional().nullable(),
-  bank: z.string().optional().nullable(),
-  facilityNo: z.string().optional().nullable(),
-  type: z.enum(FACILITY_TYPES),
-  limit: z.number().nonnegative(),
-  usedBaseline: z.number().optional(),
-  interestRate: z.number().optional().nullable(),
-  feeRate: z.number().optional().nullable(),
-  approvedDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  projectId: z.string().uuid(), company: z.string().optional().nullable(), bank: z.string().optional().nullable(),
+  facilityNo: z.string().optional().nullable(), type: z.enum(FACILITY_TYPES), limit: z.number().nonnegative(),
+  usedBaseline: z.number().optional(), interestRate: z.number().optional().nullable(), feeRate: z.number().optional().nullable(),
+  approvedDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(), notes: z.string().optional().nullable(),
 });
+router.post('/facilities', asyncHandler(async (req, res) => {
+  const parsed = facilitySchema.safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const row = await queryOne(
+    `insert into facilities (project_id, company, bank, facility_no, type, "limit", used_baseline, interest_rate, fee_rate, approved_date, due_date, notes)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+    [d.projectId, d.company || null, d.bank || null, d.facilityNo || null, d.type, d.limit, d.usedBaseline || 0,
+     d.interestRate ?? null, d.feeRate ?? null, d.approvedDate || null, d.dueDate || null, d.notes || null]
+  );
+  await writeAudit({ actor: req.profile, action: 'create', target: 'facility', targetId: row.id, note: d.type });
+  res.status(201).json({ data: facilityView(row, 0) });
+}));
+router.patch('/facilities/:id', asyncHandler(async (req, res) => {
+  const parsed = facilitySchema.partial().safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const before = await queryOne('select * from facilities where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'Facility not found');
+  const d = parsed.data;
+  const map = { company: 'company', bank: 'bank', facilityNo: 'facility_no', type: 'type', limit: '"limit"',
+    interestRate: 'interest_rate', feeRate: 'fee_rate', approvedDate: 'approved_date', dueDate: 'due_date', notes: 'notes' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] || null); sets.push(`${col} = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'No fields to update');
+  vals.push(req.params.id);
+  const after = await queryOne(`update facilities set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
+  await writeAudit({ actor: req.profile, action: 'update', target: 'facility', targetId: req.params.id,
+    changes: diff(before, after, ['limit', 'interest_rate', 'due_date', 'type', 'bank', 'facility_no', 'company', 'notes']) });
+  const used = (await authorizedUsedMap([after.id])).get(after.id) || 0;
+  res.json({ data: facilityView(after, used) });
+}));
+router.put('/facilities/:id/limit', asyncHandler(async (req, res) => {
+  const parsed = z.object({ limit: z.number().nonnegative() }).safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const before = await queryOne('select * from facilities where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'Facility not found');
+  const after = await queryOne('update facilities set "limit" = $1 where id = $2 returning *', [parsed.data.limit, req.params.id]);
+  await writeAudit({ actor: req.profile, action: 'set-limit', target: 'limit', targetId: req.params.id,
+    changes: { limit: { before: Number(before.limit), after: parsed.data.limit } } });
+  const used = (await authorizedUsedMap([after.id])).get(after.id) || 0;
+  res.json({ data: facilityView(after, used) });
+}));
 
-router.post(
-  '/facilities',
-  asyncHandler(async (req, res) => {
-    const parsed = facilitySchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const d = parsed.data;
-    const created = await Facility.create({
-      ...d,
-      approvedDate: d.approvedDate ? new Date(d.approvedDate) : null,
-      dueDate: d.dueDate ? new Date(d.dueDate) : null,
-      usedBaseline: d.usedBaseline || 0,
-    });
-    await writeAudit({ actor: req.profile, action: 'create', target: 'facility', targetId: created._id, note: d.type });
-    res.status(201).json({ data: await facilityView(created.toObject()) });
-  })
-);
-
-router.patch(
-  '/facilities/:id',
-  asyncHandler(async (req, res) => {
-    const parsed = facilitySchema.partial().safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const before = await Facility.findById(req.params.id).lean();
-    if (!before) throw new ApiError(404, 'Facility not found');
-    const d = parsed.data;
-    const set = { ...d };
-    if (d.approvedDate !== undefined) set.approvedDate = d.approvedDate ? new Date(d.approvedDate) : null;
-    if (d.dueDate !== undefined) set.dueDate = d.dueDate ? new Date(d.dueDate) : null;
-    const after = await Facility.findByIdAndUpdate(req.params.id, { $set: set }, { new: true }).lean();
-    await writeAudit({
-      actor: req.profile, action: 'update', target: 'facility', targetId: req.params.id,
-      changes: diff(before, after, ['limit', 'interestRate', 'dueDate', 'type', 'bank', 'facilityNo', 'company', 'notes']),
-    });
-    res.json({ data: await facilityView(after) });
-  })
-);
-
-/** PUT /api/credit/facilities/:id/limit — override the approved limit. */
-router.put(
-  '/facilities/:id/limit',
-  asyncHandler(async (req, res) => {
-    const parsed = z.object({ limit: z.number().nonnegative() }).safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const before = await Facility.findById(req.params.id).lean();
-    if (!before) throw new ApiError(404, 'Facility not found');
-    const after = await Facility.findByIdAndUpdate(
-      req.params.id, { $set: { limit: parsed.data.limit } }, { new: true }
-    ).lean();
-    await writeAudit({
-      actor: req.profile, action: 'set-limit', target: 'limit', targetId: req.params.id,
-      changes: { limit: { before: before.limit, after: parsed.data.limit } },
-    });
-    res.json({ data: await facilityView(after) });
-  })
-);
-
-// ── ledger (drawdown / settle / edit / delete) ──────────────────────────────
-
-/** GET /api/credit/ledger?facilityId=&projectId=&status= */
-router.get(
-  '/ledger',
-  asyncHandler(async (req, res) => {
-    const { facilityId, projectId, status } = req.query;
-    const filter = {};
-    if (facilityId) filter.facilityId = facilityId;
-    if (projectId) filter.projectId = projectId;
-    if (status) filter.status = status;
-    const rows = await CreditLedger.find(filter).sort({ startDate: -1, createdAt: -1 }).lean();
-    res.json({ data: rows.map(ledgerOut) });
-  })
-);
-
+// ── ledger ────────────────────────────────────────────────────────────────
+router.get('/ledger', asyncHandler(async (req, res) => {
+  const { facilityId, projectId, status } = req.query;
+  const where = []; const params = [];
+  const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
+  if (facilityId) add('facility_id = $$', facilityId);
+  if (projectId) add('project_id = $$', projectId);
+  if (status) add('status = $$', status);
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const { rows } = await query(`select * from credit_ledger ${whereSql} order by start_date desc nulls last, created_at desc`, params);
+  res.json({ data: rows.map(ledgerOut) });
+}));
 const ledgerSchema = z.object({
-  facilityId: z.string().min(1),
-  amount: z.number(),
-  status: z.string().optional(),
-  startDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  ref: z.string().optional().nullable(),
-  source: z.string().optional().nullable(),
-  docFrom: z.string().optional().nullable(),
-  docTo: z.string().optional().nullable(),
-  interestRate: z.number().optional().nullable(),
-  note: z.string().optional().nullable(),
+  facilityId: z.string().uuid(), amount: z.number(), status: z.string().optional(),
+  startDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(),
+  ref: z.string().optional().nullable(), source: z.string().optional().nullable(),
+  docFrom: z.string().optional().nullable(), docTo: z.string().optional().nullable(),
+  interestRate: z.number().optional().nullable(), note: z.string().optional().nullable(),
 });
+router.post('/ledger', asyncHandler(async (req, res) => {
+  const parsed = ledgerSchema.safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const fac = await queryOne('select project_id from facilities where id = $1', [d.facilityId]);
+  if (!fac) throw new ApiError(404, 'Facility not found');
+  const row = await queryOne(
+    `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, source, doc_from, doc_to, interest_rate, note, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
+    [d.facilityId, fac.project_id, d.amount, d.status || 'อนุมัติแล้ว', d.startDate || null, d.dueDate || null,
+     d.ref || null, d.source || null, d.docFrom || null, d.docTo || null, d.interestRate ?? null, d.note || null, req.profile.id]
+  );
+  await writeAudit({ actor: req.profile, action: 'create', target: 'ledger', targetId: row.id, note: `${d.amount}` });
+  res.status(201).json({ data: ledgerOut(row) });
+}));
+router.patch('/ledger/:id', asyncHandler(async (req, res) => {
+  const parsed = ledgerSchema.partial().safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const before = await queryOne('select * from credit_ledger where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'Ledger item not found');
+  const d = parsed.data;
+  const map = { amount: 'amount', status: 'status', startDate: 'start_date', dueDate: 'due_date', ref: 'ref', note: 'note', interestRate: 'interest_rate' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] ?? null); sets.push(`${col} = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'No fields to update');
+  vals.push(req.params.id);
+  const after = await queryOne(`update credit_ledger set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
+  await writeAudit({ actor: req.profile, action: 'update', target: 'ledger', targetId: req.params.id,
+    changes: diff(before, after, ['amount', 'status', 'due_date', 'start_date', 'ref', 'note']) });
+  res.json({ data: ledgerOut(after) });
+}));
+router.post('/ledger/:id/settle', asyncHandler(async (req, res) => {
+  const before = await queryOne('select status from credit_ledger where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'Ledger item not found');
+  const after = await queryOne(`update credit_ledger set status='ชำระแล้ว', settled_date=current_date where id=$1 returning *`, [req.params.id]);
+  await writeAudit({ actor: req.profile, action: 'settle', target: 'ledger', targetId: req.params.id, changes: { status: { before: before.status, after: 'ชำระแล้ว' } } });
+  res.json({ data: ledgerOut(after) });
+}));
+router.delete('/ledger/:id', asyncHandler(async (req, res) => {
+  const before = await queryOne('select amount from credit_ledger where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'Ledger item not found');
+  await query('delete from credit_ledger where id = $1', [req.params.id]);
+  await writeAudit({ actor: req.profile, action: 'delete', target: 'ledger', targetId: req.params.id, note: `${before.amount}` });
+  res.json({ data: { deleted: true } });
+}));
 
-router.post(
-  '/ledger',
-  asyncHandler(async (req, res) => {
-    const parsed = ledgerSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const d = parsed.data;
-    const facility = await Facility.findById(d.facilityId).lean();
-    if (!facility) throw new ApiError(404, 'Facility not found');
-    const created = await CreditLedger.create({
-      ...d,
-      projectId: facility.projectId,
-      status: d.status || 'อนุมัติแล้ว',
-      startDate: d.startDate ? new Date(d.startDate) : null,
-      dueDate: d.dueDate ? new Date(d.dueDate) : null,
-      createdBy: req.profile.id,
-    });
-    await writeAudit({ actor: req.profile, action: 'create', target: 'ledger', targetId: created._id, note: `${d.amount}` });
-    res.status(201).json({ data: ledgerOut(created.toObject()) });
-  })
-);
-
-router.patch(
-  '/ledger/:id',
-  asyncHandler(async (req, res) => {
-    const parsed = ledgerSchema.partial().safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const before = await CreditLedger.findById(req.params.id).lean();
-    if (!before) throw new ApiError(404, 'Ledger item not found');
-    const d = parsed.data;
-    const set = { ...d };
-    delete set.facilityId;
-    if (d.startDate !== undefined) set.startDate = d.startDate ? new Date(d.startDate) : null;
-    if (d.dueDate !== undefined) set.dueDate = d.dueDate ? new Date(d.dueDate) : null;
-    const after = await CreditLedger.findByIdAndUpdate(req.params.id, { $set: set }, { new: true }).lean();
-    await writeAudit({
-      actor: req.profile, action: 'update', target: 'ledger', targetId: req.params.id,
-      changes: diff(before, after, ['amount', 'status', 'dueDate', 'startDate', 'ref', 'note']),
-    });
-    res.json({ data: ledgerOut(after) });
-  })
-);
-
-/** POST /api/credit/ledger/:id/settle — mark settled (releases the line). */
-router.post(
-  '/ledger/:id/settle',
-  asyncHandler(async (req, res) => {
-    const before = await CreditLedger.findById(req.params.id).lean();
-    if (!before) throw new ApiError(404, 'Ledger item not found');
-    const after = await CreditLedger.findByIdAndUpdate(
-      req.params.id,
-      { $set: { status: 'ชำระแล้ว', settledDate: new Date() } },
-      { new: true }
-    ).lean();
-    await writeAudit({
-      actor: req.profile, action: 'settle', target: 'ledger', targetId: req.params.id,
-      changes: { status: { before: before.status, after: 'ชำระแล้ว' } },
-    });
-    res.json({ data: ledgerOut(after) });
-  })
-);
-
-router.delete(
-  '/ledger/:id',
-  asyncHandler(async (req, res) => {
-    const before = await CreditLedger.findById(req.params.id).lean();
-    if (!before) throw new ApiError(404, 'Ledger item not found');
-    await CreditLedger.findByIdAndDelete(req.params.id);
-    await writeAudit({ actor: req.profile, action: 'delete', target: 'ledger', targetId: req.params.id, note: `${before.amount}` });
-    res.json({ data: { deleted: true } });
-  })
-);
-
-// ── requests + approval ─────────────────────────────────────────────────────
-
-/** GET /api/credit/requests?status= */
-router.get(
-  '/requests',
-  asyncHandler(async (req, res) => {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    const rows = await CreditRequest.find(filter).sort({ createdAt: -1 }).lean();
-    res.json({ data: rows.map(requestOut) });
-  })
-);
-
-const requestSchema = z.object({
-  facilityId: z.string().min(1),
-  amount: z.number().positive(),
-  startDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  ref: z.string().optional().nullable(),
-  note: z.string().optional().nullable(),
-});
-
-router.post(
-  '/requests',
-  asyncHandler(async (req, res) => {
-    const parsed = requestSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const d = parsed.data;
-    const facility = await Facility.findById(d.facilityId).lean();
-    if (!facility) throw new ApiError(404, 'Facility not found');
-    const created = await CreditRequest.create({
-      ...d,
-      projectId: facility.projectId,
-      startDate: d.startDate ? new Date(d.startDate) : null,
-      dueDate: d.dueDate ? new Date(d.dueDate) : null,
-      createdBy: req.profile.id,
-    });
-    await writeAudit({ actor: req.profile, action: 'create', target: 'request', targetId: created._id, note: `${d.amount}` });
-    res.status(201).json({ data: requestOut(created.toObject()) });
-  })
-);
-
-/**
- * POST /api/credit/requests/:id/decide  { decision: 'อนุมัติ'|'ไม่อนุมัติ', note? }
- * On approve, AUTO-create a linked authorized ledger entry (no double count).
- */
-router.post(
-  '/requests/:id/decide',
-  asyncHandler(async (req, res) => {
-    const parsed = z.object({
-      decision: z.enum(['อนุมัติ', 'ไม่อนุมัติ']),
-      note: z.string().optional().nullable(),
-    }).safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-
-    const reqDoc = await CreditRequest.findById(req.params.id);
-    if (!reqDoc) throw new ApiError(404, 'Request not found');
-    if (reqDoc.status !== 'อยู่ระหว่างเสนออนุมัติ') {
-      throw new ApiError(409, 'คำขอนี้ถูกตัดสินไปแล้ว');
-    }
-
-    reqDoc.status = parsed.data.decision;
-    reqDoc.decidedBy = req.profile.id;
-    reqDoc.decidedAt = new Date();
-    reqDoc.decisionNote = parsed.data.note || null;
-
+// ── requests + approval ─────────────────────────────────────────────────
+router.get('/requests', asyncHandler(async (req, res) => {
+  const { rows } = req.query.status
+    ? await query('select * from credit_requests where status = $1 order by created_at desc', [req.query.status])
+    : await query('select * from credit_requests order by created_at desc');
+  res.json({ data: rows.map(requestOut) });
+}));
+router.post('/requests', asyncHandler(async (req, res) => {
+  const parsed = z.object({ facilityId: z.string().uuid(), amount: z.number().positive(),
+    startDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(),
+    ref: z.string().optional().nullable(), note: z.string().optional().nullable() }).safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const fac = await queryOne('select project_id from facilities where id = $1', [d.facilityId]);
+  if (!fac) throw new ApiError(404, 'Facility not found');
+  const row = await queryOne(
+    `insert into credit_requests (facility_id, project_id, amount, start_date, due_date, ref, note, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+    [d.facilityId, fac.project_id, d.amount, d.startDate || null, d.dueDate || null, d.ref || null, d.note || null, req.profile.id]
+  );
+  await writeAudit({ actor: req.profile, action: 'create', target: 'request', targetId: row.id, note: `${d.amount}` });
+  res.status(201).json({ data: requestOut(row) });
+}));
+router.post('/requests/:id/decide', asyncHandler(async (req, res) => {
+  const parsed = z.object({ decision: z.enum(['อนุมัติ', 'ไม่อนุมัติ']), note: z.string().optional().nullable() }).safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const r = (await client.query('select * from credit_requests where id = $1 for update', [req.params.id])).rows[0];
+    if (!r) throw new ApiError(404, 'Request not found');
+    if (r.status !== 'อยู่ระหว่างเสนออนุมัติ') throw new ApiError(409, 'คำขอนี้ถูกตัดสินไปแล้ว');
     let ledger = null;
     if (parsed.data.decision === 'อนุมัติ') {
-      ledger = await CreditLedger.create({
-        facilityId: reqDoc.facilityId,
-        projectId: reqDoc.projectId,
-        amount: reqDoc.amount,
-        status: 'อนุมัติแล้ว',
-        startDate: reqDoc.startDate,
-        dueDate: reqDoc.dueDate,
-        ref: reqDoc.ref,
-        note: reqDoc.note,
-        requestId: reqDoc._id,
-        createdBy: req.profile.id,
-      });
-      reqDoc.ledgerId = ledger._id;
+      ledger = (await client.query(
+        `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, note, request_id, created_by)
+         values ($1,$2,$3,'อนุมัติแล้ว',$4,$5,$6,$7,$8,$9) returning *`,
+        [r.facility_id, r.project_id, r.amount, r.start_date, r.due_date, r.ref, r.note, r.id, req.profile.id]
+      )).rows[0];
     }
-    await reqDoc.save();
+    const updated = (await client.query(
+      `update credit_requests set status=$1, decided_by=$2, decided_at=now(), decision_note=$3, ledger_id=$4 where id=$5 returning *`,
+      [parsed.data.decision, req.profile.id, parsed.data.note || null, ledger?.id || null, r.id]
+    )).rows[0];
+    await client.query('commit');
+    await writeAudit({ actor: req.profile, action: parsed.data.decision === 'อนุมัติ' ? 'approve' : 'reject',
+      target: 'request', targetId: r.id, changes: { status: { before: 'อยู่ระหว่างเสนออนุมัติ', after: parsed.data.decision } }, note: parsed.data.note || null });
+    res.json({ data: { request: requestOut(updated), ledger: ledger ? ledgerOut(ledger) : null } });
+  } catch (err) {
+    await client.query('rollback'); throw err;
+  } finally {
+    client.release();
+  }
+}));
 
-    await writeAudit({
-      actor: req.profile, action: parsed.data.decision === 'อนุมัติ' ? 'approve' : 'reject',
-      target: 'request', targetId: reqDoc._id,
-      changes: { status: { before: 'อยู่ระหว่างเสนออนุมัติ', after: parsed.data.decision } },
-      note: parsed.data.note || null,
-    });
+// ── overview / overdue ──────────────────────────────────────────────────
+router.get('/overview', asyncHandler(async (req, res) => {
+  const [facilities, authorized, pending, approved] = await Promise.all([
+    query('select * from facilities where is_active = true'),
+    query(`select * from credit_ledger where status = 'อนุมัติแล้ว'`),
+    query(`select amount from credit_requests where status = 'อยู่ระหว่างเสนออนุมัติ'`),
+    queryOne(`select count(*)::int n from credit_requests where status = 'อนุมัติ'`),
+  ]);
+  const rateBy = Object.fromEntries(facilities.rows.map((f) => [f.id, f.interest_rate]));
+  const usedBy = new Map();
+  for (const i of authorized.rows) usedBy.set(i.facility_id, (usedBy.get(i.facility_id) || 0) + Number(i.amount));
+  const byType = {};
+  for (const f of facilities.rows) {
+    const v = facilityView(f, usedBy.get(f.id) || 0);
+    const t = byType[f.type] || { type: f.type, limit: 0, used: 0 };
+    t.limit += v.limit; t.used += v.used; byType[f.type] = t;
+  }
+  const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 }, later: { count: 0, amount: 0 } };
+  let overdueInt = 0;
+  for (const i of authorized.rows) {
+    const b = dueBucket(i.due_date); buckets[b].count++; buckets[b].amount += Number(i.amount || 0);
+    overdueInt += overdueInterest(i, rateBy[i.facility_id]);
+  }
+  res.json({ data: {
+    byType: Object.values(byType).map((t) => ({ ...t, available: t.limit - t.used, pct: t.limit ? Math.round((t.used / t.limit) * 100) : 0 })),
+    buckets, overdueInterest: Math.round(overdueInt),
+    pendingCount: pending.rows.length, pendingAmount: pending.rows.reduce((s, r) => s + Number(r.amount || 0), 0), approvedCount: approved.n,
+  } });
+}));
+router.get('/overdue', asyncHandler(async (req, res) => {
+  const facilities = (await query('select id, interest_rate from facilities')).rows;
+  const rateBy = Object.fromEntries(facilities.map((f) => [f.id, f.interest_rate]));
+  const { rows } = await query(`select * from credit_ledger where status='อนุมัติแล้ว' and due_date < current_date`);
+  res.json({ data: rows.map((i) => ({ ...ledgerOut(i), bucket: dueBucket(i.due_date), overdue_interest: Math.round(overdueInterest(i, rateBy[i.facility_id])) })) });
+}));
 
-    res.json({ data: { request: requestOut(reqDoc.toObject()), ledger: ledger ? ledgerOut(ledger.toObject()) : null } });
-  })
-);
-
-// ── overview: due-buckets + overdue interest + status totals ────────────────
-
-/** GET /api/credit/overview — dashboard headline numbers. */
-router.get(
-  '/overview',
-  asyncHandler(async (req, res) => {
-    // facilities + all authorized ledger items in parallel (2 queries)
-    const [facilities, authorized] = await Promise.all([
-      Facility.find({ isActive: true }).lean(),
-      CreditLedger.find({ status: 'อนุมัติแล้ว' }).lean(),
-    ]);
-    const rateByFacility = Object.fromEntries(facilities.map((f) => [String(f._id), f.interestRate]));
-
-    // sum authorized ledger per facility in memory (no extra queries)
-    const usedMap = new Map();
-    for (const item of authorized) {
-      const k = String(item.facilityId);
-      usedMap.set(k, (usedMap.get(k) || 0) + (item.amount || 0));
-    }
-
-    // totals by type (limit/used)
-    const byType = {};
-    for (const f of facilities) {
-      const v = facilityViewWith(f, usedMap.get(String(f._id)) || 0);
-      const t = byType[f.type] || { type: f.type, limit: 0, used: 0 };
-      t.limit += v.limit;
-      t.used += v.used;
-      byType[f.type] = t;
-    }
-    const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 }, later: { count: 0, amount: 0 } };
-    let overdueInterestTotal = 0;
-    for (const item of authorized) {
-      const b = dueBucket(item.dueDate);
-      buckets[b].count++;
-      buckets[b].amount += item.amount || 0;
-      overdueInterestTotal += overdueInterest(item, rateByFacility[String(item.facilityId)]);
-    }
-
-    // request totals (parallel)
-    const [pending, approved] = await Promise.all([
-      CreditRequest.find({ status: 'อยู่ระหว่างเสนออนุมัติ' }).lean(),
-      CreditRequest.countDocuments({ status: 'อนุมัติ' }),
-    ]);
-
-    res.json({
-      data: {
-        byType: Object.values(byType).map((t) => ({ ...t, available: t.limit - t.used, pct: t.limit ? Math.round((t.used / t.limit) * 100) : 0 })),
-        buckets,
-        overdueInterest: Math.round(overdueInterestTotal),
-        pendingCount: pending.length,
-        pendingAmount: pending.reduce((s, r) => s + (r.amount || 0), 0),
-        approvedCount: approved,
-      },
-    });
-  })
-);
-
-/** GET /api/credit/overdue — authorized items past due, with interest. */
-router.get(
-  '/overdue',
-  asyncHandler(async (req, res) => {
-    const facilities = await Facility.find().lean();
-    const rateByFacility = Object.fromEntries(facilities.map((f) => [String(f._id), f.interestRate]));
-    const items = await CreditLedger.find({ status: 'อนุมัติแล้ว', dueDate: { $lt: new Date() } }).lean();
-    const out = items.map((i) => ({
-      ...ledgerOut(i),
-      bucket: dueBucket(i.dueDate),
-      overdue_interest: Math.round(overdueInterest(i, rateByFacility[String(i.facilityId)])),
-    }));
-    res.json({ data: out });
-  })
-);
-
-// ── cash plan (T-bar) ───────────────────────────────────────────────────────
-
-/** GET /api/credit/cash-plan?projectId=&month= */
-router.get(
-  '/cash-plan',
-  asyncHandler(async (req, res) => {
-    const filter = {};
-    if (req.query.projectId) filter.projectId = req.query.projectId;
-    if (req.query.month) filter.month = req.query.month;
-    const rows = await CashPlan.find(filter).sort({ month: 1, period: 1 }).lean();
-    res.json({ data: rows.map(cashPlanOut) });
-  })
-);
-
+// ── cash plan ───────────────────────────────────────────────────────────
+router.get('/cash-plan', asyncHandler(async (req, res) => {
+  const where = []; const params = [];
+  const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
+  if (req.query.projectId) add('project_id = $$', req.query.projectId);
+  if (req.query.month) add('month = $$', req.query.month);
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const { rows } = await query(`select * from cash_plans ${whereSql} order by month, period`, params);
+  // attach paid_ids
+  for (const r of rows) {
+    const p = await query('select ledger_id from cash_plan_paid where cash_plan_id = $1', [r.id]);
+    r.paid_ids = p.rows.map((x) => x.ledger_id);
+  }
+  res.json({ data: rows.map(cashPlanOut) });
+}));
 const cashPlanSchema = z.object({
-  projectId: z.string().min(1),
-  month: z.string().regex(/^\d{4}-\d{2}$/),
-  period: z.string().optional(),
-  income: z.number().optional(),
-  paidIds: z.array(z.string()).optional(),
-  newPN: z.number().optional(),
-  deductions: z.number().optional(),
-  incomeBreakdown: z.string().optional().nullable(),
-  available: z.number().optional(),
-  note: z.string().optional().nullable(),
+  projectId: z.string().uuid(), month: z.string().regex(/^\d{4}-\d{2}$/), period: z.string().optional(),
+  income: z.number().optional(), newPN: z.number().optional(), deductions: z.number().optional(),
+  incomeBreakdown: z.string().optional().nullable(), available: z.number().optional(), note: z.string().optional().nullable(),
 });
+router.post('/cash-plan', asyncHandler(async (req, res) => {
+  const parsed = cashPlanSchema.safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const row = await queryOne(
+    `insert into cash_plans (project_id, month, period, income, new_pn, deductions, income_breakdown, available, note, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
+    [d.projectId, d.month, d.period || '1', d.income || 0, d.newPN || 0, d.deductions || 0, d.incomeBreakdown || null, d.available || 0, d.note || null, req.profile.id]
+  );
+  await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan', targetId: row.id });
+  res.status(201).json({ data: cashPlanOut({ ...row, paid_ids: [] }) });
+}));
+router.patch('/cash-plan/:id', asyncHandler(async (req, res) => {
+  const parsed = cashPlanSchema.partial().safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const map = { month: 'month', period: 'period', income: 'income', newPN: 'new_pn', deductions: 'deductions', incomeBreakdown: 'income_breakdown', available: 'available', note: 'note' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] ?? null); sets.push(`${col} = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'No fields to update');
+  vals.push(req.params.id);
+  const row = await queryOne(`update cash_plans set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
+  if (!row) throw new ApiError(404, 'Cash plan row not found');
+  await writeAudit({ actor: req.profile, action: 'update', target: 'cashplan', targetId: req.params.id });
+  res.json({ data: cashPlanOut({ ...row, paid_ids: [] }) });
+}));
+router.delete('/cash-plan/:id', asyncHandler(async (req, res) => {
+  await query('delete from cash_plans where id = $1', [req.params.id]);
+  await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan', targetId: req.params.id });
+  res.json({ data: { deleted: true } });
+}));
 
-router.post(
-  '/cash-plan',
-  asyncHandler(async (req, res) => {
-    const parsed = cashPlanSchema.safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const created = await CashPlan.create({ ...parsed.data, createdBy: req.profile.id });
-    await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan', targetId: created._id });
-    res.status(201).json({ data: cashPlanOut(created.toObject()) });
-  })
-);
+// ── audit + export ──────────────────────────────────────────────────────
+router.get('/audit', asyncHandler(async (req, res) => {
+  const where = []; const params = [];
+  const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
+  if (req.query.target) add('target = $$', req.query.target);
+  if (req.query.targetId) add('target_id = $$', String(req.query.targetId));
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const { rows } = await query(`select * from credit_audit ${whereSql} order by created_at desc limit 200`, params);
+  res.json({ data: rows.map((a) => ({ id: a.id, actor_label: a.actor_label, action: a.action, target: a.target, target_id: a.target_id, changes: a.changes, note: a.note, created_at: a.created_at })) });
+}));
+router.get('/export', asyncHandler(async (req, res) => {
+  const where = []; const params = [];
+  const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
+  if (req.query.projectId) add('f.project_id = $$', req.query.projectId);
+  if (req.query.type) add('f.type = $$', req.query.type);
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const facilities = (await query(`select f.*, p.name as project_name, p.code as project_code from facilities f join projects p on p.id=f.project_id ${whereSql} order by f.created_at`, params)).rows;
+  const usedMap = await authorizedUsedMap(facilities.map((f) => f.id));
 
-router.patch(
-  '/cash-plan/:id',
-  asyncHandler(async (req, res) => {
-    const parsed = cashPlanSchema.partial().safeParse(req.body);
-    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const row = await CashPlan.findByIdAndUpdate(req.params.id, { $set: parsed.data }, { new: true }).lean();
-    if (!row) throw new ApiError(404, 'Cash plan row not found');
-    await writeAudit({ actor: req.profile, action: 'update', target: 'cashplan', targetId: req.params.id });
-    res.json({ data: cashPlanOut(row) });
-  })
-);
-
-router.delete(
-  '/cash-plan/:id',
-  asyncHandler(async (req, res) => {
-    await CashPlan.findByIdAndDelete(req.params.id);
-    await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan', targetId: req.params.id });
-    res.json({ data: { deleted: true } });
-  })
-);
-
-// ── audit trail ─────────────────────────────────────────────────────────────
-
-/** GET /api/credit/audit?target=&targetId= — recent audit entries. */
-router.get(
-  '/audit',
-  asyncHandler(async (req, res) => {
-    const filter = {};
-    if (req.query.target) filter.target = req.query.target;
-    if (req.query.targetId) filter.targetId = String(req.query.targetId);
-    const rows = await CreditAudit.find(filter).sort({ createdAt: -1 }).limit(200).lean();
-    res.json({
-      data: rows.map((a) => ({
-        id: String(a._id),
-        actor_label: a.actorLabel ?? null,
-        action: a.action,
-        target: a.target,
-        target_id: a.targetId ?? null,
-        changes: a.changes ?? null,
-        note: a.note ?? null,
-        created_at: a.createdAt,
-      })),
-    });
-  })
-);
-
-// ── xlsx export ─────────────────────────────────────────────────────────────
-
-/** GET /api/credit/export?projectId=&type= — facilities + transactions sheets. */
-router.get(
-  '/export',
-  asyncHandler(async (req, res) => {
-    const { projectId, type } = req.query;
-    const fFilter = {};
-    if (projectId) fFilter.projectId = projectId;
-    if (type) fFilter.type = type;
-    const facilities = await Facility.find(fFilter).lean();
-    const projects = await Project.find().lean();
-    const projName = Object.fromEntries(projects.map((p) => [String(p._id), p.name || p.code]));
-
-    const wb = new ExcelJS.Workbook();
-    const fs = wb.addWorksheet('วงเงินสินเชื่อ');
-    fs.addRow(['โครงการ', 'บริษัท', 'ธนาคาร', 'เลขที่วงเงิน', 'ประเภท', 'วงเงิน', 'ใช้ไป', 'คงเหลือ', 'ดอกเบี้ย%', 'ครบกำหนด']);
-    for (const f of facilities) {
-      const v = await facilityView(f);
-      fs.addRow([
-        projName[String(f.projectId)] || '', f.company || '', f.bank || '', f.facilityNo || '',
-        f.type, v.limit, v.used, v.available, f.interestRate ?? '', f.dueDate ? new Date(f.dueDate).toISOString().slice(0, 10) : '',
-      ]);
-    }
-    fs.getRow(1).font = { bold: true };
-
-    const facIds = facilities.map((f) => f._id);
-    const ledger = await CreditLedger.find({ facilityId: { $in: facIds } }).sort({ startDate: -1 }).lean();
-    const ts = wb.addWorksheet('รายการสินเชื่อ');
-    ts.addRow(['โครงการ', 'จำนวนเงิน', 'สถานะ', 'วันเริ่ม', 'ครบกำหนด', 'อ้างอิง', 'หมายเหตุ']);
-    for (const l of ledger) {
-      ts.addRow([
-        projName[String(l.projectId)] || '', l.amount, l.status,
-        l.startDate ? new Date(l.startDate).toISOString().slice(0, 10) : '',
-        l.dueDate ? new Date(l.dueDate).toISOString().slice(0, 10) : '',
-        l.ref || '', l.note || '',
-      ]);
-    }
-    ts.getRow(1).font = { bold: true };
-
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="credit-facilities.xlsx"');
-    await wb.xlsx.write(res);
-    res.end();
-  })
-);
+  const wb = new ExcelJS.Workbook();
+  const fs = wb.addWorksheet('วงเงินสินเชื่อ');
+  fs.addRow(['โครงการ', 'บริษัท', 'ธนาคาร', 'เลขที่วงเงิน', 'ประเภท', 'วงเงิน', 'ใช้ไป', 'คงเหลือ', 'ดอกเบี้ย%', 'ครบกำหนด']);
+  for (const f of facilities) {
+    const v = facilityView(f, usedMap.get(f.id) || 0);
+    fs.addRow([f.project_name || f.project_code, f.company || '', f.bank || '', f.facility_no || '', f.type, v.limit, v.used, v.available, f.interest_rate ?? '', f.due_date ? new Date(f.due_date).toISOString().slice(0, 10) : '']);
+  }
+  fs.getRow(1).font = { bold: true };
+  const facIds = facilities.map((f) => f.id);
+  const ledger = facIds.length ? (await query('select l.*, p.name as project_name from credit_ledger l join projects p on p.id=l.project_id where l.facility_id = any($1) order by l.start_date desc nulls last', [facIds])).rows : [];
+  const ts = wb.addWorksheet('รายการสินเชื่อ');
+  ts.addRow(['โครงการ', 'จำนวนเงิน', 'สถานะ', 'วันเริ่ม', 'ครบกำหนด', 'อ้างอิง', 'หมายเหตุ']);
+  for (const l of ledger) ts.addRow([l.project_name, Number(l.amount), l.status, l.start_date ? new Date(l.start_date).toISOString().slice(0, 10) : '', l.due_date ? new Date(l.due_date).toISOString().slice(0, 10) : '', l.ref || '', l.note || '']);
+  ts.getRow(1).font = { bold: true };
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="credit-facilities.xlsx"');
+  await wb.xlsx.write(res);
+  res.end();
+}));
 
 export default router;

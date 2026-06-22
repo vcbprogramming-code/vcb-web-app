@@ -1,4 +1,12 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+// Where the backend API lives. Priority:
+//   1. VITE_API_BASE_URL (set per environment)
+//   2. on localhost dev → "/api" (Vite proxy to the local backend)
+//   3. otherwise → the deployed Render backend (production default)
+const isLocalhost =
+  typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (isLocalhost ? '/api' : 'https://vcb-hr-api.onrender.com/api');
 
 const TOKEN_KEY = 'hr_access_token';
 

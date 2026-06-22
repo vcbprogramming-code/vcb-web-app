@@ -43,6 +43,9 @@ export const ememoApi = {
 
   // public approval (no auth — token from email link)
   lookupApproval: (token) => api(`/approvals/${token}`, { auth: false }),
+  // open an attachment from the public approval page (token-gated, no login)
+  approvalAttachmentBlobUrl: (token, attId) =>
+    apiBlobUrl(`/approvals/${token}/attachments/${attId}/download`),
   actOnApproval: (token, action, comment, signatureDataUrl) =>
     api(`/approvals/${token}`, {
       method: 'POST',

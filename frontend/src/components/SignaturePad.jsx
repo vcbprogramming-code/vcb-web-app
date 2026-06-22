@@ -1,25 +1,28 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 
 /**
  * A small canvas the approver draws their signature on (mouse or touch).
- * Exposes the drawing as a PNG data URL via onChange. Returns empty when blank.
+ * Exposes the drawing as a PNG data URL via onChange. Returns null when blank.
  */
 export default function SignaturePad({ onChange, height = 140 }) {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
-  const [hasInk, setHasInk] = useState(false);
+  const hasInk = useRef(false); // ref, not state — avoids stale closure in end()
 
+  // Size the canvas once on mount. (Setting width/height clears the canvas, so
+  // we must NOT re-run this on every render or the signature would be wiped.)
   useEffect(() => {
     const canvas = canvasRef.current;
-    // size the backing store to the displayed size for crisp lines
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.strokeStyle = '#1e3a8a';
-  }, [height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -42,18 +45,18 @@ export default function SignaturePad({ onChange, height = 140 }) {
     const { x, y } = pos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
-    if (!hasInk) setHasInk(true);
+    hasInk.current = true;
   };
   const end = () => {
     if (!drawing.current) return;
     drawing.current = false;
-    onChange?.(hasInk ? canvasRef.current.toDataURL('image/png') : null);
+    onChange?.(hasInk.current ? canvasRef.current.toDataURL('image/png') : null);
   };
 
   const clear = () => {
     const canvas = canvasRef.current;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    setHasInk(false);
+    hasInk.current = false;
     onChange?.(null);
   };
 

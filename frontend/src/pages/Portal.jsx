@@ -22,7 +22,7 @@ export default function Portal() {
     <div className="min-h-full bg-slate-50">
       {/* top header */}
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between px-4 py-3 md:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white">
               <Icon name="layers" className="h-5 w-5" />
@@ -47,7 +47,7 @@ export default function Portal() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+      <main className="mx-auto max-w-screen-2xl px-4 py-8 md:px-8 md:py-10">
         {/* hero */}
         <section className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-brand to-brand-light p-8 text-white md:p-10">
           <div className="flex flex-wrap items-center gap-2">

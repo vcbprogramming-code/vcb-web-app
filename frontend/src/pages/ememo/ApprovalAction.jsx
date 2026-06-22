@@ -4,6 +4,32 @@ import { ememoApi, APPROVAL_META, STATUS_META, formatThaiDate } from '../../lib/
 import SignaturePad from '../../components/SignaturePad.jsx';
 import Icon from '../../components/Icon.jsx';
 
+// NOTE: these are declared at module level (NOT inside ApprovalAction) so they
+// keep a stable identity across renders — otherwise the textarea loses focus on
+// every keystroke and the signature canvas resets on every state change.
+function Wrap({ children, wide }) {
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-start justify-center p-4 py-8">
+      <div className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>
+        <div className="rounded-t-2xl bg-gradient-to-br from-brand to-brand-light px-7 py-5 text-white">
+          <div className="text-xs tracking-wide opacity-85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
+          <div className="mt-0.5 text-lg font-bold">บันทึกข้อความขออนุมัติ</div>
+        </div>
+        <div className="rounded-b-2xl border border-t-0 border-slate-200 bg-white p-7 shadow-sm">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="flex gap-3 py-1.5">
+      <div className="w-24 shrink-0 text-slate-500">{label}</div>
+      <div className="flex-1 font-medium text-slate-800">{children}</div>
+    </div>
+  );
+}
+
 /**
  * Public approval page reached from the email link: /approve/:token?action=...
  * No login required — the token is the credential. Shows the document, lets the
@@ -48,11 +74,14 @@ export default function ApprovalAction() {
     }
   };
 
-  const Wrap = ({ children }) => (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 w-full max-w-md p-8">{children}</div>
-    </div>
-  );
+  const openAttachment = async (attId) => {
+    try {
+      const url = await ememoApi.approvalAttachmentBlobUrl(token, attId);
+      window.open(url, '_blank');
+    } catch (e) {
+      setError(e.message);
+    }
+  };
 
   if (error && !info) return <Wrap><p className="text-red-600">{error}</p></Wrap>;
   if (!info) return <Wrap><p className="text-slate-400">กำลังโหลด…</p></Wrap>;
@@ -94,46 +123,90 @@ export default function ApprovalAction() {
     );
   }
 
+  const enclosures = Array.isArray(info.enclosures) ? info.enclosures : [];
+  const files = (info.attachments || []).filter((a) => a.kind !== 'generated_pdf' || a.version === 'original');
+
   return (
-    <Wrap>
-      <h2 className="text-lg font-bold text-slate-800 mb-1">พิจารณาอนุมัติเอกสาร</h2>
-      <p className="text-sm text-slate-500 mb-4">เรียน {info.approver_name || info.approver_email}</p>
+    <Wrap wide>
+      <p className="mb-4 text-sm text-slate-500">เรียน <b className="text-slate-700">{info.approver_name || info.approver_email}</b> — มีเอกสารรอการพิจารณาอนุมัติจากท่าน</p>
 
-      <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm space-y-1 mb-4">
-        <div><span className="text-slate-500">เลขที่: </span><b>{info.doc_number}</b></div>
-        <div><span className="text-slate-500">เรื่อง: </span>{info.subject}</div>
-        {info.recipient && <div><span className="text-slate-500">เรียน: </span>{info.recipient}</div>}
-        {info.token_expires_at && (
-          <div><span className="text-slate-500">ลิงก์หมดอายุ: </span>{formatThaiDate(info.token_expires_at)}</div>
+      {/* full document detail */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-brand px-2.5 py-1 text-xs font-semibold text-white">{info.project_code}</span>
+          <span className="text-base font-bold text-slate-800">{info.doc_number}</span>
+        </div>
+        <Field label="เรื่อง">{info.subject}</Field>
+        {info.recipient && <Field label="เรียน">{info.recipient}</Field>}
+        {info.doc_type_name && <Field label="ประเภท">{info.doc_type_name}</Field>}
+        {info.department && <Field label="แผนก">{info.department}</Field>}
+        {info.work_unit && <Field label="หน่วยงาน">{info.work_unit}</Field>}
+        {info.date_received && <Field label="วันที่">{formatThaiDate(info.date_received)}</Field>}
+        {enclosures.length > 0 && (
+          <Field label="สิ่งที่ส่งมาด้วย">
+            <span className="font-normal">{enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}</span>
+          </Field>
         )}
+        {info.body && (
+          <div className="mt-2 border-t border-slate-200 pt-2">
+            <div className="mb-1 text-slate-500">เนื้อความ</div>
+            <div className="whitespace-pre-wrap font-normal text-slate-700">{info.body}</div>
+          </div>
+        )}
+        {info.remarks && <Field label="หมายเหตุ"><span className="font-normal">{info.remarks}</span></Field>}
       </div>
 
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        rows={2}
-        placeholder="ความเห็น (ไม่บังคับ)"
-        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
-      />
+      {/* attachments */}
+      {files.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-2 text-sm font-medium text-slate-600">เอกสารแนบ</div>
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            {files.map((a) => (
+              <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <span className="flex items-center gap-2 text-slate-700">
+                  <Icon name={a.version === 'original' ? 'file' : 'paperclip'} className="h-4 w-4 text-slate-400" />
+                  {a.file_name}{a.version === 'original' ? ' (หนังสือฉบับเต็ม)' : ''}
+                </span>
+                <button onClick={() => openAttachment(a.id)} className="inline-flex items-center gap-1 text-brand hover:underline">
+                  <Icon name="eye" className="h-4 w-4" /> เปิดดู
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      {/* signature — required to approve */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็น (สำหรับการอนุมัติ)</label>
-        <SignaturePad onChange={setSignature} />
-      </div>
+      {/* approval form */}
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <h3 className="mb-3 font-bold text-slate-800">พิจารณาอนุมัติ</h3>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={2}
+          placeholder="ความเห็น (ไม่บังคับ)"
+          className="mb-3 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/25"
+        />
+        <div className="mb-4">
+          <label className="mb-1 block text-sm font-medium text-slate-600">ลายเซ็น (สำหรับการอนุมัติ)</label>
+          <SignaturePad onChange={setSignature} />
+        </div>
 
-      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3 mb-3">{error}</div>}
+        {error && <div className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => act('approved')} disabled={busy}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 ${preselect === 'approved' ? 'ring-2 ring-emerald-300' : ''}`}>
-          <Icon name="check" className="h-4 w-4" /> อนุมัติ</button>
-        <button onClick={() => act('returned')} disabled={busy}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50 ${preselect === 'returned' ? 'ring-2 ring-orange-300' : ''}`}>
-          <Icon name="undo" className="h-4 w-4" /> ส่งกลับ</button>
-        <button onClick={() => act('rejected')} disabled={busy}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 ${preselect === 'rejected' ? 'ring-2 ring-red-300' : ''}`}>
-          <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ</button>
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => act('approved')} disabled={busy}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 ${preselect === 'approved' ? 'ring-2 ring-emerald-300' : ''}`}>
+            <Icon name="check" className="h-4 w-4" /> อนุมัติ</button>
+          <button onClick={() => act('returned')} disabled={busy}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50 ${preselect === 'returned' ? 'ring-2 ring-orange-300' : ''}`}>
+            <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข</button>
+          <button onClick={() => act('rejected')} disabled={busy}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 ${preselect === 'rejected' ? 'ring-2 ring-red-300' : ''}`}>
+            <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ</button>
+        </div>
+        {info.token_expires_at && (
+          <p className="mt-3 text-center text-xs text-slate-400">ลิงก์นี้หมดอายุ {formatThaiDate(info.token_expires_at)} · ใช้สำหรับเอกสารฉบับนี้เท่านั้น</p>
+        )}
       </div>
     </Wrap>
   );

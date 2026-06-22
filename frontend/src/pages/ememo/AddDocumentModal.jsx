@@ -114,7 +114,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={field}>
                 <option value="">— เลือกโครงการ —</option>
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
+                  <option key={p.id} value={p.id}>{p.name && p.name !== p.code ? `${p.code} — ${p.name}` : p.code}</option>
                 ))}
               </select>
             </div>

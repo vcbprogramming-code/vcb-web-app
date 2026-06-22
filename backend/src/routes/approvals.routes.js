@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { pool, queryOne } from '../config/db.js';
+import { pool, query, queryOne } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import crypto from 'node:crypto';
 import { applyApprovalAction, sendApprovalRequest } from '../services/approval.js';
-import { putObject } from '../config/storage.js';
+import { putObject, openDownloadStream } from '../config/storage.js';
 import { generateApprovedPdf } from '../services/pdfDoc.js';
 
 // PUBLIC routes — reached from email links, so NO requireAuth.
@@ -21,14 +21,59 @@ router.get(
   asyncHandler(async (req, res) => {
     const step = await queryOne(
       `select s.id, s.step_no, s.approver_name, s.approver_email, s.action,
-              s.token_expires_at, d.doc_number, d.subject, d.recipient, d.status
-         from approval_steps s join documents d on d.id = s.document_id
+              s.token_expires_at, s.document_id,
+              d.doc_number, d.subject, d.recipient, d.body, d.remarks,
+              d.department, d.work_unit, d.date_received, d.enclosures, d.status,
+              p.code as project_code, p.name as project_name,
+              t.name as doc_type_name
+         from approval_steps s
+         join documents d on d.id = s.document_id
+         join projects p on p.id = d.project_id
+         left join document_types t on t.id = d.doc_type_id
         where s.action_token = $1`,
       [req.params.token]
     );
     if (!step) throw new ApiError(404, 'ไม่พบรายการอนุมัติ หรือลิงก์ถูกใช้ไปแล้ว');
     const expired = step.token_expires_at && new Date(step.token_expires_at) < new Date();
-    res.json({ data: { ...step, expired } });
+
+    // attachments (incl. the generated original PDF) so the approver can review
+    const { rows: attachments } = await query(
+      `select id, kind, version, file_name, content_type, size_bytes, created_at
+         from document_attachments where document_id = $1 order by created_at`,
+      [step.document_id]
+    );
+    // prior steps' decisions for context
+    const { rows: steps } = await query(
+      `select step_no, approver_name, approver_email, action, comment, acted_at
+         from approval_steps where document_id = $1 order by step_no`,
+      [step.document_id]
+    );
+    res.json({ data: { ...step, expired, attachments, approval_steps: steps } });
+  })
+);
+
+/**
+ * GET /api/approvals/:token/attachments/:attId/download — public (token-gated)
+ * attachment stream, so the approver can open files/PDFs without logging in.
+ */
+router.get(
+  '/:token/attachments/:attId/download',
+  asyncHandler(async (req, res) => {
+    // the token must belong to the same document as the attachment
+    const ok = await queryOne(
+      `select a.storage_key, a.file_name, a.content_type
+         from document_attachments a
+         join approval_steps s on s.document_id = a.document_id
+        where s.action_token = $1 and a.id = $2`,
+      [req.params.token, req.params.attId]
+    );
+    if (!ok) throw new ApiError(404, 'ไม่พบไฟล์');
+    const obj = await openDownloadStream(ok.storage_key);
+    if (!obj) throw new ApiError(404, 'ไม่พบไฟล์ในที่จัดเก็บ');
+    res.setHeader('Content-Type', obj.contentType || ok.content_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(ok.file_name || 'file')}`);
+    obj.stream.on('error', () => res.destroy());
+    obj.stream.pipe(res);
   })
 );
 

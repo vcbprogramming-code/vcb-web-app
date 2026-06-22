@@ -30,7 +30,7 @@ export default function ModuleShell() {
   return (
     <div className="flex min-h-full flex-col bg-slate-50">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => navigate('/')}
@@ -58,7 +58,7 @@ export default function ModuleShell() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6">
+      <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-6 md:px-8">
         <Outlet />
       </main>
     </div>

@@ -9,7 +9,7 @@ services:
     runtime: node
     region: singapore
     plan: free
-    rootDir: hr-system/backend
+    rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health

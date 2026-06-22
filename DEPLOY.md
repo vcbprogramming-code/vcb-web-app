@@ -24,7 +24,7 @@ Deploy 3 ส่วน: **Database/Storage = Supabase (มีแล้ว)**, **B
 3. ตั้งค่า:
    - **Name:** `vcb-hr-api`
    - **Region:** Singapore
-   - **Root Directory:** `hr-system/backend`
+   - **Root Directory:** `backend`
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Instance Type:** Free
@@ -60,7 +60,7 @@ Deploy 3 ส่วน: **Database/Storage = Supabase (มีแล้ว)**, **B
 
 1. เข้า [vercel.com/new](https://vercel.com/new) → Import repo **vcb-web-app**
 2. ตั้งค่า:
-   - **Root Directory:** `hr-system/frontend` (กด Edit แล้วเลือก)
+   - **Root Directory:** `frontend` (กด Edit แล้วเลือก)
    - **Framework Preset:** Vite (auto)
 3. **Environment Variables** → เพิ่ม 1 ตัว:
 

@@ -9,7 +9,9 @@ export default function Portal() {
   const navigate = useNavigate();
   const role = profile?.role;
 
-  const visible = apps.filter((a) => !a.roles || (role && a.roles.includes(role)));
+  const visible = apps.filter(
+    (a) => a.enabled !== false && (!a.roles || (role && a.roles.includes(role)))
+  );
 
   function handleLogout() {
     logout();

@@ -12,6 +12,13 @@ import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
+import { disabledPaths } from './config/nav.js';
+
+/** Redirect to Portal if this module is soft-disabled (see config/nav.js). */
+function Feature({ path, children }) {
+  if (disabledPaths.includes(path)) return <Navigate to="/" replace />;
+  return children;
+}
 
 export default function App() {
   return (
@@ -37,18 +44,20 @@ export default function App() {
           <Route path="memos" element={<DocumentRegister />} />
           <Route path="memos/:id" element={<DocumentDetail />} />
 
-          <Route path="performance" element={<Performance />} />
+          <Route path="performance" element={<Feature path="/performance"><Performance /></Feature>} />
 
           <Route
             path="credit"
             element={
-              <ProtectedRoute roles={['admin', 'executive']}>
-                <CreditFacility />
-              </ProtectedRoute>
+              <Feature path="/credit">
+                <ProtectedRoute roles={['admin', 'executive']}>
+                  <CreditFacility />
+                </ProtectedRoute>
+              </Feature>
             }
           />
 
-          <Route path="onboarding" element={<Onboarding />} />
+          <Route path="onboarding" element={<Feature path="/onboarding"><Onboarding /></Feature>} />
 
           <Route
             path="admin"

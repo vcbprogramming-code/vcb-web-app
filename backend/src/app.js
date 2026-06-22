@@ -9,8 +9,16 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
+  // CLIENT_ORIGIN may be a comma-separated list (dev + prod frontends).
+  const allowedOrigins = env.clientOrigin.split(',').map((s) => s.trim()).filter(Boolean);
+  const corsOrigin = (origin, cb) => {
+    // allow same-origin / curl (no Origin header) and any whitelisted origin
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  };
+
   app.use(helmet());
-  app.use(cors({ origin: env.clientOrigin, credentials: true }));
+  app.use(cors({ origin: corsOrigin, credentials: true }));
   app.use(express.json({ limit: '5mb' }));
   app.use(morgan(isProd ? 'combined' : 'dev'));
 

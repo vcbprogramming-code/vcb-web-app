@@ -1,0 +1,56 @@
+# Render blueprint for the backend API (Node/Express).
+# Frontend is deployed separately on Vercel.
+#
+# Secrets (DATABASE_URL, JWT_SECRET, S3_*, SMTP_*) are NOT in this file — set
+# them in the Render dashboard (Environment) so they never hit git.
+services:
+  - type: web
+    name: vcb-hr-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: hr-system/backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # CLIENT_ORIGIN: set to the Vercel URL after the frontend is deployed
+      #   e.g. https://vcb-hr.vercel.app
+      - key: CLIENT_ORIGIN
+        sync: false
+      # APP_BASE_URL: same Vercel URL (used for approval email links)
+      - key: APP_BASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 604800
+      - key: MAX_UPLOAD_BYTES
+        value: 26214400
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: ap-southeast-1
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: documents
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

@@ -12,8 +12,15 @@ export function createApp() {
   // CLIENT_ORIGIN may be a comma-separated list (dev + prod frontends).
   const allowedOrigins = env.clientOrigin.split(',').map((s) => s.trim()).filter(Boolean);
   const corsOrigin = (origin, cb) => {
-    // allow same-origin / curl (no Origin header) and any whitelisted origin
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // allow same-origin / curl (no Origin header), any whitelisted origin, and
+    // any Vercel deployment of this app (preview + production *.vercel.app URLs)
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)
+    ) {
+      return cb(null, true);
+    }
     return cb(new Error('Not allowed by CORS'));
   };
 

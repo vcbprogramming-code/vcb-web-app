@@ -2,10 +2,13 @@ import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 
 /**
- * Email transport. If SMTP env vars are configured we send for real; otherwise
- * we fall back to a console "ethereal" logger so development works without SMTP.
- * Configure later via SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / MAIL_FROM.
+ * Email delivery. Three modes, picked at send time:
+ *   1. BREVO_API_KEY set → Brevo HTTP API over HTTPS (works on hosts like Render
+ *      that block outbound SMTP ports). This is the preferred production path.
+ *   2. else SMTP_HOST set → classic SMTP via nodemailer.
+ *   3. else → console logger so development works without any mail provider.
  */
+const hasBrevoApi = Boolean(process.env.BREVO_API_KEY);
 const hasSmtp = Boolean(process.env.SMTP_HOST);
 
 const transport = hasSmtp
@@ -19,17 +22,52 @@ const transport = hasSmtp
 
 const FROM = process.env.MAIL_FROM || 'HR System <no-reply@vcb.local>';
 
-/** Send an email. In dev (no SMTP) it just logs to the console. */
-export async function sendEmail({ to, subject, html, text }) {
-  if (!transport) {
-    console.log('\n📧 [DEV EMAIL — not sent, no SMTP configured]');
-    console.log('   to:', to);
-    console.log('   subject:', subject);
-    console.log('   text:', (text || html || '').replace(/<[^>]+>/g, '').slice(0, 400));
-    console.log('');
-    return { dev: true };
+/** Split "Name <email@host>" (or a bare address) into { name, email }. */
+function parseFrom(from) {
+  const m = /^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/.exec(from);
+  if (m) return { name: m[1] || undefined, email: m[2] };
+  return { email: from.trim() };
+}
+
+/** Send via Brevo's transactional email HTTP API (HTTPS, no SMTP needed). */
+async function sendViaBrevoApi({ to, subject, html, text }) {
+  const sender = parseFrom(FROM);
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Brevo API ${res.status}: ${body.slice(0, 300)}`);
   }
-  return transport.sendMail({ from: FROM, to, subject, html, text });
+  return res.json().catch(() => ({ ok: true }));
+}
+
+/** Send an email. Brevo API → SMTP → console, depending on what's configured. */
+export async function sendEmail({ to, subject, html, text }) {
+  if (hasBrevoApi) {
+    return sendViaBrevoApi({ to, subject, html, text });
+  }
+  if (transport) {
+    return transport.sendMail({ from: FROM, to, subject, html, text });
+  }
+  console.log('\n📧 [DEV EMAIL — not sent, no mail provider configured]');
+  console.log('   to:', to);
+  console.log('   subject:', subject);
+  console.log('   text:', (text || html || '').replace(/<[^>]+>/g, '').slice(0, 400));
+  console.log('');
+  return { dev: true };
 }
 
 const esc = (s) =>

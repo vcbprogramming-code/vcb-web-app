@@ -4,14 +4,6 @@ import { apps, roleLabels } from '../config/nav.js';
 import { formatThaiLongDate } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
 
-/** Time-of-day greeting in Thai. */
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'สวัสดีตอนเช้า';
-  if (h < 17) return 'สวัสดีตอนบ่าย';
-  return 'สวัสดีตอนเย็น';
-}
-
 export default function Portal() {
   const { profile, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -79,22 +71,21 @@ export default function Portal() {
           />
 
           <div className="relative">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-white/20">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_8px] shadow-emerald-300" />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-400/30 to-teal-400/20 px-3 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur-sm">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300 shadow-[0_0_8px] shadow-emerald-300" />
                 ระบบออนไลน์
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-white/20">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-white/25 to-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur-sm">
                 <Icon name="layers" className="h-3.5 w-3.5" /> {visible.length} แอป
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-white/20">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-300/25 to-indigo-300/15 px-3 py-1 text-xs font-semibold text-white shadow-sm ring-1 ring-inset ring-white/25 backdrop-blur-sm">
                 <Icon name="calendar" className="h-3.5 w-3.5" /> {formatThaiLongDate(new Date())}
               </span>
             </div>
 
-            <p className="mt-6 text-sm font-medium text-white/70">{greeting()}</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight md:text-[42px] md:leading-[1.1]">
-              {firstName} 👋
+            <h1 className="mt-6 text-3xl font-bold tracking-tight md:text-[42px] md:leading-[1.1]">
+              ยินดีต้อนรับสู่ระบบงานภายใน
             </h1>
             <p className="mt-3 max-w-2xl text-sm text-white/80 md:text-base">
               ศูนย์รวมแอปพลิเคชันภายในของกลุ่มวิจิตรภัณฑ์ก่อสร้าง — เลือกแอปที่ต้องการใช้งานด้านล่าง รองรับการใช้งานทุกอุปกรณ์

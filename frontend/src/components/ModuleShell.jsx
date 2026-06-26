@@ -29,17 +29,22 @@ export default function ModuleShell() {
 
   return (
     <div className="flex min-h-full flex-col bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => navigate('/')}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
+              title="กลับสู่หน้า Portal"
+              className="group flex min-w-0 items-center gap-3 rounded-xl px-1 py-0.5 transition hover:opacity-90"
             >
-              <Icon name="arrowLeft" className="h-4 w-4" /> กลับ Portal
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-light text-white shadow-sm shadow-brand/30 transition group-hover:scale-105">
+                <Icon name="layers" className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 text-left leading-tight">
+                <span className="block text-sm font-bold tracking-tight text-slate-900">VCB ONLINE</span>
+                {title && <span className="block truncate text-[11px] text-slate-500">{title}</span>}
+              </span>
             </button>
-            <div className="hidden h-6 w-px bg-slate-200 sm:block" />
-            <h1 className="truncate text-base font-bold text-slate-800">{title}</h1>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">

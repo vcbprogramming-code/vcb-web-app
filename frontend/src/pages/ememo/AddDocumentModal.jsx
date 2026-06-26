@@ -17,6 +17,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
 
   const [preview, setPreview] = useState(null); // { docNumber, department, runNo }
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -60,6 +61,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     setFile(f);
   };
 
+  const updateApprover = (i, key, value) =>
+    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)));
+  const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
+  const removeApprover = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
+
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -87,6 +93,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       // upload the supplementary file (if any) — streamed into GridFS via the API
       if (file) {
         await ememoApi.uploadAttachment(doc.id, file);
+      }
+
+      // if approvers were given, generate the PDF and send for approval right away
+      const cleanedApprovers = approvers
+        .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
+        .filter((a) => a.email);
+      if (cleanedApprovers.length > 0) {
+        await ememoApi.generatePdf(doc.id);
+        await ememoApi.submitForApproval(doc.id, cleanedApprovers);
       }
 
       onCreated();
@@ -233,12 +248,38 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             )}
           </div>
 
+          {/* approvers — optional. If filled, the doc is sent for approval on save. */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติ (ไม่บังคับ)</label>
+            <p className="mb-3 text-xs text-slate-400">
+              ระบุผู้อนุมัติตามลำดับขั้น — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ
+              <br />หากเว้นว่างไว้ เอกสารจะถูกบันทึกอย่างเดียว (ส่งอนุมัติภายหลังได้)
+            </p>
+            <div className="space-y-2">
+              {approvers.map((a, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="w-6 shrink-0 text-center font-semibold text-slate-400">{i + 1}</span>
+                  <input value={a.name} onChange={(e) => updateApprover(i, 'name', e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className={`${field} w-32`} />
+                  <input value={a.email} onChange={(e) => updateApprover(i, 'email', e.target.value)} placeholder="อีเมล" type="email" className={`${field} flex-1`} />
+                  {approvers.length > 1 && (
+                    <button type="button" onClick={() => removeApprover(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={addApprover} className="mt-2 text-sm font-medium text-blue-600 hover:underline">+ เพิ่มผู้อนุมัติ</button>
+          </div>
+
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
             <button type="submit" disabled={submitting} className="btn-primary">
-              {submitting ? 'กำลังบันทึก…' : 'บันทึกเอกสาร'}
+              {submitting
+                ? 'กำลังบันทึก…'
+                : approvers.some((a) => a.email.trim())
+                  ? 'บันทึกและส่งอนุมัติ'
+                  : 'บันทึกเอกสาร'}
             </button>
           </div>
         </form>

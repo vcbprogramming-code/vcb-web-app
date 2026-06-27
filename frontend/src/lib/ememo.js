@@ -52,6 +52,13 @@ export const ememoApi = {
       auth: false,
       body: { action, comment, signatureDataUrl },
     }),
+  // delegate the current step to someone else
+  forwardApproval: (token, toEmail, toName, comment) =>
+    api(`/approvals/${token}/forward`, {
+      method: 'POST',
+      auth: false,
+      body: { toEmail, toName, comment },
+    }),
 };
 
 export const adminApi = {

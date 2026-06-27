@@ -95,10 +95,32 @@ export default function ApprovalAction() {
   const [signature, setSignature] = useState(null);
   const [done, setDone] = useState(null);
   const [busy, setBusy] = useState(false);
+  // forward / delegate
+  const [showForward, setShowForward] = useState(false);
+  const [fwdEmail, setFwdEmail] = useState('');
+  const [fwdName, setFwdName] = useState('');
+  const [forwarded, setForwarded] = useState(null);
 
   useEffect(() => {
     ememoApi.lookupApproval(token).then((r) => setInfo(r.data)).catch((e) => setError(e.message));
   }, [token]);
+
+  const forward = async () => {
+    if (!fwdEmail.trim()) {
+      setError('กรุณาระบุอีเมลผู้ที่ต้องการส่งต่อ');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { data } = await ememoApi.forwardApproval(token, fwdEmail.trim(), fwdName.trim() || undefined, comment.trim() || undefined);
+      setForwarded(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const act = async (action) => {
     // require a signature only when approving
@@ -137,6 +159,20 @@ export default function ApprovalAction() {
 
   if (done) {
     return <DoneScreen done={done} />;
+  }
+
+  if (forwarded) {
+    return (
+      <Wrap>
+        <div className="space-y-3 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-tint text-brand">
+            <Icon name="arrowRight" className="h-7 w-7" strokeWidth={2.2} />
+          </div>
+          <h2 className="text-lg font-bold text-slate-800">ส่งต่อเรียบร้อย</h2>
+          <p className="text-sm text-slate-500">ส่งคำขออนุมัติต่อไปยัง <b className="text-slate-700">{forwarded.to}</b> แล้ว</p>
+        </div>
+      </Wrap>
+    );
   }
 
   if (info.action !== 'pending' || info.expired) {
@@ -235,6 +271,31 @@ export default function ApprovalAction() {
             className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50 ${preselect === 'rejected' ? 'ring-2 ring-red-300' : ''}`}>
             <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ</button>
         </div>
+
+        {/* forward / delegate */}
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          {!showForward ? (
+            <button onClick={() => { setShowForward(true); setError(null); }} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-brand">
+              <Icon name="arrowRight" className="h-4 w-4" /> ส่งต่อให้ผู้อื่นพิจารณาแทน
+            </button>
+          ) : (
+            <div className="rounded-xl bg-slate-50 p-4">
+              <div className="mb-2 text-sm font-semibold text-slate-700">ส่งต่อให้ผู้อื่น</div>
+              <p className="mb-3 text-xs text-slate-400">มอบหมายให้บุคคลอื่นพิจารณาในลำดับนี้แทนท่าน — ระบบจะส่งอีเมลลิงก์อนุมัติไปให้</p>
+              <div className="space-y-2">
+                <input value={fwdName} onChange={(e) => setFwdName(e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/25" />
+                <input value={fwdEmail} onChange={(e) => setFwdEmail(e.target.value)} placeholder="อีเมลผู้รับ *" type="email" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/25" />
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <button onClick={() => setShowForward(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-white">ยกเลิก</button>
+                <button onClick={forward} disabled={busy} className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-50">
+                  <Icon name="arrowRight" className="h-4 w-4" /> {busy ? 'กำลังส่ง…' : 'ส่งต่อ'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {info.token_expires_at && (
           <p className="mt-3 text-center text-xs text-slate-400">ลิงก์นี้หมดอายุ {formatThaiDate(info.token_expires_at)} · ใช้สำหรับเอกสารฉบับนี้เท่านั้น</p>
         )}

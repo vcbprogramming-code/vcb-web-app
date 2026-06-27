@@ -4,7 +4,7 @@ import { pool, query, queryOne } from '../config/db.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import crypto from 'node:crypto';
-import { applyApprovalAction, sendApprovalRequest } from '../services/approval.js';
+import { applyApprovalAction, forwardApprovalStep, sendApprovalRequest } from '../services/approval.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
 import { generateApprovedPdf } from '../services/pdfDoc.js';
 
@@ -158,6 +158,57 @@ router.post(
         finalized: Boolean(result.finalized),
       },
     });
+  })
+);
+
+const forwardSchema = z.object({
+  toEmail: z.string().email(),
+  toName: z.string().optional(),
+  comment: z.string().optional(),
+});
+
+/**
+ * POST /api/approvals/:token/forward — delegate the current step to someone else.
+ * Re-points this step at a new approver and emails them a fresh link.
+ */
+router.post(
+  '/:token/forward',
+  asyncHandler(async (req, res) => {
+    const parsed = forwardSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('begin');
+      result = await forwardApprovalStep(client, {
+        token: req.params.token,
+        toEmail: parsed.data.toEmail.trim(),
+        toName: parsed.data.toName?.trim(),
+        comment: parsed.data.comment,
+      });
+      if (result.error) {
+        await client.query('rollback');
+        const msg = {
+          invalid_token: 'ไม่พบรายการอนุมัติ',
+          already_actioned: 'รายการนี้ถูกดำเนินการไปแล้ว',
+          expired: 'ลิงก์หมดอายุแล้ว',
+        }[result.error] || 'ไม่สามารถดำเนินการได้';
+        throw new ApiError(409, msg);
+      }
+      await client.query('commit');
+    } catch (err) {
+      if (!(err instanceof ApiError)) await client.query('rollback').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    await sendApprovalRequest({ step: result.step, doc: result.document }).catch((e) =>
+      console.error('forwarded-approver email failed:', e.message)
+    );
+
+    res.json({ data: { forwarded: true, to: result.step.approver_email } });
   })
 );
 

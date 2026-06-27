@@ -158,4 +158,52 @@ export async function applyApprovalAction(client, { token, action, comment, sign
   return { step, nextStep, document: docRows[0], finalized: docStatus === 'approved' };
 }
 
+/**
+ * Forward / delegate the CURRENT approval step to a different person.
+ * Re-points the same step (same step_no, same position in the chain) at a new
+ * approver, issues a fresh token, and returns the updated step so the caller can
+ * email it. The original recipient's token is consumed (replaced).
+ *
+ * Runs inside a transaction. Returns { step, document } or { error }.
+ */
+export async function forwardApprovalStep(client, { token, toEmail, toName, comment }) {
+  const { rows: steps } = await client.query(
+    `select s.*, d.doc_number, d.subject
+       from approval_steps s join documents d on d.id = s.document_id
+      where s.action_token = $1
+      for update`,
+    [token]
+  );
+  const step = steps[0];
+  if (!step) return { error: 'invalid_token' };
+  if (step.action !== 'pending') return { error: 'already_actioned' };
+  if (step.token_expires_at && new Date(step.token_expires_at) < new Date()) {
+    return { error: 'expired' };
+  }
+
+  const { rows: updated } = await client.query(
+    `update approval_steps
+        set approver_name = $1, approver_email = $2, approver_id = null,
+            action_token = $3, token_expires_at = $4
+      where id = $5
+      returning id, step_no, approver_name, approver_email, action_token`,
+    [toName || null, toEmail, makeToken(), tokenExpiry(), step.id]
+  );
+
+  await client.query(
+    `insert into audit_log (document_id, actor_label, action, detail)
+     values ($1,$2,'forwarded',$3)`,
+    [
+      step.document_id,
+      step.approver_name || step.approver_email,
+      JSON.stringify({ step_no: step.step_no, to: toEmail, comment: comment || null }),
+    ]
+  );
+
+  return {
+    step: updated[0],
+    document: { id: step.document_id, doc_number: step.doc_number, subject: step.subject },
+  };
+}
+
 export { sendApprovalRequest };

@@ -86,6 +86,19 @@ export default function DocumentDetail() {
     }
   };
 
+  const generatePdf = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await ememoApi.generatePdf(id);
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openAttachment = async (attId) => {
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
@@ -180,9 +193,12 @@ export default function DocumentDetail() {
                 className="h-[calc(100vh-220px)] min-h-[560px] w-full rounded-xl border border-slate-200 bg-slate-50"
               />
             ) : (
-              <div className="flex h-[560px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center">
+              <div className="flex h-[560px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 text-center">
                 <Icon name="file" className="h-10 w-10 text-slate-300" />
-                <p className="text-sm text-slate-400">กำลังเตรียมหนังสือ… เอกสารที่สร้างก่อนหน้านี้อาจยังไม่มีไฟล์ — กด "แก้ไข" แล้วบันทึกเพื่อสร้างใหม่</p>
+                <p className="text-sm text-slate-400">ยังไม่มีไฟล์หนังสือสำหรับเอกสารนี้</p>
+                <button onClick={generatePdf} disabled={busy} className="btn-primary">
+                  <Icon name="file" className="h-4 w-4" /> {busy ? 'กำลังสร้าง…' : 'สร้างไฟล์หนังสือ'}
+                </button>
               </div>
             )}
           </div>
@@ -339,6 +355,7 @@ export default function DocumentDetail() {
       {showSubmit && (
         <SubmitApprovalModal
           documentId={id}
+          docCode={doc.doc_code}
           onClose={() => setShowSubmit(false)}
           onSubmitted={() => { setShowSubmit(false); load(); }}
         />

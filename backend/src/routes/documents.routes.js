@@ -23,6 +23,22 @@ router.use(requireAuth);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
 
+/**
+ * Load a document and ensure the caller may MUTATE it: the creator or an admin.
+ * Everyone can read (list/detail stay open), but edit/cancel/submit/attach are
+ * owner-or-admin only. Returns the document row.
+ */
+async function loadDocForMutation(req) {
+  const doc = await queryOne('select * from documents where id = $1', [req.params.id]);
+  if (!doc) throw new ApiError(404, 'Document not found');
+  const isOwner = doc.created_by && doc.created_by === req.profile.id;
+  const isAdmin = req.profile.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    throw new ApiError(403, 'ไม่มีสิทธิ์จัดการเอกสารนี้ (เฉพาะผู้สร้างหรือผู้ดูแลระบบ)');
+  }
+  return doc;
+}
+
 /** POST /api/documents/signature — upload an author signature image, return its
  *  storage key (used at document-create time, before the doc exists). */
 router.post(
@@ -269,8 +285,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const parsed = editSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const doc = await queryOne('select id, status from documents where id = $1', [req.params.id]);
-    if (!doc) throw new ApiError(404, 'Document not found');
+    const doc = await loadDocForMutation(req);
     if (!['draft', 'pending', 'returned'].includes(doc.status)) {
       throw new ApiError(409, 'แก้ไขได้เฉพาะเอกสารที่ยังไม่อนุมัติ/ปิดเรื่อง');
     }
@@ -308,8 +323,7 @@ router.patch(
 router.post(
   '/:id/cancel',
   asyncHandler(async (req, res) => {
-    const doc = await queryOne('select id, status from documents where id = $1', [req.params.id]);
-    if (!doc) throw new ApiError(404, 'Document not found');
+    const doc = await loadDocForMutation(req);
     if (doc.status === 'approved') throw new ApiError(409, 'เอกสารที่อนุมัติแล้วยกเลิกไม่ได้');
     if (doc.status === 'cancelled') return res.json({ data: { cancelled: true } });
     await query(`update documents set status = 'cancelled' where id = $1`, [req.params.id]);
@@ -326,8 +340,7 @@ router.post(
 router.post(
   '/:id/resend-approval',
   asyncHandler(async (req, res) => {
-    const doc = await queryOne('select id, doc_number, subject from documents where id = $1', [req.params.id]);
-    if (!doc) throw new ApiError(404, 'Document not found');
+    const doc = await loadDocForMutation(req);
     const step = await queryOne(
       `select id, step_no, approver_name, approver_email, action_token
          from approval_steps where document_id = $1 and action = 'pending' and action_token is not null
@@ -351,7 +364,7 @@ router.post(
   '/:id/attachments',
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    await getDocOr404(req.params.id);
+    await loadDocForMutation(req);
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
     const safeName = req.file.originalname.replace(/[^\w.\-ก-๙ ]/g, '_');
     const key = `documents/${req.params.id}/${crypto.randomUUID()}-${safeName}`;
@@ -386,6 +399,7 @@ router.get(
 router.delete(
   '/:id/attachments/:attId',
   asyncHandler(async (req, res) => {
+    await loadDocForMutation(req);
     const att = await queryOne('select storage_key from document_attachments where id = $1 and document_id = $2', [req.params.attId, req.params.id]);
     if (!att) throw new ApiError(404, 'Attachment not found');
     await deleteObject(att.storage_key).catch(() => {});
@@ -400,7 +414,7 @@ router.delete(
 router.post(
   '/:id/generate-pdf',
   asyncHandler(async (req, res) => {
-    await getDocOr404(req.params.id);
+    await loadDocForMutation(req);
     const row = await generateOriginalPdf(req.params.id, req.profile.id);
     res.status(201).json({ data: { id: row.id, file_name: row.file_name, version: 'original', created_at: row.created_at } });
   })
@@ -413,7 +427,11 @@ const submitSchema = z.object({
 router.post(
   '/:id/submit',
   asyncHandler(async (req, res) => {
-    const doc = await getDocOr404(req.params.id);
+    const doc = await loadDocForMutation(req);
+    // only re-submittable while not in an active/finished approval flow
+    if (!['draft', 'returned'].includes(doc.status)) {
+      throw new ApiError(409, 'ส่งอนุมัติได้เฉพาะเอกสารฉบับร่างหรือที่ถูกตีกลับเท่านั้น');
+    }
     const parsed = submitSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
 

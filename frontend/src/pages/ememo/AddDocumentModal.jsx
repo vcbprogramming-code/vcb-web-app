@@ -35,6 +35,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [previewLoading, setPreviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [createdDocId, setCreatedDocId] = useState(null); // resume target if a later step fails
 
   // load the configured doc-code → department options once
   useEffect(() => {
@@ -132,30 +133,36 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }
     setSubmitting(true);
     try {
-      // upload the author signature image first (if chosen), to get its storage key
-      let authorSignatureUrl;
-      if (sigMode === 'image' && sigFile) {
-        const { data } = await ememoApi.uploadSignature(sigFile);
-        authorSignatureUrl = data.key;
+      // resume an already-created doc if a previous attempt failed after create —
+      // avoids creating a duplicate (and burning a running number) on retry
+      let doc = createdDocId ? { id: createdDocId } : null;
+      if (!doc) {
+        // upload the author signature image first (if chosen), to get its storage key
+        let authorSignatureUrl;
+        if (sigMode === 'image' && sigFile) {
+          const { data } = await ememoApi.uploadSignature(sigFile);
+          authorSignatureUrl = data.key;
+        }
+        const res = await ememoApi.createDocument({
+          projectId,
+          docCode,
+          subject: subject.trim(),
+          recipient: recipient.trim() || undefined,
+          reference: reference.trim() || undefined,
+          cc: cc.trim() || undefined,
+          authorSignatureUrl,
+          workUnit: workUnit.trim() || undefined,
+          enclosures: enclName.trim()
+            ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
+            : undefined,
+          body: body.trim() || undefined,
+          remarks: remarks.trim() || undefined,
+          docTypeId: docTypeId || undefined,
+          dateReceived,
+        });
+        doc = res.data;
+        setCreatedDocId(doc.id);
       }
-
-      const { data: doc } = await ememoApi.createDocument({
-        projectId,
-        docCode,
-        subject: subject.trim(),
-        recipient: recipient.trim() || undefined,
-        reference: reference.trim() || undefined,
-        cc: cc.trim() || undefined,
-        authorSignatureUrl,
-        workUnit: workUnit.trim() || undefined,
-        enclosures: enclName.trim()
-          ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
-          : undefined,
-        body: body.trim() || undefined,
-        remarks: remarks.trim() || undefined,
-        docTypeId: docTypeId || undefined,
-        dateReceived,
-      });
 
       // upload the supplementary file (if any) — streamed into GridFS via the API
       if (file) {
@@ -261,6 +268,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                     setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
                     setApproversLocked(true);
                   } else {
+                    // switching to a code with no config: clear any previously-locked rows
+                    if (approversLocked) setApprovers([{ name: '', email: '' }]);
                     setApproversLocked(false);
                   }
                 }}

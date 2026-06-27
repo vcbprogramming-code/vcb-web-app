@@ -11,6 +11,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
   const [form, setForm] = useState({
     subject: doc.subject || '',
     recipient: doc.recipient || '',
+    reference: doc.reference || '',
+    cc: doc.cc_recipients || '',
     body: doc.body || '',
     remarks: doc.remarks || '',
     workUnit: doc.work_unit || '',
@@ -33,6 +35,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
       await ememoApi.updateDocument(doc.id, {
         subject: form.subject,
         recipient: form.recipient || null,
+        reference: form.reference || null,
+        cc: form.cc || null,
         body: form.body || null,
         remarks: form.remarks || null,
         workUnit: form.workUnit || null,
@@ -83,6 +87,14 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">วันที่รับ</label>
             <input type="date" value={form.dateReceived} onChange={(e) => set('dateReceived', e.target.value)} className="field" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">อ้างถึง</label>
+            <input value={form.reference} onChange={(e) => set('reference', e.target.value)} className="field" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>
+            <input value={form.cc} onChange={(e) => set('cc', e.target.value)} className="field" />
           </div>
         </div>
         <div>

@@ -5,6 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import crypto from 'node:crypto';
 import { applyApprovalAction, forwardApprovalStep, sendApprovalRequest } from '../services/approval.js';
+import { sendAuthorNotification } from '../services/email.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
 import { generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 
@@ -106,6 +107,13 @@ router.post(
     const parsed = actionSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
 
+    // reject unknown tokens BEFORE writing anything to storage (avoid abuse)
+    const validStep = await queryOne(
+      `select id from approval_steps where action_token = $1 and action = 'pending'`,
+      [req.params.token]
+    );
+    if (!validStep) throw new ApiError(404, 'ไม่พบรายการอนุมัติ หรือลิงก์ถูกใช้ไปแล้ว');
+
     // upload the drawn signature first (if any) so we can attach its key
     const signatureUrl = await storeSignatureDataUrl(req.params.token, parsed.data.signatureDataUrl);
 
@@ -153,6 +161,25 @@ router.post(
       await regenerateOriginalWithAudit(result.document.id).catch((e) =>
         console.error('audit-pdf regeneration failed:', e.message)
       );
+    }
+
+    // notify the document author of a terminal outcome (approved / returned / rejected)
+    if (result.finalized || parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
+      const author = await queryOne(
+        `select pr.full_name, pr.email from documents d
+           join profiles pr on pr.id = d.created_by where d.id = $1`,
+        [result.document.id]
+      ).catch(() => null);
+      if (author?.email) {
+        await sendAuthorNotification({
+          toEmail: author.email,
+          authorName: author.full_name,
+          doc: result.document,
+          outcome: result.finalized ? 'approved' : parsed.data.action,
+          actorName: result.step?.approver_name || result.step?.approver_email,
+          comment: parsed.data.comment,
+        }).catch((e) => console.error('author notification failed:', e.message));
+      }
     }
 
     res.json({

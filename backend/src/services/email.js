@@ -141,3 +141,40 @@ export async function sendApprovalRequest({ step, doc }) {
     text: `เรียน ${step.approver_name || 'ผู้อนุมัติ'}\n\nมีเอกสารรออนุมัติจากท่าน\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n\nดูรายละเอียดและพิจารณาอนุมัติ:\n${url}`,
   });
 }
+
+/**
+ * Notify the document author of an approval outcome (approved / returned /
+ * rejected). `outcome` ∈ 'approved'|'returned'|'rejected'.
+ */
+export async function sendAuthorNotification({ toEmail, authorName, doc, outcome, actorName, comment }) {
+  if (!toEmail) return { skipped: true };
+  const meta = {
+    approved: { label: 'ได้รับการอนุมัติแล้ว', color: '#16a34a', emoji: '✅' },
+    returned: { label: 'ถูกส่งกลับให้แก้ไข', color: '#ea580c', emoji: '↩️' },
+    rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626', emoji: '✕' },
+  }[outcome] || { label: outcome, color: '#334155', emoji: '' };
+  const url = `${env.appBaseUrl}/memos`;
+  const html = `
+  <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:${meta.color};padding:22px 28px;color:#fff">
+        <div style="font-size:13px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
+        <div style="font-size:19px;font-weight:700;margin-top:4px">${meta.emoji} เอกสารของท่าน${meta.label}</div>
+      </div>
+      <div style="padding:28px;font-size:15px;color:#334155">
+        <p style="margin:0 0 6px">เรียน <b>${esc(authorName || 'ผู้จัดทำ')}</b></p>
+        <p style="margin:0 0 16px">เอกสารเลขที่ <b>${esc(doc.doc_number)}</b> เรื่อง “${esc(doc.subject)}” <b style="color:${meta.color}">${meta.label}</b>${actorName ? ` โดย ${esc(actorName)}` : ''}</p>
+        ${comment ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:16px"><div style="color:#64748b;font-size:13px;margin-bottom:2px">เหตุผล/ความเห็น</div>${esc(comment)}</div>` : ''}
+        <div style="text-align:center;margin-top:8px">
+          <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;padding:12px 28px;border-radius:10px;text-decoration:none">เปิดดูเอกสาร</a>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  return sendEmail({
+    to: toEmail,
+    subject: `[${meta.label}] ${doc.doc_number} — ${doc.subject}`,
+    html,
+    text: `เรียน ${authorName || 'ผู้จัดทำ'}\n\nเอกสารเลขที่ ${doc.doc_number} เรื่อง ${doc.subject} ${meta.label}${actorName ? ` โดย ${actorName}` : ''}\n${comment ? `เหตุผล: ${comment}\n` : ''}\nเปิดดู: ${url}`,
+  });
+}

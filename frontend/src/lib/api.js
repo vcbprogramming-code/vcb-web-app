@@ -16,6 +16,16 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+/** On an authed 401 (expired/invalid token) clear it and bounce to /login. */
+function handleUnauthorized(res, auth) {
+  if (res.status === 401 && auth && tokenStore.get()) {
+    tokenStore.clear();
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+  }
+}
+
 /**
  * Thin fetch wrapper that attaches the Bearer token and parses JSON.
  * Throws an Error with the server's message on non-2xx responses.
@@ -35,6 +45,7 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    handleUnauthorized(res, auth);
     throw new Error(data.error || `Request failed (${res.status})`);
   }
   return data;
@@ -58,6 +69,7 @@ export async function apiUpload(path, file, { field = 'file', extra = {} } = {})
   const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: form });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    handleUnauthorized(res, true);
     throw new Error(data.error || `Upload failed (${res.status})`);
   }
   return data;

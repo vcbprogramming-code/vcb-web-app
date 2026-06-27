@@ -87,7 +87,7 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
               <div className="mt-12" />
             )}
             <div className={doc.signature_image_url ? 'mt-1' : ''}>({doc.author_name || letter.signatory_name || '...........................'})</div>
-            {letter.signatory_title && <div>{letter.signatory_title}</div>}
+            {(doc.author_title || letter.signatory_title) && <div>{doc.author_title || letter.signatory_title}</div>}
           </div>
         </div>
 

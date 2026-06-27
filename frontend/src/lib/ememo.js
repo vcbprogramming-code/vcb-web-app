@@ -64,6 +64,13 @@ export const ememoApi = {
     }),
 };
 
+export const profileApi = {
+  me: () => api('/auth/me'),
+  update: (body) => api('/auth/me', { method: 'PATCH', body }),
+  uploadSignature: (file) => apiUpload('/auth/me/signature', file),
+  signatureBlobUrl: () => apiBlobUrl('/auth/me/signature'),
+};
+
 export const adminApi = {
   // users
   listUsers: () => api('/admin/users'),

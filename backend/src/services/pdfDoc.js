@@ -5,7 +5,8 @@ import { generateLetterPdf } from './letterhead.js';
 /** Load a document row (+ author name) + its project letterhead config. */
 async function loadDocAndLetter(documentId) {
   const doc = await queryOne(
-    `select d.*, pr.full_name as author_name
+    `select d.*, pr.full_name as author_name, pr.job_title as author_title,
+            pr.signature_url as author_profile_signature
        from documents d
        left join profiles pr on pr.id = d.created_by
       where d.id = $1`,
@@ -39,12 +40,15 @@ async function clearVersion(documentId, version) {
  */
 export async function generateOriginalPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
-  // load the uploaded author signature image (if any) so it can be drawn
+  // signature image: the one chosen for this doc, else the author's saved
+  // profile signature
+  const sigKey = doc.author_signature_url || doc.author_profile_signature;
   let authorSignature = null;
-  if (doc.author_signature_url) {
-    authorSignature = await getObjectBuffer(doc.author_signature_url).catch(() => null);
+  if (sigKey) {
+    authorSignature = await getObjectBuffer(sigKey).catch(() => null);
   }
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature });
+  // the author's job title shown under their name
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, authorTitle: doc.author_title });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');

@@ -198,6 +198,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       : [],
     body,
     author_name: authorName,
+    author_title: profile?.job_title || undefined,
     signature_image_url: sigMode === 'image' ? sigPreviewUrl : null,
   };
 

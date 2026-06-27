@@ -47,10 +47,14 @@ export default function ModuleShell() {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
+            <button
+              onClick={() => navigate('/profile')}
+              title="โปรไฟล์ของฉัน"
+              className="hidden rounded-lg px-2 py-1 text-right transition hover:bg-slate-50 sm:block"
+            >
               <div className="text-sm font-medium text-slate-800">{profile?.full_name || user?.email}</div>
               <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>
-            </div>
+            </button>
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50"

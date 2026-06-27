@@ -194,7 +194,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       drawSignature({
         image: sigImage,
         name: doc.author_name || letter.signatoryName,
-        title: letter.signatoryTitle,
+        title: opts.authorTitle || letter.signatoryTitle,
       });
     }
 

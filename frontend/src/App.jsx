@@ -12,6 +12,7 @@ import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
+import MyProfile from './pages/MyProfile.jsx';
 import { disabledPaths } from './config/nav.js';
 
 /** Redirect to Portal if this module is soft-disabled (see config/nav.js). */
@@ -43,6 +44,7 @@ export default function App() {
 
           <Route path="memos" element={<DocumentRegister />} />
           <Route path="memos/:id" element={<DocumentDetail />} />
+          <Route path="profile" element={<MyProfile />} />
 
           <Route path="performance" element={<Feature path="/performance"><Performance /></Feature>} />
 

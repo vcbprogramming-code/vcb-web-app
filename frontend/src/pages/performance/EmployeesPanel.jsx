@@ -48,7 +48,7 @@ export default function EmployeesPanel({ site, onClose, onChanged }) {
       ) : (
         <form onSubmit={submit} className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">ชื่อ-นามสกุล *</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
             <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className="field" required />
           </div>
           <div>
@@ -56,7 +56,7 @@ export default function EmployeesPanel({ site, onClose, onChanged }) {
             <input value={form.employeeCode} onChange={(e) => set('employeeCode', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">ประเภท *</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">ประเภท <span className="text-red-500">*</span></label>
             <select value={form.kind} onChange={(e) => set('kind', e.target.value)} className="field">
               <option value="operation">สายปฏิบัติการ (OT)</option>
               <option value="support">สายสนับสนุน (ไดอารี่)</option>

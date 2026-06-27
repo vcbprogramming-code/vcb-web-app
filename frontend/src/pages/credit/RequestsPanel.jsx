@@ -81,14 +81,14 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
         <form onSubmit={submit} className="mb-4 space-y-3 rounded-xl border border-slate-200 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">วงเงิน *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">วงเงิน <span className="text-red-500">*</span></label>
               <select value={form.facilityId} onChange={(e) => set('facilityId', e.target.value)} className="field" required>
                 <option value="">เลือกวงเงิน</option>
                 {facilities.map((f) => <option key={f.id} value={f.id}>{facLabel(f.id)} (เหลือ {formatMoney(f.available)})</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">จำนวนเงิน *</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">จำนวนเงิน <span className="text-red-500">*</span></label>
               <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" required />
             </div>
             <div>

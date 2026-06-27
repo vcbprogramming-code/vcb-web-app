@@ -72,13 +72,13 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">โครงการ *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">โครงการ <span className="text-red-500">*</span></label>
             <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field">
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ประเภทวงเงิน *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">ประเภทวงเงิน <span className="text-red-500">*</span></label>
             <select value={form.type} onChange={(e) => set('type', e.target.value)} className="field">
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -106,7 +106,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วงเงินที่อนุมัติ *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">วงเงินที่อนุมัติ <span className="text-red-500">*</span></label>
             <input type="number" value={form.limit} onChange={(e) => set('limit', e.target.value)} className="field" />
           </div>
           {!editing && (
@@ -171,7 +171,7 @@ function DrawdownModal({ facility, onClose, onSaved }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">จำนวนเงิน *</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">จำนวนเงิน <span className="text-red-500">*</span></label>
           <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" />
         </div>
         <div className="grid grid-cols-2 gap-4">

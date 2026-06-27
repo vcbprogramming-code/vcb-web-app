@@ -52,7 +52,7 @@ function AddResourceModal({ onClose, onSaved }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อเรื่อง *</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อเรื่อง <span className="text-red-500">*</span></label>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">

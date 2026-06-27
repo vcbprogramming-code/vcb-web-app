@@ -47,11 +47,11 @@ function UserModal({ user, onClose, onSaved }) {
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล *</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">อีเมล *</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">อีเมล <span className="text-red-500">*</span></label>
             <input type="email" value={email} disabled={editing} onChange={(e) => setEmail(e.target.value)}
               className={`${field} ${editing ? 'bg-slate-50 text-slate-400' : ''}`} />
           </div>
@@ -63,7 +63,7 @@ function UserModal({ user, onClose, onSaved }) {
               placeholder={editing ? 'ไม่เปลี่ยน' : 'อย่างน้อย 6 ตัวอักษร'} className={field} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท (Role) *</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท (Role) <span className="text-red-500">*</span></label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
               <option value="hr">เจ้าหน้าที่ HR</option>
               <option value="executive">ผู้บริหาร</option>

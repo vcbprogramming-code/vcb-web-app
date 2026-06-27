@@ -61,13 +61,13 @@ function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">โครงการ *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">โครงการ <span className="text-red-500">*</span></label>
             <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field">
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">เดือน *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">เดือน <span className="text-red-500">*</span></label>
             <input type="month" value={form.month} onChange={(e) => set('month', e.target.value)} className="field" />
           </div>
           <div>

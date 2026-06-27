@@ -61,7 +61,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">เรื่อง *</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">เรื่อง <span className="text-red-500">*</span></label>
           <input value={form.subject} onChange={(e) => set('subject', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">

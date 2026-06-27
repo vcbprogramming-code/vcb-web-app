@@ -45,7 +45,7 @@ function AddHireModal({ onClose, onSaved }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล *</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
           <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -54,7 +54,7 @@ function AddHireModal({ onClose, onSaved }) {
             <input value={form.position} onChange={(e) => set('position', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วันเริ่มงาน *</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">วันเริ่มงาน <span className="text-red-500">*</span></label>
             <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" required />
           </div>
           <div>

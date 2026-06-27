@@ -41,16 +41,16 @@ function ProjectModal({ project, onClose, onSaved }) {
         <form onSubmit={submit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสโครงการ *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสโครงการ <span className="text-red-500">*</span></label>
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="เช่น BT1" className={field} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Prefix เลขเอกสาร *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Prefix เลขเอกสาร <span className="text-red-500">*</span></label>
               <input value={docPrefix} onChange={(e) => setDocPrefix(e.target.value)} placeholder="เช่น BT" className={field} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อโครงการ *</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อโครงการ <span className="text-red-500">*</span></label>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
           </div>
           <div>

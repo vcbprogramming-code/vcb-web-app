@@ -212,7 +212,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {step === 1 && (<>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ <span className="text-red-500">*</span></label>
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={field}>
                 <option value="">— เลือกโครงการ —</option>
                 {projects.map((p) => (
@@ -221,7 +221,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสเอกสาร *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสเอกสาร <span className="text-red-500">*</span></label>
               <select
                 value={docCode}
                 onChange={(e) => {
@@ -308,7 +308,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง *</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง <span className="text-red-500">*</span></label>
             <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="เช่น ขออนุมัติ…" className={field} />
           </div>
           </>)}

@@ -2,9 +2,15 @@ import { query, queryOne } from '../config/db.js';
 import { putObject, deleteObject, getObjectBuffer } from '../config/storage.js';
 import { generateLetterPdf } from './letterhead.js';
 
-/** Load a document row + its project letterhead config. */
+/** Load a document row (+ author name) + its project letterhead config. */
 async function loadDocAndLetter(documentId) {
-  const doc = await queryOne('select * from documents where id = $1', [documentId]);
+  const doc = await queryOne(
+    `select d.*, pr.full_name as author_name
+       from documents d
+       left join profiles pr on pr.id = d.created_by
+      where d.id = $1`,
+    [documentId]
+  );
   if (!doc) throw new Error('Document not found');
   const letter = await queryOne(
     'select * from project_letterhead where project_id = $1',

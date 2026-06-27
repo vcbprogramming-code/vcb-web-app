@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ememoApi, adminApi } from '../../lib/ememo.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 
 export default function AddDocumentModal({ projects, docTypes, onClose, onCreated }) {
+  const { profile, user } = useAuth();
+  const authorName = profile?.full_name || user?.email || '';
   const [projectId, setProjectId] = useState('');
   const [docCode, setDocCode] = useState('');
   const [docCodes, setDocCodes] = useState([]);
@@ -102,6 +105,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
   const submit = async (e) => {
     e.preventDefault();
+    // only the last step may actually submit — guards against Enter / stray
+    // submit events advancing past the wizard and closing the modal early
+    if (step !== 3) {
+      goNext();
+      return;
+    }
     setError(null);
     if (!projectId || !docCode || !subject.trim()) {
       setError('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง');
@@ -164,6 +173,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
       : [],
     body,
+    author_name: authorName,
   };
 
   return (
@@ -192,7 +202,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               })}
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
         </div>
 
         {/* split view: form (left) · live A4 preview (right) */}

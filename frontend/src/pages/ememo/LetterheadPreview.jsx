@@ -45,7 +45,7 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
 
         {/* doc number + date */}
         <div className="mt-3">
-          <div>ที่ {doc.doc_number || '— เลือกโครงการและรหัสเอกสาร —'}</div>
+          <div>เอกสารเลขที่ {doc.doc_number || '— เลือกโครงการและรหัสเอกสาร —'}</div>
           <div className="mt-1 text-center">{formatThaiLongDate(doc.date_received || new Date())}</div>
         </div>
 
@@ -74,11 +74,13 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
           {doc.body || <span className="text-slate-300">(เนื้อความของหนังสือจะแสดงที่นี่)</span>}
         </div>
 
-        {/* closing + signature */}
-        <div className="mt-6 ml-auto w-1/2 text-center">
-          <div>{letter.closing_line || 'ขอแสดงความนับถือ'}</div>
-          <div className="mt-10">({letter.signatory_name || '...........................'})</div>
-          {letter.signatory_title && <div>{letter.signatory_title}</div>}
+        {/* closing + signature — right-aligned block, all lines centered together */}
+        <div className="mt-8 flex justify-end">
+          <div className="w-1/2 text-center leading-relaxed">
+            <div>{letter.closing_line || 'ขอแสดงความนับถือ'}</div>
+            <div className="mt-12">({doc.author_name || letter.signatory_name || '...........................'})</div>
+            {letter.signatory_title && <div>{letter.signatory_title}</div>}
+          </div>
         </div>
 
         {/* สำเนาเรียน / CC — footer note */}

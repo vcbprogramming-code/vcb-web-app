@@ -98,7 +98,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // ---- "ที่ <doc_number>" + date (right) ----
     pdf.font('th').fontSize(13.5).fillColor('#000');
     const rowY = pdf.y;
-    pdf.text(`ที่      ${doc.doc_number}`, left, rowY);
+    pdf.text(`เอกสารเลขที่   ${doc.doc_number}`, left, rowY);
     pdf.moveDown(0.6);
     pdf.text(thaiLongDate(doc.date_received), left, pdf.y, { width: contentW, align: 'center' });
     pdf.moveDown(0.8);
@@ -183,7 +183,13 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
     } else {
       const defImg = letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null;
-      drawSignature({ image: defImg, name: letter.signatoryName, title: letter.signatoryTitle });
+      // show who prepared the document in the signature slot (falls back to the
+      // letterhead's configured signatory if there's no author on the doc)
+      drawSignature({
+        image: defImg,
+        name: doc.author_name || letter.signatoryName,
+        title: letter.signatoryTitle,
+      });
     }
 
     pdf.end();

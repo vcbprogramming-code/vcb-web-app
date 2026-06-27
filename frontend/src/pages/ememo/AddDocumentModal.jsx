@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ememoApi } from '../../lib/ememo.js';
+import { ememoApi, adminApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
+import LetterheadPreview from './LetterheadPreview.jsx';
 
 export default function AddDocumentModal({ projects, docTypes, onClose, onCreated }) {
   const [projectId, setProjectId] = useState('');
@@ -9,6 +10,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [docTypeId, setDocTypeId] = useState('');
   const [subject, setSubject] = useState('');
   const [recipient, setRecipient] = useState('');
+  const [reference, setReference] = useState('');
+  const [cc, setCc] = useState('');
   const [workUnit, setWorkUnit] = useState('');
   const [enclName, setEnclName] = useState('');
   const [enclQty, setEnclQty] = useState('');
@@ -18,6 +21,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
+  const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
 
   const [preview, setPreview] = useState(null); // { docNumber, department, runNo }
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -28,6 +32,20 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   useEffect(() => {
     ememoApi.listDocCodes().then((r) => setDocCodes(r.data)).catch(() => setDocCodes([]));
   }, []);
+
+  // load the project's letterhead so the live A4 preview renders the real header
+  useEffect(() => {
+    if (!projectId) {
+      setLetter({});
+      return;
+    }
+    let cancelled = false;
+    adminApi
+      .getLetterhead(projectId)
+      .then((r) => !cancelled && setLetter(r.data || {}))
+      .catch(() => !cancelled && setLetter({}));
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   // live-preview the auto doc number when project + code are both set
   useEffect(() => {
@@ -80,6 +98,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         docCode,
         subject: subject.trim(),
         recipient: recipient.trim() || undefined,
+        reference: reference.trim() || undefined,
+        cc: cc.trim() || undefined,
         workUnit: workUnit.trim() || undefined,
         enclosures: enclName.trim()
           ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
@@ -114,15 +134,32 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
   const field = 'field';
 
+  // shape the live-preview doc from current form state
+  const previewDoc = {
+    doc_number: preview?.docNumber,
+    date_received: dateReceived,
+    subject,
+    recipient,
+    reference,
+    cc_recipients: cc,
+    work_unit: workUnit,
+    enclosures: enclName.trim()
+      ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
+      : [],
+    body,
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h3 className="text-lg font-bold text-slate-800">เพิ่มเอกสารใหม่</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
         </div>
 
-        <form onSubmit={submit} className="p-6 space-y-4">
+        {/* split view: form (left) · live A4 preview (right) */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
+        <form onSubmit={submit} className="space-y-4 overflow-auto p-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ *</label>
@@ -199,6 +236,17 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">เรียน (ผู้รับ)</label>
             <input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">อ้างถึง (ไม่บังคับ)</label>
+              <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="เช่น BV/วิศวะ/02A/018 ลว. 26 มิ.ย. 69" className={field} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
+              <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="เช่น ฝ่ายบัญชี, ฝ่ายบุคคล" className={field} />
+            </div>
           </div>
 
           <div>
@@ -283,6 +331,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             </button>
           </div>
         </form>
+
+        {/* RIGHT: live A4 letterhead preview */}
+        <div className="hidden min-h-0 overflow-auto border-l border-slate-200 bg-slate-100 p-6 lg:block">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ (แสดงสด)
+          </div>
+          <LetterheadPreview letter={letter} doc={previewDoc} />
+        </div>
+        </div>
       </div>
     </div>
   );

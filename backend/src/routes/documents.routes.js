@@ -159,7 +159,7 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
-      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures ${LIST_FROM} where d.id = $1`,
+      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients ${LIST_FROM} where d.id = $1`,
       [req.params.id]
     );
     if (!doc) throw new ApiError(404, 'Document not found');
@@ -183,6 +183,8 @@ const createSchema = z.object({
   docCode: z.string().min(1).max(10),
   subject: z.string().min(1),
   recipient: z.string().optional(),
+  reference: z.string().optional(),
+  cc: z.string().optional(),
   body: z.string().optional(),
   remarks: z.string().optional(),
   docTypeId: z.string().uuid().optional().nullable(),
@@ -207,12 +209,12 @@ router.post(
       const { rows } = await client.query(
         `insert into documents
            (project_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
-            recipient, body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,coalesce($11::date,current_date),$12,$13::jsonb,'manual','pending',$14)
+            recipient, reference, cc_recipients, body, remarks, date_received, work_unit, enclosures, source, status, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,coalesce($13::date,current_date),$14,$15::jsonb,'manual','pending',$16)
          returning id, doc_number, run_no, department, status, date_received`,
         [project.id, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
-         input.recipient || null, input.body || null, input.remarks || null, input.dateReceived || null,
-         input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
+         input.recipient || null, input.reference || null, input.cc || null, input.body || null, input.remarks || null,
+         input.dateReceived || null, input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
       );
       const doc = rows[0];
       await client.query(
@@ -233,6 +235,8 @@ router.post(
 const editSchema = z.object({
   subject: z.string().min(1).optional(),
   recipient: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  cc: z.string().optional().nullable(),
   body: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   docTypeId: z.string().uuid().optional().nullable(),
@@ -258,6 +262,8 @@ router.patch(
     const add = (col, val, cast = '') => { vals.push(val); sets.push(`${col} = $${vals.length}${cast}`); };
     if (f.subject !== undefined) add('subject', f.subject);
     if (f.recipient !== undefined) add('recipient', f.recipient || null);
+    if (f.reference !== undefined) add('reference', f.reference || null);
+    if (f.cc !== undefined) add('cc_recipients', f.cc || null);
     if (f.body !== undefined) add('body', f.body || null);
     if (f.remarks !== undefined) add('remarks', f.remarks || null);
     if (f.workUnit !== undefined) add('work_unit', f.workUnit || null);
@@ -272,7 +278,7 @@ router.patch(
       [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ fields: sets.length })]
     );
     // return the full detail
-    const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures ${LIST_FROM} where d.id = $1`, [req.params.id]);
+    const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients ${LIST_FROM} where d.id = $1`, [req.params.id]);
     const { rows: attachments } = await query(`select id, kind, version, file_name, content_type, size_bytes, created_at from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
     const { rows: steps } = await query(`select id, step_no, approver_name, approver_email, action, comment, acted_at from approval_steps where document_id = $1 order by step_no`, [req.params.id]);
     const { rows: audit } = await query(`select action, actor_label, detail, created_at from audit_log where document_id = $1 order by created_at`, [req.params.id]);

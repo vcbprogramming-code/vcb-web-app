@@ -117,6 +117,13 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       pdf.moveDown(0.4);
     }
 
+    // ---- อ้างถึง (reference) ----
+    if (doc.reference) {
+      pdf.text('อ้างถึง', left, pdf.y);
+      pdf.text(doc.reference, left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
+      pdf.moveDown(0.4);
+    }
+
     // ---- สิ่งที่ส่งมาด้วย (enclosures) ----
     const encl = Array.isArray(doc.enclosures) ? doc.enclosures : [];
     if (encl.length) {

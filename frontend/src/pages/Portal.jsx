@@ -27,8 +27,8 @@ export default function Portal() {
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-light text-white shadow-sm shadow-brand/30">
-              <Icon name="layers" className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+              <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />
             </div>
             <div className="leading-tight">
               <div className="text-sm font-bold text-slate-900">VCB Connect</div>

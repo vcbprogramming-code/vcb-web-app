@@ -37,8 +37,8 @@ export default function ModuleShell() {
               title="กลับสู่หน้า Portal"
               className="group flex min-w-0 items-center gap-3 rounded-xl px-1 py-0.5 transition hover:opacity-90"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-light text-white shadow-sm shadow-brand/30 transition group-hover:scale-105">
-                <Icon name="layers" className="h-5 w-5" />
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
+                <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />
               </span>
               <span className="min-w-0 text-left leading-tight">
                 <span className="block text-sm font-bold tracking-tight text-slate-900">VCB ONLINE</span>

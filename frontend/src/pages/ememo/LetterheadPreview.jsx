@@ -20,18 +20,21 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
     <div className="mx-auto w-full max-w-[820px]">
       {/* A4-ish sheet */}
       <div className="aspect-[1/1.414] w-full overflow-hidden rounded-lg bg-white px-[8%] py-[6%] text-[13px] leading-relaxed text-slate-900 shadow-lg ring-1 ring-slate-200">
-        {/* header: company name (left) + contact (right) */}
+        {/* header: logo + company name (left) + contact (right) */}
         <div className="flex items-start justify-between gap-4 border-b border-slate-300 pb-3">
-          <div className="min-w-0">
-            <div className="whitespace-nowrap text-[15px] font-bold leading-tight">
-              {letter.company_name || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด'}
+          <div className="flex min-w-0 items-start gap-3">
+            <img src="/logo.png" alt="" className="h-14 w-14 shrink-0 object-contain" />
+            <div className="min-w-0">
+              <div className="whitespace-nowrap text-[15px] font-bold leading-tight">
+                {letter.company_name || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด'}
+              </div>
+              {letter.company_name_en && (
+                <div className="whitespace-nowrap text-[12px] font-bold leading-tight">{letter.company_name_en}</div>
+              )}
+              {/* work unit right under the company name, no prefix */}
+              {doc.work_unit && <div className="text-[11px] leading-tight">{doc.work_unit}</div>}
+              {letter.address && <div className="mt-0.5 text-[10px] text-slate-500">{letter.address}</div>}
             </div>
-            {letter.company_name_en && (
-              <div className="whitespace-nowrap text-[12px] font-bold leading-tight">{letter.company_name_en}</div>
-            )}
-            {/* work unit right under the company name, no prefix */}
-            {doc.work_unit && <div className="text-[11px] leading-tight">{doc.work_unit}</div>}
-            {letter.address && <div className="mt-0.5 text-[10px] text-slate-500">{letter.address}</div>}
           </div>
           <div className="shrink-0 text-right text-[9px] text-slate-500">
             {letter.phone && <div>โทรศัพท์ : {letter.phone}</div>}

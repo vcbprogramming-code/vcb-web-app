@@ -306,13 +306,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <input value={workUnit} onChange={(e) => setWorkUnit(e.target.value)} placeholder="เช่น บางเตย" className={field} />
           </div>
 
+          {/* fields ordered to match the real memo: เรื่อง → เรียน → อ้างถึง → สำเนาเรียน → สิ่งที่ส่งมาด้วย */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">สิ่งที่ส่งมาด้วย (ไม่บังคับ)</label>
-            <div className="flex gap-2">
-              <input value={enclName} onChange={(e) => setEnclName(e.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
-              <input value={enclQty} onChange={(e) => setEnclQty(e.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-28`} />
-              <span className="self-center text-sm text-slate-500">ชุด</span>
-            </div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง <span className="text-red-500">*</span></label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="เช่น ขออนุมัติ…" className={field} />
           </div>
 
           <div>
@@ -332,8 +329,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง <span className="text-red-500">*</span></label>
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="เช่น ขออนุมัติ…" className={field} />
+            <label className="block text-sm font-medium text-slate-600 mb-1">สิ่งที่ส่งมาด้วย (ไม่บังคับ)</label>
+            <div className="flex gap-2">
+              <input value={enclName} onChange={(e) => setEnclName(e.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
+              <input value={enclQty} onChange={(e) => setEnclQty(e.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-28`} />
+              <span className="self-center text-sm text-slate-500">ชุด</span>
+            </div>
           </div>
           </>)}
 
@@ -470,7 +471,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         {/* RIGHT: live A4 letterhead preview */}
         <div className="hidden min-h-0 overflow-auto border-l border-slate-200 bg-slate-100 p-6 lg:block">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ (แสดงสด)
+            <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ
           </div>
           <LetterheadPreview letter={letter} doc={previewDoc} />
         </div>

@@ -48,7 +48,7 @@ export default function DocumentRegister() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const pageSize = 10;
 
   // load reference data once
   useEffect(() => {

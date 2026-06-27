@@ -31,6 +31,55 @@ function Field({ label, children }) {
 }
 
 /**
+ * Confirmation screen after the approver acts. Auto-redirects to the web app
+ * after a short countdown, with an explicit button to go now.
+ */
+function DoneScreen({ done }) {
+  const [secs, setSecs] = useState(5);
+  // the approval page lives on the frontend, so its own origin IS the web app
+  const appUrl = window.location.origin;
+
+  useEffect(() => {
+    if (secs <= 0) {
+      window.location.href = appUrl;
+      return;
+    }
+    const t = setTimeout(() => setSecs((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [secs, appUrl]);
+
+  const m = APPROVAL_META[done.action];
+  const ring = done.action === 'approved' ? 'bg-emerald-100 text-emerald-600'
+    : done.action === 'returned' ? 'bg-orange-100 text-orange-600'
+    : 'bg-red-100 text-red-600';
+  const ic = done.action === 'approved' ? 'check' : done.action === 'returned' ? 'undo' : 'x';
+
+  return (
+    <Wrap>
+      <div className="text-center space-y-3">
+        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${ring}`}>
+          <Icon name={ic} className="h-7 w-7" strokeWidth={2.2} />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800">บันทึกการ{m.label}เรียบร้อย</h2>
+        <p className="text-slate-500 text-sm">
+          สถานะเอกสารปัจจุบัน: <b>{(STATUS_META[done.documentStatus] || {}).label || done.documentStatus}</b>
+          {done.advanced && ' — ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว'}
+        </p>
+        <div className="pt-2">
+          <a
+            href={appUrl}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-light"
+          >
+            <Icon name="arrowRight" className="h-4 w-4" /> เข้าสู่ระบบงานภายใน
+          </a>
+          <p className="mt-2 text-xs text-slate-400">กำลังนำท่านไปยังเว็บไซต์ใน {secs} วินาที…</p>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/**
  * Public approval page reached from the email link: /approve/:token?action=...
  * No login required — the token is the credential. Shows the document, lets the
  * approver confirm approve / return / reject with an optional comment.
@@ -87,25 +136,7 @@ export default function ApprovalAction() {
   if (!info) return <Wrap><p className="text-slate-400">กำลังโหลด…</p></Wrap>;
 
   if (done) {
-    const m = APPROVAL_META[done.action];
-    const ring = done.action === 'approved' ? 'bg-emerald-100 text-emerald-600'
-      : done.action === 'returned' ? 'bg-orange-100 text-orange-600'
-      : 'bg-red-100 text-red-600';
-    const ic = done.action === 'approved' ? 'check' : done.action === 'returned' ? 'undo' : 'x';
-    return (
-      <Wrap>
-        <div className="text-center space-y-3">
-          <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${ring}`}>
-            <Icon name={ic} className="h-7 w-7" strokeWidth={2.2} />
-          </div>
-          <h2 className="text-lg font-bold text-slate-800">บันทึกการ{m.label}เรียบร้อย</h2>
-          <p className="text-slate-500 text-sm">
-            สถานะเอกสารปัจจุบัน: <b>{(STATUS_META[done.documentStatus] || {}).label || done.documentStatus}</b>
-            {done.advanced && ' — ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว'}
-          </p>
-        </div>
-      </Wrap>
-    );
+    return <DoneScreen done={done} />;
   }
 
   if (info.action !== 'pending' || info.expired) {

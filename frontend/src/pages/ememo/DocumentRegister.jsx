@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
-import { PageHeader, Avatar } from '../../components/ui/index.js';
+import { Avatar } from '../../components/ui/index.js';
 
 function ProjectChip({ code, color, active, onClick }) {
   return (
@@ -100,16 +100,35 @@ export default function DocumentRegister() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="ทะเบียนเอกสาร · E-Memo"
-        subtitle="ติดตามสถานะเอกสารภายใน · กลุ่มวิจิตรภัณฑ์ก่อสร้าง"
-        right={
-          <button onClick={() => setShowAdd(true)} className="btn-primary">
-            <Icon name="plus" className="h-4 w-4" />
-            เพิ่มเอกสาร
-          </button>
-        }
-      />
+      {/* formal masthead — corporate document-control banner */}
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 md:px-8">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-inset ring-white/15">
+              <Icon name="document" className="h-6 w-6" />
+            </div>
+            <div className="leading-tight">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">
+                Document Control · E-Memo
+              </div>
+              <div className="text-xl font-bold tracking-tight">ทะเบียนเอกสารภายใน</div>
+              <div className="text-xs text-white/60">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสาร</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden rounded-xl bg-white/10 px-4 py-2 text-right ring-1 ring-inset ring-white/10 sm:block">
+              <div className="text-lg font-bold leading-none">{total}</div>
+              <div className="text-[11px] text-white/55">เอกสารทั้งหมด</div>
+            </div>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+            >
+              <Icon name="plus" className="h-4 w-4" /> เพิ่มเอกสาร
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* filter bar */}
       <div className="card-sm space-y-4">
@@ -177,13 +196,13 @@ export default function DocumentRegister() {
         </div>
         <table className="tbl">
           <thead>
-            <tr className="tbl-head">
-              <th className="tbl-th w-12">#</th>
-              <th className="tbl-th">วันที่</th>
-              <th className="tbl-th">เอกสาร</th>
-              <th className="tbl-th">รหัส</th>
-              <th className="tbl-th">สถานะ</th>
-              <th className="tbl-th text-right">จัดการ</th>
+            <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">
+              <th className="tbl-th w-12 font-semibold">#</th>
+              <th className="tbl-th font-semibold">วันที่</th>
+              <th className="tbl-th font-semibold">เอกสาร</th>
+              <th className="tbl-th font-semibold">รหัส</th>
+              <th className="tbl-th font-semibold">สถานะ</th>
+              <th className="tbl-th text-right font-semibold">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -221,9 +240,9 @@ export default function DocumentRegister() {
                         e.stopPropagation();
                         navigate(`/memos/${d.id}`);
                       }}
-                      className="btn-detail"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-light"
                     >
-                      <Icon name="eye" className="h-4 w-4" /> ดูรายละเอียด
+                      เปิด <Icon name="arrowRight" className="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>

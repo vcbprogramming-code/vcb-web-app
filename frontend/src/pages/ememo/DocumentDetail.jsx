@@ -23,11 +23,43 @@ export default function DocumentDetail() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
 
+  const [previewUrl, setPreviewUrl] = useState(null);
+
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
   }, [id]);
 
   useEffect(load, [load]);
+
+  // Inline preview: load the generated letterhead PDF (approved version if it
+  // exists, else the original) into an object URL for the embedded viewer.
+  useEffect(() => {
+    if (!doc) return;
+    const pdf =
+      doc.attachments.find((a) => a.version === 'approved') ||
+      doc.attachments.find((a) => a.version === 'original');
+    if (!pdf) {
+      setPreviewUrl(null);
+      return;
+    }
+    let url;
+    let cancelled = false;
+    ememoApi
+      .attachmentBlobUrl(id, pdf.id)
+      .then((u) => {
+        if (cancelled) {
+          URL.revokeObjectURL(u);
+          return;
+        }
+        url = u;
+        setPreviewUrl(u);
+      })
+      .catch(() => !cancelled && setPreviewUrl(null));
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [doc, id]);
 
   const cancelDoc = async () => {
     if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
@@ -168,6 +200,30 @@ export default function DocumentDetail() {
             )}
             {doc.body && <Row label="เนื้อความ"><span className="font-normal whitespace-pre-wrap">{doc.body}</span></Row>}
             {doc.remarks && <Row label="หมายเหตุ"><span className="font-normal">{doc.remarks}</span></Row>}
+          </div>
+
+          {/* inline document preview — the generated letterhead PDF, shown right here */}
+          <div className="card">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">ตัวอย่างเอกสาร</h3>
+              {previewUrl && (
+                <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
+                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
+                </button>
+              )}
+            </div>
+            {previewUrl ? (
+              <iframe
+                title="ตัวอย่างเอกสาร"
+                src={previewUrl}
+                className="h-[640px] w-full rounded-xl border border-slate-200 bg-slate-50"
+              />
+            ) : (
+              <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center">
+                <Icon name="file" className="h-8 w-8 text-slate-300" />
+                <p className="text-sm text-slate-400">ยังไม่มีหนังสือ — กด "สร้าง PDF หนังสือ" ด้านบนเพื่อสร้างเอกสาร</p>
+              </div>
+            )}
           </div>
 
           {/* document versions: original + approved */}

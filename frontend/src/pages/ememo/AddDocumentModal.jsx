@@ -91,7 +91,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
   const STEPS = ['ข้อมูลเอกสาร', 'เนื้อหา & ไฟล์แนบ', 'ผู้อนุมัติ & ยืนยัน'];
 
-  const goNext = () => {
+  const goNext = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     setError(null);
     if (step === 1) {
       if (!projectId || !docCode || !subject.trim()) {
@@ -398,9 +399,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               {step === 1 ? 'ยกเลิก' : '← ก่อนหน้า'}
             </button>
             {step < 3 ? (
-              <button type="button" onClick={goNext} className="btn-primary">ถัดไป →</button>
+              <button key="next" type="button" onClick={goNext} className="btn-primary">ถัดไป →</button>
             ) : (
-              <button type="submit" disabled={submitting} className="btn-primary">
+              <button key="submit" type="submit" disabled={submitting} className="btn-primary">
                 {submitting
                   ? 'กำลังบันทึก…'
                   : approvers.some((a) => a.email.trim())

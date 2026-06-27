@@ -23,6 +23,22 @@ router.use(requireAuth);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
 
+/** POST /api/documents/signature — upload an author signature image, return its
+ *  storage key (used at document-create time, before the doc exists). */
+router.post(
+  '/signature',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+      throw new ApiError(400, 'ไฟล์ลายเซ็นต้องเป็นรูปภาพ');
+    }
+    const key = `signatures/author/${crypto.randomUUID()}`;
+    await putObject(key, req.file.buffer, req.file.mimetype);
+    res.status(201).json({ data: { key } });
+  })
+);
+
 const LIST_SELECT = `
   d.id, d.doc_number, d.doc_code, d.department, d.run_no,
   d.subject, d.recipient, d.remarks, d.date_received, d.status, d.source,
@@ -185,6 +201,7 @@ const createSchema = z.object({
   recipient: z.string().optional(),
   reference: z.string().optional(),
   cc: z.string().optional(),
+  authorSignatureUrl: z.string().optional(),
   body: z.string().optional(),
   remarks: z.string().optional(),
   docTypeId: z.string().uuid().optional().nullable(),
@@ -209,11 +226,12 @@ router.post(
       const { rows } = await client.query(
         `insert into documents
            (project_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
-            recipient, reference, cc_recipients, body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,coalesce($13::date,current_date),$14,$15::jsonb,'manual','pending',$16)
+            recipient, reference, cc_recipients, author_signature_url, body, remarks, date_received, work_unit, enclosures, source, status, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::date,current_date),$15,$16::jsonb,'manual','pending',$17)
          returning id, doc_number, run_no, department, status, date_received`,
         [project.id, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
-         input.recipient || null, input.reference || null, input.cc || null, input.body || null, input.remarks || null,
+         input.recipient || null, input.reference || null, input.cc || null, input.authorSignatureUrl || null,
+         input.body || null, input.remarks || null,
          input.dateReceived || null, input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
       );
       const doc = rows[0];

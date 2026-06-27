@@ -75,24 +75,27 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       cy += 16;
     }
 
-    // company name (between logo and contact block)
+    // company name (between logo and contact block) — keep on a single line
     const nameW = contactX - textX - 10;
-    pdf.font('th-bold').fontSize(19).fillColor('#000')
-      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 6, { width: nameW });
+    pdf.font('th-bold').fontSize(16).fillColor('#000')
+      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 8, { width: nameW, lineBreak: false });
     if (letter.companyNameEn) {
-      pdf.font('th-bold').fontSize(15).fillColor('#000')
-        .text(letter.companyNameEn, textX, pdf.y, { width: nameW });
+      pdf.font('th-bold').fontSize(13).fillColor('#000')
+        .text(letter.companyNameEn, textX, pdf.y, { width: nameW, lineBreak: false });
+    }
+    // work unit (department) right under the company name, no "หน่วยงาน" prefix
+    if (doc.work_unit) {
+      pdf.font('th').fontSize(11).fillColor('#000')
+        .text(doc.work_unit, textX, pdf.y, { width: nameW, lineBreak: false });
     }
 
-    // move below the tallest of: logo(64), company name, contact block
+    // move below the tallest of: logo(64), company name block, contact block
     pdf.y = Math.max(headerTop + 70, pdf.y + 6, cy + 4);
     pdf.moveDown(0.3);
 
-    // ---- หน่วยงาน (work unit) — centered ----
-    if (doc.work_unit) {
-      pdf.font('th-bold').fontSize(15).fillColor('#000')
-        .text(`หน่วยงาน  ${doc.work_unit}`, left, pdf.y, { width: contentW, align: 'center' });
-    }
+    // ---- บันทึกข้อความ — centered title ----
+    pdf.font('th-bold').fontSize(20).fillColor('#000')
+      .text('บันทึกข้อความ', left, pdf.y, { width: contentW, align: 'center' });
     pdf.moveDown(0.8);
 
     // ---- "ที่ <doc_number>" + date (right) ----
@@ -182,11 +185,14 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     if (signatures && signatures.length) {
       signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
     } else {
-      const defImg = letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null;
+      // the author's uploaded signature image (Buffer) takes precedence; else the
+      // letterhead's configured default signature image; else just the name text
+      const sigImage = opts.authorSignature
+        || (letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null);
       // show who prepared the document in the signature slot (falls back to the
       // letterhead's configured signatory if there's no author on the doc)
       drawSignature({
-        image: defImg,
+        image: sigImage,
         name: doc.author_name || letter.signatoryName,
         title: letter.signatoryTitle,
       });

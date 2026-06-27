@@ -23,6 +23,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [sigMode, setSigMode] = useState('text'); // 'text' = พิมพ์ชื่อ · 'image' = อัปโหลดลายเซ็น
+  const [sigFile, setSigFile] = useState(null);
+  const [sigPreviewUrl, setSigPreviewUrl] = useState(null); // local object URL for preview
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
   const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
@@ -84,6 +87,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     setFile(f);
   };
 
+  const pickSignature = (f) => {
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { setError('ลายเซ็นต้องเป็นไฟล์รูปภาพ'); return; }
+    if (f.size > 2 * 1024 * 1024) { setError('รูปลายเซ็นใหญ่เกิน 2 MB'); return; }
+    setError(null);
+    setSigFile(f);
+    setSigPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(f); });
+  };
+
   const updateApprover = (i, key, value) =>
     setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)));
   const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
@@ -120,6 +132,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }
     setSubmitting(true);
     try {
+      // upload the author signature image first (if chosen), to get its storage key
+      let authorSignatureUrl;
+      if (sigMode === 'image' && sigFile) {
+        const { data } = await ememoApi.uploadSignature(sigFile);
+        authorSignatureUrl = data.key;
+      }
+
       const { data: doc } = await ememoApi.createDocument({
         projectId,
         docCode,
@@ -127,6 +146,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         recipient: recipient.trim() || undefined,
         reference: reference.trim() || undefined,
         cc: cc.trim() || undefined,
+        authorSignatureUrl,
         workUnit: workUnit.trim() || undefined,
         enclosures: enclName.trim()
           ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
@@ -178,6 +198,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       : [],
     body,
     author_name: authorName,
+    signature_image_url: sigMode === 'image' ? sigPreviewUrl : null,
   };
 
   return (
@@ -355,6 +376,37 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 <span className="text-sm text-slate-600">คลิกหรือลากไฟล์มาวางที่นี่</span>
                 <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · สูงสุด 7 MB</span>
                 <input type="file" className="hidden" onChange={(e) => pickFile(e.target.files?.[0])} />
+              </label>
+            )}
+          </div>
+
+          {/* signature: typed name or uploaded image */}
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็น (ใต้ขอแสดงความนับถือ)</label>
+            <div className="mb-2 inline-flex rounded-xl border border-slate-200 p-0.5 text-sm">
+              <button type="button" onClick={() => setSigMode('text')}
+                className={`rounded-lg px-3 py-1.5 font-medium transition ${sigMode === 'text' ? 'bg-brand text-white' : 'text-slate-600'}`}>
+                พิมพ์ชื่อ
+              </button>
+              <button type="button" onClick={() => setSigMode('image')}
+                className={`rounded-lg px-3 py-1.5 font-medium transition ${sigMode === 'image' ? 'bg-brand text-white' : 'text-slate-600'}`}>
+                อัปโหลดลายเซ็น
+              </button>
+            </div>
+            {sigMode === 'text' ? (
+              <p className="text-xs text-slate-400">ระบบจะแสดงชื่อผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นตัวพิมพ์</p>
+            ) : sigFile ? (
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
+                <img src={sigPreviewUrl} alt="ลายเซ็น" className="h-12 w-auto object-contain" />
+                <span className="flex-1 truncate text-sm text-slate-600">{sigFile.name}</span>
+                <button type="button" onClick={() => { setSigFile(null); setSigPreviewUrl((o) => { if (o) URL.revokeObjectURL(o); return null; }); }} className="text-sm text-red-500 hover:underline">ลบ</button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 py-5 hover:border-slate-300">
+                <Icon name="signature" className="h-6 w-6 text-slate-400" />
+                <span className="text-sm text-slate-600">คลิกเพื่ออัปโหลดรูปลายเซ็น</span>
+                <span className="text-xs text-slate-400">PNG/JPG พื้นหลังโปร่งใสจะดูดีที่สุด · สูงสุด 2 MB</span>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => pickSignature(e.target.files?.[0])} />
               </label>
             )}
           </div>

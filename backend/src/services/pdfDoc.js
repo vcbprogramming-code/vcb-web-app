@@ -39,7 +39,12 @@ async function clearVersion(documentId, version) {
  */
 export async function generateOriginalPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
-  const pdf = await generateLetterPdf(doc, letter);
+  // load the uploaded author signature image (if any) so it can be drawn
+  let authorSignature = null;
+  if (doc.author_signature_url) {
+    authorSignature = await getObjectBuffer(doc.author_signature_url).catch(() => null);
+  }
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');

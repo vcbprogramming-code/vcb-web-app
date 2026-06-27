@@ -23,12 +23,14 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
         {/* header: company name (left) + contact (right) */}
         <div className="flex items-start justify-between gap-4 border-b border-slate-300 pb-3">
           <div className="min-w-0">
-            <div className="text-[17px] font-bold leading-tight">
+            <div className="whitespace-nowrap text-[15px] font-bold leading-tight">
               {letter.company_name || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด'}
             </div>
             {letter.company_name_en && (
-              <div className="text-[13px] font-bold leading-tight">{letter.company_name_en}</div>
+              <div className="whitespace-nowrap text-[12px] font-bold leading-tight">{letter.company_name_en}</div>
             )}
+            {/* work unit right under the company name, no prefix */}
+            {doc.work_unit && <div className="text-[11px] leading-tight">{doc.work_unit}</div>}
             {letter.address && <div className="mt-0.5 text-[10px] text-slate-500">{letter.address}</div>}
           </div>
           <div className="shrink-0 text-right text-[9px] text-slate-500">
@@ -38,10 +40,8 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
           </div>
         </div>
 
-        {/* หน่วยงาน */}
-        {doc.work_unit && (
-          <div className="mt-3 text-center text-[15px] font-bold">หน่วยงาน {doc.work_unit}</div>
-        )}
+        {/* บันทึกข้อความ — title */}
+        <div className="mt-3 text-center text-[19px] font-bold">บันทึกข้อความ</div>
 
         {/* doc number + date */}
         <div className="mt-3">
@@ -78,7 +78,12 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
         <div className="mt-8 flex justify-end">
           <div className="w-1/2 text-center leading-relaxed">
             <div>{letter.closing_line || 'ขอแสดงความนับถือ'}</div>
-            <div className="mt-12">({doc.author_name || letter.signatory_name || '...........................'})</div>
+            {doc.signature_image_url ? (
+              <img src={doc.signature_image_url} alt="ลายเซ็น" className="mx-auto mt-2 h-12 w-auto object-contain" />
+            ) : (
+              <div className="mt-12" />
+            )}
+            <div className={doc.signature_image_url ? 'mt-1' : ''}>({doc.author_name || letter.signatory_name || '...........................'})</div>
             {letter.signatory_title && <div>{letter.signatory_title}</div>}
           </div>
         </div>

@@ -156,9 +156,6 @@ export default function DocumentDetail() {
                 <Icon name="edit" className="h-4 w-4" /> แก้ไข
               </button>
             )}
-            <button onClick={generatePdf} disabled={busy} className="btn-outline">
-              <Icon name="file" className="h-4 w-4" /> สร้าง PDF หนังสือ
-            </button>
             {canResend && (
               <button onClick={resendApproval} disabled={busy} className="btn-outline">
                 <Icon name="undo" className="h-4 w-4" /> ส่งเมลซ้ำ

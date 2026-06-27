@@ -29,6 +29,9 @@ export const ememoApi = {
   // letterhead PDF — generate, then open the resulting attachment via /download
   generatePdf: (id) => api(`/documents/${id}/generate-pdf`, { method: 'POST' }),
 
+  // upload an author signature image, returns { key } (used at create time)
+  uploadSignature: (file) => apiUpload('/documents/signature', file),
+
   // attachments (files stored in GridFS; streamed through the API)
   uploadAttachment: (id, file) => apiUpload(`/documents/${id}/attachments`, file),
   // returns a blob object URL the browser can open/preview

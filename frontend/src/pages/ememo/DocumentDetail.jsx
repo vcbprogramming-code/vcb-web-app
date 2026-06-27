@@ -295,21 +295,43 @@ export default function DocumentDetail() {
         <div className="space-y-5">
           {doc.approval_steps.length > 0 && (
             <div className="card">
-              <h3 className="font-bold text-slate-800 mb-3">สายอนุมัติ</h3>
-              <ol className="space-y-3">
-                {doc.approval_steps.map((s) => {
-                  const m = APPROVAL_META[s.action] || APPROVAL_META.pending;
-                  return (
-                    <li key={s.id} className="flex items-center gap-3 text-sm">
-                      <span className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center font-semibold text-slate-600">{s.step_no}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-slate-800 truncate">{s.approver_name || s.approver_email}</div>
-                        <div className="text-slate-400 text-xs truncate">{s.approver_email}{s.comment ? ` · ${s.comment}` : ''}</div>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${m.chip}`}>{m.label}</span>
-                    </li>
-                  );
-                })}
+              <h3 className="font-bold text-slate-800 mb-3">สายอนุมัติ (ตามลำดับ)</h3>
+              <ol className="relative space-y-1">
+                {(() => {
+                  // the current step = first one still pending (the live queue position)
+                  const currentIdx = doc.approval_steps.findIndex((s) => s.action === 'pending');
+                  return doc.approval_steps.map((s, i) => {
+                    const m = APPROVAL_META[s.action] || APPROVAL_META.pending;
+                    const isCurrent = i === currentIdx;
+                    const isDone = s.action !== 'pending';
+                    const isWaiting = s.action === 'pending' && !isCurrent;
+                    const last = i === doc.approval_steps.length - 1;
+
+                    const circle = isDone
+                      ? (s.action === 'approved' ? 'bg-emerald-500 text-white' : s.action === 'rejected' ? 'bg-red-500 text-white' : 'bg-orange-500 text-white')
+                      : isCurrent ? 'bg-brand text-white ring-4 ring-brand/15'
+                      : 'bg-slate-100 text-slate-400';
+                    const icon = s.action === 'approved' ? 'check' : s.action === 'rejected' ? 'x' : s.action === 'returned' ? 'undo' : null;
+
+                    return (
+                      <li key={s.id} className="relative flex gap-3 pb-4 text-sm last:pb-0">
+                        {/* connector line */}
+                        {!last && <span className="absolute left-[13px] top-7 h-full w-px bg-slate-200" />}
+                        <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${circle}`}>
+                          {icon ? <Icon name={icon} className="h-4 w-4" strokeWidth={2.4} /> : s.step_no}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className={`flex items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
+                            <span className="truncate">{s.approver_name || s.approver_email}</span>
+                            {isCurrent && <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">กำลังพิจารณา</span>}
+                          </div>
+                          <div className="truncate text-xs text-slate-400">{s.approver_email}{s.comment ? ` · ${s.comment}` : ''}</div>
+                        </div>
+                        <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : m.label}</span>
+                      </li>
+                    );
+                  });
+                })()}
               </ol>
             </div>
           )}

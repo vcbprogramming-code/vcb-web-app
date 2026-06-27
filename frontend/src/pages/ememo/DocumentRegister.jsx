@@ -89,6 +89,21 @@ export default function DocumentRegister() {
     setTo('');
   };
 
+  // open the document's generated PDF (approved version if present, else original)
+  const openFile = async (docId) => {
+    try {
+      const { data } = await ememoApi.getDocument(docId);
+      const pdf =
+        data.attachments?.find((a) => a.version === 'approved') ||
+        data.attachments?.find((a) => a.version === 'original');
+      if (!pdf) { navigate(`/memos/${docId}`); return; }
+      const url = await ememoApi.attachmentBlobUrl(docId, pdf.id);
+      window.open(url, '_blank');
+    } catch {
+      navigate(`/memos/${docId}`);
+    }
+  };
+
   const quickRange = (days) => {
     const today = new Date();
     const start = new Date();
@@ -116,15 +131,15 @@ export default function DocumentRegister() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden rounded-xl bg-white/10 px-4 py-2 text-right ring-1 ring-inset ring-white/10 sm:block">
-              <div className="text-lg font-bold leading-none">{total}</div>
-              <div className="text-[11px] text-white/55">เอกสารทั้งหมด</div>
+            <div className="hidden items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-inset ring-white/10 sm:flex">
+              <span className="text-lg font-bold leading-none">{total}</span>
+              <span className="text-[11px] text-white/55">เอกสารทั้งหมด</span>
             </div>
             <button
               onClick={() => setShowAdd(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
             >
-              <Icon name="plus" className="h-4 w-4" /> เพิ่มเอกสาร
+              <Icon name="plus" className="h-4 w-4" /> สร้างเอกสาร
             </button>
           </div>
         </div>
@@ -235,15 +250,21 @@ export default function DocumentRegister() {
                   <td className="tbl-td text-slate-600">{d.doc_code}</td>
                   <td className="tbl-td"><StatusBadge status={d.status} /></td>
                   <td className="tbl-td text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/memos/${d.id}`);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-light"
-                    >
-                      เปิด <Icon name="arrowRight" className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openFile(d.id); }}
+                        title="เปิดไฟล์เอกสาร (PDF)"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        <Icon name="file" className="h-3.5 w-3.5" /> เปิดไฟล์
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/memos/${d.id}`); }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-light"
+                      >
+                        ดูรายละเอียด <Icon name="arrowRight" className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

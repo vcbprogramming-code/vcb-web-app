@@ -116,9 +116,6 @@ export default function Portal() {
             <h2 className="text-lg font-bold text-slate-900">แอปพลิเคชัน</h2>
             <p className="text-sm text-slate-500">เลือกระบบที่ต้องการเปิดใช้งาน</p>
           </div>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-            {visible.length} รายการ
-          </span>
         </div>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

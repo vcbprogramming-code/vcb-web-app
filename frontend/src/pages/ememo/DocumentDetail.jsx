@@ -86,21 +86,6 @@ export default function DocumentDetail() {
     }
   };
 
-  const generatePdf = async () => {
-    setBusy(true);
-    try {
-      const { data } = await ememoApi.generatePdf(id);
-      // open the freshly generated PDF via the streaming download endpoint
-      const url = await ememoApi.attachmentBlobUrl(id, data.id);
-      window.open(url, '_blank');
-      load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const openAttachment = async (attId) => {
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
@@ -197,7 +182,7 @@ export default function DocumentDetail() {
             ) : (
               <div className="flex h-[560px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center">
                 <Icon name="file" className="h-10 w-10 text-slate-300" />
-                <p className="text-sm text-slate-400">กำลังเตรียมหนังสือ… หากไม่แสดง กด "สร้าง PDF หนังสือ" ด้านบน</p>
+                <p className="text-sm text-slate-400">กำลังเตรียมหนังสือ… เอกสารที่สร้างก่อนหน้านี้อาจยังไม่มีไฟล์ — กด "แก้ไข" แล้วบันทึกเพื่อสร้างใหม่</p>
               </div>
             )}
           </div>
@@ -241,7 +226,7 @@ export default function DocumentDetail() {
                   return orig ? (
                     <button onClick={() => openAttachment(orig.id)} className="text-blue-600 hover:underline text-sm break-all">{orig.file_name}</button>
                   ) : (
-                    <p className="text-xs text-slate-400">ยังไม่มี — กด "สร้าง PDF หนังสือ" ด้านบน</p>
+                    <p className="text-xs text-slate-400">ยังไม่มีไฟล์ — กด "แก้ไข" แล้วบันทึกเพื่อสร้าง</p>
                   );
                 })()}
               </div>

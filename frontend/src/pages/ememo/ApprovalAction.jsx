@@ -273,7 +273,53 @@ export default function ApprovalAction() {
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand-tint px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10">
             <Icon name="file" className="h-5 w-5" /> เปิดดูหนังสือฉบับเต็ม (PDF)
           </button>
-        ) : null;
+        ) : (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2.5 text-center text-xs text-amber-700">เอกสารนี้ยังไม่มีไฟล์ PDF (เป็นเอกสารที่สร้างก่อนระบบสร้างไฟล์อัตโนมัติ)</p>
+        );
+      })()}
+
+      {/* approval chain — who approves, in what order, and your position */}
+      {Array.isArray(info.approval_steps) && info.approval_steps.length > 0 && (() => {
+        const steps = info.approval_steps;
+        const currentIdx = steps.findIndex((s) => s.action === 'pending');
+        const myStep = currentIdx + 1;
+        return (
+          <div className="mt-4 rounded-xl border border-slate-200 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-700">สายอนุมัติ</span>
+              <span className="text-xs text-slate-400">ผู้อนุมัติ {steps.length} ลำดับ · ท่านคือลำดับที่ {myStep}</span>
+            </div>
+            <ol className="relative space-y-1">
+              {steps.map((s, i) => {
+                const m = APPROVAL_META[s.action] || APPROVAL_META.pending;
+                const isCurrent = i === currentIdx;
+                const isDone = s.action !== 'pending';
+                const isWaiting = s.action === 'pending' && !isCurrent;
+                const last = i === steps.length - 1;
+                const circle = isDone
+                  ? (s.action === 'approved' ? 'bg-emerald-500 text-white' : s.action === 'rejected' ? 'bg-red-500 text-white' : 'bg-orange-500 text-white')
+                  : isCurrent ? 'bg-brand text-white ring-4 ring-brand/15' : 'bg-slate-100 text-slate-400';
+                const icon = s.action === 'approved' ? 'check' : s.action === 'rejected' ? 'x' : s.action === 'returned' ? 'undo' : null;
+                return (
+                  <li key={s.step_no} className="relative flex gap-3 pb-3 text-sm last:pb-0">
+                    {!last && <span className="absolute left-[13px] top-7 h-full w-px bg-slate-200" />}
+                    <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${circle}`}>
+                      {icon ? <Icon name={icon} className="h-4 w-4" strokeWidth={2.4} /> : s.step_no}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className={`flex items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
+                        <span className="truncate">{s.approver_name || s.approver_email}</span>
+                        {isCurrent && <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">กำลังพิจารณา{i === currentIdx && myStep === currentIdx + 1 ? ' (ท่าน)' : ''}</span>}
+                      </div>
+                      {s.comment && <div className="truncate text-xs text-slate-400">{s.comment}</div>}
+                    </div>
+                    <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : m.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        );
       })()}
 
       {/* attachments */}

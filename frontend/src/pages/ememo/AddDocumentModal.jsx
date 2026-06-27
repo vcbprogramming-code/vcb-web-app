@@ -23,6 +23,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
   const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
+  const [step, setStep] = useState(1); // wizard step: 1 ข้อมูล · 2 เนื้อหา · 3 ผู้อนุมัติ
 
   const [preview, setPreview] = useState(null); // { docNumber, department, runNo }
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -85,11 +86,26 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
   const removeApprover = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
 
+  const STEPS = ['ข้อมูลเอกสาร', 'เนื้อหา & ไฟล์แนบ', 'ผู้อนุมัติ & ยืนยัน'];
+
+  const goNext = () => {
+    setError(null);
+    if (step === 1) {
+      if (!projectId || !docCode || !subject.trim()) {
+        setError('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง');
+        return;
+      }
+    }
+    setStep((s) => Math.min(3, s + 1));
+  };
+  const goBack = () => { setError(null); setStep((s) => Math.max(1, s - 1)); };
+
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     if (!projectId || !docCode || !subject.trim()) {
       setError('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง');
+      setStep(1);
       return;
     }
     setSubmitting(true);
@@ -154,13 +170,35 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h3 className="text-lg font-bold text-slate-800">เพิ่มเอกสารใหม่</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-bold text-slate-800">เพิ่มเอกสารใหม่</h3>
+            {/* stepper */}
+            <div className="hidden items-center gap-1.5 sm:flex">
+              {STEPS.map((label, i) => {
+                const n = i + 1;
+                const stState = n === step ? 'active' : n < step ? 'done' : 'todo';
+                return (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                      stState === 'active' ? 'bg-brand text-white'
+                      : stState === 'done' ? 'bg-emerald-500 text-white'
+                      : 'bg-slate-100 text-slate-400'}`}>
+                      {stState === 'done' ? <Icon name="check" className="h-3.5 w-3.5" strokeWidth={2.5} /> : n}
+                    </span>
+                    <span className={`text-xs ${n === step ? 'font-semibold text-slate-800' : 'text-slate-400'}`}>{label}</span>
+                    {n < 3 && <span className="mx-1 h-px w-4 bg-slate-200" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
         </div>
 
         {/* split view: form (left) · live A4 preview (right) */}
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
         <form onSubmit={submit} className="space-y-4 overflow-auto p-6">
+          {step === 1 && (<>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ *</label>
@@ -262,10 +300,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง *</label>
             <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="เช่น ขออนุมัติ…" className={field} />
           </div>
+          </>)}
 
+          {step === 2 && (<>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">เนื้อความ</label>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="รายละเอียดเนื้อความ (ใช้สำหรับสร้างหนังสือในขั้นถัดไป)" className={field} />
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} placeholder="รายละเอียดเนื้อความ (จะแสดงในหนังสือฝั่งขวา)" className={field} />
           </div>
 
           <div>
@@ -304,7 +344,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               </label>
             )}
           </div>
+          </>)}
 
+          {step === 3 && (<>
           {/* approvers — optional, OR auto-filled+locked from the doc-code config */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
             <div className="flex items-center justify-between">
@@ -336,18 +378,26 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <button type="button" onClick={addApprover} className="mt-2 text-sm font-medium text-blue-600 hover:underline">+ เพิ่มผู้อนุมัติ</button>
             )}
           </div>
+          </>)}
 
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
-            <button type="submit" disabled={submitting} className="btn-primary">
-              {submitting
-                ? 'กำลังบันทึก…'
-                : approvers.some((a) => a.email.trim())
-                  ? 'บันทึกและส่งอนุมัติ'
-                  : 'บันทึกเอกสาร'}
+          {/* wizard nav */}
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <button type="button" onClick={step === 1 ? onClose : goBack} className="btn-outline">
+              {step === 1 ? 'ยกเลิก' : '← ก่อนหน้า'}
             </button>
+            {step < 3 ? (
+              <button type="button" onClick={goNext} className="btn-primary">ถัดไป →</button>
+            ) : (
+              <button type="submit" disabled={submitting} className="btn-primary">
+                {submitting
+                  ? 'กำลังบันทึก…'
+                  : approvers.some((a) => a.email.trim())
+                    ? 'บันทึกและส่งอนุมัติ'
+                    : 'บันทึกเอกสาร'}
+              </button>
+            )}
           </div>
         </form>
 

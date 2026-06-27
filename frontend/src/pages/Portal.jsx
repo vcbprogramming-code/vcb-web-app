@@ -57,18 +57,35 @@ export default function Portal() {
 
       <main className="mx-auto max-w-screen-xl px-4 py-8 md:px-8 md:py-10">
         {/* hero */}
-        <section className="relative mb-10 overflow-hidden rounded-[28px] bg-gradient-to-br from-brand via-brand to-brand-light p-8 text-white shadow-xl shadow-brand/20 md:p-12">
-          {/* decorative glows + grid */}
-          <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-10 h-72 w-72 rounded-full bg-brand-light/40 blur-3xl" />
+        <section className="relative mb-10 overflow-hidden rounded-[28px] bg-slate-950 p-8 text-white shadow-xl shadow-brand/20 md:p-12">
+          {/* tech background: layered gradient mesh */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-700 via-brand to-blue-900" />
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-sky-400/30 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/4 h-72 w-72 rounded-full bg-indigo-500/40 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 top-10 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
+          {/* perspective grid lines */}
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.07]"
+            className="pointer-events-none absolute inset-0 opacity-[0.12]"
             style={{
               backgroundImage:
-                'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+                'linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)',
+              backgroundSize: '46px 46px',
+              maskImage: 'radial-gradient(ellipse 80% 100% at 50% 0%, black 40%, transparent 75%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 80% 100% at 50% 0%, black 40%, transparent 75%)',
+            }}
+          />
+          {/* fine dot grid on top for texture */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.10]"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
               backgroundSize: '22px 22px',
             }}
           />
+          {/* diagonal sheen */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent" />
+          {/* top hairline highlight */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2.5">

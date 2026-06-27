@@ -313,4 +313,45 @@ router.put(
   })
 );
 
+// ===========================================================================
+// Doc-code → default approvers config (locks the approver chain per code).
+// ===========================================================================
+
+/** GET /api/admin/doc-codes — codes with their default approver chains. */
+router.get(
+  '/doc-codes',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `select code, department, recipient_title, default_approvers
+         from doc_code_departments order by code`
+    );
+    res.json({ data: rows });
+  })
+);
+
+const approversSchema = z.object({
+  approvers: z.array(z.object({
+    name: z.string().optional(),
+    email: z.string().email(),
+  })),
+});
+
+/** PUT /api/admin/doc-codes/:code/approvers — set the default approver chain. */
+router.put(
+  '/doc-codes/:code/approvers',
+  asyncHandler(async (req, res) => {
+    const parsed = approversSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const cleaned = parsed.data.approvers.map((a) => ({ name: a.name?.trim() || undefined, email: a.email.trim() }));
+    const row = await queryOne(
+      `update doc_code_departments set default_approvers = $2::jsonb
+        where code = $1
+        returning code, department, recipient_title, default_approvers`,
+      [req.params.code, JSON.stringify(cleaned)]
+    );
+    if (!row) throw new ApiError(404, 'Doc code not found');
+    res.json({ data: row });
+  })
+);
+
 export default router;

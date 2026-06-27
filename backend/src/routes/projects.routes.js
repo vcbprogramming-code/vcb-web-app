@@ -25,7 +25,7 @@ router.get(
   '/doc-codes',
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `select code, department, recipient_title from doc_code_departments order by code`
+      `select code, department, recipient_title, default_approvers from doc_code_departments order by code`
     );
     res.json({ data: rows });
   })

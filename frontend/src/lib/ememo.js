@@ -77,6 +77,11 @@ export const adminApi = {
   getLetterhead: (projectId) => api(`/admin/projects/${projectId}/letterhead`),
   saveLetterhead: (projectId, body) =>
     api(`/admin/projects/${projectId}/letterhead`, { method: 'PUT', body }),
+
+  // doc-code → default approver chain
+  listDocCodeApprovers: () => api('/admin/doc-codes'),
+  saveDocCodeApprovers: (code, approvers) =>
+    api(`/admin/doc-codes/${encodeURIComponent(code)}/approvers`, { method: 'PUT', body: { approvers } }),
 };
 
 /** Role → Thai label. */

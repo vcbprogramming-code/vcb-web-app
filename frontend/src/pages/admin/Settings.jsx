@@ -2,6 +2,7 @@ import { useState } from 'react';
 import UsersTab from './UsersTab.jsx';
 import ProjectsTab from './ProjectsTab.jsx';
 import DocTypesTab from './DocTypesTab.jsx';
+import DocCodeApproversTab from './DocCodeApproversTab.jsx';
 import LetterheadTab from './LetterheadTab.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 
@@ -9,6 +10,7 @@ const TABS = [
   { key: 'users', label: 'จัดการผู้ใช้', Comp: UsersTab },
   { key: 'projects', label: 'โครงการ', Comp: ProjectsTab },
   { key: 'doctypes', label: 'ประเภทเอกสาร', Comp: DocTypesTab },
+  { key: 'approvers', label: 'ผู้อนุมัติตามรหัส', Comp: DocCodeApproversTab },
   { key: 'letterhead', label: 'หัวจดหมาย (Letterhead)', Comp: LetterheadTab },
 ];
 

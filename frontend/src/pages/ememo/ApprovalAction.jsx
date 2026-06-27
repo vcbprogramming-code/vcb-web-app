@@ -104,6 +104,7 @@ export default function ApprovalAction() {
   const [fwdEmail, setFwdEmail] = useState('');
   const [fwdName, setFwdName] = useState('');
   const [forwarded, setForwarded] = useState(null);
+  const [viewerUrl, setViewerUrl] = useState(null); // inline PDF viewer
 
   useEffect(() => {
     ememoApi.lookupApproval(token).then((r) => setInfo(r.data)).catch((e) => setError(e.message));
@@ -168,11 +169,12 @@ export default function ApprovalAction() {
   const openAttachment = async (attId) => {
     try {
       const url = await ememoApi.approvalAttachmentBlobUrl(token, attId);
-      window.open(url, '_blank');
+      setViewerUrl(url);
     } catch (e) {
       setError(e.message);
     }
   };
+  const closeViewer = () => setViewerUrl((u) => { if (u) URL.revokeObjectURL(u); return null; });
 
   if (error && !info) return <Wrap><p className="text-red-600">{error}</p></Wrap>;
   if (!info) return <Wrap><p className="text-slate-400">กำลังโหลด…</p></Wrap>;
@@ -214,6 +216,25 @@ export default function ApprovalAction() {
   const files = (info.attachments || []).filter((a) => a.kind !== 'generated_pdf' || a.version === 'original');
 
   return (
+    <>
+    {viewerUrl && (
+      <div className="fixed inset-0 z-[60] flex flex-col bg-slate-900/60 p-4" onClick={closeViewer}>
+        <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <Icon name="file" className="h-4 w-4 text-brand" /> {info.doc_number}
+            </div>
+            <div className="flex items-center gap-2">
+              <a href={viewerUrl} download={`${(info.doc_number || 'document').replace(/\//g, '-')}.pdf`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+                <Icon name="download" className="h-4 w-4" /> ดาวน์โหลด
+              </a>
+              <button onClick={closeViewer} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <iframe title="เอกสาร" src={viewerUrl} className="min-h-0 flex-1 bg-slate-50" />
+        </div>
+      </div>
+    )}
     <Wrap wide>
       <p className="mb-4 text-sm text-slate-500">เรียน <b className="text-slate-700">{info.approver_name || info.approver_email}</b> — มีเอกสารรอการพิจารณาอนุมัติจากท่าน</p>
 
@@ -242,6 +263,18 @@ export default function ApprovalAction() {
         )}
         {info.remarks && <Field label="หมายเหตุ"><span className="font-normal">{info.remarks}</span></Field>}
       </div>
+
+      {/* open the full letter PDF inline */}
+      {(() => {
+        const mainPdf = (info.attachments || []).find((a) => a.version === 'approved')
+          || (info.attachments || []).find((a) => a.version === 'original');
+        return mainPdf ? (
+          <button onClick={() => openAttachment(mainPdf.id)}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand-tint px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10">
+            <Icon name="file" className="h-5 w-5" /> เปิดดูหนังสือฉบับเต็ม (PDF)
+          </button>
+        ) : null;
+      })()}
 
       {/* attachments */}
       {files.length > 0 && (
@@ -377,5 +410,6 @@ export default function ApprovalAction() {
         )}
       </div>
     </Wrap>
+    </>
   );
 }

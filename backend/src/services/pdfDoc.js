@@ -38,6 +38,33 @@ async function clearVersion(documentId, version) {
  * store it on S3, and record it as a generated, version='original' attachment.
  * Returns { id, storage_key, file_name }.
  */
+/**
+ * Regenerate the ORIGINAL PDF with the decision trail page appended — used when
+ * a document is returned/rejected so the reason is captured in the document.
+ */
+export async function regenerateOriginalWithAudit(documentId, uploadedBy = null) {
+  const { doc, letter } = await loadDocAndLetter(documentId);
+  const sigKey = doc.author_signature_url || doc.author_profile_signature;
+  let authorSignature = null;
+  if (sigKey) authorSignature = await getObjectBuffer(sigKey).catch(() => null);
+  const { rows: auditSteps } = await query(
+    `select approver_name, approver_email, action, comment, acted_at
+       from approval_steps where document_id = $1 order by step_no`,
+    [documentId]
+  );
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, authorTitle: doc.author_title, auditSteps });
+  const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
+  await putObject(key, pdf, 'application/pdf');
+  await clearVersion(doc.id, 'original');
+  return queryOne(
+    `insert into document_attachments
+       (document_id, kind, version, file_name, content_type, size_bytes, storage_key, uploaded_by)
+     values ($1,'generated_pdf','original',$2,'application/pdf',$3,$4,$5)
+     returning id, storage_key, file_name, created_at`,
+    [doc.id, `${doc.doc_number.replace(/\//g, '-')}.pdf`, pdf.length, key, uploadedBy]
+  );
+}
+
 export async function generateOriginalPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
   // signature image: the one chosen for this doc, else the author's saved
@@ -88,7 +115,14 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     signatures.push({ image, name: s.approver_name, title: letter.signatory_title || '' });
   }
 
-  const pdf = await generateLetterPdf(doc, letter, { signatures });
+  // full decision trail for the "บันทึกการพิจารณา" page
+  const { rows: auditSteps } = await query(
+    `select approver_name, approver_email, action, comment, acted_at
+       from approval_steps where document_id = $1 order by step_no`,
+    [documentId]
+  );
+
+  const pdf = await generateLetterPdf(doc, letter, { signatures, auditSteps });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'approved');

@@ -6,7 +6,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import crypto from 'node:crypto';
 import { applyApprovalAction, forwardApprovalStep, sendApprovalRequest } from '../services/approval.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
-import { generateApprovedPdf } from '../services/pdfDoc.js';
+import { generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 
 // PUBLIC routes — reached from email links, so NO requireAuth.
 // Security comes from the unguessable one-time token, not a login session.
@@ -147,6 +147,11 @@ router.post(
     if (result.finalized) {
       await generateApprovedPdf(result.document.id).catch((e) =>
         console.error('approved-pdf generation failed:', e.message)
+      );
+    } else if (parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
+      // append the decision/reason to the document's PDF
+      await regenerateOriginalWithAudit(result.document.id).catch((e) =>
+        console.error('audit-pdf regeneration failed:', e.message)
       );
     }
 

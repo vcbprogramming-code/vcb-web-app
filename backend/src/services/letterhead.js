@@ -198,6 +198,38 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       });
     }
 
+    // ---- "บันทึกการพิจารณา" page (approval trail) ----
+    const trail = Array.isArray(opts.auditSteps) ? opts.auditSteps.filter((s) => s.action && s.action !== 'pending') : [];
+    if (trail.length) {
+      const actionTH = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };
+      pdf.addPage();
+      pdf.font('th-bold').fontSize(18).fillColor('#000')
+        .text('บันทึกการพิจารณา', left, pdf.y, { width: contentW, align: 'center' });
+      pdf.moveDown(0.4);
+      pdf.font('th').fontSize(12).fillColor('#555')
+        .text(`เลขที่เอกสาร ${doc.doc_number}  ·  เรื่อง ${doc.subject || ''}`, left, pdf.y, { width: contentW, align: 'center' });
+      pdf.moveDown(1);
+
+      trail.forEach((s, i) => {
+        const acted = s.acted_at ? thaiLongDate(s.acted_at) : '';
+        // card-ish row
+        const top = pdf.y;
+        pdf.font('th-bold').fontSize(13).fillColor('#000')
+          .text(`${i + 1}. ${s.approver_name || s.approver_email || ''}`, left, top, { width: contentW - 120, continued: false });
+        pdf.font('th').fontSize(12).fillColor(
+          s.action === 'approved' ? '#16a34a' : s.action === 'rejected' ? '#dc2626' : '#ea580c'
+        ).text(actionTH[s.action] || s.action, left + contentW - 120, top, { width: 120, align: 'right' });
+        if (acted) {
+          pdf.font('th').fontSize(10).fillColor('#888').text(acted, left, pdf.y, { width: contentW });
+        }
+        if (s.comment) {
+          pdf.font('th').fontSize(11.5).fillColor('#333')
+            .text(`เหตุผล/ความเห็น: ${s.comment}`, left + 14, pdf.y + 2, { width: contentW - 14 });
+        }
+        pdf.moveDown(0.8);
+      });
+    }
+
     pdf.end();
   });
 }

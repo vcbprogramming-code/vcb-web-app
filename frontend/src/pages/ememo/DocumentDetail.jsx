@@ -178,14 +178,42 @@ export default function DocumentDetail() {
         </div>
       </div>
 
-      {/* two-column layout fills the page */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-        {/* LEFT: document info + attachments (wider) */}
+      {/* two-column layout: big document (left) · all info (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-start">
+        {/* LEFT: the document itself, large */}
+        <div className="lg:col-span-3 lg:sticky lg:top-20">
+          <div className="card !p-3">
+            <div className="mb-2 flex items-center justify-between px-2 pt-1">
+              <h3 className="font-bold text-slate-800">ตัวอย่างเอกสาร</h3>
+              {previewUrl && (
+                <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
+                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
+                </button>
+              )}
+            </div>
+            {previewUrl ? (
+              <iframe
+                title="ตัวอย่างเอกสาร"
+                src={previewUrl}
+                className="h-[calc(100vh-220px)] min-h-[560px] w-full rounded-xl border border-slate-200 bg-slate-50"
+              />
+            ) : (
+              <div className="flex h-[560px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center">
+                <Icon name="file" className="h-10 w-10 text-slate-300" />
+                <p className="text-sm text-slate-400">กำลังเตรียมหนังสือ… หากไม่แสดง กด "สร้าง PDF หนังสือ" ด้านบน</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT: all information stacked */}
         <div className="lg:col-span-2 space-y-5">
           <div className="card">
             <h3 className="font-bold text-slate-800 mb-3">ข้อมูลเอกสาร</h3>
             <Row label="วันที่รับ">{formatThaiDate(doc.date_received)}</Row>
             {doc.recipient && <Row label="เรียน">{doc.recipient}</Row>}
+            {doc.reference && <Row label="อ้างถึง">{doc.reference}</Row>}
+            {doc.cc_recipients && <Row label="สำเนาเรียน">{doc.cc_recipients}</Row>}
             {doc.doc_type_name && <Row label="ประเภท">{doc.doc_type_name}</Row>}
             <Row label="แผนก">{doc.department}</Row>
             {doc.work_unit && <Row label="หน่วยงาน">{doc.work_unit}</Row>}
@@ -202,34 +230,10 @@ export default function DocumentDetail() {
             {doc.remarks && <Row label="หมายเหตุ"><span className="font-normal">{doc.remarks}</span></Row>}
           </div>
 
-          {/* inline document preview — the generated letterhead PDF, shown right here */}
-          <div className="card">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">ตัวอย่างเอกสาร</h3>
-              {previewUrl && (
-                <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
-                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
-                </button>
-              )}
-            </div>
-            {previewUrl ? (
-              <iframe
-                title="ตัวอย่างเอกสาร"
-                src={previewUrl}
-                className="h-[640px] w-full rounded-xl border border-slate-200 bg-slate-50"
-              />
-            ) : (
-              <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center">
-                <Icon name="file" className="h-8 w-8 text-slate-300" />
-                <p className="text-sm text-slate-400">ยังไม่มีหนังสือ — กด "สร้าง PDF หนังสือ" ด้านบนเพื่อสร้างเอกสาร</p>
-              </div>
-            )}
-          </div>
-
           {/* document versions: original + approved */}
           <div className="card">
-            <h3 className="font-bold text-slate-800 mb-3">เอกสาร</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <h3 className="font-bold text-slate-800 mb-3">ไฟล์เอกสาร</h3>
+            <div className="grid grid-cols-1 gap-3">
               {/* ฉบับต้นฉบับ */}
               <div className="rounded-xl border border-slate-200 p-4">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -289,10 +293,8 @@ export default function DocumentDetail() {
               );
             })()}
           </div>
-        </div>
 
-        {/* RIGHT: approval chain + audit trail */}
-        <div className="space-y-5">
+          {/* approval chain */}
           {doc.approval_steps.length > 0 && (
             <div className="card">
               <h3 className="font-bold text-slate-800 mb-3">สายอนุมัติ (ตามลำดับ)</h3>

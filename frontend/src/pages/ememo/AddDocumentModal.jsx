@@ -142,12 +142,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         await ememoApi.uploadAttachment(doc.id, file);
       }
 
-      // if approvers were given, generate the PDF and send for approval right away
+      // always generate the letterhead PDF right away so the document is ready
+      // to view/print without a manual step (it can be regenerated after edits)
+      await ememoApi.generatePdf(doc.id).catch(() => {});
+
+      // if approvers were given, send for approval right away
       const cleanedApprovers = approvers
         .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
         .filter((a) => a.email);
       if (cleanedApprovers.length > 0) {
-        await ememoApi.generatePdf(doc.id);
         await ememoApi.submitForApproval(doc.id, cleanedApprovers);
       }
 

@@ -428,9 +428,20 @@ router.post(
   '/:id/submit',
   asyncHandler(async (req, res) => {
     const doc = await loadDocForMutation(req);
-    // only re-submittable while not in an active/finished approval flow
-    if (!['draft', 'returned'].includes(doc.status)) {
-      throw new ApiError(409, 'ส่งอนุมัติได้เฉพาะเอกสารฉบับร่างหรือที่ถูกตีกลับเท่านั้น');
+    // approved/rejected/cancelled documents are done — never re-submittable
+    if (!['draft', 'returned', 'pending'].includes(doc.status)) {
+      throw new ApiError(409, 'ส่งอนุมัติได้เฉพาะเอกสารที่ยังไม่อนุมัติเท่านั้น');
+    }
+    // a pending doc that already has a live approval chain must not be re-submitted
+    // (that would wipe an in-flight chain on a double-click / stray re-send)
+    if (doc.status === 'pending') {
+      const live = await queryOne(
+        `select id from approval_steps where document_id = $1 and action = 'pending' limit 1`,
+        [doc.id]
+      );
+      if (live) {
+        throw new ApiError(409, 'เอกสารนี้อยู่ระหว่างรออนุมัติแล้ว');
+      }
     }
     const parsed = submitSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());

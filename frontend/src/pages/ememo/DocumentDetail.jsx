@@ -213,9 +213,7 @@ export default function DocumentDetail() {
             {doc.reference && <Row label="อ้างถึง">{doc.reference}</Row>}
             {doc.cc_recipients && <Row label="สำเนาเรียน">{doc.cc_recipients}</Row>}
             {doc.doc_type_name && <Row label="ประเภท">{doc.doc_type_name}</Row>}
-            <Row label="แผนก">{doc.department}</Row>
-            {doc.work_unit && <Row label="หน่วยงาน">{doc.work_unit}</Row>}
-            {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
+            <Row label="แผนก">{doc.department}</Row>            {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
               <Row label="สิ่งที่ส่งมาด้วย">
                 <span className="font-normal">
                   {doc.enclosures.map((e, i) =>

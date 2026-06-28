@@ -15,7 +15,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [recipient, setRecipient] = useState('');
   const [reference, setReference] = useState('');
   const [cc, setCc] = useState('');
-  const [workUnit, setWorkUnit] = useState('');
   const [enclName, setEnclName] = useState('');
   const [enclQty, setEnclQty] = useState('');
   const [body, setBody] = useState('');
@@ -151,7 +150,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           reference: reference.trim() || undefined,
           cc: cc.trim() || undefined,
           authorSignatureUrl,
-          workUnit: workUnit.trim() || undefined,
           enclosures: enclName.trim()
             ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
             : undefined,
@@ -199,7 +197,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     recipient,
     reference,
     cc_recipients: cc,
-    work_unit: workUnit,
     enclosures: enclName.trim()
       ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
       : [],
@@ -309,11 +306,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <label className="block text-sm font-medium text-slate-600 mb-1">วันที่เอกสาร</label>
               <input type="date" value={dateReceived} onChange={(e) => setDateReceived(e.target.value)} className={field} />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">หน่วยงาน</label>
-            <input value={workUnit} onChange={(e) => setWorkUnit(e.target.value)} placeholder="เช่น บางเตย" className={field} />
           </div>
 
           {/* fields ordered to match the real memo: เรื่อง → เรียน → อ้างถึง → สำเนาเรียน → สิ่งที่ส่งมาด้วย */}

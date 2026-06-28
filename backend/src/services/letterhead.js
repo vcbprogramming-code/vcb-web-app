@@ -83,12 +83,6 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       pdf.font('th-bold').fontSize(13).fillColor('#000')
         .text(letter.companyNameEn, textX, pdf.y, { width: nameW, lineBreak: false });
     }
-    // work unit (department) right under the company name, no "หน่วยงาน" prefix
-    if (doc.work_unit) {
-      pdf.font('th').fontSize(11).fillColor('#000')
-        .text(doc.work_unit, textX, pdf.y, { width: nameW, lineBreak: false });
-    }
-
     // move below the tallest of: logo(64), company name block, contact block
     pdf.y = Math.max(headerTop + 70, pdf.y + 6, cy + 4);
     pdf.moveDown(0.3);

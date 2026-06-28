@@ -31,8 +31,6 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
               {letter.company_name_en && (
                 <div className="whitespace-nowrap text-[12px] font-bold leading-tight">{letter.company_name_en}</div>
               )}
-              {/* work unit right under the company name, no prefix */}
-              {doc.work_unit && <div className="text-[11px] leading-tight">{doc.work_unit}</div>}
               {letter.address && <div className="mt-0.5 text-[10px] text-slate-500">{letter.address}</div>}
             </div>
           </div>

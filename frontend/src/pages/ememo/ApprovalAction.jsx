@@ -247,9 +247,7 @@ export default function ApprovalAction() {
         <Field label="เรื่อง">{info.subject}</Field>
         {info.recipient && <Field label="เรียน">{info.recipient}</Field>}
         {info.doc_type_name && <Field label="ประเภท">{info.doc_type_name}</Field>}
-        {info.department && <Field label="แผนก">{info.department}</Field>}
-        {info.work_unit && <Field label="หน่วยงาน">{info.work_unit}</Field>}
-        {info.date_received && <Field label="วันที่">{formatThaiDate(info.date_received)}</Field>}
+        {info.department && <Field label="แผนก">{info.department}</Field>}        {info.date_received && <Field label="วันที่">{formatThaiDate(info.date_received)}</Field>}
         {enclosures.length > 0 && (
           <Field label="สิ่งที่ส่งมาด้วย">
             <span className="font-normal">{enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}</span>

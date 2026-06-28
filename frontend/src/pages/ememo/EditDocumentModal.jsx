@@ -15,7 +15,6 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
     cc: doc.cc_recipients || '',
     body: doc.body || '',
     remarks: doc.remarks || '',
-    workUnit: doc.work_unit || '',
     docTypeId: doc.doc_type_id || '',
     dateReceived: doc.date_received ? String(doc.date_received).slice(0, 10) : '',
   });
@@ -39,7 +38,6 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
         cc: form.cc || null,
         body: form.body || null,
         remarks: form.remarks || null,
-        workUnit: form.workUnit || null,
         docTypeId: form.docTypeId || null,
         dateReceived: form.dateReceived || undefined,
       });
@@ -79,10 +77,6 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
               <option value="">— ไม่ระบุ —</option>
               {docTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">หน่วยงาน</label>
-            <input value={form.workUnit} onChange={(e) => set('workUnit', e.target.value)} className="field" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">วันที่รับ</label>

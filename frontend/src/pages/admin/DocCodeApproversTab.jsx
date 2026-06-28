@@ -3,27 +3,35 @@ import { adminApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 
 /**
- * Admin config: per-document-code default approver chain. When a code has
- * approvers set here, the create-document form auto-fills and locks them.
+ * Admin config: document codes. Each code can be added / edited (department +
+ * recipient title) / deleted, and has a default approver chain. When a code has
+ * approvers set, the create-document form auto-fills and locks them.
  */
 export default function DocCodeApproversTab() {
   const [codes, setCodes] = useState([]);
   const [error, setError] = useState(null);
-  const [editCode, setEditCode] = useState(null);   // code currently being edited
+  const [editCode, setEditCode] = useState(null);   // code whose approvers are being edited
   const [rows, setRows] = useState([]);             // approver rows in the editor
   const [busy, setBusy] = useState(false);
+
+  // add / edit the code itself (code + department + recipient title)
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ code: '', department: '', recipientTitle: '' });
+  const [editMeta, setEditMeta] = useState(null);   // code whose meta is being edited
+  const [metaForm, setMetaForm] = useState({ department: '', recipientTitle: '' });
 
   const load = () =>
     adminApi.listDocCodeApprovers().then((r) => setCodes(r.data)).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
+  // ---- approver chain editor ----
   const startEdit = (c) => {
     setError(null);
+    setEditMeta(null);
     setEditCode(c.code);
     const existing = Array.isArray(c.default_approvers) ? c.default_approvers : [];
     setRows(existing.length ? existing.map((a) => ({ name: a.name || '', email: a.email || '' })) : [{ name: '', email: '' }]);
   };
-
   const updateRow = (i, key, val) => setRows((p) => p.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
   const addRow = () => setRows((p) => [...p, { name: '', email: '' }]);
   const removeRow = (i) => setRows((p) => p.filter((_, idx) => idx !== i));
@@ -42,14 +50,100 @@ export default function DocCodeApproversTab() {
     finally { setBusy(false); }
   };
 
+  // ---- add a new code ----
+  const createCode = async () => {
+    if (!addForm.code.trim() || !addForm.department.trim()) {
+      setError('กรุณาระบุรหัสและชื่อแผนก/ตำแหน่ง');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.createDocCode({
+        code: addForm.code.trim(),
+        department: addForm.department.trim(),
+        recipientTitle: addForm.recipientTitle.trim() || undefined,
+      });
+      setShowAdd(false);
+      setAddForm({ code: '', department: '', recipientTitle: '' });
+      load();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // ---- edit code meta (department + recipient title) ----
+  const startEditMeta = (c) => {
+    setError(null);
+    setEditCode(null);
+    setEditMeta(c.code);
+    setMetaForm({ department: c.department || '', recipientTitle: c.recipient_title || '' });
+  };
+  const saveMeta = async () => {
+    if (!metaForm.department.trim()) { setError('กรุณาระบุชื่อแผนก/ตำแหน่ง'); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.updateDocCode(editMeta, {
+        department: metaForm.department.trim(),
+        recipientTitle: metaForm.recipientTitle.trim() || undefined,
+      });
+      setEditMeta(null);
+      load();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  // ---- delete a code ----
+  const removeCode = async (code) => {
+    if (!window.confirm(`ลบรหัสเอกสาร "${code}"? (ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await adminApi.deleteDocCode(code);
+      load();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
   const field = 'field';
 
   return (
     <div className="max-w-3xl space-y-4">
-      <p className="text-sm text-slate-500">
-        กำหนดสายอนุมัติประจำแต่ละรหัสเอกสาร — เมื่อผู้ใช้เลือกรหัสนี้ตอนสร้างเอกสาร ระบบจะเติมผู้อนุมัติให้อัตโนมัติและล็อกไว้
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          จัดการรหัสเอกสาร — เพิ่ม / แก้ไข / ลบ และกำหนดสายอนุมัติประจำแต่ละรหัส เมื่อผู้ใช้เลือกรหัสตอนสร้างเอกสาร ระบบจะเติมผู้อนุมัติให้อัตโนมัติและล็อกไว้
+        </p>
+        {!showAdd && (
+          <button onClick={() => { setShowAdd(true); setError(null); }} className="btn-primary shrink-0 !py-2 !text-sm">
+            <Icon name="plus" className="h-4 w-4" /> เพิ่มรหัสเอกสาร
+          </button>
+        )}
+      </div>
       {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {/* add-code form */}
+      {showAdd && (
+        <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">รหัส <span className="text-red-500">*</span></label>
+              <input value={addForm.code} onChange={(e) => setAddForm((f) => ({ ...f, code: e.target.value }))} placeholder="เช่น 08" className={field} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-500">แผนก / ชื่อย่อ <span className="text-red-500">*</span></label>
+              <input value={addForm.department} onChange={(e) => setAddForm((f) => ({ ...f, department: e.target.value }))} placeholder="เช่น ฝ่ายการเงิน" className={field} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">ตำแหน่งผู้รับ (เรียน) — ไม่บังคับ</label>
+            <input value={addForm.recipientTitle} onChange={(e) => setAddForm((f) => ({ ...f, recipientTitle: e.target.value }))} placeholder="เช่น ผู้จัดการฝ่ายการเงิน" className={field} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => { setShowAdd(false); setError(null); }} className="btn-outline !py-1.5 !text-sm">ยกเลิก</button>
+            <button onClick={createCode} disabled={busy} className="btn-primary !py-1.5 !text-sm">{busy ? 'กำลังเพิ่ม…' : 'เพิ่มรหัส'}</button>
+          </div>
+        </div>
+      )}
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
         {codes.length === 0 ? (
@@ -65,17 +159,40 @@ export default function DocCodeApproversTab() {
                     <span className="text-sm font-medium text-slate-800">{c.recipient_title || c.department}</span>
                   </div>
                   <div className="mt-0.5 text-xs text-slate-400">
+                    แผนก: {c.department}{' · '}
                     {count > 0 ? `ผู้อนุมัติ ${count} ลำดับ` : 'ยังไม่ได้กำหนดผู้อนุมัติ'}
                   </div>
                 </div>
-                {editCode !== c.code && (
-                  <button onClick={() => startEdit(c)} className="shrink-0 text-sm font-medium text-blue-600 hover:underline">
-                    {count > 0 ? 'แก้ไข' : 'กำหนด'}
-                  </button>
+                {editCode !== c.code && editMeta !== c.code && (
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button onClick={() => startEdit(c)} className="text-sm font-medium text-blue-600 hover:underline">
+                      {count > 0 ? 'ผู้อนุมัติ' : 'กำหนดผู้อนุมัติ'}
+                    </button>
+                    <button onClick={() => startEditMeta(c)} className="text-sm font-medium text-slate-500 hover:underline">แก้รหัส</button>
+                    <button onClick={() => removeCode(c.code)} className="text-sm font-medium text-red-500 hover:underline">ลบ</button>
+                  </div>
                 )}
               </div>
 
-              {/* inline editor */}
+              {/* meta editor (department + recipient title) */}
+              {editMeta === c.code && (
+                <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">แผนก / ชื่อย่อ <span className="text-red-500">*</span></label>
+                    <input value={metaForm.department} onChange={(e) => setMetaForm((f) => ({ ...f, department: e.target.value }))} className={field} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">ตำแหน่งผู้รับ (เรียน)</label>
+                    <input value={metaForm.recipientTitle} onChange={(e) => setMetaForm((f) => ({ ...f, recipientTitle: e.target.value }))} className={field} />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setEditMeta(null)} className="btn-outline !py-1.5 !text-sm">ยกเลิก</button>
+                    <button onClick={saveMeta} disabled={busy} className="btn-primary !py-1.5 !text-sm">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+                  </div>
+                </div>
+              )}
+
+              {/* approver chain editor */}
               {editCode === c.code && (
                 <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
                   {rows.map((r, i) => (

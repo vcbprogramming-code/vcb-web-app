@@ -99,6 +99,12 @@ export const adminApi = {
   listDocCodeApprovers: () => api('/admin/doc-codes'),
   saveDocCodeApprovers: (code, approvers) =>
     api(`/admin/doc-codes/${encodeURIComponent(code)}/approvers`, { method: 'PUT', body: { approvers } }),
+  // doc-code CRUD (the code itself: code + department + recipient title)
+  createDocCode: (body) => api('/admin/doc-codes', { method: 'POST', body }),
+  updateDocCode: (code, body) =>
+    api(`/admin/doc-codes/${encodeURIComponent(code)}`, { method: 'PUT', body }),
+  deleteDocCode: (code) =>
+    api(`/admin/doc-codes/${encodeURIComponent(code)}`, { method: 'DELETE' }),
 };
 
 /** Role → Thai label. */

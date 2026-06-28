@@ -329,6 +329,66 @@ router.get(
   })
 );
 
+const docCodeSchema = z.object({
+  code: z.string().trim().min(1).max(20),
+  department: z.string().trim().min(1),
+  recipientTitle: z.string().trim().optional(),
+});
+const docCodeEditSchema = z.object({
+  department: z.string().trim().min(1),
+  recipientTitle: z.string().trim().optional(),
+});
+
+/** POST /api/admin/doc-codes — add a new document code. */
+router.post(
+  '/doc-codes',
+  asyncHandler(async (req, res) => {
+    const parsed = docCodeSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const code = parsed.data.code.toUpperCase();
+    const dup = await queryOne('select code from doc_code_departments where upper(code) = $1', [code]);
+    if (dup) throw new ApiError(409, `รหัสเอกสาร "${code}" มีอยู่แล้ว`);
+    const row = await queryOne(
+      `insert into doc_code_departments (code, department, recipient_title, default_approvers)
+       values ($1, $2, $3, '[]'::jsonb)
+       returning code, department, recipient_title, default_approvers`,
+      [code, parsed.data.department, parsed.data.recipientTitle || null]
+    );
+    res.status(201).json({ data: row });
+  })
+);
+
+/** PUT /api/admin/doc-codes/:code — edit a code's department / recipient title. */
+router.put(
+  '/doc-codes/:code',
+  asyncHandler(async (req, res) => {
+    const parsed = docCodeEditSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const row = await queryOne(
+      `update doc_code_departments set department = $2, recipient_title = $3
+        where code = $1
+        returning code, department, recipient_title, default_approvers`,
+      [req.params.code, parsed.data.department, parsed.data.recipientTitle || null]
+    );
+    if (!row) throw new ApiError(404, 'Doc code not found');
+    res.json({ data: row });
+  })
+);
+
+/** DELETE /api/admin/doc-codes/:code — remove a code (blocked if documents use it). */
+router.delete(
+  '/doc-codes/:code',
+  asyncHandler(async (req, res) => {
+    const used = await queryOne('select count(*)::int as n from documents where doc_code = $1', [req.params.code]);
+    if (used && used.n > 0) {
+      throw new ApiError(409, `ลบไม่ได้ — มีเอกสาร ${used.n} ฉบับใช้รหัสนี้อยู่`);
+    }
+    const row = await queryOne('delete from doc_code_departments where code = $1 returning code', [req.params.code]);
+    if (!row) throw new ApiError(404, 'Doc code not found');
+    res.json({ data: { code: row.code } });
+  })
+);
+
 const approversSchema = z.object({
   approvers: z.array(z.object({
     name: z.string().optional(),

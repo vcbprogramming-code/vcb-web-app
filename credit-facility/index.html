@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1F3864">
+<link rel="icon" href="data:,">
+<title>VCB Credit Facility Manager</title>
+<!-- Inter (Latin + tabular figures) paired with Sarabun (Thai). Inter has no Thai
+     glyphs, so Thai falls through to Sarabun per-glyph automatically. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Mobile detection: UA test for actual phones OR a narrow viewport. Runs in
+  // <head> so the .is-mobile class is set on <html> before first paint, and
+  // re-runs on resize/orientationchange. Reason: in-app browsers (Gmail/Slack
+  // webviews, Apps Script iframe wrappers) often report 980+ px viewports even
+  // on a real iPhone, so @media alone misses them — the UA + screen.width
+  // checks catch those cases.
+  (function(){
+    function detect(){
+      var ua=navigator.userAgent||'';
+      var uaMobile=/iPhone|iPod|Android.+Mobile/.test(ua);
+      var sw=screen.width||9999, iw=window.innerWidth||9999;
+      var narrow = Math.min(sw, iw) <= 820;
+      document.documentElement.classList.toggle('is-mobile', uaMobile || narrow);
+    }
+    detect();
+    window.addEventListener('resize', detect);
+    window.addEventListener('orientationchange', detect);
+  })();
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

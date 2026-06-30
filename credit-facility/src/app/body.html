@@ -1,0 +1,245 @@
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <a class="bg" href="https://script.google.com/a/macros/vcb-con.com/s/AKfycbxqIk8Qql3XWXIWn_p0f0FSd04i-FcWZjoXgRErlU5bTXUkpujbQ4ZN4mWco6HEQFUB/exec" target="_top" title="กลับไปหน้าหลัก VCB Connect">VCB Group</a>
+      <span class="bx">
+        <span class="bx1">Credit Facility Manager</span>
+        <span class="bx2">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามวงเงินสินเชื่อทุกโครงการ</span>
+      </span>
+    </div>
+    <div class="hdr-actions">
+      <button class="iconbtn ico-gear" id="settingsBtn" title="ตั้งค่า" onclick="openSettings()"></button>
+      <div class="me" id="me">…</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="cards" id="cards"></div>
+
+  <div class="tabs">
+    <button class="tab on" data-v="fac" onclick="setView('fac')">วงเงิน<span class="tab-x">สินเชื่อ (Facilities)</span></button>
+    <button class="tab" data-v="txn" onclick="setView('txn')">รายการ<span class="tab-x">สินเชื่อ (Credit Ledger)</span></button>
+    <button class="tab" data-v="plan" onclick="setView('plan')">วางแผน<span class="tab-x">สินเชื่อ (T-bar)</span></button>
+  </div>
+
+  <div class="bar" id="bar">
+    <select id="fCo" onchange="render()" title="บริษัท"><option value="">ทุกบริษัท</option></select>
+    <select id="fType" onchange="render()" title="ประเภทวงเงิน"><option value="">ทุกประเภท</option></select>
+    <select id="fProj" onchange="render()" title="โครงการ"><option value="">ทุกโครงการ</option></select>
+    <select id="fDue" onchange="render()" title="ระยะเวลา"><option value="">ทุกระยะเวลา</option>
+      <option value="7d">ครบใน 7 วัน</option><option value="this">เดือนนี้</option><option value="next">เดือนหน้า</option><option value="overdue">เกินกำหนด</option></select>
+    <select id="fStatus" onchange="render()" title="สถานะ"><option value="">ทุกสถานะ</option>
+      <option value="คำขอใหม่,อยู่ระหว่างเสนออนุมัติ">รออนุมัติ (ใหม่/เสนอ)</option><option value="คำขอใหม่">คำขอใหม่</option><option value="อยู่ระหว่างเสนออนุมัติ">อยู่ระหว่างเสนออนุมัติ</option><option value="อนุมัติแล้ว">อนุมัติแล้ว</option><option value="ชำระแล้ว">ชำระแล้ว</option></select>
+    <input id="fQ" class="grow" placeholder="ค้นหา…" title="ค้นหา รหัส / รายละเอียด / ผู้รับเงิน" oninput="render()">
+    <div class="bar-actions">
+      <button class="btn add" id="addReqBtn" onclick="openReq()">＋ เพิ่มคำขอสินเชื่อ</button>
+      <button class="btn ghost" id="addTxnBtn" onclick="openTxn()">＋ บันทึกการใช้วงเงิน</button>
+      <button class="btn export" id="xlsBtn" onclick="exportExcel()">📥 Export Excel</button>
+    </div>
+  </div>
+
+  <div id="body"><div class="ctr">กำลังโหลดข้อมูล…</div></div>
+</div>
+
+<!-- Request modal -->
+<div class="ovl" id="ovlReq">
+  <div class="modal">
+    <h3><span id="reqTitle">เพิ่มคำขอสินเชื่อ</span><span class="modalX" onclick="close_('ovlReq')">✕</span></h3>
+    <div class="modal-body">
+      <div class="row">
+        <label class="f req grow">โครงการ<select id="rProj" onchange="reqProjChange()"></select></label>
+        <label class="f grow">บริษัท<select id="rCo" disabled><option value="">— เลือกบริษัท —</option></select></label>
+      </div>
+      <div class="row">
+        <label class="f req grow">ประเภทสินเชื่อ<select id="rType" onchange="reqAvailHint()"></select></label>
+        <label class="f req grow">จำนวนเงิน (บาท)<input id="rAmt" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtMoneyInput(this);reqAvailHint()"></label>
+      </div>
+      <div id="rAvail" class="availhint"></div>
+      <div class="row">
+        <label class="f">วันที่เริ่ม<input id="rStart" type="date" oninput="onStart()"></label>
+        <label class="f">จำนวนวัน<input id="rDays" type="number" min="0" placeholder="เช่น 120" oninput="onDays()"></label>
+        <label class="f">วันครบกำหนด<input id="rMat" type="date" oninput="onMat()"></label>
+      </div>
+      <div class="row">
+        <label class="f req grow">ผู้รับผลประโยชน์<input id="rBeneficiary" placeholder="เช่น บริษัท สิริวัฒน์ ค้าเหล็ก จำกัด"></label>
+        <label class="f grow">เลขที่เอกสารอ้างอิง<input id="rRef" placeholder="เช่น PO:20260000170 / BT-001/69"></label>
+      </div>
+      <div class="row">
+        <label class="f grow">วันที่เอกสารอ้างอิง (ช่วง)<input id="rRefDocFrom" placeholder="dd/mm/yyyy"></label>
+        <label class="f grow">&nbsp;<input id="rRefDocTo" placeholder="dd/mm/yyyy — ถึง"></label>
+      </div>
+      <div class="secttl">เอกสารแนบ &amp; สถานะ</div>
+      <div class="row">
+        <label class="f grow">เอกสารแนบ (อีเมล / แหล่งที่มา)<input id="rSrc" placeholder="เช่น อีเมล จาก คุณ… / แหล่งที่มา"></label>
+        <label class="f grow">หมวดค่าใช้จ่าย
+          <div class="combo-cost" style="position:relative">
+            <input id="rCostCat" placeholder="เช่น ทราย / ค่าแรง / คอนกรีต" autocomplete="off"
+              onkeyup="costCatShow(false);reqAvailHint()" onclick="event.stopPropagation()" style="width:100%;padding-right:24px">
+            <span onclick="event.stopPropagation();costCatToggle()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--mut);font-size:11px;user-select:none;padding:4px 4px">▼</span>
+            <div id="costCatPop" style="display:none;position:absolute;top:100%;left:0;background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-top:2px;width:420px;max-width:90vw;max-height:72vh;overflow-y:auto;z-index:100;box-shadow:0 6px 16px rgba(0,0,0,.15);transition:opacity .12s ease"></div>
+          </div>
+        </label>
+      </div>
+      <div class="row">
+        <label class="f grow">วันที่เอกสารแนบ (ช่วง)<input id="rDocFrom" placeholder="dd/mm/yyyy"></label>
+        <label class="f grow">&nbsp;<input id="rDocTo" placeholder="dd/mm/yyyy — ถึง"></label>
+      </div>
+      <label class="f">สถานะ<select id="rStatus">
+        <option value="คำขอใหม่">🔵 คำขอใหม่</option>
+        <option value="อยู่ระหว่างเสนออนุมัติ">🟡 อยู่ระหว่างเสนออนุมัติ</option>
+        <option value="อนุมัติแล้ว">🟢 อนุมัติแล้ว</option>
+        <option value="ชำระแล้ว">✅ ชำระแล้ว (ปิดรายการ)</option></select></label>
+      <label class="f">หมายเหตุ<textarea id="rNote" rows="2" placeholder="รายละเอียดเพิ่มเติม…"></textarea></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlReq')">ยกเลิก</button>
+      <button class="btn ico-save" id="rSave" onclick="saveReq()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Request detail (read-only) modal -->
+<div class="ovl" id="ovlView">
+  <div class="modal">
+    <h3><span id="vTitle">รายละเอียดรายการสินเชื่อ</span><span class="modalX" onclick="close_('ovlView')">✕</span></h3>
+    <div class="modal-body" id="viewBody"></div>
+    <div class="modal-foot">
+      <button class="btn ghost ico-trash" id="vDelBtn">ลบ</button>
+      <button class="btn ico-edit" id="vEditBtn">แก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transaction modal -->
+<div class="ovl" id="ovlTxn">
+  <div class="modal">
+    <h3>บันทึกการใช้วงเงิน<span class="modalX" onclick="close_('ovlTxn')">✕</span></h3>
+    <div class="modal-body">
+      <div class="row">
+        <label class="f req grow">โครงการ<select id="tProj"></select></label>
+        <label class="f req grow">ประเภทวงเงิน<select id="tType"></select></label>
+      </div>
+      <label class="f req">จำนวนเงิน (บาท) — ใส่ค่าลบเมื่อปลด/คืนวงเงิน<input id="tAmt" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtMoneyInput(this)"></label>
+      <label class="f">เลขที่อ้างอิง<input id="tRef" placeholder="เช่น BT-001/69"></label>
+      <label class="f">รายละเอียด / คู่ค้า<input id="tDesc"></label>
+      <div class="row">
+        <label class="f grow">วันที่เริ่ม<input id="tStart" type="date"></label>
+        <label class="f grow">วันครบกำหนด<input id="tDue" type="date"></label>
+      </div>
+      <label class="f">หมายเหตุ<textarea id="tNote" rows="2" placeholder="รายละเอียดเพิ่มเติม…"></textarea></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlTxn')">ยกเลิก</button>
+      <button class="btn ico-save" id="tSave" onclick="saveTxn()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom confirm (replaces the browser's confirm, which leaks the iframe URL) -->
+<div class="ovl" id="ovlConfirm">
+  <div class="modal" style="max-width:420px">
+    <h3><span id="cfTitle">ยืนยัน</span><span class="modalX" onclick="close_('ovlConfirm')">✕</span></h3>
+    <div class="modal-body">
+      <div id="cfMsg" style="font-size:14px;line-height:1.55"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlConfirm')">ยกเลิก</button>
+      <button class="btn" id="cfOk">ตกลง</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal: dark/light toggle, chart mode, language, and a visual
+     cost-category list editor (pills + reorder/delete + inline add). -->
+<div class="ovl" id="ovlSettings">
+  <div class="modal" style="max-width:680px">
+    <h3>ตั้งค่า / Settings<span class="modalX" onclick="close_('ovlSettings')">✕</span></h3>
+    <div class="modal-body">
+      <div class="secttl">การแสดงผล / Display</div>
+      <div class="row">
+        <label class="f">โหมดสี / Theme
+          <div class="seg-toggle">
+            <button type="button" class="seg ico-sun" id="segLight" onclick="setDark(false)">สว่าง</button>
+            <button type="button" class="seg ico-moon" id="segDark" onclick="setDark(true)">มืด</button>
+          </div>
+        </label>
+        <label class="f">ภาษา / Language
+          <select id="setLang" onchange="setLang(this.value)">
+            <option value="th">ไทย</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+      <div class="secttl">แดชบอร์ด / Dashboard</div>
+      <div class="dashgrid">
+        <div class="dashcol">
+          <div class="dashcol-h">วงเงินสินเชื่อ / Credit lines</div>
+          <label><input type="checkbox" id="dl_tl" onchange="setDashLine('tl',this.checked)">T/L</label>
+          <label><input type="checkbox" id="dl_bg" onchange="setDashLine('bg',this.checked)">BG</label>
+          <label><input type="checkbox" id="dl_ml" onchange="setDashLine('ml',this.checked)">M/L</label>
+          <label><input type="checkbox" id="dl_be" onchange="setDashLine('be',this.checked)">B/E <span class="muted" style="font-weight:normal">(รวม DLC)</span></label>
+          <label><input type="checkbox" id="dl_pn" onchange="setDashLine('pn',this.checked)">P/N</label>
+        </div>
+        <div class="dashcol">
+          <div class="dashcol-h">ครบกำหนด / Due dates</div>
+          <label><input type="checkbox" id="du_week" onchange="setDuePanel('week',this.checked)">ภายใน 1 สัปดาห์</label>
+          <label><input type="checkbox" id="du_this" onchange="setDuePanel('this',this.checked)">เดือนนี้</label>
+          <label><input type="checkbox" id="du_next" onchange="setDuePanel('next',this.checked)">เดือนหน้า</label>
+        </div>
+        <div class="dashcol">
+          <div class="dashcol-h">สถานะ / Status</div>
+          <label><input type="checkbox" id="st_new" onchange="setStatusPanel('new',this.checked)">คำขอใหม่</label>
+          <label><input type="checkbox" id="st_proposed" onchange="setStatusPanel('proposed',this.checked)">เสนออนุมัติ</label>
+          <label><input type="checkbox" id="st_approved" onchange="setStatusPanel('approved',this.checked)">อนุมัติแล้ว</label>
+        </div>
+      </div>
+      <div class="secttl">หมวดค่าใช้จ่าย / Cost categories</div>
+      <div class="muted" style="font-size:11px;margin:-4px 0 4px">ลำดับในรายการ = ลำดับที่แสดงในเมนู · กด ▲▼ เพื่อย้าย · กด × เพื่อลบ</div>
+      <div id="setCatList" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;max-height:34vh;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:6px 12px;background:#fafbfd"></div>
+      <div class="row" style="margin-top:6px">
+        <input id="setCatNew" class="grow" placeholder="พิมพ์ชื่อหมวดใหม่…" onkeydown="if(event.key==='Enter'){event.preventDefault();catAdd();}" style="flex:1">
+        <button type="button" class="btn add" onclick="catAdd()" style="white-space:nowrap">＋ เพิ่มหมวด</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlSettings')">ปิด</button>
+      <button class="btn ico-save" id="setSave" onclick="saveSettings()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Set / edit budget cap for a (Project × CostCategory) — referenced from the
+     สรุปหมวดค่าใช้จ่าย panel on the Credit Ledger tab. -->
+<div class="ovl" id="ovlCap">
+  <div class="modal" style="max-width:460px">
+    <h3>ตั้งงบหมวดค่าใช้จ่าย<span class="modalX" onclick="close_('ovlCap')">✕</span></h3>
+    <div class="modal-body">
+      <div id="capInfo" class="muted" style="font-size:13px;margin:0 0 14px"></div>
+      <label class="f">งบประมาณ (บาท) <span class="muted" style="font-weight:normal;font-size:11px">— เว้นว่างเพื่อยกเลิกงบ</span><input id="capVal" type="text" inputmode="decimal" oninput="fmtMoneyInput(this)"></label>
+      <label class="f">หมายเหตุ (ที่มา / cashflow) <span class="muted" style="font-weight:normal;font-size:11px">— ไม่บังคับ</span><input id="capNote" placeholder="เช่น cashflow ที่ส่งธนาคารตอนขอวงเงิน"></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlCap')">ยกเลิก</button>
+      <button class="btn ico-save" id="capSave">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Adjust facility limit / used override modal -->
+<div class="ovl" id="ovlLim">
+  <div class="modal" style="max-width:480px">
+    <h3>ปรับวงเงิน / ใช้ไป<span class="modalX" onclick="close_('ovlLim')">✕</span></h3>
+    <div class="modal-body">
+      <div id="lmInfo" class="muted" style="font-size:13px;margin:0 0 14px"></div>
+      <label class="f req">วงเงิน (บาท)<input id="lmVal" type="text" inputmode="decimal" oninput="fmtMoneyInput(this)"></label>
+      <label class="f">ใช้ไป (บาท) <span class="muted" style="font-weight:normal;font-size:11px">— เว้นว่างเพื่อใช้ค่าที่คำนวณอัตโนมัติจากรายการ</span><input id="lmUsed" type="text" inputmode="decimal" oninput="fmtMoneyInput(this)"></label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="close_('ovlLim')">ยกเลิก</button>
+      <button class="btn ico-save" id="lmSave">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>

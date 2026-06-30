@@ -1,0 +1,400 @@
+  /* Palette follows the bank reference (VCB-Group) */
+  :root{--bg:#F0F4F8;--card:#FFFFFF;--ink:#1d2433;--mut:#6b7689;--bd:#e3e8f0;
+        --brand:#1F3864;--brand2:#2E75B6;--ok:#217346;--warn:#ED7D31;--bad:#C00000;--new:#2E75B6;
+        --navy:#1F3864;--blue:#2E75B6;--orange:#ED7D31;--excel:#217346;
+        /* elevation scale — used consistently across cards, bars, modals, toasts */
+        --sh-sm:0 1px 2px rgba(20,40,90,.06);
+        --sh-md:0 4px 12px rgba(20,40,90,.10);
+        --sh-lg:0 12px 32px rgba(20,40,90,.16);
+        /* radius scale */
+        --r-sm:7px;--r-md:10px;--r-lg:14px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  /* Always reserve space for the vertical scrollbar so the page width stays
+     constant when sections expand/collapse — keeps dashboard panels fixed in
+     place instead of shifting left/right as the scrollbar appears/disappears. */
+  html{overflow-y:scroll;scrollbar-gutter:stable}
+  body{font-family:"Inter","Sarabun","Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--ink);
+     font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  /* Numbers everywhere read as aligned, lining, tabular figures — the single
+     biggest "finance-grade" typographic cue. */
+  .c .val,.c .val.sm,td.num,th.num,.vval,.money,.meter+*,table{font-variant-numeric:tabular-nums lining-nums}
+  a{color:var(--brand2)}
+  .wrap{max-width:none;width:100%;margin:0 auto;padding:0 62px 48px}
+  header{background:linear-gradient(135deg,var(--navy) 0%,var(--blue) 100%);color:#fff;
+     padding:18px 0;box-shadow:0 2px 8px rgba(0,0,0,.25);border-bottom:3px solid var(--orange)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:0 62px}
+  .brand{display:flex;align-items:center;gap:18px}
+  .brand .bg{font-size:24px;font-weight:800;letter-spacing:.3px;white-space:nowrap;
+     color:inherit;text-decoration:none;cursor:pointer;transition:opacity .15s}
+  a.bg:hover{opacity:.8}
+  .brand .bx{display:flex;flex-direction:column;justify-content:center;line-height:1.3;
+     border-left:1px solid rgba(255,255,255,.35);padding-left:18px}
+  .brand .bx1{font-size:14px;font-weight:700;letter-spacing:3px;text-transform:uppercase}
+  .brand .bx2{font-size:12px;opacity:.9}
+  header .me{font-size:12px;opacity:.92;text-align:right;margin-left:8px}
+  .hdr-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  /* Make the iconbtn legible on the dark navy banner */
+  .hdr-actions .iconbtn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.3)}
+  .hdr-actions .iconbtn:hover{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.5)}
+  /* Settings gear: square 40×40 pill matching the Admin-button reference (same as mobile). */
+  #settingsBtn{width:40px;height:40px;padding:0;border-radius:10px;font-size:19px;
+     display:inline-flex;align-items:center;justify-content:center;line-height:1}
+  /* Dark-mode toggle: circular moon icon */
+  #darkBtn{width:34px;height:34px;border-radius:50%;padding:0;font-size:16px;
+     display:inline-flex;align-items:center;justify-content:center;line-height:1}
+  .cards-wrap{position:relative;margin:18px 0}
+  /* Two-panel grid: facility cards on the left, KPI cards on the right.
+     Collapses to a single column on narrow viewports. */
+  /* Dashboard = four labelled sections. Desktop: a 2×2 grid of sections (two
+     per row → four cards across) to use the horizontal space. Phone: one
+     column, sections stacked. Each section has exactly 2 cards, so they stretch
+     to equal widths and stay aligned. */
+  .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0 18px}
+  @media (max-width:980px){.cards{grid-template-columns:1fr}}
+  /* Subtle panel that groups one half of the dashboard cards. The grouping
+     itself replaces the old vertical divider — no line needed. */
+  .grp{background:#f7f9fc;border:1px solid #eef2f7;border-radius:14px;padding:12px}
+  /* No uppercase / letter-spacing — those break Thai script rendering
+     (diacritics get separated from their base character). Hierarchy comes
+     from size and weight instead. */
+  .grp-ttl{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 10px;padding:0 4px}
+  .grp-row{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+  .grp-row > .c{flex:1 1 150px;width:auto;min-width:140px}   /* 2 cards per section stretch to equal widths */
+  /* boxes are equal fixed size — not stretched across the screen */
+  .c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;
+     box-shadow:0 1px 2px rgba(20,40,90,.04);flex:0 0 168px;width:168px;height:124px;
+     overflow:hidden;display:flex;flex-direction:column}
+  /* fixed-height viz slot so bar↔pie never resizes the box */
+  .c .vizslot{margin-top:auto;display:flex;align-items:flex-end}
+  /* Refined hierarchy: muted small label, prominent value. Skip uppercase /
+     letter-spacing on labels because they break Thai script rendering. */
+  .c .lbl{font-size:12px;color:var(--mut);margin-bottom:6px;font-weight:600}
+  .c .val{font-size:24px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+  .c .val.sm{font-size:19px}
+  .c .go{margin-top:auto}
+  .c.kpi-ok .val,.c.kpi-bad .val,.c.kpi-br .val{color:var(--navy)}
+  /* vertical separator between the facility boxes and the KPI boxes */
+  /* (.vdiv removed — the two .grp panels above provide the visual separation.) */
+  /* every card is clickable — uniform interactive affordance */
+  .c.act{cursor:pointer;position:relative;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+  .c.act:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(20,40,90,.12);border-color:var(--brand2)}
+  .c.act:active{transform:translateY(0);box-shadow:0 1px 2px rgba(20,40,90,.04)}
+  .c.act::after{content:"›";position:absolute;top:9px;right:13px;font-size:17px;font-weight:700;line-height:1;color:var(--bd);transition:color .12s ease,transform .12s ease}
+  .c.act:hover::after{color:var(--brand2);transform:translateX(2px)}
+  .c.act .go{display:inline-flex;align-items:center;gap:4px;margin-top:auto;align-self:flex-end;font-size:11px;font-weight:700;color:var(--brand2)}
+  .c.act:hover .go{text-decoration:underline}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .tabs{display:flex;gap:6px;margin:8px 0 14px;border-bottom:2px solid var(--bd)}
+  .tab{padding:9px 16px;cursor:pointer;border:0;background:none;font:inherit;color:var(--mut);font-weight:600;border-bottom:3px solid transparent;margin-bottom:-2px}
+  .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
+  .bar{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  /* Actions sit on the right of the filter bar so they're spatially close to the
+     content they affect (the transactions/list below). margin-left:auto pushes
+     them to the far right regardless of how many filters take up the middle. */
+  .bar-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  label.f{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:2px}
+  select,input,textarea{font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:var(--r-sm);background:#fff;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px rgba(46,117,182,.18)}
+  select,input{min-width:120px}
+  .grow{min-width:200px}
+  button{font:inherit;cursor:pointer;border:0;border-radius:var(--r-sm);padding:8px 14px;font-weight:600;transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
+  .btn{background:var(--navy);color:#fff} .btn:hover{background:var(--blue)}
+  .btn.ghost{background:#fff;color:#3d4757;border:1px solid #cbd5e1} .btn.ghost:hover{background:#f1f5fa;border-color:#b6c2d4}
+  .btn.add{background:var(--orange);color:#fff} .btn.add:hover{background:#C96320}
+  .btn.export{background:var(--excel);color:#fff} .btn.export:hover{background:#1A5C38}
+  .btn.pay{background:var(--blue);color:#fff} .btn.pay:hover{background:var(--navy)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  /* Solid buttons get a subtle lift + tactile press; ghost stays flat (secondary). */
+  .btn,.btn.add,.btn.export,.btn.pay,.btn.ok,.btn.bad{box-shadow:var(--sh-sm)}
+  .btn:hover,.btn.add:hover,.btn.export:hover,.btn.pay:hover,.btn.ok:hover,.btn.bad:hover{box-shadow:var(--sh-md)}
+  .btn.ghost,.btn.ghost:hover{box-shadow:none}
+  .btn:active{transform:translateY(1px)}
+  /* Visible keyboard-focus ring — accessibility + perceived quality. */
+  button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.tab:focus-visible,.seg:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+  .btn.ok{background:var(--ok);color:#fff} .btn.ok:hover{background:#1A5C38}
+  .btn.bad{background:var(--bad);color:#fff} .btn.bad:hover{background:#9e0000}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+  th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--bd);font-size:13px;vertical-align:top}
+  /* Light-blue row highlight on hover so the eye can follow a row across to
+     its edit/action buttons at the right end. Excludes thead/tfoot. */
+  table tbody tr:nth-child(even){background:#fafbfd}
+  table tbody tr:hover{background:#eef3fa}
+  body.dark table tbody tr:nth-child(even){background:#1a2436}
+  body.dark table tbody tr:hover{background:#243047}
+  /* date columns kept narrow so เริ่ม + ครบ sit closer together */
+  th.date,td.date{padding-left:6px;padding-right:6px;white-space:nowrap}
+  /* type pill column — the pill is tiny so the column shouldn't be wide */
+  th.kind,td.kind{width:72px;text-align:center;padding-left:6px;padding-right:6px}
+  /* T-bar planner: tighter tables/inputs to fit more on screen */
+  .plan th,.plan td{padding:4px 6px;font-size:12px}
+  .plan input[type=text],.plan input[type=number],.plan input[type=date]{padding:3px 6px;font-size:12px}
+  .plan .secttl{margin:6px 0 2px;font-size:11px;padding-top:6px}
+  .plan label.f{font-size:11px}
+  .plan textarea{padding:4px 6px;font-size:12px}
+  /* Dotted separator between the 5 numbered periods (mirrors the bank T-bar) */
+  .plan-divider{border-top:2px dotted #555;margin:6px 0}
+  body.dark .plan-divider{border-top-color:#94a3b8}
+  /* Header: light cool-navy tint + navy text + crisp divider — a modern data-grid
+     look that's easier on the eyes than a solid navy fill across long ledgers. */
+  th{background:#EDF1F8;color:var(--navy);font-weight:700;white-space:nowrap;border-bottom:2px solid #cdd8e8}
+  tr:last-child td{border-bottom:0}
+  /* Footer total row reads as a summary, not another header. */
+  tfoot th{background:#F3F6FB;border-top:2px solid #cdd8e8;border-bottom:0}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  /* document-type colours — match the dashboard card accents so the same
+     instrument reads the same color everywhere. LG kept yellow-peach per user. */
+  .pill.LG{background:#E5D8F2;color:#5B3A8C}                       /* lavender — matches dashboard BG #B59FD6 */
+  .pill.TL{background:#DDEAC8;color:#3F6529}                       /* sage green — matches dashboard T/L #7FB069 */
+  .pill.AVAL{background:#FBE0C8;color:#A85B1A}                     /* peach — matches dashboard B/E #F0A95F */
+  .pill.LGM{background:#FBE0C8;color:#A85B1A}                      /* same peach as B/E (shared cap on dashboard) */
+  .pill.PN{background:#D5EEFA;color:#1F6F95}                       /* sky blue — matches dashboard P/N #6FC1E0 */
+  .pill.ML{background:#E2EFD2;color:#3F6529}                       /* light green — matches dashboard M/L #9CCB7A */
+  .pill.DLC{background:#DCE5FB;color:#2C49A8}                      /* periwinkle — DLC ledger rows (shown inside B/E) */
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .st-ใหม่ .dot{background:var(--new)} .st-รออนุมัติ .dot{background:var(--warn)}
+  .st-อนุมัติ .dot{background:var(--ok)} .st-ไม่อนุมัติ .dot{background:var(--bad)}
+  /* status as a soft pill (like the screenshot) */
+  .stp{background:#eef1f6;color:var(--ink);border:1px solid transparent}
+  .stp.st-ใหม่{background:#EEF2FF;color:#3730A3;border-color:#C7D2FE}
+  .stp.st-รออนุมัติ{background:#FFF8E1;color:#92400E;border-color:#FDE68A}
+  .stp.st-อนุมัติ{background:#ECFDF5;color:#065F46;border-color:#A7F3D0}
+  .stp.st-ไม่อนุมัติ{background:#fdeaea;color:var(--bad);border-color:#f3c0c0}
+  .editsub{display:block;font-size:11px;color:#9aa3b2;margin-top:2px}
+  .trunc{max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iconbtn{border:1px solid var(--bd);background:#fff;border-radius:7px;padding:4px 7px;cursor:pointer;font-size:13px;line-height:1}
+  .iconbtn:hover{border-color:var(--blue);background:#DEEAF1}
+  .iconbtn.del:hover{border-color:var(--bad);color:var(--bad);background:#FFE4E1}
+  /* ---------- Inline SVG icon system (refined-corporate) ----------
+     Each .ico-* class sets --ic to a masked SVG; ::before paints it with
+     currentColor, so icons inherit the element's text colour — dark mode,
+     hover, and dark/light buttons all just work. The glyph is a pseudo-
+     element, not text, so it survives textContent swaps (save buttons keep
+     their icon while toggling to "Saving…"). */
+  [class*="ico-"]::before{content:"";display:inline-block;width:1em;height:1em;background:currentColor;
+     -webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+  .iconbtn[class*="ico-"]{display:inline-flex;align-items:center;justify-content:center}
+  .iconbtn[class*="ico-"]::before{width:16px;height:16px}
+  .btn[class*="ico-"],.seg[class*="ico-"]{display:inline-flex;align-items:center;justify-content:center}
+  .btn[class*="ico-"]::before{width:15px;height:15px;margin-right:7px}
+  .seg[class*="ico-"]::before{width:16px;height:16px;margin-right:7px}
+  #settingsBtn::before{width:20px;height:20px}
+  .ico-gear{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E")}
+  .ico-eye{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E")}
+  .ico-edit{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E")}
+  .ico-trash{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3Cline x1='10' x2='10' y1='11' y2='17'/%3E%3Cline x1='14' x2='14' y1='11' y2='17'/%3E%3C/svg%3E")}
+  .ico-save{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'/%3E%3Cpath d='M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7'/%3E%3Cpath d='M7 3v4a1 1 0 0 0 1 1h7'/%3E%3C/svg%3E")}
+  .ico-sun{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m4.93 4.93 1.41 1.41'/%3E%3Cpath d='m17.66 17.66 1.41 1.41'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='m6.34 17.66-1.41 1.41'/%3E%3Cpath d='m19.07 4.93-1.41 1.41'/%3E%3C/svg%3E")}
+  .ico-moon{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'/%3E%3C/svg%3E")}
+  .ico-copy{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2' ry='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E")}
+  /* Search input: magnifier baked into the field background (muted ink). */
+  #fQ{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7689' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:11px center;background-size:15px;padding-left:33px}
+  .iconrow{display:flex;gap:5px;white-space:nowrap}
+  .meter{height:7px;background:#eef0f5;border-radius:6px;overflow:hidden;margin-top:5px;min-width:90px}
+  .meter > i{display:block;height:100%;background:var(--blue);animation:meterRise 700ms cubic-bezier(.22,1,.36,1)}
+  .meter > i.hi{background:var(--orange)} .meter > i.full{background:var(--bad)}
+  /* Bars fluidly grow from 0 to their target width on each render — pure CSS, no JS hit. */
+  @keyframes meterRise{from{width:0}}
+  @media (prefers-reduced-motion: reduce){.meter > i{animation:none}}
+  .muted{color:var(--mut)} .ctr{text-align:center;padding:34px;color:var(--mut)}
+  .ovl{position:fixed;inset:0;background:rgba(15,25,50,.5);display:none;align-items:flex-start;justify-content:center;padding:40px 12px;overflow:auto;z-index:50}
+  .ovl.on{display:flex}
+  /* Flex column capped to the viewport (minus the .ovl 40px top/bottom padding)
+     so the modal never runs off screen — header & footer stay fixed, only the
+     body scrolls. */
+  .modal{background:#fff;border-radius:14px;max-width:620px;width:100%;padding:0;overflow:hidden;
+     display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
+  .modal h3{flex:0 0 auto;font-size:16px;margin:0;padding:9px 18px;background:linear-gradient(135deg,var(--navy),var(--blue));
+     color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0}
+  .modalX{cursor:pointer;font-size:20px;line-height:1;font-weight:400;opacity:.9;padding:2px 4px}
+  .modalX:hover{opacity:1}
+  .modal-body{flex:1 1 auto;min-height:0;padding:10px 20px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+  .modal-body .row{display:flex;gap:10px;align-items:stretch;flex-wrap:nowrap;margin:0}
+  .modal-body .row .f{flex:1 1 0;min-width:0}
+  .modal-body .secttl{margin:2px 0 -2px;font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.4px;text-transform:uppercase;border-top:1px solid var(--bd);padding-top:4px}
+  /* Tighter input padding inside modals — saves ~3px per field × ~12 fields */
+  .modal .f input,.modal .f select,.modal .f textarea{padding:5px 10px}
+  /* Read-only detail rows in the view popup */
+  .vrow{padding:9px 0;border-bottom:1px solid var(--bd)}
+  .vrow:last-child{border-bottom:0}
+  .vlbl{font-size:11px;color:var(--mut);margin-bottom:3px;letter-spacing:.2px}
+  .vval{font-size:14px;color:var(--ink);font-weight:600}
+  .modal-foot{flex:0 0 auto;display:flex;justify-content:flex-end;gap:8px;padding:9px 22px;border-top:1px solid var(--bd);background:#fafbfd}
+  body.dark .modal-foot{background:#0f172a;border-top-color:#334155}
+  body.dark .modal{background:#1e293b;color:#e5e7eb}
+  body.dark .modal-body{color:#e5e7eb}
+  body.dark .vrow{border-bottom-color:#334155}
+  body.dark .vlbl{color:#94a3b8}
+  body.dark .vval{color:#f1f5f9}
+  body.dark .modal label.f{color:#e5e7eb}
+  .modal label.f{margin:0;color:var(--ink);font-weight:600;font-size:12px}
+  .modal .f input,.modal .f select,.modal .f textarea{min-width:0;width:100%;font-weight:400}
+  /* Dashboard panel toggles in Settings — compact, content-sized columns that
+     wrap on narrow screens. Deliberately NOT inside .f (whose `input{width:100%}`
+     would stretch the checkboxes and break the layout). */
+  .dashgrid{display:flex;flex-wrap:wrap;gap:12px 28px;margin:4px 0 2px}
+  .dashcol{display:flex;flex-direction:column;gap:5px;min-width:130px}
+  .dashcol-h{font-size:12px;font-weight:600;color:var(--mut);margin-bottom:2px}
+  .dashcol label{display:inline-flex;gap:6px;align-items:center;font-size:13px;font-weight:400;color:var(--ink);cursor:pointer;white-space:nowrap}
+  .dashcol input[type=checkbox]{width:auto;min-width:0;margin:0;flex:0 0 auto}
+  .modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+  .req::after{content:" *";color:var(--bad)}
+  .availhint{font-size:12px;margin:-2px 0 0;min-height:16px;font-weight:600}
+  .availhint.ok{color:var(--ok)} .availhint.over{color:var(--bad)}
+  .badge-over{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;background:#fdeaea;color:var(--bad);white-space:nowrap}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f2a44;color:#fff;padding:10px 18px;border-radius:8px;opacity:0;transition:.25s;z-index:99}
+  .toast.on{opacity:1}
+  .secttl{font-weight:700;margin:18px 0 8px;font-size:15px}
+  /* Row-count line above the ledger table — "showing X / Y" like the inbox queue. */
+  .rowcount{font-size:12px;font-weight:600;color:var(--mut);margin:6px 2px;font-variant-numeric:tabular-nums}
+  /* Segmented light/dark toggle inside Settings — two pill-buttons share a border. */
+  .seg-toggle{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fff;width:100%}
+  .seg-toggle .seg{flex:1;padding:5px 8px;background:transparent;border:0;cursor:pointer;font-size:12px;color:var(--mut);font-weight:600;line-height:1.4;transition:background .15s,color .15s}
+  .seg-toggle .seg+.seg{border-left:1px solid var(--bd)}
+  .seg-toggle .seg.on{background:linear-gradient(135deg,var(--navy),var(--blue));color:#fff}
+  body.dark .seg-toggle{background:#0f172a;border-color:#334155}
+  body.dark .seg-toggle .seg{color:#94a3b8}
+  body.dark .seg-toggle .seg+.seg{border-left-color:#334155}
+  /* Category list editor inside Settings — pill rows with reorder/delete buttons. */
+  .catrow{display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px dashed var(--bd)}
+  .catrow .nm{flex:1;max-width:160px;font-size:13px;color:var(--ink);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .catrow .ord{font-size:10px;color:var(--mut);font-weight:700;min-width:18px;text-align:right}
+  .catrow .miniBtn{border:1px solid var(--bd);background:#fff;border-radius:5px;padding:2px 6px;font-size:11px;cursor:pointer;line-height:1;color:var(--ink)}
+  .catrow .miniBtn:hover{border-color:var(--blue);background:#DEEAF1}
+  .catrow .miniBtn.del:hover{border-color:var(--bad);color:var(--bad);background:#FFE4E1}
+  .catrow .miniBtn:disabled{opacity:.35;cursor:not-allowed}
+  body.dark .catrow{border-bottom-color:#334155}
+  body.dark .catrow .miniBtn{background:#1e293b;color:#e5e7eb;border-color:#334155}
+  body.dark .catrow .miniBtn:hover{background:#243047}
+  body.dark #setCatList{background:#0f172a !important;border-color:#334155 !important}
+  /* dark mode — overrides via CSS variables so most rules adapt automatically */
+  body.dark{--bg:#0f172a;--card:#1e293b;--ink:#e5e7eb;--mut:#94a3b8;--bd:#334155}
+  body.dark .bar,body.dark .c{box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  body.dark select,body.dark input,body.dark textarea{background:#0f172a;color:var(--ink);border-color:#334155}
+  body.dark .iconbtn{background:#1e293b;color:var(--ink);border-color:#334155}
+  body.dark .iconbtn:hover{background:#243047}
+  body.dark .btn.ghost{background:#1e293b;color:var(--ink);border-color:#334155}
+  body.dark .btn.ghost:hover{background:#243047}
+  body.dark .grp{background:#1a2436;border-color:#283449}
+  body.dark .grp-ttl{color:#94a3b8}
+  body.dark .meter{background:#334155}
+  body.dark .editsub{color:#94a3b8}
+  body.dark th{background:#1a2436;color:#cbd5e1;border-bottom-color:#2b3a52}
+  body.dark tfoot th{background:#151f33;border-top-color:#2b3a52}
+  body.dark .tab{color:#cbd5e1}
+  body.dark .tab.on{color:#dbeafe;border-bottom-color:var(--blue)}
+  body.dark .tabs{border-bottom-color:#334155}
+  /* In dark mode, navy text on dark navy is unreadable — use a near-white tone. */
+  body.dark .c .val,
+  body.dark .c.kpi-ok .val,
+  body.dark .c.kpi-bad .val,
+  body.dark .c.kpi-br .val{color:#f1f5f9}
+  body.dark .secttl,body.dark h3{color:#f1f5f9}
+  body.dark .muted{color:#94a3b8}
+  body.dark .availhint.ok{color:#86efac}
+  body.dark .trunc{color:var(--ink)}
+  /* Cost-category summary panel: its header is navy and its inner project boxes
+     have a hardcoded light background — both unreadable in dark mode. Force the
+     header to near-white and darken the inner boxes. (!important needed because
+     these colours are set via inline styles in the generated markup.) */
+  body.dark .csum > summary{color:#f1f5f9 !important}
+  body.dark .csum-proj{background:#16202e !important}
+
+  /* ============================================================
+     MOBILE LAYER — only applies when <html class="is-mobile"> is set
+     by the JS detector at the top of <head>. Desktop layout is
+     untouched. Selectors target html.is-mobile (not @media) so
+     in-app browsers that misreport viewport width still pick it up.
+     ============================================================ */
+  html.is-mobile body{
+    font-size:14px;
+    overscroll-behavior-y:contain;
+    -webkit-tap-highlight-color:rgba(46,117,182,.22);   /* brand-tinted */
+    -webkit-text-size-adjust:100%;
+  }
+  /* Inputs must be ≥16px on iOS Safari or the page auto-zooms on focus. */
+  html.is-mobile input,html.is-mobile select,html.is-mobile textarea{font-size:16px}
+  /* Compact topbar — shrink brand, drop the email/me chip, keep the gear. */
+  html.is-mobile .wrap{padding:0 12px 24px}
+  html.is-mobile header{padding:max(10px,env(safe-area-inset-top)) 0 10px;position:sticky;top:0;z-index:30}
+  html.is-mobile header .wrap{padding:0 12px;flex-wrap:nowrap;gap:6px;align-items:center}
+  html.is-mobile .brand{gap:10px;flex:1 1 auto;min-width:0}
+  html.is-mobile .brand .bg{font-size:17px;letter-spacing:0}
+  html.is-mobile .brand .bx{padding-left:10px}
+  html.is-mobile .brand .bx1{font-size:10px;letter-spacing:1px;white-space:nowrap}
+  html.is-mobile .brand .bx2{font-size:10px;line-height:1.3;white-space:normal;max-width:none}    /* allow wrap — show full subtitle */
+  html.is-mobile .hdr-actions{flex:0 0 auto;gap:6px}
+  html.is-mobile .hdr-actions .me{display:none}
+  /* Square 40×40 gear pill — matches the Admin-button reference (translucent
+     dark fill, soft border, white glyph, generously rounded corners). */
+  html.is-mobile .iconbtn{width:40px;height:40px;min-width:40px;min-height:40px;padding:0;
+     border-radius:10px;font-size:18px;display:inline-flex;align-items:center;justify-content:center;
+     background:rgba(15,30,60,.28);border:1px solid rgba(255,255,255,.22);color:#fff;
+     backdrop-filter:saturate(140%) blur(2px);-webkit-backdrop-filter:saturate(140%) blur(2px)}
+  html.is-mobile .iconbtn:active{background:rgba(15,30,60,.42)}
+  /* Tabs — horizontally scrollable strip, 48px+ touch targets. */
+  html.is-mobile .tabs{display:flex;overflow-x:auto;gap:0;margin:10px -12px 12px;padding:0 12px;scrollbar-width:none}
+  html.is-mobile .tabs::-webkit-scrollbar{display:none}
+  html.is-mobile .tab{flex:0 0 auto;padding:14px 14px;font-size:13px;white-space:nowrap;min-height:48px;margin-bottom:-2px}
+  /* Filter bar — dense 2-col grid for the dropdowns; search full-width below;
+     action buttons in a tight 3-up row instead of stacking. Saves ~40% vertical
+     space vs the old one-per-line layout. */
+  html.is-mobile .bar{padding:8px;gap:6px;display:grid;grid-template-columns:1fr 1fr;align-items:stretch;flex-direction:row}
+  html.is-mobile .bar > select{min-width:0;width:100%;min-height:40px;padding:7px 10px;font-size:15px}
+  html.is-mobile .bar > input{min-width:0;width:100%;min-height:40px;padding:7px 12px;font-size:16px}
+  html.is-mobile .bar > .grow{min-width:0}                /* search flows into grid next to last filter */
+  html.is-mobile .tab-x{display:none}                     /* drop the Thai suffix + English parens on mobile */
+  html.is-mobile .tab{padding:14px 10px;min-width:0}      /* tighter horizontal so all 3 tabs fit on a 390px phone */
+  html.is-mobile .tabs{justify-content:space-around;overflow-x:visible}
+  html.is-mobile .bar-actions{grid-column:1 / -1;margin-left:0;display:flex;gap:6px;flex-wrap:wrap;width:100%}
+  html.is-mobile .bar-actions > .btn{flex:1 1 calc(50% - 3px);min-width:0;min-height:44px;font-size:13px;padding:10px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Dashboard number font — system stack with tabular figures + tight kerning.
+     Sarabun's ฿ symbol overhangs adjacent digits and looks amateurish at large
+     sizes; the SF Pro / system fallback renders the baht glyph with proper
+     side-bearing and the numbers feel like a real bank dashboard. */
+  html.is-mobile .c .val,
+  html.is-mobile .c .val.sm{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Helvetica Neue",system-ui,sans-serif;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.015em;
+    font-weight:700;
+  }
+  /* Slim card padding so the 2-up grid fits comfortably on a 390px iPhone. */
+  html.is-mobile .c{padding:13px 13px;min-height:112px}
+  html.is-mobile .c .lbl{font-size:11px;margin-bottom:5px;letter-spacing:.1px}
+  html.is-mobile .c .val{font-size:22px}
+  html.is-mobile .c .val.sm{font-size:18px}
+  /* Dashboard cards — keep the 2-col grid on phones; tighten gaps. */
+  html.is-mobile .cards{grid-template-columns:1fr;gap:10px;margin:12px 0}
+  html.is-mobile .grp{padding:10px}
+  html.is-mobile .grp-row{justify-content:center;gap:8px}
+  html.is-mobile .c{flex:1 1 calc(50% - 4px);min-width:0;width:auto;height:auto;min-height:120px;padding:14px 12px}
+  /* Pie-mode on mobile: two per row, slightly smaller donuts. */
+  /* Data tables — horizontal scroll inside #body so columns aren't crushed. */
+  html.is-mobile #body{margin:0 -12px;padding:0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  html.is-mobile #body > table{min-width:780px}
+  html.is-mobile th,html.is-mobile td{padding:10px 8px;font-size:13px}
+  /* Modals → bottom sheets. Drag-down feel via rounded top, full-width, safe-area. */
+  html.is-mobile .ovl{align-items:flex-end;padding:0;-webkit-overflow-scrolling:touch}
+  html.is-mobile .modal{max-width:100%;width:100%;border-radius:16px 16px 0 0;max-height:92vh;display:flex;flex-direction:column;animation:sheetUp .25s cubic-bezier(.22,1,.36,1)}
+  html.is-mobile .modal h3{border-radius:16px 16px 0 0;padding:14px 18px;font-size:15px;position:sticky;top:0;z-index:2}
+  html.is-mobile .modalX{font-size:24px;padding:4px 10px;min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center}
+  html.is-mobile .modal-body{max-height:none;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 18px;gap:10px}
+  /* All modal rows wrap to one-per-line on phones — fields breathe instead of squishing. */
+  html.is-mobile .modal-body .row{flex-wrap:wrap;gap:10px}
+  html.is-mobile .modal-body .row .f{flex:1 1 100%}
+  html.is-mobile .modal .f input,html.is-mobile .modal .f select,html.is-mobile .modal .f textarea{padding:10px 12px;font-size:16px}
+  /* Settings category list: single column on phones (the 2-col grid is desktop-only). */
+  html.is-mobile #setCatList{grid-template-columns:1fr !important;width:auto !important;max-height:none !important}
+  html.is-mobile .modal-foot{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));gap:10px;flex-wrap:wrap;background:var(--card);position:sticky;bottom:0}
+  html.is-mobile .modal-foot .btn{flex:1 1 auto;min-height:48px;font-size:14px;padding:12px 10px}
+  /* Cost-category popover — cap width inside narrow modal. */
+  html.is-mobile #costCatPop{width:calc(100vw - 48px);max-width:340px}
+  /* T-bar planner tables — also horizontal scroll. */
+  html.is-mobile .plan table{min-width:760px}
+  /* Buttons in tables (✎ delete etc.) need bigger touch targets. */
+  html.is-mobile td .iconbtn,html.is-mobile td .btn.sm{min-width:36px;min-height:36px;padding:6px 8px}
+  @keyframes sheetUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+  /* Honour reduced-motion preference. */
+  @media (prefers-reduced-motion:reduce){html.is-mobile .modal{animation:none}}

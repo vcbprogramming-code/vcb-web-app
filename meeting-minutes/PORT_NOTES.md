@@ -1,0 +1,102 @@
+# PORT_NOTES — GAS → React mirror
+
+This folder lives **inside** the Google Apps Script (GAS) project root
+(`Meeting Minute Web App/meeting-minutes-react`) and is a **live mirror** of it. The
+GAS project is **canonical**: build/demo there first, then re-sync here. After ANY
+change to the GAS source, diff it against this folder and update only what changed
+(components, logic, and the verbatim CSS).
+
+> **Deploy safety:** the GAS root's `.claspignore` excludes `meeting-minutes-react/**`,
+> `node_modules`, and `dist`, so `clasp push` never sends this app to the live Apps
+> Script deployment. Verify anytime with `clasp status` (run in the GAS root) — only
+> the 7 `.gs`/`.html`/`.json` source files should appear under *Tracked files*.
+
+## Last synced
+- **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
+- **Synced at:** 2026-06-29
+- **Live deployment referenced:** `@28` (per `PROJECT_SUMMARY.md`); the React build
+  does not call it (see *Data layer* below).
+
+## CSS
+`src/styles.css` is the **verbatim** contents of the `<style>…</style>` block in
+`Stylesheet.html` (tags stripped, nothing else changed). **Never hand-edit it** —
+re-extract on every sync:
+
+```bash
+# run from this folder (Meeting Minute Web App/meeting-minutes-react)
+sed '1d;$d' "../Stylesheet.html" > src/styles.css
+```
+
+The pre-paint theme/lang/mobile bootstrap from `Index.html`'s `<head>` script is
+reproduced verbatim in this folder's `index.html`.
+
+## Data layer (mock by default — and why)
+The GAS server functions are reachable **only** through `google.script.run` inside
+the GAS-served iframe. `doGet` serves HTML (plus `?diag`/`?seed`); there is **no
+CORS JSON endpoint** on the `/exec` URL. A standalone Vercel SPA therefore cannot
+call them over HTTP. So the data layer is a **typed mock** that mirrors the GAS API
+contracts exactly. To wire a real backend you would add an Apps Script JSON API
+(or a separate server) and swap `src/api/client.ts` — the rest of the app is
+contract-typed against `src/types.ts` and unaffected.
+
+## Server API mapping (GAS → mock)
+Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
+
+| GAS function (Code.js / Auth.js) | React mock | Return type |
+|---|---|---|
+| `getSessionState` | `mockApi.getSessionState` | `SessionState` |
+| `listMeetings` | `mockApi.listMeetings` | `MeetingListItem[]` |
+| `getMeeting` | `mockApi.getMeeting` | `MeetingFull \| null` |
+| `autoSync` | `mockApi.autoSync` | `SyncResult` |
+| `togglePin` | `mockApi.togglePin` | `boolean` |
+| `setVisibility` | `mockApi.setVisibility` | `boolean` |
+| `saveMeeting` | `mockApi.saveMeeting` | `string` (id) |
+| `deleteMeeting` | `mockApi.deleteMeeting` | `boolean` |
+| `saveEdit` | `mockApi.saveEdit` | `SaveEditResult` |
+| `getProjectAccess` | `mockApi.getProjectAccess` | `ProjectAccess[]` |
+| `setProjectDomain` | `mockApi.setProjectDomain` | `ProjectAccess[]` |
+| `addProjectViewer` | `mockApi.addProjectViewer` | `ProjectAccess[]` |
+| `removeProjectViewer` | `mockApi.removeProjectViewer` | `ProjectAccess[]` |
+
+## Component mapping (GAS → React)
+| GAS (Index.html / JavaScript.html) | React component |
+|---|---|
+| topbar + `initHeader()` | `components/Topbar.tsx` |
+| sidebar `renderProjects()` / `projRow()` | `components/Sidebar.tsx` |
+| `renderMobileLatest()` | `components/MobileLatest.tsx` |
+| list `renderList()` + range filter | `components/MeetingList.tsx` |
+| ALL dashboard `renderDashboard()` | `components/Dashboard.tsx` |
+| project dashboard `renderProjectDashboard()` + `loadSummary()` | `components/ProjectDashboard.tsx` |
+| detail `openMeeting()` / `renderDetail()` | `components/MeetingDetail.tsx` |
+| New/Edit modal `openModal()` | `components/MeetingModal.tsx` |
+| in-app editor `openEditor()` | `components/EditorModal.tsx` |
+| project access `openAccess()` | `components/AccessModal.tsx` |
+| settings sheet `openSettings()` | `components/SettingsModal.tsx` |
+| busy / toast | `components/Overlays.tsx` |
+| `I18N`, `fmtDate`/`fmtTime`/`fmtThaiDate` | `lib/i18n.ts` |
+| `OVERRIDE_CSS`, section extraction, bullets | `lib/docRender.ts` |
+| mobile panes, range math, theme/lang apply, `applyMobileScale` | `lib/ui.ts` |
+| `S.contentCache`, `prefetchLatest()` | `api/contentCache.ts` |
+
+## Admin simulation
+The live web app is `ANYONE_ANONYMOUS`, so `isAdmin` is only ever true when an admin
+email is in the Google session (see `PROJECT_SUMMARY.md`). To make every admin
+screen reachable for sign-off, the mock derives admin from a **URL flag**:
+
+- `http://localhost:5200/?admin=1` → admin view (New meeting, pin, hide/show,
+  edit-here, project access, refresh).
+- `http://localhost:5200/` → public view (what real users currently get).
+- `?meeting=<id>` → deep-link straight into a meeting (parity with the GAS share link).
+
+This is a faithful entry hook, not an added feature — the GAS code already branches
+on `isAdmin` everywhere.
+
+## Known deviations (intentional)
+1. **Mobile detail action lift:** the GAS client physically *moves* the Pin/Share/
+   Open-in-Docs buttons onto the mobile back-bar via DOM ops. Here they stay in the
+   detail bar (CSS still orders/hides them on mobile). Desktop is identical; this is
+   a minor mobile-only placement nuance.
+2. **Doc reskin / importer / Drive-chip generation** are server-only GAS concerns
+   (they shape the stored HTML). The mock ships already-rendered sample HTML, so the
+   render path is identical; the import-time transforms are out of scope for the SPA.
+3. **Magic-link sign-in** is retired/vestigial in the GAS source and not reproduced.

@@ -1,0 +1,778 @@
+  :root {
+    --bg: #f6f8fa;
+    --panel: #ffffff;
+    --ink: #1f2328;
+    --ink-soft: #57606a;
+    --ink-faint: #8b949e;
+    --line: #d8dee4;
+    --line-soft: #eaeef2;
+    --brand: #0b3d62;
+    --brand-2: #1f6feb;
+    --accent: #1f6feb;
+    --danger: #cf222e;
+    --ok: #1a7f37;
+    --shadow: 0 1px 3px rgba(27,31,36,.08), 0 8px 24px rgba(27,31,36,.06);
+    --radius: 12px;
+    --sans: "Sarabun", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  a { color: var(--brand-2); }
+
+  /* ----- Layout ----- */
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+  /* Banner — matched exactly to the VCB Document Control app */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 30px; color: #fff; z-index: 5;
+    background: linear-gradient(135deg, #1F3864 0%, #2E75B6 100%);
+    box-shadow: 0 2px 12px rgba(31,56,100,.25);
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+  .brandwrap { display: flex; align-items: center; gap: 18px; }
+  .brand-txt { display: flex; align-items: center; gap: 16px; }
+  .brand-h1 { font-size: 24px; font-weight: 800; letter-spacing: .3px; line-height: 1; color: #fff; margin: 0; }
+  .brand-h1 .brand-link { color: inherit; text-decoration: none; cursor: pointer; transition: opacity .15s; }
+  a.brand-link:hover { opacity: .8; text-decoration: none; }
+  .brand-div { width: 1px; height: 40px; background: rgba(255,255,255,.45); }
+  .brand-stack { display: flex; flex-direction: column; gap: 6px; }
+  .brand-sub { font-size: 12.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: #fff; }
+  .brand-th { font-size: 13px; font-weight: 500; color: #fff; letter-spacing: .5px; line-height: 1; }
+  .hdr-right { display: flex; align-items: center; gap: 14px; }
+  .search {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 9px; padding: 7px 11px; width: 320px; max-width: 38vw;
+  }
+  .search input {
+    border: none; background: transparent; color: #fff; outline: none;
+    width: 100%; font-size: 13.5px;
+  }
+  .search input::placeholder { color: #b6c6d6; }
+  .tbtn {
+    background: rgba(255,255,255,.14); color: #fff;
+    border: 1px solid rgba(255,255,255,.2); border-radius: 9px;
+    padding: 7px 12px; font-size: 13px; white-space: nowrap;
+  }
+  .tbtn:hover { background: rgba(255,255,255,.24); }
+  .who { font-size: 13.5px; color: #fff; font-weight: 500; margin-left: 4px; white-space: nowrap; }
+
+  .body { display: grid; grid-template-columns: 294px 360px 1fr; min-height: 0; }
+  @media (max-width: 1100px) { .body { grid-template-columns: 258px 320px 1fr; } }
+
+  /* ----- Sidebar ----- */
+  .sidebar { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+  .side-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); margin: 6px 8px 8px; font-weight: 600; }
+  .proj { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; cursor: pointer; margin-bottom: 2px; }
+  .proj:hover { background: var(--line-soft); }
+  .proj.active { background: #e8f0fe; }
+  .proj .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .proj .pn { flex: 1; min-width: 0; }
+  .proj .pn b { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj .pn small { color: var(--ink-faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .proj .cnt { font-size: 11.5px; color: var(--ink-soft); background: var(--line-soft); border-radius: 20px; padding: 1px 8px; }
+  .newbtn { width: 100%; margin-top: 12px; background: var(--brand-2); color: #fff; border: none; border-radius: 9px; padding: 10px; font-size: 13.5px; font-weight: 600; }
+  .newbtn:hover { filter: brightness(1.05); }
+
+  /* ----- Meeting list ----- */
+  .list { background: var(--bg); border-right: 1px solid var(--line); overflow-y: auto; }
+  .list-head { padding: 12px 14px 6px; font-size: 12px; color: var(--ink-soft); position: sticky; top: 0; background: var(--bg); }
+  .range { display: flex; gap: 6px; padding: 4px 12px 8px; position: sticky; top: 34px; background: var(--bg); z-index: 1; }
+  .range button { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 4px; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .range button .n { color: var(--ink-faint); font-weight: 400; }
+  .range button.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .range button.active .n { color: #c7d6e5; }
+  .range button:not(.active):hover { background: var(--line-soft); }
+
+  /* Dashboard */
+  .dash-wrap { padding: 26px 28px; max-width: 1100px; }
+  .dash-head h2 { margin: 0 0 4px; font-size: 20px; color: var(--brand); }
+  .dash-head p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13.5px; }
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .dash-card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c, var(--brand)); border-radius: 12px; padding: 15px 16px; cursor: pointer; transition: box-shadow .12s, transform .12s; }
+  .dash-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .dash-proj { font-size: 12px; font-weight: 700; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+  .dash-date { font-size: 12px; font-weight: 700; color: var(--brand-2); margin-bottom: 4px; }
+  .dash-ttl { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .dash-ex { font-size: 12.5px; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 50px; }
+  .dash-read { margin-top: 10px; font-size: 12.5px; font-weight: 700; color: var(--brand-2); }
+  .dash-bullets { margin: 4px 0 2px; padding-left: 20px; color: var(--ink); }
+  .dash-bullets li.bmuted { list-style: none; margin-left: -20px; color: var(--ink-soft); font-style: italic; }
+  .pbig-card { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--c, var(--brand)); border-radius: 14px; padding: 22px 26px; max-width: 880px; cursor: pointer; transition: box-shadow .12s, transform .12s; }
+  .pbig-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .pbig-ttl { font-size: 17px; font-weight: 700; color: var(--brand-2); margin: 0 0 4px; }
+  .pbig-sub { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+  .pbig-ttl + .pbig-body { margin-top: 8px; }
+  .pbig-body { font-size: 14px; line-height: 1.6; min-height: 40px; }
+  .seclabel { font-size: 12.5px; font-weight: 800; color: var(--brand-2); margin: 16px 0 7px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .seclabel:first-child { margin-top: 2px; }
+  .secbody { color: var(--ink); }
+  .secbody p { margin: 0 0 7px; }
+  .secbody ul, .secbody ol { margin: 0 0 9px; padding-left: 20px; }
+  .secbody li { margin: 0 0 5px; }
+  .secbody h1, .secbody h2, .secbody h3 { font-size: 14.5px; color: var(--brand); margin: 11px 0 5px; }
+  .secbody table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 4px 0 9px; }
+  .secbody td, .secbody th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; text-align: left; }
+  .secbody a { color: var(--brand-2); }
+  .secbody img { max-width: 100%; height: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 8px 12px; padding: 11px 13px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+  .card:hover { border-color: #c0c8d0; box-shadow: var(--shadow); }
+  .card.active { border-color: var(--brand-2); box-shadow: 0 0 0 2px rgba(31,111,235,.18); }
+  .card .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .card .date { font-size: 12px; font-weight: 700; color: var(--brand); }
+  .card .ttl { font-size: 13.5px; font-weight: 600; margin: 1px 0 4px; }
+  .card .ex { font-size: 12px; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; text-transform: uppercase; letter-spacing: .03em; }
+  .badge.fathom { background: #fdeef0; color: #cf222e; }
+  .badge.overview { background: #eef6ff; color: #1f6feb; }
+  .badge.manual { background: #eafbf0; color: #1a7f37; }
+  .badge.pin { background: #fff4d6; color: #9a6700; }
+  .badge.hiddenb { background: #ffe9e9; color: #cf222e; }
+  .card.ishidden { opacity: .62; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #fcf4f4 10px, #fcf4f4 20px); }
+  .empty { padding: 30px 16px; color: var(--ink-faint); text-align: center; }
+
+  /* ----- Detail ----- */
+  .detail { background: var(--panel); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  .detail-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .detail-bar h2 { font-size: 16px; margin: 0; flex: 1; min-width: 200px; }
+  .detail-bar .sub { font-size: 12px; color: var(--ink-soft); width: 100%; margin-top: -2px; }
+  .dbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  .dbtn:hover { background: var(--line-soft); }
+  .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
+  .dbtn.danger:hover { background: #fdeef0; color: var(--danger); border-color: #f3c2c8; }
+  .attendees { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); background: #fbfcfe; }
+  .attendees .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 3px 12px 3px 3px; text-decoration: none; color: var(--ink); }
+  .chip:hover { border-color: var(--brand-2); box-shadow: var(--shadow); }
+  .chip .av { width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none; }
+  .chip .cm { display: flex; flex-direction: column; line-height: 1.15; }
+  .chip .cm b { font-size: 12px; font-weight: 600; text-transform: capitalize; }
+  .chip .cm small { font-size: 10.5px; color: var(--ink-faint); }
+  .frame-wrap { flex: 1; overflow: auto; background: #eef1f4; padding: 22px; }
+  .paper { max-width: 860px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
+  iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 400px; }
+  .placeholder { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ink-faint); flex-direction: column; gap: 10px; text-align: center; padding: 40px; }
+  .placeholder .big { font-size: 40px; opacity: .4; }
+
+  /* ----- Modal ----- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,20,28,.45); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-bg.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 560px; max-width: 92vw; max-height: 88vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .modal h3 { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .modal .form { padding: 16px 20px; display: grid; gap: 12px; }
+  .modal label { font-size: 12px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+  .modal input:not([type="checkbox"]):not([type="radio"]), .modal select, .modal textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-family: inherit; }
+  .modal textarea { min-height: 160px; resize: vertical; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal .actions { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
+
+  .busy { position: fixed; inset: 0; background: rgba(15,20,28,.28); display: none; align-items: center; justify-content: center; z-index: 70; backdrop-filter: blur(1px); }
+  .busy.show { display: flex; }
+  .busybox { background: #1f2328; color: #fff; padding: 14px 22px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  .editor { background: #fff; border-radius: 14px; width: 900px; max-width: 95vw; height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .editor h3 { margin: 0; padding: 14px 20px; border-bottom: 1px solid var(--line); font-size: 16px; }
+  .editor h3 #edTitle { font-weight: 400; color: var(--ink-soft); font-size: 14px; }
+  .ed-toolbar { display: flex; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: #fbfcfe; }
+  .ed-toolbar button { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 5px 11px; font-size: 13px; color: var(--ink); }
+  .ed-toolbar button:hover { background: var(--line-soft); }
+  .ed-area { flex: 1; overflow: auto; padding: 26px 34px; font-size: 14.5px; line-height: 1.62; outline: none; font-family: var(--sans); }
+  .ed-area h1, .ed-area h2 { color: #0b3d62; }
+  .ed-area table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .ed-area td, .ed-area th { border: 1px solid var(--line); padding: 6px 9px; }
+  .ed-doc { margin-right: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink); }
+  .ed-doc .hint { color: var(--ink-faint); font-size: 11.5px; }
+  .ac-status { font-size: 13px; padding: 9px 12px; border-radius: 8px; background: #eef6ff; color: #0b3d62; font-weight: 600; }
+  .ac-status.restricted { background: #fff4d6; color: #9a6700; }
+  .ac-proj { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .ac-proj-name { font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 7px; }
+  .ac-proj-name .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .ac-dom { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-weight: 500; font-size: 13px; }
+  .ac-add { display: flex; gap: 8px; margin-top: 7px; }
+  .ac-add input { flex: 1; min-width: 0; }
+  .ac-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow: auto; margin-top: 7px; }
+  .ac-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+  .ac-item.admin { background: #f6f8fa; color: var(--ink-soft); }
+  .ac-item button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; color: var(--danger); }
+  .ac-item button:hover { background: #fdeef0; border-color: #f3c2c8; }
+  .ac-note { font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; }
+  #acBg .ac-note { padding: 2px 20px 6px; }
+  .denied { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 12px; text-align: center; padding: 40px; color: var(--ink-soft); }
+  .denied .big { font-size: 46px; }
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 60; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+  .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: sp .7s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+
+  /* ===========================================================
+     Mobile (phone) — single-pane stack navigation
+     Scoped to html.is-mobile (toggled by JS in <head>) so narrow
+     desktop windows and misreporting in-app browsers both get it.
+     Desktop layout is untouched.
+     =========================================================== */
+  .mobile-backbar { display: none; }
+
+  /* ⚙ Settings — desktop variant lives in .hdr-right, icon-only, styled like a .tbtn.
+     Hidden on mobile (mobile uses .settings-btn in .brandwrap instead). */
+  .settings-btn-d {
+    width: 38px;
+    padding: 7px 0;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+  }
+  html.is-mobile .settings-btn-d.tbtn { display: none; }
+
+  /* ⚙ Settings — mobile variant lives in .brandwrap. Hidden on desktop. */
+  .settings-btn { display: none; }
+  html.is-mobile .settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  html.is-mobile .settings-btn:active { background: rgba(255,255,255,.28); }
+  /* Settings sheet — identity + segmented controls */
+  .set-who { font-size: 14px; padding: 2px 0; color: var(--ink); font-weight: 600; }
+  .set-group { display: flex; flex-direction: column; gap: 8px; }
+  .set-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 700;
+    margin-top: 6px;
+  }
+  .set-mini-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 700;
+  }
+  .set-row-label {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .set-segment {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+  }
+  .set-seg-opt {
+    background: transparent;
+    border: none;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    border-radius: 9px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s, color .15s, box-shadow .15s;
+  }
+  .set-seg-opt.active {
+    background: var(--brand-2);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(31,111,235,.35);
+  }
+  .set-seg-opt:not(.active):hover { background: var(--line-soft); color: var(--ink); }
+  .set-actions-inline { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .set-segment-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .set-about { gap: 4px; margin-top: 4px; }
+  .set-about-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    padding: 3px 2px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .set-about-row:last-child { border-bottom: none; }
+  .set-about-k { color: var(--ink-faint); font-weight: 600; }
+  .set-about-v { color: var(--ink); text-align: right; }
+  a.set-about-v { color: var(--brand-2); text-decoration: none; }
+  a.set-about-v:hover { text-decoration: underline; }
+
+  /* ===========================================================
+     Dark theme — variable overrides + targeted surface fixes
+     for places that hardcoded #fff / light backgrounds.
+     The topbar stays brand-blue in both themes (it IS the brand).
+     The rendered Doc iframe stays light — Docs are paper, not chrome.
+     =========================================================== */
+  html.theme-dark {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --ink: #e6edf3;
+    --ink-soft: #9da7b1;
+    --ink-faint: #7d8590;
+    --line: #30363d;
+    --line-soft: #21262d;
+    --brand-2: #58a6ff;
+    --accent: #58a6ff;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+  html.theme-dark .modal { background: var(--panel); color: var(--ink); }
+  html.theme-dark .modal h3 { border-bottom-color: var(--line); }
+  html.theme-dark .modal .actions { border-top-color: var(--line); }
+  html.theme-dark .modal input,
+  html.theme-dark .modal select,
+  html.theme-dark .modal textarea { background: #0d1117; color: var(--ink); border-color: var(--line); }
+  html.theme-dark .editor { background: var(--panel); color: var(--ink); }
+  html.theme-dark .editor h3 { border-bottom-color: var(--line); }
+  html.theme-dark .ed-toolbar { background: #1c2128; border-bottom-color: var(--line); }
+  html.theme-dark .ed-toolbar button { background: var(--panel); color: var(--ink); border-color: var(--line); }
+  html.theme-dark .ed-toolbar button:hover { background: var(--line-soft); }
+  html.theme-dark .ed-area { color: var(--ink); }
+  html.theme-dark .ed-area h1, html.theme-dark .ed-area h2 { color: var(--brand-2); }
+  html.theme-dark .ed-area td, html.theme-dark .ed-area th { border-color: var(--line); }
+  html.theme-dark .dbtn { background: var(--panel); color: var(--ink); border-color: var(--line); }
+  html.theme-dark .dbtn:hover { background: var(--line-soft); }
+  html.theme-dark .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
+  html.theme-dark .proj.active { background: rgba(88,166,255,.18); }
+  html.theme-dark .proj:hover { background: var(--line-soft); }
+  html.theme-dark .range button { background: var(--panel); color: var(--ink-soft); border-color: var(--line); }
+  html.theme-dark .range button:not(.active):hover { background: var(--line-soft); }
+  html.theme-dark .attendees { background: #1c2128; border-bottom-color: var(--line); }
+  html.theme-dark .chip { background: var(--panel); border-color: var(--line); color: var(--ink); }
+  html.theme-dark .frame-wrap { background: #1a1f26; }
+  html.theme-dark .mobile-backbar { background: var(--panel); border-bottom-color: var(--line); }
+  html.theme-dark .mobile-back-btn { background: transparent; border-color: var(--line); color: var(--brand-2); }
+  html.theme-dark.is-mobile .ml-item { background: var(--panel); border-color: var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 12px rgba(0,0,0,.3); }
+  html.theme-dark.is-mobile .ml-item:active { background: var(--line-soft); }
+  html.theme-dark .dash-card { background: var(--panel); border-color: var(--line); }
+  html.theme-dark .card { background: var(--panel); border-color: var(--line); }
+  html.theme-dark .dash-head h2 { color: var(--brand-2); }
+  html.theme-dark .card .date, html.theme-dark .dash-date { color: var(--brand-2); }
+  html.theme-dark .list-head, html.theme-dark .range { background: var(--bg); }
+  html.theme-dark .badge.fathom { background: #3a1d23; color: #ff7a85; }
+  html.theme-dark .badge.overview { background: #1e2a40; color: #7aa2f7; }
+  html.theme-dark .badge.manual { background: #1c2e23; color: #6dcf7e; }
+  html.theme-dark .badge.pin { background: #3a2e16; color: #ffce62; }
+  html.theme-dark .badge.hiddenb { background: #3a1d23; color: #ff7a85; }
+  html.theme-dark .card.ishidden { background: repeating-linear-gradient(45deg, #161b22, #161b22 10px, #1f1719 10px, #1f1719 20px); }
+  html.theme-dark .ac-status { background: #1e2a40; color: #7aa2f7; }
+  html.theme-dark .ac-status.restricted { background: #3a2e16; color: #ffce62; }
+  html.theme-dark .ac-item { background: var(--panel); border-color: var(--line); }
+  html.theme-dark .ac-item.admin { background: var(--bg); }
+  html.theme-dark .ac-item button { background: var(--panel); border-color: var(--line); }
+
+  html.is-mobile {
+    -webkit-tap-highlight-color: rgba(31, 111, 235, 0.18);
+  }
+  html.is-mobile body {
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: rgba(31, 111, 235, 0.18);
+  }
+
+  html.is-mobile .app {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* --- Topbar compaction: brand on row 1, search + buttons on a single nowrap row 2 --- */
+  html.is-mobile .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  /* Brand row 1: title on the left, ⚙ Settings on the right (mobile only). */
+  html.is-mobile .brandwrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+  }
+  html.is-mobile .brand-txt { gap: 8px; flex: 1; min-width: 0; }
+  html.is-mobile .brand-h1 { font-size: 15px; }
+  html.is-mobile .brand-div { height: 20px; }
+  html.is-mobile .brand-stack { gap: 2px; }
+  html.is-mobile .brand-sub { font-size: 10px; letter-spacing: 1.2px; }
+  html.is-mobile .brand-th { font-size: 10.5px; }
+  html.is-mobile .hdr-right {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    width: 100%;
+    gap: 6px;
+  }
+  /* Search + buttons share one row and must visually match — same height, padding, line-height. */
+  html.is-mobile .search,
+  html.is-mobile .tbtn {
+    height: 38px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+  }
+  html.is-mobile .search {
+    order: 0;
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    gap: 6px;
+  }
+  html.is-mobile .search input {
+    font-size: 16px;
+    line-height: 1;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+  /* Each row-2 control shares the row width equally — search and buttons all flex:1. */
+  html.is-mobile .tbtn {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    justify-content: center;
+  }
+  /* Identity label takes up too much room on a phone — hide; sign-out is in the same row. */
+  html.is-mobile .who { display: none; }
+
+  /* --- Single-pane navigation --- */
+  html.is-mobile .body {
+    display: block;
+    height: 100%;
+    min-height: 0;
+  }
+  html.is-mobile .sidebar,
+  html.is-mobile .list,
+  html.is-mobile .detail {
+    display: none;
+    border-right: none;
+    height: 100%;
+    width: 100%;
+  }
+  html.is-mobile.mobile-pane-projects .sidebar {
+    display: block;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  html.is-mobile.mobile-pane-list .list {
+    display: block;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  html.is-mobile.mobile-pane-detail .detail {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- Sticky back bar at the top of each non-root pane --- */
+  /* Boot loader: a full-screen spinner shown on mobile until the app routes to its
+     first pane. Stops a shared link from flashing the home/projects pane while data
+     loads. Desktop keeps its instant cached render (overlay never shows). */
+  .boot-loader { display: none; }
+  html.is-mobile .boot-loader {
+    display: flex; align-items: center; justify-content: center;
+    position: fixed; inset: 0; z-index: 200; background: var(--bg);
+  }
+  html.is-mobile .boot-loader.hide { display: none; }
+  .boot-loader .spin { width: 30px; height: 30px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: sp .7s linear infinite; }
+
+  html.is-mobile .mobile-backbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    z-index: 30;
+    min-height: 48px;
+  }
+  html.is-mobile .mobile-back-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-size: 14px;
+    color: var(--brand);
+    font-weight: 600;
+    min-height: 40px;
+    font-family: inherit;
+  }
+  html.is-mobile .mobile-back-btn:active { background: var(--line-soft); }
+
+  /* --- Mobile-only "Latest meetings" tiles at the top of the projects pane.
+     2-up grid with a project-colored stripe + drop shadow so they read as
+     featured highlights and don't blend into the project list below. --- */
+  .mobile-latest { display: none; }
+  html.is-mobile .mobile-latest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  html.is-mobile .ml-label {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-faint);
+    margin: 2px 2px -2px;
+    font-weight: 600;
+  }
+  html.is-mobile .ml-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--c, var(--brand));
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(27,31,36,.05), 0 4px 12px rgba(27,31,36,.04);
+    min-height: 180px;
+    cursor: pointer;
+  }
+  html.is-mobile .ml-item:active { background: var(--line-soft); }
+  html.is-mobile .ml-proj {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  html.is-mobile .ml-date {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--brand-2);
+    margin-bottom: 2px;
+  }
+  html.is-mobile .ml-ttl {
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ink);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    margin-bottom: 4px;
+  }
+  html.is-mobile .ml-ex {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex: 1;
+  }
+  html.is-mobile .ml-read {
+    margin-top: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--brand-2);
+  }
+
+  /* --- Sidebar (project) list — bigger touch targets --- */
+  html.is-mobile .side-label { font-size: 12px; margin: 4px 4px 10px; }
+  html.is-mobile .proj {
+    padding: 12px 12px;
+    min-height: 48px;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  html.is-mobile .proj .pn b { font-size: 15px; }
+  html.is-mobile .proj .pn small { font-size: 12px; }
+  html.is-mobile .proj .cnt { font-size: 12.5px; padding: 2px 10px; }
+  html.is-mobile .newbtn {
+    padding: 14px;
+    font-size: 15px;
+    min-height: 48px;
+  }
+
+  /* --- Meeting list — stack stickies cleanly below the backbar --- */
+  html.is-mobile .list-head {
+    position: static;
+    padding: 14px 14px 6px;
+    font-size: 13px;
+  }
+  html.is-mobile .range {
+    position: static;
+    padding: 4px 12px 10px;
+    gap: 8px;
+  }
+  html.is-mobile .range button {
+    padding: 10px 6px;
+    font-size: 13px;
+    min-height: 44px;
+  }
+  html.is-mobile .card {
+    margin: 8px 12px;
+    padding: 14px 14px;
+    min-height: 60px;
+  }
+  html.is-mobile .card .ttl { font-size: 15px; }
+  html.is-mobile .card .ex { font-size: 13px; }
+  html.is-mobile .card .date { font-size: 12.5px; }
+  html.is-mobile #cards {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  /* --- Detail pane --- */
+  html.is-mobile .detail-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  html.is-mobile .detail-bar h2 { font-size: 15px; min-width: 0; flex-basis: 100%; }
+  html.is-mobile .detail-bar .sub { font-size: 12px; margin-top: 2px; order: 10; }
+  html.is-mobile .detail-bar .dbtn {
+    font-size: 12.5px;
+    padding: 9px 11px;
+    min-height: 38px;
+  }
+  /* Mobile detail action row: only Pin, Share, Edit-in-Docs, in that order. */
+  html.is-mobile #d_vis,
+  html.is-mobile #d_editapp,
+  html.is-mobile #d_print,
+  html.is-mobile #d_recording { display: none; }
+  html.is-mobile #d_pin { order: 1; }
+  html.is-mobile #d_share { order: 2; }
+  html.is-mobile #d_docedit { order: 3; }
+  /* Action buttons lifted onto the backbar row, right-aligned next to "← Meetings". */
+  .backbar-actions { display: none; }
+  html.is-mobile .backbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+  html.is-mobile .backbar-actions .dbtn { min-height: 40px; padding: 9px 12px; font-size: 12.5px; }
+  /* Collapse Pin / Share to their icons so the whole row fits without wrapping. */
+  html.is-mobile .backbar-actions #d_pin .blbl,
+  html.is-mobile .backbar-actions #d_share .blbl { display: none; }
+  html.is-mobile .attendees { padding: 10px 12px; }
+  /* A4 doc keeps its native 860px layout / fonts / tables intact, but is
+     CSS-scaled to fit phone width — no horizontal scroll, no layout distortion.
+     The iframe + .paper dimensions are set inline by JS (see applyMobileScale). */
+  html.is-mobile .frame-wrap {
+    padding: 0;
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #eef1f4;
+  }
+  html.is-mobile .paper {
+    max-width: none;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+  }
+  html.is-mobile iframe.render { display: block; }
+
+  /* --- Dashboard (also lives in #detailContent on mobile if user lands there) --- */
+  html.is-mobile .dash-wrap { padding: 16px 14px; }
+  html.is-mobile .dash-grid { grid-template-columns: 1fr; gap: 12px; }
+  html.is-mobile .dash-card { padding: 14px 15px; }
+
+  /* --- Inputs ≥16px so iOS Safari doesn't zoom on focus --- */
+  html.is-mobile input,
+  html.is-mobile select,
+  html.is-mobile textarea {
+    font-size: 16px;
+  }
+
+  /* --- Modals become bottom sheets --- */
+  html.is-mobile .modal-bg {
+    align-items: flex-end;
+    padding: 0;
+  }
+  html.is-mobile .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  html.is-mobile .modal h3 { padding: 14px 18px; font-size: 15.5px; }
+  html.is-mobile .modal .form { padding: 14px 18px; gap: 14px; }
+  html.is-mobile .modal .form input:not([type="checkbox"]):not([type="radio"]),
+  html.is-mobile .modal .form select,
+  html.is-mobile .modal .form textarea { padding: 11px 12px; min-height: 44px; }
+  html.is-mobile .modal textarea { min-height: 180px; }
+  html.is-mobile .modal .actions {
+    padding: 12px 18px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    flex-wrap: wrap;
+  }
+  html.is-mobile .modal .actions .dbtn { min-height: 44px; padding: 10px 14px; }
+  html.is-mobile .row2 { grid-template-columns: 1fr; }
+
+  /* Rich-text editor becomes a near-fullscreen bottom sheet too */
+  html.is-mobile .editor {
+    width: 100%;
+    max-width: 100%;
+    height: 92vh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  html.is-mobile .editor h3 { padding: 14px 16px; }
+  html.is-mobile .ed-toolbar {
+    padding: 8px 12px;
+    gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  html.is-mobile .ed-toolbar button {
+    padding: 9px 12px;
+    font-size: 14px;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+  html.is-mobile .ed-area {
+    padding: 18px 18px;
+    font-size: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Toast clears the home indicator */
+  html.is-mobile .toast {
+    bottom: max(22px, calc(env(safe-area-inset-bottom) + 16px));
+  }

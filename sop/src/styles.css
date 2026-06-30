@@ -1,0 +1,658 @@
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fbfcfe;
+    --brand:#1F3864; --brand-dark:#16284a; --brand-2:#2E75B6; --brand-soft:#e9f0f9;
+    --accent:#b8860b; --accent-soft:#f6efdd;
+    --ink:#1b2430; --muted:#5b6675; --faint:#929cab;
+    --line:#e3e8ee; --line-soft:#eef1f5;
+    /* Layered, low-opacity shadows for a calmer, more premium feel */
+    --shadow-xs:0 1px 2px rgba(16,24,40,.05);
+    --shadow-sm:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 16px -4px rgba(16,24,40,.08);
+    --shadow-lg:0 2px 4px rgba(16,24,40,.05),0 16px 32px -8px rgba(16,24,40,.14);
+    --ring:0 0 0 3px rgba(46,117,182,.18);
+    --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+    --sans:'Sarabun',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+    --banner-font:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+    --ico:18px;
+  }
+  /* Base icon: sized by --ico (or local font-size via em fallbacks below) */
+  .ico{width:var(--ico);height:var(--ico);flex:0 0 auto;display:inline-block;vertical-align:middle;stroke-width:1.7}
+  [data-icon]{display:inline-flex;align-items:center;justify-content:center}
+  .m-PO{--mc:#2563eb}.m-IC{--mc:#0891b2}.m-AP{--mc:#9333ea}.m-FA{--mc:#c2410c}
+  .m-PM{--mc:#0d9488}.m-OF{--mc:#ca8a04}.m-GL{--mc:#dc2626}.m-AR{--mc:#db2777}
+  .m-BD{--mc:#4f46e5}.m-SE{--mc:#475569}.m-FIN{--mc:#059669}.m-RP{--mc:#0b3d62}
+
+  /* Night mode — overrides the palette variables defined in :root */
+  html.dark{
+    --bg:#0c1014; --panel:#161b22; --panel-2:#1a2029;
+    --brand-soft:#1c2d4a; --accent:#d2a24a; --accent-soft:#2a2415;
+    --ink:#e6edf3; --muted:#9aa4b1; --faint:#7d8590;
+    --line:#2a313b; --line-soft:#20262e;
+    --shadow-xs:0 1px 2px rgba(0,0,0,.4);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.5);
+    --shadow-lg:0 2px 6px rgba(0,0,0,.5),0 18px 40px rgba(0,0,0,.6);
+    --ring:0 0 0 3px rgba(124,162,214,.25);
+  }
+  html.dark .ptext{background:#1a2230;border-color:#26303d;color:#cdd6e0}
+  html.dark .pathbox{background:#1c2d4a;border-color:#2e4060;color:#a7c1e0}
+  html.dark .w-box{background:#1a2230;border-color:#26303d}
+  /* Welcome / home hero — these use hardcoded light colors (white card
+     backgrounds, dark-navy title, dark-gray body) that are invisible or render
+     as white panels on the dark page. Re-skin them for dark mode. */
+  html.dark .w-title{color:#cdddef}
+  html.dark .w-txt{color:#c3ccd6}
+  html.dark .w-lbl{color:#7fa8d6}
+  html.dark .w-stats{background:#1a2230;border-color:#26303d}
+  html.dark .w-stats span{border-color:#26303d}
+  html.dark .howto-card{background:#1a2230;border-color:#26303d}
+  html.dark .w-notes{background:#2a2415;border-color:#4a3f1a;color:#d6c899}
+  html.dark .w-notes ul{color:#d6c899}
+  html.dark .w-notes ul li::before{color:#caa84d}
+  html.dark .w-notes .w-lbl{color:#caa84d}
+  html.dark .note{background:#3a1f1d;border-color:#5a2c28;color:#e8b6b1}
+  html.dark .note b{color:#ff8a82}
+  html.dark .rep-table tbody tr:hover{background:#1a2230}
+  html.dark .rt-path{color:#a3c1d4}
+  html.dark .lc-no{background:var(--brand-soft);color:#cdddef}
+  /* Descriptions/subtitles need lifting in dark mode — the hero description is a
+     hardcoded light-mode gray, and the muted variable is too dim on dark panels. */
+  html.dark .mhero-desc{color:#c3ccd6}
+  html.dark .mhero-en{color:#aab4be}
+  html.dark .lc-ex{color:#b6bfc9}
+  /* Brand-colored TEXT (uppercase section labels, report numbers, back bar,
+     edit button) stays dark navy in dark mode because --brand is a dark blue.
+     Lift these to a light blue so they're readable on the dark panels. */
+  html.dark .lbl{color:#7fa8d6}
+  html.dark .lbl.accent{color:var(--accent)}
+  html.dark .rt-no{color:#7fa8d6}
+  html.dark .mback{color:#9cc2ea}
+  html.dark .d-edit{background:#1a2230;border-color:#30363d;color:#9cc2ea}
+  html.dark .d-edit:hover{background:var(--brand-soft);border-color:#2e4d7a}
+  html.dark .modal{background:var(--panel);color:var(--ink)}
+  html.dark .modal h3{color:#cdddef}
+  html.dark .modal input,html.dark .modal textarea{background:#0e141d;color:var(--ink);border-color:var(--line)}
+  html.dark .btn{background:var(--panel);color:var(--ink);border-color:var(--line)}
+  html.dark .btn:hover{background:var(--line-soft)}
+  html.dark #modules .mod{background:#1a2230}
+  html.dark #modules .mod.is-empty{background:#161b22}
+  /* Active-module count badge — light-mode flips it to a white pill (.mod.active
+     .cnt{background:#fff}); on the dark page that leaves a stray white chip with
+     low-contrast text. Re-skin it to a dark chip with light text. */
+  html.dark .mod.active .cnt{background:#0e1726;color:#cdddef}
+  /* Sub-step lines under a procedure use a hardcoded dark slate (#3c4a44) that
+     is almost invisible on the dark detail panel. Lift to a light gray. */
+  html.dark li.sub{color:#b9c2cc}
+
+  /* "Signed in as …" label — plain white text at the rightmost edge of the banner */
+  .user-pill{
+    display:inline-flex;align-items:center;
+    padding:0;background:none;border:none;
+    color:#fff;
+    font-family:var(--banner-font);
+    font-size:13px;font-weight:500;letter-spacing:.2px;
+    max-width:260px;min-width:0;
+    cursor:default
+  }
+  .user-pill > span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  html.is-mobile .user-pill{display:none !important} /* mobile: search takes the full row, email shown in settings instead */
+
+  /* Settings button (gear) + dropdown menu — desktop default, mobile overridden above */
+  .settings-wrap{position:relative;flex:0 0 auto;z-index:10}
+  .settings-btn{
+    width:34px;height:34px;padding:0;
+    border-radius:9px;
+    background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.28);
+    color:#fff;
+    font-size:17px;line-height:1;
+    cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:-apple-system,'Segoe UI Symbol',sans-serif
+  }
+  html.is-mobile .settings-btn{width:38px;height:38px;font-size:19px;border-radius:9px;
+    background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24)}
+  .settings-btn:hover{background:rgba(255,255,255,.28)}
+  .settings-btn.is-syncing{animation:gear-spin 1.1s linear infinite}
+  /* Settings modal — opened from the gear button */
+  .settings-modal{max-width:520px;padding:20px 22px}
+  .settings-modal h3{margin:0 0 6px;font-size:1.2rem;font-weight:800;color:var(--ink);letter-spacing:.2px}
+  .sm-section{padding-top:14px;border-top:1px solid var(--line-soft);margin-top:12px}
+  .sm-section.sm-section-account{padding-top:10px;margin-top:8px}
+  .sm-section-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);
+    text-transform:uppercase;margin:0 0 8px}
+  .sm-account{font-size:1rem;font-weight:600;color:var(--ink);margin:0;letter-spacing:.1px;word-break:break-all}
+  .sm-row{margin-bottom:14px}
+  .sm-row:last-child{margin-bottom:0}
+  .sm-row-label{display:block;font-size:.84rem;font-weight:500;color:var(--ink);margin:0 0 8px}
+  .sm-toggle{display:grid;grid-template-columns:1fr 1fr;gap:0;
+    background:var(--line-soft);padding:4px;border-radius:11px}
+  .sm-toggle-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:9px 14px;background:none;border:none;border-radius:8px;
+    font-family:var(--sans);font-size:.92rem;font-weight:600;
+    color:var(--muted);cursor:pointer;
+    transition:background .15s,color .15s,box-shadow .15s
+  }
+  .sm-toggle-btn:hover:not(.active){background:rgba(0,0,0,.04);color:var(--ink)}
+  .sm-toggle-btn.active{background:var(--brand-2);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .sm-action{
+    display:flex;align-items:center;gap:9px;width:100%;
+    padding:11px 14px;background:none;border:1px solid var(--line);
+    border-radius:9px;
+    font-family:var(--sans);font-size:.92rem;font-weight:500;color:var(--ink);
+    text-align:left;cursor:pointer;margin-bottom:8px
+  }
+  .sm-action:last-child{margin-bottom:0}
+  .sm-action:hover{background:var(--line-soft)}
+  .sm-signout{color:#dc2626;border-color:#fecaca}
+  .sm-signout:hover{background:#fef2f2;border-color:#fca5a5}
+  html.dark .sm-toggle{background:#1c2434}
+  html.dark .sm-toggle-btn:hover:not(.active){background:rgba(255,255,255,.05)}
+  html.dark .sm-signout{color:#fca5a5;border-color:#4a2629}
+  html.dark .sm-signout:hover{background:#3a1f1d;border-color:#5a2c28}
+  /* About & Contact (bottom of settings) */
+  .sm-contact{color:var(--brand-2)}
+  .sm-contact:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  /* Contact on one row: label left, click-to-copy email button to its right */
+  .sm-contact-sec{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .sm-contact-sec .sm-section-label{margin:0;flex:0 0 auto}
+  .sm-contact-sec .sm-contact{margin:0;width:auto;flex:1 1 200px;min-width:0;cursor:pointer}
+  .sm-contact .sm-contact-email{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+  .sm-contact .sm-contact-copy{margin-left:auto;--ico:15px;opacity:.55;transition:opacity .14s,color .14s}
+  .sm-contact:hover .sm-contact-copy{opacity:1}
+  .sm-contact.copied{border-color:#2e9e5b;color:#2e9e5b}
+  .sm-contact.copied .sm-contact-copy{opacity:1}
+  html.dark .sm-contact.copied{border-color:#46b277;color:#82d9a4}
+  .sm-about-meta{font-size:.82rem;color:var(--muted);line-height:1.55}
+  .sm-about-meta b{color:var(--ink);font-weight:700}
+  .sm-updates{margin-top:9px}
+  .sm-updates-lbl{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .sm-updates ul{margin:0;padding:0;list-style:none}
+  .sm-updates li{position:relative;padding-left:16px;margin-bottom:4px;font-size:.82rem;color:var(--muted);line-height:1.5}
+  .sm-updates li::before{content:'';position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .sm-select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+    background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:.92rem;font-weight:500;
+    outline:none;cursor:pointer}
+  .sm-select:focus{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(46,117,182,.18)}
+  .sm-hint{font-size:.74rem;color:var(--faint);margin-top:7px;line-height:1.45}
+  html.dark .sm-select{background:#0e141d;border-color:var(--line)}
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:15px}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--brand-2)}
+
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  /* ===== Banner ===== */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 30px;color:#fff;z-index:5;gap:18px;flex-wrap:wrap;
+    background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);
+    box-shadow:0 2px 12px rgba(31,56,100,.25);font-family:var(--banner-font)}
+  .brand-txt{display:flex;align-items:center;gap:16px}
+  .brand-h1{font-size:24px;font-weight:800;letter-spacing:.3px;line-height:1;color:#fff;margin:0}
+  .brand-div{width:1px;height:40px;background:rgba(255,255,255,.45)}
+  .brand-stack{display:flex;flex-direction:column;gap:6px}
+  .brand-sub{font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#fff}
+  .brand-th{font-size:13px;font-weight:500;color:#fff;letter-spacing:.5px;line-height:1.2;font-family:var(--sans)}
+  .search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:7px 11px;width:340px;max-width:40vw}
+  .search input{border:none;background:transparent;color:#fff;outline:none;width:100%;font-size:13.5px;font-family:var(--sans)}
+  .search input::placeholder{color:#b6c6d6}
+  .hdr-right{display:flex;align-items:center;gap:12px}
+  .tbtn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.2);
+    border-radius:9px;padding:7px 13px;font-size:13px;white-space:nowrap;font-family:var(--banner-font);cursor:pointer}
+  .tbtn:hover{background:rgba(255,255,255,.24)}
+  .tbtn[disabled]{opacity:.6;cursor:wait}
+
+  /* ===== Three-pane body ===== */
+  .body{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:286px 380px 1fr}
+  @media (max-width:1100px){.body{grid-template-columns:240px 330px 1fr}}
+  body.reports-mode .list{display:none}
+  body.reports-mode .body{grid-template-columns:286px 1fr}
+  @media (max-width:1100px){body.reports-mode .body{grid-template-columns:240px 1fr}}
+
+  /* ----- Sidebar ----- */
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px;display:flex;flex-direction:column}
+  .side-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:10px 8px 7px;font-weight:700}
+  .side-label:first-child{margin-top:4px}
+  .mod{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;border:1px solid transparent;width:100%;text-align:left;background:none}
+  .mod:hover{background:var(--line-soft)}
+  .mod.active{background:var(--brand-soft);border-color:#cdddef}
+  .mod.is-empty{opacity:.55}
+  .mod.is-empty:hover{opacity:1}
+  .mod.is-empty .cnt{background:transparent;color:var(--faint)}
+  .mod .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--mc,#999)}
+  .mod .mn{flex:1 1 auto;min-width:0}
+  .mod .mn b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.2}
+  .mod .mn small{display:block;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mod .cnt{flex:0 0 auto;font-size:11.5px;color:var(--muted);background:var(--line-soft);border-radius:20px;padding:1px 9px;font-weight:600}
+  .mod.active .cnt{background:#fff}
+
+  /* Top-level nav: Process Flows (primary) · Case Studies (accordion) · Reports.
+     The module buttons live inside #modules and collapse unless the Case Studies
+     branch is active (sidebar gets .cs-open from setActiveSidebar). */
+  .sidebar > .mod{margin-bottom:5px}   /* equal gaps between the 3 top-level branches */
+  .cs-chevron{flex:0 0 auto;width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2.4;
+    transition:transform .18s ease;margin-left:2px}
+  .cs-chevron-spacer{flex:0 0 auto;width:18px}   /* matches chevron width so Reports' count aligns */
+  /* Each root's chevron points down when its own submenu is open, right when closed */
+  .sidebar:not(.flows-open) #flowsHeader .cs-chevron{transform:rotate(-90deg)}
+  .sidebar:not(.cs-open) #csHeader .cs-chevron{transform:rotate(-90deg)}
+  .cs-children{margin:2px 0 2px 10px;padding-left:8px;border-left:2px solid var(--line-soft)}
+  /* #id selectors raise specificity over the mobile grid rule (html.is-mobile #modules) */
+  .sidebar:not(.flows-open) #flowModules{display:none}
+  .sidebar:not(.cs-open) #modules{display:none}
+  html.dark .cs-children{border-left-color:var(--line)}
+  html.is-mobile .cs-children{margin-left:0;padding-left:0;border-left:none}
+  .side-foot{margin-top:auto;padding:10px 8px 4px;font-size:11px;color:var(--faint);line-height:1.5;border-top:1px solid var(--line-soft)}
+
+  /* Process Flows list — module subheaders so 33 flows are scannable */
+  .flow-group-h{display:flex;align-items:center;gap:8px;margin:12px 12px 2px;
+    font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .flow-group-h:first-child{margin-top:6px}
+  .flow-group-h .fg-dot{width:8px;height:8px;border-radius:50%;background:var(--mc,#999);flex:0 0 auto}
+  .flow-group-h .fg-line{flex:1 1 auto;height:1px;background:var(--line-soft)}
+
+  /* ----- Mobile home intro ----- */
+  /* A brief "what is this page / how to use it" block shown at the very top of
+     the first mobile screen (the module picker), so staff know what the portal
+     is for before choosing a module. Hidden on desktop, where the right-pane
+     welcome page already covers this. */
+  .m-home{display:none}
+  html.is-mobile .m-home{display:block;margin:2px 2px 4px;padding:4px 6px 16px;
+    border-bottom:1px solid var(--line-soft)}
+  html.is-mobile .m-home .mh-title{font-size:1.12rem;font-weight:800;color:var(--brand-dark);
+    line-height:1.35;margin:0 0 6px;letter-spacing:.2px}
+  html.is-mobile .m-home .mh-lead{font-size:.86rem;color:var(--muted);line-height:1.6;margin:0}
+  html.dark .m-home .mh-title{color:#cdddef}
+
+  /* ----- Middle list ----- */
+  .list{background:var(--bg);border-right:1px solid var(--line);overflow-y:auto}
+  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1}
+  .lcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 12px;padding:10px 12px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+  .lcard:hover{border-color:#c0c8d0;box-shadow:var(--shadow)}
+  .lcard.active{border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(46,117,182,.18)}
+  .lc-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .lc-no{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:var(--brand-soft);color:var(--brand-dark);font-weight:700;font-size:.74rem;display:flex;align-items:center;justify-content:center}
+  .lc-badge{flex:0 0 auto;background:var(--mc,#999);color:#fff;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.5px}
+  .lc-title{font-weight:700;font-size:.9rem;line-height:1.35;color:var(--ink)}
+  .lc-ex{margin-top:4px;font-size:.8rem;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .empty{padding:30px 16px;color:var(--faint);text-align:center;font-size:.88rem}
+
+  /* ----- Detail ----- */
+  .detail{background:var(--panel);overflow-y:auto}
+  /* ----- Welcome / home page (right pane when nothing is selected) ----- */
+  .welcome{padding:28px 32px;max-width:900px}
+  .w-title{font-size:1.55rem;font-weight:800;color:var(--brand-dark);line-height:1.3;margin:0 0 4px;letter-spacing:.2px}
+  .w-sub{font-size:.95rem;color:var(--muted);margin:0 0 18px}
+  .w-stats{display:inline-flex;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--muted);
+    border:1px solid var(--line);border-radius:9px;background:#fbfcfe;padding:5px 2px;margin-bottom:20px}
+  .w-stats span{padding:2px 13px;border-right:1px solid var(--line)}
+  .w-stats span:last-child{border-right:none}
+  .w-box{background:#fafbfc;border:1px solid var(--line-soft);border-left:4px solid var(--brand);
+    border-radius:9px;padding:14px 18px;margin-bottom:18px}
+  .w-lbl{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand);margin:0 0 7px}
+  .w-txt{font-size:.95rem;color:#3c4650;line-height:1.7;margin:0}
+  .howto{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:20px}
+  @media (max-width:860px){.howto{grid-template-columns:1fr}}
+  .howto-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 15px}
+  .ht-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;
+    background:var(--brand);color:#fff;font-weight:700;font-size:.82rem;margin-bottom:8px}
+  .ht-t{font-weight:700;font-size:.94rem;margin-bottom:3px;color:var(--ink)}
+  .ht-d{font-size:.82rem;color:var(--muted);line-height:1.5}
+  .w-notes{background:#fdf6e3;border:1px solid #f1e1b6;border-radius:9px;padding:13px 16px}
+  .w-notes .w-lbl{color:#a16f12}
+  .w-notes ul{margin:0;padding:0;list-style:none;font-size:.86rem;color:#5d4a18;line-height:1.6}
+  .w-notes ul li{position:relative;padding-left:14px;margin-bottom:3px}
+  .w-notes ul li::before{content:'–';position:absolute;left:0;color:#a16f12}
+
+  .d-wrap{padding:22px 26px;max-width:900px}
+  .d-head{display:flex;align-items:center;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+  .d-num{flex:0 0 auto;width:36px;height:36px;border-radius:9px;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem}
+  .d-titles{flex:1 1 auto;min-width:0}
+  .d-th{font-weight:700;font-size:1.18rem;line-height:1.35}
+  .d-en{font-size:.85rem;color:var(--muted);margin-top:2px}
+  .d-badge{flex:0 0 auto;align-self:flex-start;background:var(--mc,#999);color:#fff;font-size:.72rem;font-weight:700;padding:4px 11px;border-radius:999px;letter-spacing:.5px}
+
+  .d-sec{margin-bottom:18px}
+  .lbl{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
+  .lbl.accent{color:var(--accent)}
+  .ptext{font-size:.95rem;color:#3c4650;line-height:1.6;background:#fafbfc;border:1px solid var(--line-soft);border-radius:9px;padding:12px 14px}
+
+  ol.steps{margin:0;padding:0;counter-reset:s;list-style:none;font-size:.95rem;line-height:1.55}
+  ol.steps>li{position:relative;padding:5px 0 5px 34px;counter-increment:s}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:4px;width:23px;height:23px;
+    background:var(--brand);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.76rem;font-weight:700}
+  li.sub{padding:2px 0 2px 34px !important;counter-increment:none !important;color:#3c4a44}
+  li.sub::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
+  li.sub .stxt{position:relative;padding-left:17px;display:block}
+  li.sub .stxt::before{content:'';position:absolute;left:3px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+  .note{margin-top:14px;background:#fdeceb;border:1px solid #f6c9c5;border-radius:9px;padding:10px 13px;font-size:.88rem;color:#8d2820}
+  .note b{color:#b5302a}
+  .d-ref{margin-top:6px;font-size:.82rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;display:flex;align-items:center;gap:6px}
+  .d-ref svg{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+  .pathbox{font-family:'Consolas','Courier New',monospace;font-size:.95rem;color:var(--brand-dark);
+    background:var(--brand-soft);border:1px solid #cdddef;border-radius:9px;padding:13px 16px;line-height:1.6}
+
+  /* Module hero — sits at the top of the list pane after a module is picked */
+  .mhero{margin:10px 12px 6px;padding:13px 15px;background:var(--panel);
+    border:1px solid var(--line);border-left:4px solid var(--mc,var(--brand));
+    border-radius:10px;box-shadow:var(--shadow)}
+  .mhero-name{font-size:.98rem;font-weight:800;color:var(--ink);margin:0 0 2px;letter-spacing:.2px}
+  .mhero-en{font-size:.78rem;color:var(--muted);font-style:italic;margin:0 0 8px;letter-spacing:.2px}
+  .mhero-desc{font-size:.83rem;color:#3c4650;line-height:1.6;margin:0}
+
+  /* Reports table (shown in detail pane when "วิธีเรียก Report" is selected) */
+  .rep-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px}
+  .rep-table{width:100%;border-collapse:collapse;font-size:.92rem}
+  .rep-table thead th{background:var(--brand);color:#fff;text-align:left;padding:11px 14px;font-weight:600;position:sticky;top:0}
+  .rep-table tbody td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top}
+  .rep-table tbody tr:hover{background:#fafcfd}
+  .rt-no{font-weight:700;color:var(--brand);width:46px;text-align:center}
+  .rt-path{font-family:'Consolas','Courier New',monospace;font-size:.86rem;color:#2b3a33;white-space:nowrap}
+  @media (max-width:680px){.rt-path{white-space:normal}}
+
+  /* ===== Mobile / iPhone — single-pane stack navigation =====
+     Triggered by html.is-mobile (set by JS in <head>) so it fires reliably
+     even inside the Apps Script iframe wrapper, where @media (max-width) is
+     unreliable in some in-app browsers (Gmail, Slack, etc.). */
+  .mback{display:none}
+  html.is-mobile,html.is-mobile body{height:100%;-webkit-text-size-adjust:100%}
+  html.is-mobile body{font-size:14.5px;overscroll-behavior-y:contain}
+
+  /* Compact topbar with safe-area insets. Gear sits in flex flow next to the
+     brand-txt so they stay vertically aligned. */
+  html.is-mobile .topbar{position:relative;padding:10px 14px;gap:10px;flex-wrap:wrap;
+    align-items:center;
+    padding-top:max(10px,env(safe-area-inset-top));
+    padding-left:max(14px,env(safe-area-inset-left));
+    padding-right:max(14px,env(safe-area-inset-right))}
+  html.is-mobile .brand-txt{gap:9px;flex:1 1 0;min-width:0;order:1;align-self:center}
+  html.is-mobile .brand-h1{font-size:17px;white-space:nowrap;flex:0 0 auto}
+  html.is-mobile .brand-div{height:28px;flex:0 0 auto}
+  html.is-mobile .brand-stack{gap:2px;min-width:0;flex:1 1 0;overflow:hidden}
+  html.is-mobile .brand-sub{font-size:9.5px;letter-spacing:.3px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.is-mobile .brand-th{font-size:9.5px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Mobile: gear sits in flex flow on the right end of the brand row so it's
+     always vertically centered with the brand text — no absolute positioning. */
+  html.is-mobile .settings-wrap{
+    position:relative;
+    order:2;
+    flex:0 0 auto;
+    align-self:center;
+    margin-left:auto;
+    z-index:10
+  }
+  @keyframes gear-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+  /* Bottom row inside topbar: Admin badge + Search spread across full width */
+  html.is-mobile .hdr-right{order:3;flex:1 1 100%;width:100%;
+    display:flex;gap:8px;margin-left:0;margin-top:0;align-items:center;
+    padding-right:0}
+  html.is-mobile .tbtn{padding:8px 12px;font-size:13px;min-height:38px}
+  html.is-mobile .hdr-right #adminBadge{order:1;flex:0 0 auto}
+  html.is-mobile .search{order:2;flex:1 1 auto;width:auto;max-width:none;
+    padding:0 11px;min-height:38px;border-color:rgba(255,255,255,.2)}
+  html.is-mobile .search input{font-size:16px;padding:0;line-height:1.2;height:auto} /* keep ≥16px so iOS doesn't zoom on focus */
+
+  /* Body becomes a single visible pane; CSS class on <body> switches view */
+  html.is-mobile .body{display:block;position:relative;overflow:hidden;grid-template-columns:none}
+  html.is-mobile body.reports-mode .body{grid-template-columns:none}
+  html.is-mobile .sidebar,html.is-mobile .list,html.is-mobile .detail{
+    position:absolute;inset:0;
+    border:none;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:max(16px,env(safe-area-inset-bottom))
+  }
+  html.is-mobile .list,html.is-mobile .detail{display:none}
+  html.is-mobile body.m-list .sidebar,html.is-mobile body.m-list .detail{display:none}
+  html.is-mobile body.m-list .list{display:block}
+  html.is-mobile body.m-detail .sidebar,html.is-mobile body.m-detail .list{display:none}
+  html.is-mobile body.m-detail .detail{display:block}
+
+  /* Back bar at top of list / detail panes */
+  html.is-mobile body.m-list .list .mback,
+  html.is-mobile body.m-detail .detail .mback{
+    display:flex;align-items:center;gap:8px;
+    padding:12px 14px;
+    padding-left:max(14px,env(safe-area-inset-left));
+    padding-right:max(14px,env(safe-area-inset-right));
+    background:var(--panel);border:none;border-bottom:1px solid var(--line);
+    color:var(--brand);font-weight:700;font-size:14px;
+    width:100%;text-align:left;font-family:var(--sans);
+    position:sticky;top:0;z-index:3;
+    -webkit-tap-highlight-color:rgba(46,117,182,.18)
+  }
+  html.is-mobile .mback svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.5;flex:0 0 auto}
+
+  /* Sidebar (full-screen module picker) */
+  html.is-mobile .sidebar{padding:14px 12px;flex-direction:column}
+  html.is-mobile .side-label{font-size:12px;margin:14px 8px 8px}
+  html.is-mobile .side-label:first-child{margin-top:6px}
+  html.is-mobile .mod{padding:13px 12px;min-height:54px;margin-bottom:2px;width:100%}
+  html.is-mobile .mod .mn b{font-size:15px}
+  html.is-mobile .mod .mn small{font-size:12px}
+  html.is-mobile .mod .cnt{font-size:12.5px;padding:2px 10px}
+
+  /* Module submenus (Process Flows + Case Studies share class .cs-children)
+     laid out as a 2-column grid on mobile to use the horizontal space */
+  html.is-mobile .cs-children{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:2px 0 4px;padding:0;border:none}
+  html.is-mobile .cs-children .mod{
+    margin-bottom:0;padding:11px 10px;min-height:62px;
+    background:#fbfcfe;border:1px solid var(--line-soft);border-radius:10px;gap:8px}
+  html.is-mobile .cs-children .mod:hover{background:var(--line-soft)}
+  html.is-mobile .cs-children .mod.active{background:var(--brand-soft);border-color:#cdddef}
+  html.is-mobile .cs-children .mod.is-empty{background:#fafbfc}
+  html.is-mobile .cs-children .mod .dot{width:9px;height:9px}
+  html.is-mobile .cs-children .mod .mn{min-width:0;overflow:hidden}
+  html.is-mobile .cs-children .mod .mn b{font-size:14px;line-height:1.15}
+  html.is-mobile .cs-children .mod .mn small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.is-mobile .cs-children .mod .cnt{font-size:11.5px;padding:1px 8px;flex:0 0 auto}
+
+  /* Night mode on mobile — the 2-col grid rules above re-set the .mod
+     background/border to light values at the SAME specificity as the global
+     dark rule, so source order lets them win and the cards stay white. Re-apply
+     the dark palette with a more specific selector (html.dark.is-mobile). */
+  html.dark.is-mobile .cs-children .mod{background:#1a2230;border-color:#26303d}
+  html.dark.is-mobile .cs-children .mod:hover{background:var(--line-soft)}
+  html.dark.is-mobile .cs-children .mod.active{background:var(--brand-soft);border-color:#2e4d7a}
+  html.dark.is-mobile .cs-children .mod.is-empty{background:#161b22}
+
+  /* Cases list */
+  html.is-mobile .list-head{padding:12px 14px;font-size:12.5px}
+  html.is-mobile .lcard{margin:8px 12px;padding:13px}
+  html.is-mobile .lc-title{font-size:.95rem}
+  html.is-mobile .lc-ex{font-size:.82rem}
+
+  /* Detail / welcome */
+  html.is-mobile .d-wrap{padding:18px 16px;max-width:none}
+  html.is-mobile .d-head{gap:10px;padding-bottom:12px;margin-bottom:14px}
+  html.is-mobile .d-num{width:32px;height:32px;font-size:.95rem}
+  html.is-mobile .d-th{font-size:1.05rem}
+  html.is-mobile .welcome{padding:18px 16px;max-width:none}
+  html.is-mobile .w-title{font-size:1.25rem}
+  html.is-mobile .w-sub{font-size:.88rem}
+  html.is-mobile .w-stats{font-size:.74rem;padding:4px 0}
+  html.is-mobile .w-stats span{padding:3px 10px}
+  html.is-mobile .howto{grid-template-columns:1fr;gap:9px}
+
+  /* Reports table — wrap menu paths so it fits */
+  html.is-mobile .rt-path{white-space:normal;font-size:.82rem}
+
+  /* Edit modal becomes a bottom sheet */
+  html.is-mobile .modal-bg{padding:0;align-items:flex-end}
+  html.is-mobile .modal{max-width:none;border-radius:14px 14px 0 0;
+    padding:16px 16px max(16px,env(safe-area-inset-bottom));
+    max-height:92vh;overflow-y:auto}
+  html.is-mobile .modal .row{grid-template-columns:1fr;gap:4px}
+  html.is-mobile .modal label{padding-top:0;padding-bottom:2px}
+  html.is-mobile .modal input[type=text],
+  html.is-mobile .modal input[type=password],
+  html.is-mobile .modal textarea{font-size:16px}
+
+  /* iOS tap feedback on interactive elements */
+  html.is-mobile .mod,html.is-mobile .lcard,html.is-mobile .tbtn,
+  html.is-mobile .btn,html.is-mobile .d-edit{-webkit-tap-highlight-color:rgba(46,117,182,.18)}
+
+  /* ===== Modals (admin login + edit scenario) ===== */
+  .modal-bg{position:fixed;inset:0;background:rgba(20,30,45,.55);z-index:100;
+    display:none;align-items:flex-start;justify-content:center;padding:60px 20px;overflow-y:auto}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:100%;max-width:680px;padding:22px 26px;font-family:var(--sans)}
+  .modal h3{margin:0 0 14px;font-size:1.15rem;color:var(--brand-dark)}
+  .modal .row{display:grid;grid-template-columns:120px 1fr;gap:10px 14px;margin-bottom:11px;align-items:start}
+  .modal label{font-size:.82rem;font-weight:700;color:var(--muted);padding-top:8px}
+  .modal input[type=text],.modal input[type=password],.modal textarea{
+    width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;
+    font-family:var(--sans);font-size:.92rem;outline:none;background:#fff;color:var(--ink)}
+  .modal input:focus,.modal textarea:focus{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(46,117,182,.18)}
+  .modal textarea{resize:vertical;min-height:60px;line-height:1.55;font-family:var(--sans)}
+  .modal .hint{font-size:.74rem;color:var(--faint);margin-top:4px;line-height:1.5}
+  .modal .hint code{background:var(--line-soft);padding:1px 5px;border-radius:4px;font-size:.86em}
+  .modal .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid var(--line-soft);padding-top:14px}
+  .btn{padding:8px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:8px;font-family:var(--sans);font-size:.92rem;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--line-soft)}
+  .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.primary:hover{background:var(--brand-dark)}
+  .btn[disabled]{opacity:.6;cursor:wait}
+  .tbtn.on{background:rgba(40,200,140,.35);border-color:rgba(40,200,140,.65)}
+  .d-edit{background:#fff;border:1px solid var(--line);color:var(--brand);
+    border-radius:8px;padding:5px 11px;font-size:.82rem;font-weight:700;cursor:pointer;margin-left:8px;font-family:var(--sans)}
+  .d-edit:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+
+  /* ===== Process-flow diagrams (Process Flows view) =====
+     Each flow is a swimlane diagram: lanes = responsible actors/modules,
+     ranks = vertical sequence. Boxes are laid out on a CSS grid; the arrows
+     between them are drawn by JS into an absolutely-positioned <svg> overlay
+     (layoutFlowEdges) that is re-measured on resize / theme change. */
+  .flow-id-badge{flex:0 0 auto;align-self:flex-start;background:var(--brand);color:#fff;
+    font-weight:800;font-size:.82rem;letter-spacing:.4px;border-radius:9px;padding:7px 11px;font-family:var(--banner-font)}
+  .flow-wrap{margin-top:4px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel)}
+  .flow-scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .flow-canvas{--flow-col:212px;width:max-content;min-width:100%}
+  html.is-mobile .flow-canvas{--flow-col:158px}
+  .flow-lanes{display:grid;border-bottom:1px solid var(--line)}
+  .flow-lane-h{padding:9px 10px;border-left:1px solid var(--line-soft);text-align:center;background:var(--bg)}
+  .flow-lane-h:first-child{border-left:none}
+  .flow-lane-h b{display:block;font-size:.79rem;font-weight:700;color:var(--ink);line-height:1.3}
+  .flow-lane-h small{display:block;font-size:.67rem;color:var(--muted);margin-top:2px;letter-spacing:.2px}
+  .flow-body{position:relative}
+  .flow-edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:0}
+  .flow-grid{display:grid;row-gap:34px;padding:24px 0;position:relative;z-index:1}
+  .flow-node{align-self:center;justify-self:center;max-width:calc(var(--flow-col) - 22px);
+    padding:9px 12px;border-radius:9px;font-size:.79rem;line-height:1.32;text-align:center;
+    background:var(--panel);border:1.5px solid var(--brand);color:var(--ink);
+    box-shadow:0 1px 2px rgba(27,31,36,.07);word-break:break-word}
+  .fn-start,.fn-end{border-radius:999px;background:var(--brand-soft);border-color:transparent;
+    color:var(--brand-dark);font-weight:700;padding:7px 20px;font-size:.78rem}
+  .fn-decision{border-color:var(--accent);background:#fff8ec;color:#7a5a16;font-weight:700}
+  html.dark .flow-lane-h{background:#10161f}
+  html.dark .fn-decision{background:#2a2415;color:#e4cd8f}
+  html.dark .flow-id-badge{background:#1a2230;color:#cdddef}
+  /* Narrative (left-column process text) shown under the diagram — readable on
+     mobile where the wide swimlane has to scroll horizontally. */
+  .flow-narr{margin:0;padding:0;list-style:none;font-size:.9rem;line-height:1.6}
+  .flow-narr li.fn-main{padding:4px 0;color:var(--ink)}
+  .flow-narr li.fn-sub{position:relative;padding:2px 0 2px 18px;color:var(--muted);font-size:.85rem}
+  .flow-narr li.fn-sub::before{content:'–';position:absolute;left:4px;color:var(--accent)}
+  .flow-narr li.fn-note{margin-top:8px;color:#8d2820;font-size:.84rem;background:#fdeceb;
+    border:1px solid #f6c9c5;border-radius:8px;padding:8px 11px;line-height:1.55}
+  html.dark .flow-narr li.fn-note{background:#3a1f1d;border-color:#5a2c28;color:#e8b6b1}
+  .flow-legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 2px 2px;font-size:.74rem;color:var(--muted)}
+  .flow-legend span{display:inline-flex;align-items:center;gap:6px}
+  .flow-legend i{width:18px;height:0;border-top-width:2.4px;border-top-style:solid;display:inline-block}
+
+  /* ============================================================
+     Refined-corporate revamp — appended last so it refines the
+     base styles above (icon sizing, surfaces, states, rhythm).
+     ============================================================ */
+  /* Icon sizing per context (the --ico custom property inherits) */
+  .search .ico{--ico:16px}
+  .settings-btn .ico{--ico:18px}
+  .admin-badge .ico{--ico:13px}
+  .sm-toggle-btn .ico{--ico:16px}
+  .sm-action .ico{--ico:17px}
+  .d-edit .ico{--ico:13px}
+
+  /* Banner — calmer gradient, brand mark, refined type */
+  .topbar{padding:13px 24px;
+    background:linear-gradient(118deg,#1c3a67 0%,#274f7d 52%,#2f76b7 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 18px rgba(20,38,72,.26)}
+  .brand-mark{display:inline-flex;width:34px;height:34px;flex:0 0 auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
+  .brand-mark svg{width:34px;height:34px}
+  .brand-h1{font-size:21px;font-weight:700;letter-spacing:.2px}
+  /* Wordmark doubles as a "back to VCB Connect" link — reads as a logo, not a text link */
+  .brand-link{color:inherit;text-decoration:none;cursor:pointer;transition:opacity .15s}
+  .brand-link:hover,.brand-link:focus-visible{opacity:.82;text-decoration:none}
+  .brand-link:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.35);border-radius:6px}
+  .brand-div{height:34px;background:rgba(255,255,255,.28)}
+  .brand-sub{font-size:12px;font-weight:600;letter-spacing:.5px;opacity:.96}
+  .brand-th{font-size:12px;opacity:.85;font-weight:500}
+  html.is-mobile .brand-mark,html.is-mobile .brand-mark svg{width:26px;height:26px}
+
+  /* Search field */
+  .search{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+    border-radius:10px;padding:8px 12px;transition:background .15s,border-color .15s,box-shadow .15s}
+  .search:focus-within{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.42)}
+  .search-ico{display:inline-flex;color:#c2d6ec}
+  .search input::placeholder{color:#b9cbe0}
+
+  /* Admin badge + settings/gear */
+  .admin-badge{display:inline-flex;align-items:center;gap:6px;border-radius:9px;font-weight:600}
+  .admin-badge>span[data-icon]{display:inline-flex}
+  .settings-btn{border-radius:10px}
+
+  /* Sidebar — section chips with real icons */
+  .sidebar{padding:14px 12px}
+  .mod{border-radius:10px;transition:background .14s ease,border-color .14s ease,box-shadow .14s ease}
+  .cs-root{padding:10px;gap:11px;border:1px solid transparent}
+  .cs-root .mn b{font-weight:700;font-size:14px;letter-spacing:.1px}
+  .cs-root .mn small{font-size:11px}
+  .mod-ico{width:32px;height:32px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:9px;background:var(--brand-soft);color:var(--brand-2);--ico:18px;
+    transition:background .14s,color .14s,box-shadow .14s}
+  .cs-root:hover .mod-ico{box-shadow:inset 0 0 0 1px rgba(46,117,182,.22)}
+  .cs-root.active{background:var(--brand-soft);border-color:transparent}
+  .m-RP .mod-ico{color:var(--brand)}
+  /* Active icon chip fills navy for ALL top-level branches (Flows, Case Studies, Reports) */
+  .mod.active .mod-ico{background:var(--brand);color:#fff}
+  html.dark .mod-ico{background:#1b2840;color:#9cc2ea}
+  html.dark .mod.active .mod-ico{background:var(--brand-2);color:#fff}
+  .cs-children .mod{padding:8px 10px}
+  .cnt{background:var(--line-soft);color:var(--muted);font-weight:600;border-radius:999px}
+
+  /* Cards */
+  .lcard{border-radius:11px;transition:border-color .14s,box-shadow .14s,transform .12s}
+  .lcard:hover{border-color:#c5d2e2;box-shadow:var(--shadow);transform:translateY(-1px)}
+  .lcard.active{border-color:var(--brand-2);box-shadow:var(--ring)}
+  .lc-no{border-radius:7px;font-weight:700}
+  .lc-badge{font-weight:700;letter-spacing:.4px}
+
+  /* Detail header icon (reports) + edit button + note row */
+  .d-hicon{flex:0 0 auto;width:40px;height:40px;border-radius:11px;display:inline-flex;
+    align-items:center;justify-content:center;background:var(--brand-soft);color:var(--brand-2);--ico:20px}
+  html.dark .d-hicon{background:#1b2840;color:#9cc2ea}
+  .d-edit{display:inline-flex;align-items:center;gap:5px}
+  .d-num{border-radius:10px}
+  .d-badge{font-weight:700;letter-spacing:.4px}
+  .note{display:flex;gap:9px;align-items:flex-start}
+  .note-ico{--ico:17px;flex:0 0 auto;margin-top:1px;color:#b5302a}
+  html.dark .note-ico{color:#ff8a82}
+
+  /* Surfaces, buttons, focus rings */
+  .btn{border-radius:9px;transition:background .14s,border-color .14s,box-shadow .14s}
+  .btn.primary{box-shadow:var(--shadow-xs)}
+  .modal{border-radius:var(--r-lg);box-shadow:var(--shadow-lg)}
+  .btn:focus-visible,.sm-action:focus-visible,.mod:focus-visible,.tbtn:focus-visible,
+  .lcard:focus-visible,.settings-btn:focus-visible,.sm-toggle-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+  .ptext,.pathbox,.w-box{border-radius:11px}

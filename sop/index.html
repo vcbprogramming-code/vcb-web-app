@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1F3864">
+<script>
+  // Pre-paint setup (ported VERBATIM from index.html <head>): mobile detection +
+  // saved theme/lang, applied before React mounts so the first paint matches.
+  (function(){
+    function check(){
+      var ua = navigator.userAgent || '';
+      var w  = window.innerWidth || document.documentElement.clientWidth || 0;
+      var sw = (window.screen && window.screen.width) || 0;
+      var minDim = (sw && w) ? Math.min(w, sw) : (sw || w);
+      var isPhone = /iPhone|iPod|Android.+Mobile|Mobile.+Firefox|IEMobile|Opera Mini/i.test(ua);
+      document.documentElement.classList.toggle('is-mobile', isPhone || minDim <= 768);
+    }
+    check();
+    window.addEventListener('resize', check, {passive:true});
+    window.addEventListener('orientationchange', check, {passive:true});
+    try {
+      if (localStorage.getItem('sop-night') === '1') document.documentElement.classList.add('dark');
+      var sl = localStorage.getItem('sop-lang');
+      if (sl === 'th' || sl === 'en') document.documentElement.lang = sl;
+    } catch(e){}
+  })();
+</script>
+<title>VCB-MANGO ERP — SOP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

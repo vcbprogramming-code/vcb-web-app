@@ -1,0 +1,12 @@
+/* Supplemental styles for the React preview — only for elements the original
+   built inline via JS (month nav arrows) plus the Overview→Weekly focus ring. */
+.mnav{display:inline-flex;align-items:center;gap:.3rem;height:38px;border:1px solid var(--line);
+  border-radius:8px;background:var(--input-bg,#fff);padding:0 .35rem;width:100%;justify-content:space-between}
+.mnav-b{border:0;background:transparent;font:inherit;font-size:1.2rem;line-height:1;color:var(--blue);
+  cursor:pointer;width:30px;height:30px;border-radius:6px}
+.mnav-b:hover{background:var(--hover,#f1f5fa)}
+.mnav-lbl{font-weight:700;font-size:.92rem;white-space:nowrap}
+td.cellfocus{box-shadow:inset 0 0 0 2px var(--site,#1d4e89);border-radius:6px}
+tr.rowfocus td.emp-col{box-shadow:inset 3px 0 0 var(--site,#1d4e89)}
+.cov-cell{cursor:pointer}
+body.dark .mnav{background:#0f1722}

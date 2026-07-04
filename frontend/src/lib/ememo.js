@@ -20,6 +20,9 @@ export const ememoApi = {
   getDocument: (id) => api(`/documents/${id}`),
   nextNumber: (projectId, docCode) =>
     api(`/documents/next-number${qs({ projectId, docCode })}`),
+  // companies (for the create-form brand picker) — active only
+  listCompanies: () => api('/documents/companies'),
+  companyLogoUrl: (companyId) => apiBlobUrl(`/documents/companies/${companyId}/logo`),
   createDocument: (body) => api('/documents', { method: 'POST', body }),
   combineDocument: (id) => api(`/documents/${id}/combine`, { method: 'POST' }),
   postMessage: (id, body) => api(`/documents/${id}/messages`, { method: 'POST', body: { body } }),
@@ -103,6 +106,14 @@ export const adminApi = {
   createDocType: (body) => api('/admin/document-types', { method: 'POST', body }),
   updateDocType: (id, body) => api(`/admin/document-types/${id}`, { method: 'PATCH', body }),
   deleteDocType: (id) => api(`/admin/document-types/${id}`, { method: 'DELETE' }),
+
+  // companies (บริษัท / ตรา — selectable letterhead identity)
+  listCompanies: () => api('/admin/companies'),
+  createCompany: (body) => api('/admin/companies', { method: 'POST', body }),
+  updateCompany: (id, body) => api(`/admin/companies/${id}`, { method: 'PATCH', body }),
+  deleteCompany: (id) => api(`/admin/companies/${id}`, { method: 'DELETE' }),
+  uploadCompanyLogo: (file) => apiUpload('/admin/companies/logo', file),
+  companyLogoBlobUrl: (id) => apiBlobUrl(`/documents/companies/${id}/logo`),
 
   // letterhead
   getLetterhead: (projectId) => api(`/admin/projects/${projectId}/letterhead`),

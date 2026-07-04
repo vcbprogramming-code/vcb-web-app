@@ -157,6 +157,32 @@ router.get(
   })
 );
 
+/** GET /api/documents/companies — active companies for the create-form picker. */
+router.get(
+  '/companies',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `select id, name, name_en, address, phone, telex, fax, logo_url, is_default
+         from companies where is_active = true order by is_default desc, sort_order, name`
+    );
+    res.json({ data: rows });
+  })
+);
+
+/** GET /api/documents/companies/:id/logo — stream a company's logo image. */
+router.get(
+  '/companies/:id/logo',
+  asyncHandler(async (req, res) => {
+    const c = await queryOne('select logo_url from companies where id = $1', [req.params.id]);
+    if (!c?.logo_url) throw new ApiError(404, 'ไม่มีโลโก้');
+    const obj = await openDownloadStream(c.logo_url);
+    if (!obj) throw new ApiError(404, 'ไม่พบไฟล์โลโก้');
+    res.setHeader('Content-Type', obj.contentType || 'image/png');
+    obj.stream.on('error', () => res.destroy());
+    obj.stream.pipe(res);
+  })
+);
+
 router.get(
   '/next-number',
   asyncHandler(async (req, res) => {
@@ -328,6 +354,7 @@ router.post(
 
 const createSchema = z.object({
   projectId: z.string().uuid(),
+  companyId: z.string().uuid().optional().nullable(),
   docCode: z.string().min(1).max(10),
   subject: z.string().min(1),
   recipient: z.string().optional(),
@@ -360,12 +387,12 @@ router.post(
       const { runNo, docNumber, department } = await allocateDocNumber(client, { project, docCode: input.docCode });
       const { rows } = await client.query(
         `insert into documents
-           (project_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
+           (project_id, company_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
             recipient, reference, cc_recipients, signer_name, signer_title, author_signature_url,
             body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,coalesce($16::date,current_date),$17,$18::jsonb,'manual','pending',$19)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,coalesce($17::date,current_date),$18,$19::jsonb,'manual','pending',$20)
          returning id, doc_number, run_no, department, status, date_received`,
-        [project.id, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
+        [project.id, input.companyId || null, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
          input.recipient || null, input.reference || null, input.cc || null,
          input.signerName || null, input.signerTitle || null, input.authorSignatureUrl || null,
          input.body || null, input.remarks || null,

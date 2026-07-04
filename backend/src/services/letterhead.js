@@ -45,98 +45,113 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     const right = pdf.page.width - pdf.page.margins.right;
     const contentW = right - left;
 
+    const INK = '#1a1a1a';
+    const MUTED = '#5b6472';
+    const RULE = '#1f2a44';
+
     // ---- Header: logo + company name (left) | contact block (right) ----
     const headerTop = pdf.y;
+    // logo can be a Buffer (fetched from S3 by pdfDoc.js), else the bundled asset
+    const logoSource = Buffer.isBuffer(letter.logoBuffer)
+      ? letter.logoBuffer
+      : (existsSync(LOGO_PATH) ? LOGO_PATH : null);
     let textX = left;
-    if (letter.logoUrl && existsSync(letter.logoUrl)) {
+    if (logoSource) {
       try {
-        pdf.image(letter.logoUrl, left, headerTop, { width: 64, height: 64 });
-        textX = left + 76;
+        pdf.image(logoSource, left, headerTop, { fit: [58, 58], align: 'center', valign: 'center' });
+        textX = left + 70;
       } catch { /* ignore bad logo */ }
-    } else if (existsSync(LOGO_PATH)) {
-      try {
-        pdf.image(LOGO_PATH, left, headerTop, { width: 64, height: 64 });
-        textX = left + 76;
-      } catch { /* ignore */ }
     }
 
     // contact block (right) — drawn first so we know its width
-    const contactW = 175;
+    const contactW = 172;
     const contactX = right - contactW;
-    pdf.font('th').fontSize(8.5).fillColor('#333');
+    pdf.font('th').fontSize(8.5).fillColor(MUTED);
     const contactLines = [
-      ['โทรศัพท์', letter.phone],
-      ['เทเล็กซ์', letter.telex],
+      ['โทร.', letter.phone],
       ['โทรสาร', letter.fax],
+      ['เทเล็กซ์', letter.telex],
     ].filter(([, v]) => v);
-    let cy = headerTop;
+    let cy = headerTop + 2;
     for (const [label, val] of contactLines) {
-      pdf.text(`${label} :`, contactX, cy, { width: 58, continued: false });
-      pdf.text(String(val), contactX + 62, cy, { width: contactW - 62 });
-      cy += 16;
+      pdf.text(`${label}`, contactX, cy, { width: 44, continued: false });
+      pdf.text(String(val), contactX + 46, cy, { width: contactW - 46 });
+      cy += 14;
     }
 
-    // company name (between logo and contact block) — keep on a single line
-    const nameW = contactX - textX - 10;
-    pdf.font('th-bold').fontSize(16).fillColor('#000')
-      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 8, { width: nameW, lineBreak: false });
+    // company name (between logo and contact block)
+    const nameW = contactX - textX - 12;
+    pdf.font('th-bold').fontSize(16).fillColor(INK)
+      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 4, { width: nameW, lineBreak: false });
     if (letter.companyNameEn) {
-      pdf.font('th-bold').fontSize(13).fillColor('#000')
-        .text(letter.companyNameEn, textX, pdf.y, { width: nameW, lineBreak: false });
+      pdf.font('th').fontSize(10.5).fillColor(MUTED)
+        .text(letter.companyNameEn, textX, pdf.y + 1, { width: nameW, lineBreak: false });
     }
-    // move below the tallest of: logo(64), company name block, contact block
-    pdf.y = Math.max(headerTop + 70, pdf.y + 6, cy + 4);
-    pdf.moveDown(0.3);
+    if (letter.address) {
+      pdf.font('th').fontSize(8.5).fillColor(MUTED)
+        .text(letter.address, textX, pdf.y + 2, { width: nameW });
+    }
+
+    // move below the tallest of: logo, company name block, contact block
+    const headerBottom = Math.max(headerTop + 62, pdf.y + 4, cy + 2);
+    // double rule under the masthead — the classic official-letter look
+    pdf.moveTo(left, headerBottom).lineTo(right, headerBottom).lineWidth(1.4).strokeColor(RULE).stroke();
+    pdf.moveTo(left, headerBottom + 2.6).lineTo(right, headerBottom + 2.6).lineWidth(0.5).strokeColor(RULE).stroke();
+    pdf.y = headerBottom + 14;
 
     // ---- บันทึกข้อความ — centered title ----
-    pdf.font('th-bold').fontSize(20).fillColor('#000')
-      .text('บันทึกข้อความ', left, pdf.y, { width: contentW, align: 'center' });
-    pdf.moveDown(0.8);
+    pdf.font('th-bold').fontSize(22).fillColor(INK)
+      .text('บันทึกข้อความ', left, pdf.y, { width: contentW, align: 'center', characterSpacing: 1 });
+    pdf.moveDown(0.7);
 
-    // ---- "ที่ <doc_number>" + date (right) ----
-    pdf.font('th').fontSize(13.5).fillColor('#000');
-    const rowY = pdf.y;
-    pdf.text(`เอกสารเลขที่   ${doc.doc_number}`, left, rowY);
+    // ---- meta row: เลขที่เอกสาร (left) · วันที่ (right) ----
+    pdf.font('th').fontSize(13).fillColor(INK);
+    const metaY = pdf.y;
+    pdf.font('th-bold').text('เลขที่', left, metaY, { continued: true })
+      .font('th').text(`  ${doc.doc_number}`);
+    pdf.font('th-bold').text('วันที่', left + contentW * 0.55, metaY, { width: contentW * 0.45, continued: true })
+      .font('th').text(`  ${thaiLongDate(doc.date_received)}`, { width: contentW * 0.45 });
+    pdf.y = Math.max(pdf.y, metaY + pdf.currentLineHeight());
+    pdf.moveDown(0.5);
+
+    // thin separator between the meta block and the subject/body
+    pdf.moveTo(left, pdf.y).lineTo(right, pdf.y).lineWidth(0.5).strokeColor('#c8ced9').stroke();
     pdf.moveDown(0.6);
-    pdf.text(thaiLongDate(doc.date_received), left, pdf.y, { width: contentW, align: 'center' });
-    pdf.moveDown(0.8);
 
-    // ---- เรื่อง / เรียน ----
-    const labelGap = 52;
-    pdf.font('th').fontSize(13.5);
-    pdf.text('เรื่อง', left, pdf.y, { continued: false });
-    pdf.text(doc.subject || '', left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
-    pdf.moveDown(0.4);
-
-    const recipient = doc.recipient || letter.defaultRecipient;
-    if (recipient) {
-      pdf.text('เรียน', left, pdf.y);
-      pdf.text(recipient, left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
-      pdf.moveDown(0.4);
-    }
-
-    // ---- อ้างถึง (reference) ----
-    if (doc.reference) {
-      pdf.text('อ้างถึง', left, pdf.y);
-      pdf.text(doc.reference, left + labelGap, pdf.y - pdf.currentLineHeight(), { width: contentW - labelGap });
-      pdf.moveDown(0.4);
-    }
+    // ---- เรื่อง / เรียน / อ้างถึง — aligned label column ----
+    const labelW = 58;
+    const valueX = left + labelW;
+    const valueW = contentW - labelW;
+    const fieldRow = (label, value) => {
+      if (!value) return;
+      const y = pdf.y;
+      pdf.font('th-bold').fontSize(13.5).fillColor(INK).text(label, left, y, { width: labelW });
+      pdf.font('th').fontSize(13.5).fillColor(INK).text(value, valueX, y, { width: valueW });
+      pdf.y = Math.max(pdf.y, y + pdf.currentLineHeight());
+      pdf.moveDown(0.35);
+    };
+    fieldRow('เรื่อง', doc.subject || '');
+    fieldRow('เรียน', doc.recipient || letter.defaultRecipient);
+    fieldRow('อ้างถึง', doc.reference);
 
     // ---- สิ่งที่ส่งมาด้วย (enclosures) ----
     const encl = Array.isArray(doc.enclosures) ? doc.enclosures : [];
     if (encl.length) {
-      pdf.text('สิ่งที่ส่งมาด้วย', left, pdf.y);
-      let ey = pdf.y - pdf.currentLineHeight();
+      const y0 = pdf.y;
+      pdf.font('th-bold').fontSize(13.5).fillColor(INK).text('สิ่งที่ส่งมาด้วย', left, y0, { width: labelW + 60 });
+      let ey = y0;
+      pdf.font('th').fontSize(13);
       encl.forEach((e, i) => {
-        const name = `${i + 1}.${e.name || ''}`;
+        const name = `${i + 1}. ${e.name || ''}`;
         const qty = e.qty != null ? `จำนวน  ${e.qty}  ${e.unit || 'ชุด'}` : '';
-        pdf.text(name, left + 110, ey, { width: 220, continued: false });
-        if (qty) pdf.text(qty, left + 340, ey, { width: contentW - 340 - left + left });
-        ey += pdf.currentLineHeight() + 4;
+        pdf.fillColor(INK).text(name, valueX + 60, ey, { width: valueW - 200, continued: false });
+        if (qty) pdf.text(qty, right - 150, ey, { width: 150, align: 'right' });
+        ey = pdf.y + 3;
       });
-      pdf.y = ey;
+      pdf.y = Math.max(pdf.y, ey);
+      pdf.moveDown(0.35);
     }
-    pdf.moveDown(1);
+    pdf.moveDown(0.9);
 
     // ---- Body (auto-paginates onto extra pages when long) ----
     if (doc.body) {

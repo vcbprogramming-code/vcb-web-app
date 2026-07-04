@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { query, queryOne } from '../config/db.js';
+import crypto from 'node:crypto';
+import multer from 'multer';
+import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { hashPassword } from '../utils/auth.js';
 import { PERMISSION_CATALOG, effectivePermissions } from '../config/permissions.js';
+import { putObject } from '../config/storage.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
 
 // Everything here is admin-only.
 const router = Router();
@@ -202,6 +207,114 @@ router.put(
     );
     if (!row) throw new ApiError(404, 'User not found');
     res.json({ data: { overrides: row.permissions, effective: effectivePermissions(row) } });
+  })
+);
+
+// ===========================================================================
+// Config: Companies (บริษัท / ตรา) — selectable letterhead identity
+// ===========================================================================
+
+/** GET /api/admin/companies — all companies (default first). */
+router.get(
+  '/companies',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `select id, name, name_en, address, phone, telex, fax, logo_url, is_default, is_active, sort_order
+         from companies order by is_default desc, sort_order, name`
+    );
+    res.json({ data: rows });
+  })
+);
+
+const companySchema = z.object({
+  name: z.string().trim().min(1),
+  nameEn: z.string().trim().optional().nullable(),
+  address: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  telex: z.string().optional().nullable(),
+  fax: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  isDefault: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+/** POST /api/admin/companies/logo — upload a logo image, returns { key }. */
+router.post(
+  '/companies/logo',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+      throw new ApiError(400, 'โลโก้ต้องเป็นไฟล์รูปภาพ');
+    }
+    const key = `companies/logo/${crypto.randomUUID()}`;
+    await putObject(key, req.file.buffer, req.file.mimetype);
+    res.status(201).json({ data: { key } });
+  })
+);
+
+/** POST /api/admin/companies — create a company. */
+router.post(
+  '/companies',
+  asyncHandler(async (req, res) => {
+    const parsed = companySchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const f = parsed.data;
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      if (f.isDefault) await client.query('update companies set is_default = false where is_default = true');
+      const { rows } = await client.query(
+        `insert into companies (name, name_en, address, phone, telex, fax, logo_url, is_default, sort_order)
+         values ($1,$2,$3,$4,$5,$6,$7,coalesce($8,false),coalesce($9,0))
+         returning *`,
+        [f.name, f.nameEn || null, f.address || null, f.phone || null, f.telex || null, f.fax || null,
+         f.logoUrl || null, f.isDefault || false, f.sortOrder]
+      );
+      await client.query('commit');
+      res.status(201).json({ data: rows[0] });
+    } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
+  })
+);
+
+/** PATCH /api/admin/companies/:id — update. */
+router.patch(
+  '/companies/:id',
+  asyncHandler(async (req, res) => {
+    const parsed = companySchema.partial().safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const f = parsed.data;
+    const map = { name: 'name', nameEn: 'name_en', address: 'address', phone: 'phone', telex: 'telex', fax: 'fax', logoUrl: 'logo_url', isDefault: 'is_default', isActive: 'is_active', sortOrder: 'sort_order' };
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      if (f.isDefault === true) await client.query('update companies set is_default = false where is_default = true and id <> $1', [req.params.id]);
+      const sets = []; const vals = [];
+      for (const [k, col] of Object.entries(map)) {
+        if (f[k] !== undefined) { vals.push(f[k]); sets.push(`${col} = $${vals.length}`); }
+      }
+      if (!sets.length) { await client.query('rollback'); throw new ApiError(400, 'No fields to update'); }
+      vals.push(req.params.id);
+      const { rows } = await client.query(`update companies set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
+      if (!rows[0]) { await client.query('rollback'); throw new ApiError(404, 'Company not found'); }
+      await client.query('commit');
+      res.json({ data: rows[0] });
+    } catch (e) { if (!(e instanceof ApiError)) await client.query('rollback').catch(() => {}); throw e; } finally { client.release(); }
+  })
+);
+
+/** DELETE /api/admin/companies/:id — remove (blocked if it's the default or in use). */
+router.delete(
+  '/companies/:id',
+  asyncHandler(async (req, res) => {
+    const c = await queryOne('select is_default from companies where id = $1', [req.params.id]);
+    if (!c) throw new ApiError(404, 'Company not found');
+    if (c.is_default) throw new ApiError(409, 'ลบบริษัทหลัก (ค่าเริ่มต้น) ไม่ได้ — ตั้งบริษัทอื่นเป็นค่าเริ่มต้นก่อน');
+    const used = await queryOne('select count(*)::int as n from documents where company_id = $1', [req.params.id]);
+    if (used && used.n > 0) throw new ApiError(409, `ลบไม่ได้ — มีเอกสาร ${used.n} ฉบับใช้บริษัทนี้อยู่`);
+    await query('delete from companies where id = $1', [req.params.id]);
+    res.json({ data: { deleted: true } });
   })
 );
 

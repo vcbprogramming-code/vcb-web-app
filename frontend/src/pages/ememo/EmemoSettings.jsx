@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProjectsTab from '../admin/ProjectsTab.jsx';
+import CompaniesTab from '../admin/CompaniesTab.jsx';
 import DocTypesTab from '../admin/DocTypesTab.jsx';
 import DocCodeApproversTab from '../admin/DocCodeApproversTab.jsx';
 import { PageHeader } from '../../components/ui/index.js';
@@ -11,6 +12,7 @@ import Icon from '../../components/Icon.jsx';
 // each project (โครงการ tab). Users + Permissions stay central (admin page).
 const TABS = [
   { key: 'projects', label: 'โครงการ', Comp: ProjectsTab },
+  { key: 'companies', label: 'บริษัท / ตรา', Comp: CompaniesTab },
   { key: 'doctypes', label: 'ประเภทเอกสาร', Comp: DocTypesTab },
   { key: 'approvers', label: 'ผู้อนุมัติตามรหัส', Comp: DocCodeApproversTab },
 ];

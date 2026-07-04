@@ -24,7 +24,33 @@ async function loadDocAndLetter(documentId) {
     'select * from project_letterhead where project_id = $1',
     [doc.project_id]
   );
-  return { doc, letter: toCamelLetter(row) };
+  const letter = toCamelLetter(row);
+
+  // Company identity (name/logo/contact) overrides the project letterhead. Use
+  // the company chosen for this doc, else the default company. Signatory/closing
+  // defaults still come from the project letterhead.
+  const company = await queryOne(
+    doc.company_id
+      ? 'select * from companies where id = $1'
+      : 'select * from companies where is_default = true limit 1',
+    doc.company_id ? [doc.company_id] : []
+  );
+  if (company) {
+    letter.companyName = company.name || letter.companyName;
+    letter.companyNameEn = company.name_en || letter.companyNameEn;
+    letter.address = company.address || letter.address;
+    letter.logoUrl = company.logo_url || letter.logoUrl;
+    letter.phone = company.phone || letter.phone;
+    letter.telex = company.telex || letter.telex;
+    letter.fax = company.fax || letter.fax;
+  }
+
+  // The logo is an S3 key (companies) — fetch its bytes so the PDF generator can
+  // embed it (pdfkit can't read from S3). Falls back to the bundled asset logo.
+  if (letter.logoUrl) {
+    letter.logoBuffer = await getObjectBuffer(letter.logoUrl).catch(() => null);
+  }
+  return { doc, letter };
 }
 
 /**

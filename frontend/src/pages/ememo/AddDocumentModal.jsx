@@ -8,6 +8,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const { profile, user } = useAuth();
   const authorName = profile?.full_name || user?.email || '';
   const [projectId, setProjectId] = useState('');
+  const [companyId, setCompanyId] = useState('');
+  const [companies, setCompanies] = useState([]);
   const [docCode, setDocCode] = useState('');
   const [docCodes, setDocCodes] = useState([]);
   const [docTypeId, setDocTypeId] = useState('');
@@ -50,6 +52,18 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // load the configured doc-code → department options once
   useEffect(() => {
     ememoApi.listDocCodes().then((r) => setDocCodes(r.data)).catch(() => setDocCodes([]));
+  }, []);
+
+  // load companies (บริษัท/ตรา) and pre-select the default (main company)
+  useEffect(() => {
+    ememoApi.listCompanies()
+      .then((r) => {
+        const list = r.data || [];
+        setCompanies(list);
+        const def = list.find((c) => c.is_default) || list[0];
+        if (def) setCompanyId((cur) => cur || def.id);
+      })
+      .catch(() => setCompanies([]));
   }, []);
 
   // load the project's letterhead so the live A4 preview renders the real header
@@ -155,6 +169,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         }
         const res = await ememoApi.createDocument({
           projectId,
+          companyId: companyId || undefined,
           docCode,
           subject: subject.trim(),
           recipient: recipient.trim() || undefined,
@@ -217,6 +232,21 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     signature_image_url: sigMode === 'image' ? sigPreviewUrl : null,
   };
 
+  // the selected company overrides the letterhead identity (name/logo/contact),
+  // so the live preview matches what the generated PDF will show.
+  const company = companies.find((c) => c.id === companyId) || null;
+  const previewLetter = company
+    ? {
+      ...letter,
+      company_name: company.name || letter.company_name,
+      company_name_en: company.name_en || letter.company_name_en,
+      address: company.address || letter.address,
+      phone: company.phone || letter.phone,
+      telex: company.telex || letter.telex,
+      fax: company.fax || letter.fax,
+    }
+    : letter;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
@@ -250,6 +280,16 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
         <form onSubmit={submit} className="space-y-4 overflow-auto p-6">
           {step === 1 && (<>
+          {companies.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">บริษัท / ตราหัวจดหมาย</label>
+              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ <span className="text-red-500">*</span></label>
@@ -511,18 +551,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
             <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ
           </div>
-          {/* warn when the chosen project has no company name — the header falls
-              back to the default, which is wrong for JV/other-company projects */}
-          {projectId && !letter?.company_name && (
-            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-              <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                โครงการนี้ยังไม่ได้ตั้งชื่อบริษัทบนหัวจดหมาย — ระบบจะใช้ชื่อเริ่มต้น
-                ตั้งได้ที่ <b>ตั้งค่า E-Memo → โครงการ → แก้ไข</b>
-              </span>
-            </div>
-          )}
-          <LetterheadPreview letter={letter} doc={previewDoc} />
+          <LetterheadPreview letter={previewLetter} doc={previewDoc} company={company} />
         </div>
         </div>
       </div>

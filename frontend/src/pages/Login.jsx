@@ -141,7 +141,6 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
-              placeholder="you@vcb.local"
             />
           </div>
           <div>

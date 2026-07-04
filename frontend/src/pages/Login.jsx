@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
+import GlowOrb from '../components/GlowOrb.jsx';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -69,11 +70,11 @@ export default function Login() {
           },
         });
         window.google.accounts.id.renderButton(googleBtnRef.current, {
-          theme: 'outline',
+          theme: 'filled_black',
           size: 'large',
-          width: 340,
+          width: 320,
           text: 'signin_with',
-          shape: 'rectangular',
+          shape: 'pill',
           logo_alignment: 'left',
         });
       })
@@ -101,18 +102,41 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-brand to-brand-light p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white">
-            <Icon name="layers" className="h-7 w-7" />
+    <div className="cyber-bg relative flex min-h-full w-full items-center justify-center overflow-hidden p-4">
+      {/* perspective grid backdrop */}
+      <div className="pointer-events-none absolute inset-0 cyber-grid opacity-70" />
+
+      {/* two-pane composition: brand + orb (left) · card (right) */}
+      <div className="relative grid w-full max-w-5xl items-center gap-8 lg:grid-cols-2">
+        {/* left brand pane (hidden on small screens) */}
+        <div className="relative hidden flex-col items-center justify-center lg:flex">
+          <GlowOrb size={420} className="animate-float-slow" />
+          <div className="mt-4 text-center">
+            <h2 className="cyber-title text-3xl font-extrabold text-white">
+              VCB <span className="text-cyan-300 drop-shadow-[0_0_18px_rgba(34,211,238,0.5)]">CONNECT</span>
+            </h2>
+            <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">Internal Intranet Portal</p>
           </div>
-          <h1 className="text-xl font-bold text-brand">ระบบงานภายใน</h1>
-          <p className="mt-1 text-sm text-slate-500">วิจิตรภัณฑ์ก่อสร้าง</p>
+        </div>
+
+        {/* login card */}
+        <div className="cyber-panel relative mx-auto w-full max-w-md p-8">
+        {/* corner accents */}
+        <span className="pointer-events-none absolute left-3 top-3 h-4 w-4 border-l border-t border-cyan-300/40" />
+        <span className="pointer-events-none absolute bottom-3 right-3 h-4 w-4 border-b border-r border-cyan-300/40" />
+
+        <div className="mb-7 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/25 to-blue-500/15 text-cyan-200 ring-1 ring-inset ring-cyan-300/40 shadow-[0_0_30px_-6px_rgba(34,211,238,0.6)]">
+            <Icon name="layers" className="h-8 w-8" />
+          </div>
+          <h1 className="cyber-title text-2xl font-extrabold tracking-wide text-white">
+            VCB <span className="text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.5)]">CONNECT</span>
+          </h1>
+          <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {error}
           </div>
         )}
@@ -120,23 +144,23 @@ export default function Login() {
         {/* Sign in with Google (shown only when configured on the backend) */}
         {googleClientId && (
           <>
-            <div className="flex justify-center">
+            <div className="flex justify-center [color-scheme:dark]">
               <div ref={googleBtnRef} />
             </div>
-            <div className="my-5 flex items-center gap-3 text-xs text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" /> หรือ <span className="h-px flex-1 bg-slate-200" />
+            <div className="my-5 flex items-center gap-3">
+              <span className="h-px flex-1 bg-cyan-300/15" />
+              <span className="cyber-label text-[10px] text-cyan-200/40">หรือ</span>
+              <span className="h-px flex-1 bg-cyan-300/15" />
             </div>
           </>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              อีเมล
-            </label>
+            <label className="cyber-label mb-1.5 block text-[10px] text-cyan-200/70">อีเมล</label>
             <input
               type="email"
-              className="input"
+              className="cyber-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -144,24 +168,23 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              รหัสผ่าน
-            </label>
+            <label className="cyber-label mb-1.5 block text-[10px] text-cyan-200/70">รหัสผ่าน</label>
             <input
               type="password"
-              className="input"
+              className="cyber-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
             />
-            <p className="mt-1 text-xs text-slate-400">บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)</p>
+            <p className="mt-1.5 text-xs text-slate-500">บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)</p>
           </div>
 
-          <button type="submit" className="btn-primary w-full" disabled={submitting}>
+          <button type="submit" className="cyber-btn w-full" disabled={submitting}>
             {submitting ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบด้วยอีเมล'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );

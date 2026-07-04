@@ -6,7 +6,7 @@
   html,
   body,
   #root {
-    @apply h-full;
+    @apply h-full w-full;
   }
   body {
     @apply bg-slate-50 text-slate-800 antialiased;
@@ -62,5 +62,61 @@
   /* badges / chips */
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+}
+
+/* =========================================================================
+   Futuristic theme — used ONLY on the Portal + Login (dark sci-fi surfaces).
+   Scoped utility classes so the rest of the app keeps its light theme.
+   ========================================================================= */
+@layer components {
+  /* deep-space page background with layered nebula glows */
+  .cyber-bg {
+    background-color: #060b18;
+    background-image:
+      radial-gradient(ellipse 60% 50% at 78% 12%, rgba(34, 211, 238, 0.16), transparent 60%),
+      radial-gradient(ellipse 50% 45% at 12% 88%, rgba(59, 130, 246, 0.18), transparent 60%),
+      radial-gradient(ellipse 80% 60% at 50% 120%, rgba(14, 165, 233, 0.1), transparent 70%);
+  }
+  /* perspective grid floor (put inside a relatively-positioned parent) */
+  .cyber-grid {
+    background-image:
+      linear-gradient(to right, rgba(103, 232, 249, 0.16) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(103, 232, 249, 0.16) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 90% at 50% 0%, black 35%, transparent 72%);
+    mask-image: radial-gradient(ellipse 75% 90% at 50% 0%, black 35%, transparent 72%);
+  }
+  /* glass panel — translucent card with a soft cyan edge */
+  .cyber-panel {
+    @apply rounded-2xl border border-cyan-300/15 bg-white/[0.04] backdrop-blur-xl;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 20px 60px -20px rgba(3, 10, 26, 0.9);
+  }
+  /* HUD pill badge with a clipped (angular) corner */
+  .cyber-badge {
+    @apply inline-flex items-center gap-1.5 border border-cyan-300/25 bg-cyan-400/[0.06] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  /* display heading — tech font, cyan glow */
+  .cyber-title {
+    font-family: 'Orbitron', 'Noto Sans Thai', sans-serif;
+    letter-spacing: 0.02em;
+  }
+  /* small tech label (Rajdhani, spaced caps) */
+  .cyber-label {
+    font-family: 'Rajdhani', 'Noto Sans Thai', sans-serif;
+    @apply uppercase tracking-[0.25em];
+  }
+  /* cyan primary button */
+  .cyber-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300/40 bg-gradient-to-r from-cyan-400/90 to-blue-500/90 px-4 py-2.5 text-sm font-semibold text-slate-900 transition;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.15), 0 8px 24px -8px rgba(34, 211, 238, 0.6);
+  }
+  .cyber-btn:hover {
+    @apply from-cyan-300 to-blue-400;
+  }
+  /* cyber input on dark glass */
+  .cyber-input {
+    @apply w-full rounded-xl border border-cyan-300/20 bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/20;
   }
 }

@@ -207,9 +207,9 @@ export default function DocumentDetail() {
         </div>
       )}
 
-      {/* header card — title (left) · actions + document meta (right), one row */}
+      {/* header card — title (left) · meta (middle) · actions (right), all top-aligned */}
       <div className={`card ${myApproval.canApprove ? 'ring-2 ring-brand/20' : ''}`}>
-        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
           {/* LEFT: identity */}
           <div className="min-w-[240px]">
             <div className="mb-1 flex items-center gap-2">
@@ -220,58 +220,55 @@ export default function DocumentDetail() {
             <p className="text-slate-600">{doc.subject}</p>
           </div>
 
-          {/* RIGHT: actions on top, document meta filling the space below them */}
-          <div className="flex flex-1 flex-col items-end gap-3">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
-              {myApproval.canApprove && (
-                <>
-                  <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
-                    <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
-                  </button>
-                  <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-                    <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
-                  </button>
-                  <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
-                    <Icon name="check" className="h-5 w-5" /> อนุมัติ
-                  </button>
-                </>
-              )}
+          {/* MIDDLE: document meta — always level with the title (independent of actions) */}
+          <div className="grid min-w-[240px] flex-1 grid-cols-1 gap-x-6 gap-y-1.5 pt-0.5 text-sm sm:grid-cols-2">
+            <MetaItem icon="calendar" label="วันที่รับ">{formatThaiDate(doc.date_received)}</MetaItem>
+            <MetaItem icon="building" label="แผนก">{doc.department}</MetaItem>
+            {doc.recipient && <MetaItem icon="inbox" label="เรียน">{doc.recipient}</MetaItem>}
+            {doc.doc_type_name && <MetaItem icon="layers" label="ประเภท">{doc.doc_type_name}</MetaItem>}
+            {doc.reference && <MetaItem icon="file" label="อ้างถึง">{doc.reference}</MetaItem>}
+            {doc.cc_recipients && <MetaItem icon="people" label="สำเนาเรียน">{doc.cc_recipients}</MetaItem>}
+            {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
+              <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">
+                {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
+              </MetaItem>
+            )}
+            {doc.remarks && <MetaItem icon="edit" label="หมายเหตุ" className="sm:col-span-2">{doc.remarks}</MetaItem>}
+          </div>
 
-              {/* OWNER/ADMIN actions — scoped to status */}
-              {canManage && notSubmitted && (
-                <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
-                  <Icon name="edit" className="h-4 w-4" /> แก้ไข
+          {/* RIGHT: actions (only when there are any, so the row doesn't get skewed) */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
+            {myApproval.canApprove && (
+              <>
+                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
+                  <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
                 </button>
-              )}
-              {canManage && (notSubmitted || isPending) && (
-                <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
-                  <Icon name="x" className="h-4 w-4" /> ยกเลิก
+                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+                  <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
                 </button>
-              )}
-              {canManage && notSubmitted && (
-                <button onClick={() => setShowSubmit(true)} className="btn-primary">
-                  <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                  <Icon name="check" className="h-5 w-5" /> อนุมัติ
                 </button>
-              )}
-            </div>
+              </>
+            )}
 
-            {/* document meta — relocated from the old "ข้อมูลเอกสาร" card, fills the
-                right-hand space instead of adding a new full-width row */}
-            <div className="grid w-full grid-cols-1 gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
-              <MetaItem icon="calendar" label="วันที่รับ">{formatThaiDate(doc.date_received)}</MetaItem>
-              <MetaItem icon="building" label="แผนก">{doc.department}</MetaItem>
-              {doc.recipient && <MetaItem icon="inbox" label="เรียน">{doc.recipient}</MetaItem>}
-              {doc.doc_type_name && <MetaItem icon="layers" label="ประเภท">{doc.doc_type_name}</MetaItem>}
-              {doc.reference && <MetaItem icon="file" label="อ้างถึง">{doc.reference}</MetaItem>}
-              {doc.cc_recipients && <MetaItem icon="people" label="สำเนาเรียน">{doc.cc_recipients}</MetaItem>}
-              {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
-                <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">
-                  {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
-                </MetaItem>
-              )}
-              {doc.remarks && <MetaItem icon="edit" label="หมายเหตุ" className="sm:col-span-2">{doc.remarks}</MetaItem>}
-            </div>
+            {/* OWNER/ADMIN actions — scoped to status */}
+            {canManage && notSubmitted && (
+              <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
+                <Icon name="edit" className="h-4 w-4" /> แก้ไข
+              </button>
+            )}
+            {canManage && (notSubmitted || isPending) && (
+              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
+                <Icon name="x" className="h-4 w-4" /> ยกเลิก
+              </button>
+            )}
+            {canManage && notSubmitted && (
+              <button onClick={() => setShowSubmit(true)} className="btn-primary">
+                <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ const META = {
     label: 'ความเห็นเพิ่มเติม (ไม่บังคับ)',
     confirm: 'ยืนยันการอนุมัติ',
     required: false,
-    btn: 'bg-emerald-600 hover:bg-emerald-500 text-white',
+    btn: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     icon: 'check', iconBg: 'bg-emerald-50 text-emerald-600',
   },
   returned: {
@@ -24,8 +24,8 @@ const META = {
     label: 'เหตุผล / สิ่งที่ต้องแก้ไข',
     confirm: 'ยืนยันส่งกลับแก้ไข',
     required: true,
-    btn: 'bg-orange-500 hover:bg-orange-400 text-white',
-    icon: 'undo', iconBg: 'bg-orange-50 text-orange-600',
+    btn: 'bg-amber-500 hover:bg-amber-600 text-white',
+    icon: 'undo', iconBg: 'bg-amber-50 text-amber-600',
   },
   rejected: {
     title: 'ไม่อนุมัติเอกสาร',
@@ -33,7 +33,7 @@ const META = {
     label: 'เหตุผลที่ไม่อนุมัติ',
     confirm: 'ยืนยันไม่อนุมัติ',
     required: true,
-    btn: 'bg-red-600 hover:bg-red-500 text-white',
+    btn: 'bg-red-600 hover:bg-red-700 text-white',
     icon: 'x', iconBg: 'bg-red-50 text-red-600',
   },
 };

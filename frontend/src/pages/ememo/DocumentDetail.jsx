@@ -169,16 +169,16 @@ export default function DocumentDetail() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* APPROVER actions — click opens a confirm/reason modal */}
+            {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
             {myApproval.canApprove && (
               <>
-                <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-medium text-orange-600 transition hover:bg-orange-50">
+                <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
                   <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
                 </button>
-                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
+                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
                   <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
                 </button>
-                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500">
+                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
                   <Icon name="check" className="h-5 w-5" /> อนุมัติ
                 </button>
               </>

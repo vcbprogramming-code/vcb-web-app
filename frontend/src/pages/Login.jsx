@@ -31,6 +31,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(null);
@@ -90,7 +91,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      await login(email);
+      await login(email, password);
       goDest();
     } catch (err) {
       setError(err.message || 'เข้าสู่ระบบไม่สำเร็จ');
@@ -142,7 +143,20 @@ export default function Login() {
               autoComplete="username"
               placeholder="you@vcb.local"
             />
-            <p className="mt-1 text-xs text-slate-400">กรอกอีเมลที่ลงทะเบียนไว้เพื่อเข้าสู่ระบบ</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              รหัสผ่าน
+            </label>
+            <input
+              type="password"
+              className="input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+            <p className="mt-1 text-xs text-slate-400">บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)</p>
           </div>
 
           <button type="submit" className="btn-primary w-full" disabled={submitting}>

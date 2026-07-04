@@ -23,7 +23,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `select p.id, p.full_name, p.email, p.role, p.unit_id, p.is_active,
-              p.created_at, u.name as unit_name
+              p.login_method, p.created_at, u.name as unit_name
          from profiles p
          left join units u on u.id = p.unit_id
         order by p.created_at`
@@ -35,9 +35,11 @@ router.get(
 const createUserSchema = z.object({
   fullName: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  // password only matters for email accounts; optional (email login is passwordless)
+  password: z.string().min(6).optional(),
   role: z.enum(ROLES),
   unitId: z.string().uuid().optional().nullable(),
+  loginMethod: z.enum(['email', 'google']).optional(),
 });
 
 /** POST /api/admin/users — create a login account. */
@@ -46,17 +48,23 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-    const { fullName, email, password, role, unitId } = parsed.data;
+    const { fullName, email, password, role, unitId, loginMethod = 'email' } = parsed.data;
+
+    // email accounts must have a password (standard email+password login);
+    // google accounts don't (they authenticate via Google).
+    if (loginMethod === 'email' && !password) {
+      throw new ApiError(400, 'บัญชีแบบอีเมลต้องตั้งรหัสผ่าน');
+    }
 
     const existing = await queryOne('select id from profiles where lower(email) = lower($1)', [email]);
     if (existing) throw new ApiError(409, 'อีเมลนี้ถูกใช้งานแล้ว');
 
-    const hash = await hashPassword(password);
+    const hash = password ? await hashPassword(password) : null;
     const row = await queryOne(
-      `insert into profiles (full_name, email, password_hash, role, unit_id, is_active)
-       values ($1,$2,$3,$4,$5,true)
-       returning id, full_name, email, role, unit_id, is_active`,
-      [fullName, email, hash, role, unitId || null]
+      `insert into profiles (full_name, email, password_hash, role, unit_id, is_active, login_method)
+       values ($1,$2,$3,$4,$5,true,$6)
+       returning id, full_name, email, role, unit_id, is_active, login_method`,
+      [fullName, email, hash, role, unitId || null, loginMethod]
     );
     res.status(201).json({ data: row });
   })
@@ -67,6 +75,7 @@ const updateUserSchema = z.object({
   role: z.enum(ROLES).optional(),
   unitId: z.string().uuid().optional().nullable(),
   isActive: z.boolean().optional(),
+  loginMethod: z.enum(['email', 'google']).optional(),
 });
 
 /** PATCH /api/admin/users/:id — update name/role/unit/active. */
@@ -89,12 +98,13 @@ router.patch(
     if (f.role !== undefined) add('role', f.role);
     if (f.unitId !== undefined) add('unit_id', f.unitId);
     if (f.isActive !== undefined) add('is_active', f.isActive);
+    if (f.loginMethod !== undefined) add('login_method', f.loginMethod);
     if (!sets.length) throw new ApiError(400, 'No fields to update');
 
     vals.push(req.params.id);
     const row = await queryOne(
       `update profiles set ${sets.join(', ')} where id = $${vals.length}
-       returning id, full_name, email, role, unit_id, is_active`,
+       returning id, full_name, email, role, unit_id, is_active, login_method`,
       vals
     );
     if (!row) throw new ApiError(404, 'User not found');

@@ -40,18 +40,15 @@ function loginResponse(profile) {
 
 const loginSchema = z.object({
   email: z.string().email(),
-  // passwordless login (client request, round 2 #1): password is optional. When
-  // supplied it is still verified (backwards compatible); when omitted, an active
-  // account with a known email is enough. Intended for the internal tool only.
-  password: z.string().min(1).optional(),
+  // email accounts log in with email + password (standard flow, 2026-07-04).
+  password: z.string().min(1),
 });
 
 /**
  * POST /api/auth/login
- * Looks up the email in profiles and returns a signed JWT. If a password is
- * provided it is verified against the stored bcrypt hash; if omitted, login
- * succeeds for any active account with that email (email-only / passwordless).
- * The frontend stores the access token and sends it as a Bearer.
+ * Standard email + password login for 'email'-type accounts. Verifies the
+ * password against the stored bcrypt hash and returns a signed JWT. 'google'-type
+ * accounts are rejected here (they must use Sign in with Google).
  */
 router.post(
   '/login',
@@ -63,20 +60,22 @@ router.post(
     const { email, password } = parsed.data;
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, password_hash, permissions
+      `select id, full_name, email, role, unit_id, is_active, password_hash, permissions, login_method
          from profiles where lower(email) = lower($1)`,
       [email]
     );
 
-    // Unknown email → generic error (don't reveal which emails exist).
+    // Same generic error for unknown email OR wrong password (don't leak which).
     if (!profile) {
-      throw new ApiError(401, 'ไม่พบบัญชีอีเมลนี้');
+      throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     }
-    // When a password is supplied, it must match (keeps password login working).
-    if (password) {
-      const ok = profile.password_hash && await verifyPassword(password, profile.password_hash);
-      if (!ok) throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    // google-type accounts must use "Sign in with Google", not the email box.
+    if (profile.login_method === 'google') {
+      throw new ApiError(403, 'บัญชีนี้ต้องเข้าสู่ระบบด้วย Google เท่านั้น');
     }
+    // password is required and must match.
+    const ok = profile.password_hash && await verifyPassword(password, profile.password_hash);
+    if (!ok) throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
 
     if (!profile.is_active) {
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
@@ -119,13 +118,17 @@ router.post(
     }
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, permissions
+      `select id, full_name, email, role, unit_id, is_active, permissions, login_method
          from profiles where lower(email) = lower($1)`,
       [payload.email]
     );
     // Only pre-provisioned emails may enter (client chose "เฉพาะอีเมลที่อยู่ในระบบ").
     if (!profile) {
       throw new ApiError(403, `บัญชี ${payload.email} ยังไม่ได้รับสิทธิ์ใช้งานระบบ — โปรดติดต่อผู้ดูแล`);
+    }
+    // email-type accounts must use the email login, not Google.
+    if (profile.login_method === 'email') {
+      throw new ApiError(403, 'บัญชีนี้ต้องเข้าสู่ระบบด้วยอีเมล ไม่ใช่ Google');
     }
     if (!profile.is_active) {
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');

@@ -14,8 +14,11 @@ function UserModal({ user, onClose, onSaved }) {
   const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(user?.role || 'hr');
+  const [loginMethod, setLoginMethod] = useState(user?.login_method || 'email');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  const isGoogle = loginMethod === 'google';
 
   const submit = async (e) => {
     e.preventDefault();
@@ -23,10 +26,20 @@ function UserModal({ user, onClose, onSaved }) {
     setBusy(true);
     try {
       if (editing) {
-        await adminApi.updateUser(user.id, { fullName, role });
-        if (password) await adminApi.resetPassword(user.id, password);
+        await adminApi.updateUser(user.id, { fullName, role, loginMethod });
+        // password only applies to email accounts
+        if (!isGoogle && password) await adminApi.resetPassword(user.id, password);
       } else {
-        await adminApi.createUser({ fullName, email, password, role });
+        // email accounts require a password (standard email+password login)
+        if (!isGoogle && !password) {
+          setError('บัญชีแบบอีเมลต้องตั้งรหัสผ่าน');
+          setBusy(false);
+          return;
+        }
+        await adminApi.createUser({
+          fullName, email, role, loginMethod,
+          password: isGoogle ? undefined : password,
+        });
       }
       onSaved();
     } catch (err) {
@@ -54,14 +67,37 @@ function UserModal({ user, onClose, onSaved }) {
             <label className="block text-sm font-medium text-slate-600 mb-1">อีเมล <span className="text-red-500">*</span></label>
             <input type="email" value={email} disabled={editing} onChange={(e) => setEmail(e.target.value)}
               className={`${field} ${editing ? 'bg-slate-50 text-slate-400' : ''}`} />
+            {isGoogle && !editing && <p className="mt-1 text-xs text-slate-400">ต้องเป็นอีเมล Google (Gmail/Workspace) ที่จะใช้ Sign in with Google</p>}
           </div>
+
+          {/* login method — how this account signs in */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">
-              {editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน *'}
-            </label>
-            <input type="text" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder={editing ? 'ไม่เปลี่ยน' : 'อย่างน้อย 6 ตัวอักษร'} className={field} />
+            <label className="block text-sm font-medium text-slate-600 mb-1">วิธีเข้าสู่ระบบ <span className="text-red-500">*</span></label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setLoginMethod('email')}
+                className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${loginMethod === 'email' ? 'border-brand bg-brand-tint text-brand' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                อีเมล
+              </button>
+              <button type="button" onClick={() => setLoginMethod('google')}
+                className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${loginMethod === 'google' ? 'border-brand bg-brand-tint text-brand' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                Google
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              {isGoogle ? 'บัญชีนี้จะเข้าได้เฉพาะปุ่ม “Sign in with Google” เท่านั้น' : 'บัญชีนี้จะเข้าด้วยการกรอกอีเมล (ไม่ใช้ Google)'}
+            </p>
           </div>
+
+          {/* password only for email accounts */}
+          {!isGoogle && (
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">
+                {editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : <>รหัสผ่าน <span className="text-red-500">*</span></>}
+              </label>
+              <input type="text" value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder={editing ? 'ไม่เปลี่ยน' : 'อย่างน้อย 6 ตัวอักษร'} className={field} />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท (Role) <span className="text-red-500">*</span></label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
@@ -115,6 +151,7 @@ export default function UsersTab() {
             <tr className="tbl-head">
               <th className="tbl-th">ชื่อ</th>
               <th className="tbl-th">อีเมล</th>
+              <th className="tbl-th">เข้าระบบด้วย</th>
               <th className="tbl-th">บทบาท</th>
               <th className="tbl-th">สถานะ</th>
               <th className="tbl-th text-right">จัดการ</th>
@@ -125,6 +162,11 @@ export default function UsersTab() {
               <tr key={u.id} className="tbl-row">
                 <td className="tbl-td font-medium text-slate-800">{u.full_name}</td>
                 <td className="tbl-td text-slate-600">{u.email}</td>
+                <td className="tbl-td">
+                  <span className={`chip ${u.login_method === 'google' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                    {u.login_method === 'google' ? 'Google' : 'อีเมล'}
+                  </span>
+                </td>
                 <td className="tbl-td">
                   <span className={`chip ${ROLE_CHIP[u.role]}`}>{ROLE_LABELS[u.role]}</span>
                 </td>

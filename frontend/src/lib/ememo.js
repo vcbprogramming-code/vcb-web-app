@@ -27,6 +27,7 @@ export const ememoApi = {
   listApprovers: () => api('/documents/approvers'),
   myApproval: (id) => api(`/documents/${id}/my-approval`),
   approveDocument: (id, action, comment) => api(`/documents/${id}/approve`, { method: 'POST', body: { action, comment } }),
+  consultDocument: (id, email, name, question) => api(`/documents/${id}/consult`, { method: 'POST', body: { email, name, question } }),
   updateDocument: (id, body) => api(`/documents/${id}`, { method: 'PATCH', body }),
   cancelDocument: (id, reason) => api(`/documents/${id}/cancel`, { method: 'POST', body: { reason } }),
   resendApproval: (id) => api(`/documents/${id}/resend-approval`, { method: 'POST' }),

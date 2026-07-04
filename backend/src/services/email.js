@@ -223,6 +223,56 @@ export async function sendCcNotification({ toEmails, doc, actorName }) {
 }
 
 /**
+ * Ask an in-system user for an OPINION on a document (not an approval). Sent when
+ * the current approver uses "ขอความเห็น". The recipient logs in and replies in
+ * the conversation thread; the approval status is unchanged.
+ */
+export async function sendConsultRequest({ toEmail, toName, doc, askerName, question }) {
+  if (!toEmail) return { skipped: true };
+  const url = `${env.appBaseUrl}/memos/${doc.id}`;
+  const row = (label, value) =>
+    `<tr>
+       <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
+       <td style="padding:8px 0;color:#0f172a;font-weight:500">${value}</td>
+     </tr>`;
+  const html = `
+  <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:#1d4ed8;background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:24px 28px;color:#fff">
+        <div style="font-size:13px;letter-spacing:.5px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">ขอความเห็นประกอบการพิจารณา</div>
+      </div>
+      <div style="padding:28px">
+        <p style="margin:0 0 6px;font-size:15px;color:#0f172a">เรียน <b>${esc(toName || 'ผู้รับ')}</b></p>
+        <p style="margin:0 0 16px;font-size:15px;color:#334155">
+          ${esc(askerName || 'ผู้อนุมัติ')} ขอความเห็นจากท่านเกี่ยวกับเอกสารด้านล่าง
+          <b>ท่านไม่จำเป็นต้องอนุมัติ</b> เพียงเข้าไปดูเอกสารและให้ความเห็นในระบบ
+        </p>
+        <table style="border-collapse:collapse;width:100%;font-size:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:16px">
+          ${row('เลขที่หนังสือ', `<b style="font-size:15px">${esc(doc.doc_number)}</b>`)}
+          ${row('เรื่อง', esc(doc.subject))}
+        </table>
+        ${question ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:20px"><div style="color:#1d4ed8;font-size:13px;margin-bottom:2px;font-weight:600">คำถาม/สิ่งที่ขอปรึกษา</div>${esc(question)}</div>` : ''}
+        <div style="text-align:center">
+          <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;font-size:15px;font-weight:600;padding:12px 30px;border-radius:10px;text-decoration:none">
+            เปิดดูเอกสารและให้ความเห็น
+          </a>
+        </div>
+      </div>
+      <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
+        เข้าสู่ระบบด้วยบัญชีของท่าน (อีเมลนี้) เพื่อให้ความเห็น — ไม่ใช่การอนุมัติ
+      </div>
+    </div>
+  </div>`;
+  return sendEmail({
+    to: toEmail,
+    subject: `[ขอความเห็น] ${doc.doc_number} — ${doc.subject}`,
+    html,
+    text: `เรียน ${toName || 'ผู้รับ'}\n\n${askerName || 'ผู้อนุมัติ'} ขอความเห็นจากท่าน (ไม่ใช่การอนุมัติ)\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${question ? `คำถาม: ${question}\n` : ''}\nเปิดดูและให้ความเห็น: ${url}`,
+  });
+}
+
+/**
  * Notify the document author of an approval outcome (approved / returned /
  * rejected). `outcome` ∈ 'approved'|'returned'|'rejected'.
  */

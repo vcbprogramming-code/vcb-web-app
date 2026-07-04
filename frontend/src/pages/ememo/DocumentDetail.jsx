@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast.jsx';
 import SubmitApprovalModal from './SubmitApprovalModal.jsx';
 import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
+import ConsultModal from './ConsultModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
 function Row({ label, children }) {
@@ -39,6 +40,7 @@ export default function DocumentDetail() {
   // is the logged-in user the current pending approver?
   const [myApproval, setMyApproval] = useState({ canApprove: false });
   const [approvalAction, setApprovalAction] = useState(null); // 'approved'|'returned'|'rejected' → opens the modal
+  const [showConsult, setShowConsult] = useState(false);
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
@@ -53,6 +55,14 @@ export default function DocumentDetail() {
     await ememoApi.approveDocument(id, approvalAction, comment);
     setApprovalAction(null);
     toast.success(done[approvalAction] || 'ดำเนินการเรียบร้อย');
+    load();
+  };
+
+  // confirmed from ConsultModal — ask someone for an opinion (not approval)
+  const confirmConsult = async ({ email, name, question }) => {
+    await ememoApi.consultDocument(id, email, name, question);
+    setShowConsult(false);
+    toast.success(`ส่งขอความเห็นถึง ${name || email} แล้ว`);
     load();
   };
 
@@ -172,6 +182,9 @@ export default function DocumentDetail() {
             {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
             {myApproval.canApprove && (
               <>
+                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
+                  <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
+                </button>
                 <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
                   <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
                 </button>
@@ -400,6 +413,10 @@ export default function DocumentDetail() {
           onConfirm={confirmApproval}
         />
       )}
+
+      {showConsult && (
+        <ConsultModal onClose={() => setShowConsult(false)} onConfirm={confirmConsult} />
+      )}
     </div>
   );
 }
@@ -462,19 +479,21 @@ function Timeline({ doc, openAttachment }) {
             </li>
           );
         }
-        // message
+        // message — 'consult' rows (ขอความเห็น) get a distinct blue accent
         const m = ev.msg;
+        const isConsult = m.kind === 'consult';
         return (
           <li key={ev.id} className="relative flex gap-3 text-sm">
-            <span className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isConsult ? 'bg-brand-tint text-brand' : 'bg-slate-100 text-slate-500'}`}>
               <Icon name="chat" className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-slate-800">{m.author_name || m.author_label || 'ผู้ใช้'}</span>
+                {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ขอความเห็น</span>}
                 <span className="text-[11px] text-slate-500">{formatThaiDate(m.created_at)}</span>
               </div>
-              <div className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{m.body}</div>
+              <div className={`mt-1 whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
               {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {m.attachments.map((a) => (

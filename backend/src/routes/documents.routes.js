@@ -18,7 +18,7 @@ import { putObject, deleteObject, openDownloadStream } from '../config/storage.j
 import { generateOriginalPdf, generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 import { generateCombinedPdf } from '../services/pdfMerge.js';
 import { createApprovalChain, sendApprovalRequest, applyApprovalAction } from '../services/approval.js';
-import { sendCcNotification, extractCcEmails, sendAuthorNotification } from '../services/email.js';
+import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsultRequest } from '../services/email.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -224,7 +224,7 @@ router.get(
          from audit_log where document_id = $1 order by created_at`, [req.params.id]);
     // conversation thread: messages + each message's file attachments
     const { rows: messages } = await query(
-      `select m.id, m.body, m.author_label, m.created_at,
+      `select m.id, m.body, m.author_label, m.created_at, m.kind, m.consult_email,
               pr.full_name as author_name,
               coalesce(
                 (select json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type) order by a.created_at)
@@ -276,6 +276,51 @@ router.post(
       [req.params.id, req.params.msgId, req.file.originalname, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
     );
     res.status(201).json({ data: row });
+  })
+);
+
+const consultSchema = z.object({
+  email: z.string().email(),
+  name: z.string().optional(),
+  question: z.string().trim().optional(),
+});
+
+/**
+ * POST /api/documents/:id/consult — ask an in-system user for an OPINION on this
+ * document (not an approval). Records a 'consult' note in the thread and emails
+ * the person a login-gated link to view + comment. The approval status is
+ * unchanged — the current approver still decides.
+ */
+router.post(
+  '/:id/consult',
+  asyncHandler(async (req, res) => {
+    const doc = await getDocOr404(req.params.id);
+    const parsed = consultSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const { email, name, question } = parsed.data;
+
+    // the person asked must be an active account (they log in to reply)
+    const target = await queryOne(
+      'select full_name, email from profiles where lower(email) = lower($1) and is_active = true',
+      [email]
+    );
+    if (!target) throw new ApiError(404, 'ไม่พบบัญชีผู้ใช้ที่ใช้งานอยู่สำหรับอีเมลนี้');
+
+    const askerName = req.profile.full_name || req.profile.email;
+    const targetName = target.full_name || target.email;
+    const body = `ขอความเห็นจาก ${targetName}${question ? ` — ${question}` : ''}`;
+    const row = await queryOne(
+      `insert into document_messages (document_id, author_id, author_label, body, kind, consult_email)
+       values ($1,$2,$3,$4,'consult',$5)
+       returning id, body, author_label, kind, consult_email, created_at`,
+      [doc.id, req.profile.id, askerName, body, target.email]
+    );
+
+    await sendConsultRequest({
+      toEmail: target.email, toName: target.full_name, doc, askerName, question,
+    }).catch((e) => console.error('consult email failed:', e.message));
+
+    res.status(201).json({ data: { ...row, author_name: req.profile.full_name || null, attachments: [] } });
   })
 );
 

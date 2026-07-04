@@ -20,7 +20,7 @@ function ProjectChip({ code, color, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
         active
           ? 'bg-brand text-white border-brand'
           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
@@ -52,7 +52,7 @@ function FilterDropdown({ label, value, active, icon = 'chevronDown', align = 'l
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
           active
             ? 'border-brand bg-brand/5 text-brand'
             : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -201,15 +201,15 @@ export default function DocumentRegister() {
       )}
 
       {/* filter bar — search · type · status · project chips, then a date row */}
-      <div className="card-sm space-y-3">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[220px] flex-1">
+      <div className="card-sm !p-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search document"
-              className="field pl-9"
+              className="field !py-1.5 pl-9"
             />
           </div>
 
@@ -272,23 +272,22 @@ export default function DocumentRegister() {
           ))}
         </div>
 
-        {/* date row */}
-        <div className="flex flex-wrap items-center gap-2.5 text-sm">
+        {/* date row (+ result count on the far right) */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-slate-500">Date received:</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2" />
-          <Icon name="arrowRight" className="h-4 w-4 text-slate-400" />
+            className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
+          <Icon name="arrowRight" className="h-3.5 w-3.5 text-slate-400" />
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2" />
-          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last 7 days</button>
-          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last 30 days</button>
-          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last month</button>
+            className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
+          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last 7 days</button>
+          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last 30 days</button>
+          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last month</button>
           {(from || to) && (
-            <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-4 w-4" /> Clear dates</button>
+            <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> Clear dates</button>
           )}
+          <span className="ml-auto italic text-slate-400">Showing {docs.length} of {total} documents</span>
         </div>
-
-        <div className="text-sm italic text-slate-400">Showing {docs.length} of {total} documents</div>
       </div>
 
       {/* table */}

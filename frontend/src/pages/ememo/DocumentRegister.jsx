@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
@@ -18,6 +18,18 @@ function ProjectChip({ code, color, active, onClick }) {
     >
       {code}
     </button>
+  );
+}
+
+/** A removable chip summarising one active filter, shown under the toolbar. */
+function ActiveFilterChip({ label, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 py-1 pl-3 pr-1.5 text-xs font-medium text-brand">
+      {label}
+      <button onClick={onClear} className="flex h-4 w-4 items-center justify-center rounded-full text-brand/70 transition hover:bg-brand/20 hover:text-brand" aria-label="ล้างตัวกรอง">
+        <Icon name="x" className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
 
@@ -51,6 +63,18 @@ export default function DocumentRegister() {
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  // filter popover (holds ประเภท / โครงการ / วันที่ so the toolbar stays 1 row)
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef(null);
+  useEffect(() => {
+    if (!filterOpen) return;
+    const onDown = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setFilterOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [filterOpen]);
 
   // load reference data once
   useEffect(() => {
@@ -100,99 +124,40 @@ export default function DocumentRegister() {
     setTo(iso(today));
   };
 
+  const activeProject = projects.find((p) => p.id === projectId);
+  const activeDocType = docTypes.find((t) => t.id === docTypeId);
+  const dateLabel = from && to ? `${formatThaiDate(from)} – ${formatThaiDate(to)}`
+    : from ? `ตั้งแต่ ${formatThaiDate(from)}`
+    : to ? `ถึง ${formatThaiDate(to)}` : null;
+  const filterCount = (projectId ? 1 : 0) + (docTypeId ? 1 : 0) + (from || to ? 1 : 0);
+  const resetFilters = () => { setProjectId(''); setDocTypeId(''); setFrom(''); setTo(''); };
+
   return (
     <div className="space-y-5">
-      {/* formal masthead — corporate document-control banner */}
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 md:px-8">
-          <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-inset ring-white/15">
-              <Icon name="document" className="h-6 w-6" />
-            </div>
-            <div className="leading-tight">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/55">
-                Document Control · E-Memo
-              </div>
-              <div className="text-xl font-bold tracking-tight">ทะเบียนเอกสารภายใน</div>
-              <div className="text-xs text-white/60">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสาร</div>
-            </div>
+      {/* compact masthead — single row: title + count (left) · settings (right) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-3 text-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-inset ring-white/15">
+            <Icon name="document" className="h-5 w-5" />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-inset ring-white/10 sm:flex">
-              <span className="text-lg font-bold leading-none">{total}</span>
-              <span className="text-[11px] text-white/55">เอกสารทั้งหมด</span>
-            </div>
-            {isAdmin && (
-              <button
-                onClick={() => navigate('/memos-settings')}
-                title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
-                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
-              >
-                <Icon name="settings" className="h-4 w-4" /> ตั้งค่า
-              </button>
-            )}
-            <button
-              onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-            >
-              <Icon name="plus" className="h-4 w-4" /> สร้างเอกสาร
-            </button>
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-base font-bold tracking-tight">ทะเบียนเอกสารภายใน</span>
+            <span className="hidden text-xs text-white/55 sm:inline">กลุ่มวิจิตรภัณฑ์ก่อสร้าง</span>
           </div>
+          <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-inset ring-white/10">
+            <span className="text-sm font-bold leading-none">{total}</span>
+            <span className="text-[11px] text-white/55">เอกสาร</span>
+          </span>
         </div>
-      </div>
-
-      {/* filter bar */}
-      <div className="card-sm space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[220px] flex-1">
-            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาเอกสาร / เลขที่ / เรื่อง"
-              className="field pl-9"
-            />
-          </div>
-          <select
-            value={docTypeId}
-            onChange={(e) => setDocTypeId(e.target.value)}
-            className="field !w-auto bg-white"
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/memos-settings')}
+            title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
+            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
-            <option value="">ทุกประเภทเอกสาร</option>
-            {docTypes.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* project chips */}
-        <div className="flex flex-wrap gap-2">
-          <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => setProjectId('')} />
-          {projects.map((p) => (
-            <ProjectChip
-              key={p.id}
-              code={p.code}
-              color={p.color}
-              active={projectId === p.id}
-              onClick={() => setProjectId(p.id)}
-            />
-          ))}
-        </div>
-
-        {/* date filters */}
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-slate-500">วันที่รับ:</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-200" />
-          <Icon name="arrowRight" className="h-4 w-4 text-slate-500" />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-200" />
-          <button onClick={() => quickRange(7)} className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">7 วันล่าสุด</button>
-          <button onClick={() => quickRange(30)} className="px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50">30 วันล่าสุด</button>
-          {(from || to) && (
-            <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-rose-300 hover:bg-rose-500/10"><Icon name="x" className="h-4 w-4" /> ล้างวันที่</button>
-          )}
-        </div>
+            <Icon name="settings" className="h-4 w-4" /> ตั้งค่า
+          </button>
+        )}
       </div>
 
       {error && (
@@ -201,9 +166,96 @@ export default function DocumentRegister() {
 
       {/* table */}
       <div className="card !p-0 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 className="font-bold text-slate-800">รายการเอกสาร</h3>
-          <span className="text-sm text-slate-400">แสดง {docs.length} จาก {total} เอกสาร</span>
+        {/* toolbar — single row: search · filters popover · create button */}
+        <div className="border-b border-slate-100 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative min-w-[200px] flex-1">
+              <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหาเอกสาร / เลขที่ / เรื่อง"
+                className="field pl-9"
+              />
+            </div>
+
+            {/* filters popover trigger */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setFilterOpen((o) => !o)}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
+                  filterCount > 0 || filterOpen
+                    ? 'border-brand bg-brand/5 text-brand'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Icon name="settings" className="h-4 w-4" /> ตัวกรอง
+                {filterCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white">{filterCount}</span>
+                )}
+              </button>
+
+              {filterOpen && (
+                <div className="absolute right-0 z-30 mt-2 w-[min(92vw,420px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-slate-800">ตัวกรอง</h4>
+                    {filterCount > 0 && (
+                      <button onClick={resetFilters} className="text-xs font-medium text-slate-400 hover:text-slate-700">ล้างทั้งหมด</button>
+                    )}
+                  </div>
+
+                  {/* ประเภทเอกสาร */}
+                  <label className="mb-1 block text-xs font-medium text-slate-500">ประเภทเอกสาร</label>
+                  <select value={docTypeId} onChange={(e) => setDocTypeId(e.target.value)} className="field mb-3 w-full bg-white">
+                    <option value="">ทุกประเภทเอกสาร</option>
+                    {docTypes.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                  </select>
+
+                  {/* โครงการ chips */}
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">โครงการ</label>
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => setProjectId('')} />
+                    {projects.map((p) => (
+                      <ProjectChip key={p.id} code={p.code} color={p.color} active={projectId === p.id} onClick={() => setProjectId(p.id)} />
+                    ))}
+                  </div>
+
+                  {/* วันที่รับ */}
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">วันที่รับ</label>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2" />
+                    <Icon name="arrowRight" className="h-4 w-4 shrink-0 text-slate-400" />
+                    <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2" />
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">7 วันล่าสุด</button>
+                    <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">30 วันล่าสุด</button>
+                    {(from || to) && (
+                      <button onClick={clearDates} className="ml-auto inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* create — sits right above the list */}
+            <button
+              onClick={() => setShowAdd(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light"
+            >
+              <Icon name="plus" className="h-4 w-4" /> สร้างเอกสาร
+            </button>
+          </div>
+
+          {/* active filter chips + result count */}
+          {(filterCount > 0 || total > 0) && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              {activeDocType && <ActiveFilterChip label={activeDocType.name} onClear={() => setDocTypeId('')} />}
+              {activeProject && <ActiveFilterChip label={`โครงการ ${activeProject.code}`} onClear={() => setProjectId('')} />}
+              {dateLabel && <ActiveFilterChip label={dateLabel} onClear={clearDates} />}
+              <span className="ml-auto text-xs text-slate-400">แสดง {docs.length} จาก {total} เอกสาร</span>
+            </div>
+          )}
         </div>
         <table className="tbl">
           <thead>

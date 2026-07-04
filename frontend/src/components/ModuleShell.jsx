@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { moduleTitles, roleLabels } from '../config/nav.js';
 import { useTheme } from '../theme/ThemeContext.jsx';
+import { useHeaderSlotValue } from './HeaderSlot.jsx';
 import Icon from './Icon.jsx';
 import GlobeMark from './GlobeMark.jsx';
 
@@ -26,6 +27,7 @@ function brandFor(pathname) {
 export default function ModuleShell() {
   const { profile, user, logout } = useAuth();
   const { isDark, toggle } = useTheme();
+  const headerSlot = useHeaderSlotValue();
   const navigate = useNavigate();
   const location = useLocation();
   const role = profile?.role;
@@ -64,6 +66,12 @@ export default function ModuleShell() {
               </span>
             </button>
           </div>
+          {/* page-injected actions/stats (fills the old blue banner's role) */}
+          {headerSlot && (
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+              {headerSlot}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             {/* light/dark theme toggle */}
             <button

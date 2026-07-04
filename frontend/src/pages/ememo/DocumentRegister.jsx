@@ -4,6 +4,7 @@ import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useHeaderSlot } from '../../components/HeaderSlot.jsx';
 
 // English status labels for the "All statuses" dropdown (client's mockup uses EN)
 const STATUS_OPTIONS = [
@@ -164,43 +165,37 @@ export default function DocumentRegister() {
   const activeDocType = docTypes.find((t) => t.id === docTypeId);
   const activeStatus = STATUS_OPTIONS.find((s) => s.value === status);
 
+  // Inject the register's stats + actions into the shared top bar (no 2nd banner).
+  useHeaderSlot(
+    (
+      <>
+        <div className="hidden rounded-lg bg-white/10 px-3.5 py-1.5 text-sm text-cyan-100/80 ring-1 ring-inset ring-white/15 md:block">
+          <span className="font-bold text-white">{total}</span> documents
+          <span className="mx-1.5 text-white/30">·</span>
+          <span className="font-bold text-white">{total}</span> linked
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/memos-settings')}
+            title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
+            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+          >
+            <Icon name="settings" className="h-4 w-4" /> <span className="hidden sm:inline">Settings</span>
+          </button>
+        )}
+        <button
+          onClick={() => setShowAdd(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+        >
+          <Icon name="plus" className="h-4 w-4" /> <span className="hidden sm:inline">Add Document</span>
+        </button>
+      </>
+    ),
+    [total, isAdmin]
+  );
+
   return (
     <div className="space-y-4">
-      {/* masthead — blue document-control banner (client's design) */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-[#1e3a8a] to-[#2563eb] px-6 py-5 text-white shadow-sm md:px-8">
-        <div className="flex items-baseline gap-4">
-          <span className="text-2xl font-extrabold tracking-tight">VCB Group</span>
-          <div className="leading-tight">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
-              Document Control · E-Memo
-            </div>
-            <div className="text-xs text-white/70">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสารภายใน</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden rounded-xl bg-white/10 px-4 py-2.5 text-sm text-white/80 ring-1 ring-inset ring-white/15 sm:block">
-            <span className="font-bold text-white">{total}</span> documents
-            <span className="mx-1.5 text-white/40">·</span>
-            <span className="font-bold text-white">{total}</span> linked
-          </div>
-          {isAdmin && (
-            <button
-              onClick={() => navigate('/memos-settings')}
-              title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
-              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
-            >
-              <Icon name="settings" className="h-4 w-4" /> Settings
-            </button>
-          )}
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-          >
-            <Icon name="plus" className="h-4 w-4" /> Add Document
-          </button>
-        </div>
-      </div>
-
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
       )}

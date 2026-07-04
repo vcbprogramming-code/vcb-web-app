@@ -33,6 +33,48 @@ function ActiveFilterChip({ label, onClear }) {
   );
 }
 
+/**
+ * A compact toolbar filter dropdown: a button showing "label · value" that
+ * opens a small panel (its `children`). Closes on outside-click / Esc. When
+ * `active` the button gets the brand accent so it's clear a filter is applied.
+ */
+function FilterDropdown({ label, value, active, icon = 'chevronDown', align = 'left', width = 'w-64', children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
+          active
+            ? 'border-brand bg-brand/5 text-brand'
+            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        <span className={active ? 'font-semibold' : ''}>{label}</span>
+        {value && <span className="max-w-[120px] truncate text-slate-400">· {value}</span>}
+        <Icon name="chevronDown" className={`h-3.5 w-3.5 shrink-0 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className={`absolute z-30 mt-2 ${width} rounded-2xl border border-slate-200 bg-white p-3 shadow-xl ${align === 'right' ? 'right-0' : 'left-0'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {typeof children === 'function' ? children(() => setOpen(false)) : children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || STATUS_META.pending;
   return (
@@ -63,18 +105,6 @@ export default function DocumentRegister() {
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
-
-  // filter popover (holds ประเภท / โครงการ / วันที่ so the toolbar stays 1 row)
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef(null);
-  useEffect(() => {
-    if (!filterOpen) return;
-    const onDown = (e) => { if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setFilterOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [filterOpen]);
 
   // load reference data once
   useEffect(() => {
@@ -179,64 +209,57 @@ export default function DocumentRegister() {
               />
             </div>
 
-            {/* filters popover trigger */}
-            <div className="relative" ref={filterRef}>
-              <button
-                onClick={() => setFilterOpen((o) => !o)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
-                  filterCount > 0 || filterOpen
-                    ? 'border-brand bg-brand/5 text-brand'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Icon name="settings" className="h-4 w-4" /> ตัวกรอง
-                {filterCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-white">{filterCount}</span>
-                )}
-              </button>
-
-              {filterOpen && (
-                <div className="absolute right-0 z-30 mt-2 w-[min(92vw,420px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-slate-800">ตัวกรอง</h4>
-                    {filterCount > 0 && (
-                      <button onClick={resetFilters} className="text-xs font-medium text-slate-400 hover:text-slate-700">ล้างทั้งหมด</button>
-                    )}
-                  </div>
-
-                  {/* ประเภทเอกสาร */}
-                  <label className="mb-1 block text-xs font-medium text-slate-500">ประเภทเอกสาร</label>
-                  <select value={docTypeId} onChange={(e) => setDocTypeId(e.target.value)} className="field mb-3 w-full bg-white">
-                    <option value="">ทุกประเภทเอกสาร</option>
-                    {docTypes.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
-                  </select>
-
-                  {/* โครงการ chips */}
-                  <label className="mb-1.5 block text-xs font-medium text-slate-500">โครงการ</label>
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => setProjectId('')} />
-                    {projects.map((p) => (
-                      <ProjectChip key={p.id} code={p.code} color={p.color} active={projectId === p.id} onClick={() => setProjectId(p.id)} />
-                    ))}
-                  </div>
-
-                  {/* วันที่รับ */}
-                  <label className="mb-1.5 block text-xs font-medium text-slate-500">วันที่รับ</label>
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2" />
-                    <Icon name="arrowRight" className="h-4 w-4 shrink-0 text-slate-400" />
-                    <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2" />
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">7 วันล่าสุด</button>
-                    <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">30 วันล่าสุด</button>
-                    {(from || to) && (
-                      <button onClick={clearDates} className="ml-auto inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
-                    )}
-                  </div>
+            {/* separate compact dropdowns — โครงการ · ประเภท · วันที่ */}
+            <FilterDropdown label="โครงการ" value={activeProject?.code} active={!!projectId} width="w-72">
+              {(close) => (
+                <div className="flex flex-wrap gap-1.5">
+                  <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => { setProjectId(''); close(); }} />
+                  {projects.map((p) => (
+                    <ProjectChip key={p.id} code={p.code} color={p.color} active={projectId === p.id} onClick={() => { setProjectId(p.id); close(); }} />
+                  ))}
                 </div>
               )}
-            </div>
+            </FilterDropdown>
+
+            <FilterDropdown label="ประเภท" value={activeDocType?.name} active={!!docTypeId} width="w-56">
+              {(close) => (
+                <div className="max-h-72 overflow-auto">
+                  <button
+                    onClick={() => { setDocTypeId(''); close(); }}
+                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!docTypeId ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                  >
+                    ทุกประเภทเอกสาร
+                  </button>
+                  {docTypes.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setDocTypeId(t.id); close(); }}
+                      className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${docTypeId === t.id ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </FilterDropdown>
+
+            <FilterDropdown label="วันที่" value={dateLabel} active={!!(from || to)} width="w-72">
+              {(close) => (
+                <div>
+                  <div className="mb-2 flex gap-2">
+                    <button onClick={() => quickRange(7)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">7 วันล่าสุด</button>
+                    <button onClick={() => quickRange(30)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">30 วันล่าสุด</button>
+                  </div>
+                  <label className="mb-1 block text-xs font-medium text-slate-500">ตั้งแต่วันที่</label>
+                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  <label className="mb-1 block text-xs font-medium text-slate-500">ถึงวันที่</label>
+                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                  {(from || to) && (
+                    <button onClick={() => { clearDates(); close(); }} className="mt-2 inline-flex items-center gap-1 text-xs text-rose-600 hover:underline"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
+                  )}
+                </div>
+              )}
+            </FilterDropdown>
 
             {/* create — sits right above the list */}
             <button
@@ -250,9 +273,12 @@ export default function DocumentRegister() {
           {/* active filter chips + result count */}
           {(filterCount > 0 || total > 0) && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              {activeDocType && <ActiveFilterChip label={activeDocType.name} onClear={() => setDocTypeId('')} />}
               {activeProject && <ActiveFilterChip label={`โครงการ ${activeProject.code}`} onClear={() => setProjectId('')} />}
+              {activeDocType && <ActiveFilterChip label={activeDocType.name} onClear={() => setDocTypeId('')} />}
               {dateLabel && <ActiveFilterChip label={dateLabel} onClear={clearDates} />}
+              {filterCount >= 2 && (
+                <button onClick={resetFilters} className="text-xs font-medium text-slate-400 hover:text-slate-700">ล้างทั้งหมด</button>
+              )}
               <span className="ml-auto text-xs text-slate-400">แสดง {docs.length} จาก {total} เอกสาร</span>
             </div>
           )}

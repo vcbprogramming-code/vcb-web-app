@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate } from '../../lib/ememo.js';
+import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import SubmitApprovalModal from './SubmitApprovalModal.jsx';
@@ -278,53 +278,9 @@ export default function DocumentDetail() {
             {doc.remarks && <Row label="หมายเหตุ"><span className="font-normal">{doc.remarks}</span></Row>}
           </div>
 
-          {/* ONE document file (B2): the combined file when attachments exist,
-              otherwise the letter — the approved/signed version once approved. */}
+          {/* ── บันทึก: approval chain + messages merged as a timeline ── */}
           <div className="card">
-            <h3 className="mb-3 font-bold text-slate-800">ไฟล์เอกสาร</h3>
-            {(() => {
-              const combined = doc.attachments.find((a) => a.kind === 'combined_pdf');
-              const letter =
-                doc.attachments.find((a) => a.version === 'approved') ||
-                doc.attachments.find((a) => a.version === 'original');
-              const primary = combined || letter;
-              if (!primary) {
-                return <p className="text-xs text-slate-400">ยังไม่มีไฟล์ — กด "แก้ไข" แล้วบันทึกเพื่อสร้าง</p>;
-              }
-              const signed = (primary === letter && letter.version === 'approved')
-                || (combined && doc.attachments.some((a) => a.version === 'approved'));
-              const supp = doc.attachments.filter((a) => a.kind === 'upload');
-              return (
-                <>
-                  <button
-                    onClick={() => openAttachment(primary.id)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                      <Icon name={signed ? 'signature' : 'file'} className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-800">{primary.file_name}</span>
-                      <span className="block text-xs text-slate-500">
-                        {signed ? 'ฉบับอนุมัติ (มีลายเซ็น)' : 'บันทึกข้อความ'}
-                        {supp.length > 0 ? '  ·  รวมไฟล์แนบในไฟล์เดียว' : ''}
-                      </span>
-                    </span>
-                    <Icon name="download" className="ml-auto h-4 w-4 shrink-0 text-slate-400" />
-                  </button>
-                  {supp.length > 0 && (
-                    <p className="mt-2 text-xs text-slate-400">
-                      มีไฟล์แนบ {supp.length} รายการ — ดูได้จากแท็บด้านซ้าย
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-
-          {/* ── Conversation: approval chain + messages merged as a timeline ── */}
-          <div className="card">
-            <h3 className="mb-4 font-bold text-slate-800">การสื่อสาร & การพิจารณา</h3>
+            <h3 className="mb-4 font-bold text-slate-800">บันทึก</h3>
 
             <Timeline doc={doc} openAttachment={openAttachment} />
 
@@ -437,7 +393,7 @@ function Timeline({ doc, openAttachment }) {
                 <div className={`flex flex-wrap items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
                   <span className="truncate">{s.approver_name || s.approver_email}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : ev.isCurrent ? 'กำลังพิจารณา' : m.label}</span>
-                  {s.acted_at && <span className="text-[11px] text-slate-500">{formatThaiDate(s.acted_at)}</span>}
+                  {s.acted_at && <span className="text-[11px] text-slate-500">{formatThaiDateTime(s.acted_at)}</span>}
                 </div>
                 <div className="truncate text-xs text-slate-500">{s.approver_email}</div>
                 {s.comment && <div className="mt-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">{s.comment}</div>}
@@ -457,7 +413,7 @@ function Timeline({ doc, openAttachment }) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-slate-800">{m.author_name || m.author_label || 'ผู้ใช้'}</span>
                 {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ขอความเห็น</span>}
-                <span className="text-[11px] text-slate-500">{formatThaiDate(m.created_at)}</span>
+                <span className="text-[11px] text-slate-500">{formatThaiDateTime(m.created_at)}</span>
               </div>
               <div className={`mt-1 whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
               {Array.isArray(m.attachments) && m.attachments.length > 0 && (

@@ -5,6 +5,16 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
+// English status labels for the "All statuses" dropdown (client's mockup uses EN)
+const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'returned', label: 'Returned' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
 function ProjectChip({ code, color, active, onClick }) {
   return (
     <button
@@ -18,18 +28,6 @@ function ProjectChip({ code, color, active, onClick }) {
     >
       {code}
     </button>
-  );
-}
-
-/** A removable chip summarising one active filter, shown under the toolbar. */
-function ActiveFilterChip({ label, onClear }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 py-1 pl-3 pr-1.5 text-xs font-medium text-brand">
-      {label}
-      <button onClick={onClear} className="flex h-4 w-4 items-center justify-center rounded-full text-brand/70 transition hover:bg-brand/20 hover:text-brand" aria-label="ล้างตัวกรอง">
-        <Icon name="x" className="h-3 w-3" />
-      </button>
-    </span>
   );
 }
 
@@ -100,6 +98,7 @@ export default function DocumentRegister() {
   // filters
   const [projectId, setProjectId] = useState('');
   const [docTypeId, setDocTypeId] = useState('');
+  const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -119,14 +118,14 @@ export default function DocumentRegister() {
   const loadDocs = useCallback(() => {
     setLoading(true);
     ememoApi
-      .listDocuments({ projectId, docTypeId, search, from, to, page, pageSize })
+      .listDocuments({ projectId, docTypeId, status, search, from, to, page, pageSize })
       .then((res) => {
         setDocs(res.data);
         setTotal(res.total);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [projectId, docTypeId, search, from, to, page]);
+  }, [projectId, docTypeId, status, search, from, to, page]);
 
   // debounce search; reload on filter change
   useEffect(() => {
@@ -137,7 +136,7 @@ export default function DocumentRegister() {
   // reset to page 1 whenever a non-page filter changes
   useEffect(() => {
     setPage(1);
-  }, [projectId, docTypeId, search, from, to]);
+  }, [projectId, docTypeId, status, search, from, to]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const clearDates = () => {
@@ -145,144 +144,160 @@ export default function DocumentRegister() {
     setTo('');
   };
 
+  const iso = (d) => d.toISOString().slice(0, 10);
   const quickRange = (days) => {
     const today = new Date();
     const start = new Date();
     start.setDate(today.getDate() - days);
-    const iso = (d) => d.toISOString().slice(0, 10);
     setFrom(iso(start));
     setTo(iso(today));
   };
+  // "Last month" = the previous calendar month (1st → last day)
+  const lastMonth = () => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    setFrom(iso(first));
+    setTo(iso(last));
+  };
 
-  const activeProject = projects.find((p) => p.id === projectId);
   const activeDocType = docTypes.find((t) => t.id === docTypeId);
-  const dateLabel = from && to ? `${formatThaiDate(from)} – ${formatThaiDate(to)}`
-    : from ? `ตั้งแต่ ${formatThaiDate(from)}`
-    : to ? `ถึง ${formatThaiDate(to)}` : null;
-  const filterCount = (projectId ? 1 : 0) + (docTypeId ? 1 : 0) + (from || to ? 1 : 0);
-  const resetFilters = () => { setProjectId(''); setDocTypeId(''); setFrom(''); setTo(''); };
+  const activeStatus = STATUS_OPTIONS.find((s) => s.value === status);
 
   return (
-    <div className="space-y-5">
-      {/* compact masthead — single row: title + count (left) · settings (right) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-3 text-white shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-inset ring-white/15">
-            <Icon name="document" className="h-5 w-5" />
+    <div className="space-y-4">
+      {/* masthead — blue document-control banner (client's design) */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-[#1e3a8a] to-[#2563eb] px-6 py-5 text-white shadow-sm md:px-8">
+        <div className="flex items-baseline gap-4">
+          <span className="text-2xl font-extrabold tracking-tight">VCB Group</span>
+          <div className="leading-tight">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+              Document Control · E-Memo
+            </div>
+            <div className="text-xs text-white/70">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสารภายใน</div>
           </div>
-          <div className="flex items-baseline gap-2.5">
-            <span className="text-base font-bold tracking-tight">ทะเบียนเอกสารภายใน</span>
-            <span className="hidden text-xs text-white/55 sm:inline">กลุ่มวิจิตรภัณฑ์ก่อสร้าง</span>
-          </div>
-          <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-inset ring-white/10">
-            <span className="text-sm font-bold leading-none">{total}</span>
-            <span className="text-[11px] text-white/55">เอกสาร</span>
-          </span>
         </div>
-        {isAdmin && (
+        <div className="flex items-center gap-3">
+          <div className="hidden rounded-xl bg-white/10 px-4 py-2.5 text-sm text-white/80 ring-1 ring-inset ring-white/15 sm:block">
+            <span className="font-bold text-white">{total}</span> documents
+            <span className="mx-1.5 text-white/40">·</span>
+            <span className="font-bold text-white">{total}</span> linked
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/memos-settings')}
+              title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
+              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+            >
+              <Icon name="settings" className="h-4 w-4" /> Settings
+            </button>
+          )}
           <button
-            onClick={() => navigate('/memos-settings')}
-            title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
-            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
           >
-            <Icon name="settings" className="h-4 w-4" /> ตั้งค่า
+            <Icon name="plus" className="h-4 w-4" /> Add Document
           </button>
-        )}
+        </div>
       </div>
 
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
       )}
 
-      {/* table */}
-      <div className="card !p-0 overflow-hidden">
-        {/* toolbar — single row: search · filters popover · create button */}
-        <div className="border-b border-slate-100 px-5 py-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[200px] flex-1">
-              <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหาเอกสาร / เลขที่ / เรื่อง"
-                className="field pl-9"
-              />
-            </div>
-
-            {/* separate compact dropdowns — โครงการ · ประเภท · วันที่ */}
-            <FilterDropdown label="โครงการ" value={activeProject?.code} active={!!projectId} width="w-72">
-              {(close) => (
-                <div className="flex flex-wrap gap-1.5">
-                  <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => { setProjectId(''); close(); }} />
-                  {projects.map((p) => (
-                    <ProjectChip key={p.id} code={p.code} color={p.color} active={projectId === p.id} onClick={() => { setProjectId(p.id); close(); }} />
-                  ))}
-                </div>
-              )}
-            </FilterDropdown>
-
-            <FilterDropdown label="ประเภท" value={activeDocType?.name} active={!!docTypeId} width="w-56">
-              {(close) => (
-                <div className="max-h-72 overflow-auto">
-                  <button
-                    onClick={() => { setDocTypeId(''); close(); }}
-                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!docTypeId ? 'font-semibold text-brand' : 'text-slate-600'}`}
-                  >
-                    ทุกประเภทเอกสาร
-                  </button>
-                  {docTypes.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => { setDocTypeId(t.id); close(); }}
-                      className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${docTypeId === t.id ? 'font-semibold text-brand' : 'text-slate-600'}`}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </FilterDropdown>
-
-            <FilterDropdown label="วันที่" value={dateLabel} active={!!(from || to)} width="w-72">
-              {(close) => (
-                <div>
-                  <div className="mb-2 flex gap-2">
-                    <button onClick={() => quickRange(7)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">7 วันล่าสุด</button>
-                    <button onClick={() => quickRange(30)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50">30 วันล่าสุด</button>
-                  </div>
-                  <label className="mb-1 block text-xs font-medium text-slate-500">ตั้งแต่วันที่</label>
-                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mb-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  <label className="mb-1 block text-xs font-medium text-slate-500">ถึงวันที่</label>
-                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-                  {(from || to) && (
-                    <button onClick={() => { clearDates(); close(); }} className="mt-2 inline-flex items-center gap-1 text-xs text-rose-600 hover:underline"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
-                  )}
-                </div>
-              )}
-            </FilterDropdown>
-
-            {/* create — sits right above the list */}
-            <button
-              onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light"
-            >
-              <Icon name="plus" className="h-4 w-4" /> สร้างเอกสาร
-            </button>
+      {/* filter bar — search · type · status · project chips, then a date row */}
+      <div className="card-sm space-y-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-[220px] flex-1">
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search document"
+              className="field pl-9"
+            />
           </div>
 
-          {/* active filter chips + result count */}
-          {(filterCount > 0 || total > 0) && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              {activeProject && <ActiveFilterChip label={`โครงการ ${activeProject.code}`} onClear={() => setProjectId('')} />}
-              {activeDocType && <ActiveFilterChip label={activeDocType.name} onClear={() => setDocTypeId('')} />}
-              {dateLabel && <ActiveFilterChip label={dateLabel} onClear={clearDates} />}
-              {filterCount >= 2 && (
-                <button onClick={resetFilters} className="text-xs font-medium text-slate-400 hover:text-slate-700">ล้างทั้งหมด</button>
-              )}
-              <span className="ml-auto text-xs text-slate-400">แสดง {docs.length} จาก {total} เอกสาร</span>
-            </div>
+          {/* All document types */}
+          <FilterDropdown label="All document types" value={activeDocType?.name} active={!!docTypeId} width="w-56">
+            {(close) => (
+              <div className="max-h-72 overflow-auto">
+                <button
+                  onClick={() => { setDocTypeId(''); close(); }}
+                  className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!docTypeId ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                >
+                  All document types
+                </button>
+                {docTypes.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setDocTypeId(t.id); close(); }}
+                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${docTypeId === t.id ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </FilterDropdown>
+
+          {/* All statuses */}
+          <FilterDropdown label="All statuses" value={activeStatus?.label} active={!!status} width="w-48">
+            {(close) => (
+              <div>
+                <button
+                  onClick={() => { setStatus(''); close(); }}
+                  className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!status ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                >
+                  All statuses
+                </button>
+                {STATUS_OPTIONS.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => { setStatus(s.value); close(); }}
+                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${status === s.value ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </FilterDropdown>
+
+          {/* project chips — shown inline (client's design) */}
+          <ProjectChip code="All Projects" active={!projectId} onClick={() => setProjectId('')} />
+          {projects.map((p) => (
+            <ProjectChip
+              key={p.id}
+              code={p.code}
+              color={p.color}
+              active={projectId === p.id}
+              onClick={() => setProjectId(p.id)}
+            />
+          ))}
+        </div>
+
+        {/* date row */}
+        <div className="flex flex-wrap items-center gap-2.5 text-sm">
+          <span className="text-slate-500">Date received:</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            className="rounded-lg border border-slate-200 px-3 py-2" />
+          <Icon name="arrowRight" className="h-4 w-4 text-slate-400" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            className="rounded-lg border border-slate-200 px-3 py-2" />
+          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last 7 days</button>
+          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last 30 days</button>
+          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Last month</button>
+          {(from || to) && (
+            <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-4 w-4" /> Clear dates</button>
           )}
         </div>
+
+        <div className="text-sm italic text-slate-400">Showing {docs.length} of {total} documents</div>
+      </div>
+
+      {/* table */}
+      <div className="card !p-0 overflow-hidden">
         <table className="tbl">
           <thead>
             <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">

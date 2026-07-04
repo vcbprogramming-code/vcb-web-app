@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { pool, query, queryOne } from '../config/db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
@@ -191,7 +191,11 @@ router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
-      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients ${LIST_FROM} where d.id = $1`,
+      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
+              d.signer_name, d.signer_title, pr.full_name as preparer_name
+         ${LIST_FROM}
+         left join profiles pr on pr.id = d.created_by
+        where d.id = $1`,
       [req.params.id]
     );
     if (!doc) throw new ApiError(404, 'Document not found');
@@ -217,6 +221,8 @@ const createSchema = z.object({
   recipient: z.string().optional(),
   reference: z.string().optional(),
   cc: z.string().optional(),
+  signerName: z.string().optional(),
+  signerTitle: z.string().optional(),
   authorSignatureUrl: z.string().optional(),
   body: z.string().optional(),
   remarks: z.string().optional(),
@@ -228,6 +234,7 @@ const createSchema = z.object({
 
 router.post(
   '/',
+  requirePermission('ememo', 'create'),
   asyncHandler(async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
@@ -242,11 +249,13 @@ router.post(
       const { rows } = await client.query(
         `insert into documents
            (project_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
-            recipient, reference, cc_recipients, author_signature_url, body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::date,current_date),$15,$16::jsonb,'manual','pending',$17)
+            recipient, reference, cc_recipients, signer_name, signer_title, author_signature_url,
+            body, remarks, date_received, work_unit, enclosures, source, status, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,coalesce($16::date,current_date),$17,$18::jsonb,'manual','pending',$19)
          returning id, doc_number, run_no, department, status, date_received`,
         [project.id, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
-         input.recipient || null, input.reference || null, input.cc || null, input.authorSignatureUrl || null,
+         input.recipient || null, input.reference || null, input.cc || null,
+         input.signerName || null, input.signerTitle || null, input.authorSignatureUrl || null,
          input.body || null, input.remarks || null,
          input.dateReceived || null, input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
       );
@@ -271,6 +280,8 @@ const editSchema = z.object({
   recipient: z.string().optional().nullable(),
   reference: z.string().optional().nullable(),
   cc: z.string().optional().nullable(),
+  signerName: z.string().optional().nullable(),
+  signerTitle: z.string().optional().nullable(),
   body: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   docTypeId: z.string().uuid().optional().nullable(),
@@ -297,6 +308,8 @@ router.patch(
     if (f.recipient !== undefined) add('recipient', f.recipient || null);
     if (f.reference !== undefined) add('reference', f.reference || null);
     if (f.cc !== undefined) add('cc_recipients', f.cc || null);
+    if (f.signerName !== undefined) add('signer_name', f.signerName || null);
+    if (f.signerTitle !== undefined) add('signer_title', f.signerTitle || null);
     if (f.body !== undefined) add('body', f.body || null);
     if (f.remarks !== undefined) add('remarks', f.remarks || null);
     if (f.workUnit !== undefined) add('work_unit', f.workUnit || null);
@@ -311,7 +324,11 @@ router.patch(
       [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ fields: sets.length })]
     );
     // return the full detail
-    const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients ${LIST_FROM} where d.id = $1`, [req.params.id]);
+    const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
+              d.signer_name, d.signer_title, pr.full_name as preparer_name
+         ${LIST_FROM}
+         left join profiles pr on pr.id = d.created_by
+        where d.id = $1`, [req.params.id]);
     const { rows: attachments } = await query(`select id, kind, version, file_name, content_type, size_bytes, created_at from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
     const { rows: steps } = await query(`select id, step_no, approver_name, approver_email, action, comment, acted_at from approval_steps where document_id = $1 order by step_no`, [req.params.id]);
     const { rows: audit } = await query(`select action, actor_label, detail, created_at from audit_log where document_id = $1 order by created_at`, [req.params.id]);
@@ -426,6 +443,7 @@ const submitSchema = z.object({
 
 router.post(
   '/:id/submit',
+  requirePermission('ememo', 'submit'),
   asyncHandler(async (req, res) => {
     const doc = await loadDocForMutation(req);
     // approved/rejected/cancelled documents are done — never re-submittable

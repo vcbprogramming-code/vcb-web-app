@@ -15,6 +15,12 @@ import { formatThaiLongDate } from '../../lib/ememo.js';
 export default function LetterheadPreview({ letter = {}, doc = {} }) {
   const enclosures = Array.isArray(doc.enclosures) ? doc.enclosures : [];
   const recipient = doc.recipient || letter.default_recipient;
+  // signature block shows the SIGNER (falls back to the preparer/author, then the
+  // letterhead's default signatory); the preparer line only appears when different.
+  const signerName = doc.signer_name || doc.author_name || letter.signatory_name;
+  const signerTitle = doc.signer_title || doc.author_title || letter.signatory_title;
+  const preparerName = doc.preparer_name || doc.author_name;
+  const showPreparer = preparerName && preparerName !== signerName;
 
   return (
     <div className="mx-auto w-full max-w-[820px]">
@@ -84,10 +90,15 @@ export default function LetterheadPreview({ letter = {}, doc = {} }) {
             ) : (
               <div className="mt-12" />
             )}
-            <div className={doc.signature_image_url ? 'mt-1' : ''}>({doc.author_name || letter.signatory_name || '...........................'})</div>
-            {(doc.author_title || letter.signatory_title) && <div>{doc.author_title || letter.signatory_title}</div>}
+            <div className={doc.signature_image_url ? 'mt-1' : ''}>({signerName || '...........................'})</div>
+            {signerTitle && <div>{signerTitle}</div>}
           </div>
         </div>
+
+        {/* ผู้จัดทำ (preparer) — only when different from the signer */}
+        {showPreparer && (
+          <div className="mt-6 text-[11px] text-slate-500">ผู้จัดทำ: {preparerName}</div>
+        )}
 
         {/* สำเนาเรียน / CC — footer note */}
         {doc.cc_recipients && (

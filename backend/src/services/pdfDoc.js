@@ -12,12 +12,44 @@ async function loadDocAndLetter(documentId) {
       where d.id = $1`,
     [documentId]
   );
+  // The signature block shows the *signer* (may differ from the preparer). When
+  // no explicit signer is set on the doc, fall back to the author (preparer).
+  if (doc) {
+    doc.signer_name = doc.signer_name || doc.author_name;
+    doc.signer_title = doc.signer_title || doc.author_title;
+    doc.preparer_name = doc.author_name; // always the logged-in creator
+  }
   if (!doc) throw new Error('Document not found');
-  const letter = await queryOne(
+  const row = await queryOne(
     'select * from project_letterhead where project_id = $1',
     [doc.project_id]
   );
-  return { doc, letter: letter || {} };
+  return { doc, letter: toCamelLetter(row) };
+}
+
+/**
+ * Map a snake_case project_letterhead DB row to the camelCase keys the PDF
+ * generator (letterhead.js) reads. Without this the per-project company name,
+ * signatory, contact block and logo were silently dropped (letterhead.js read
+ * letter.companyName while the row only had company_name), so every letter fell
+ * back to the hardcoded default company. Returns {} for a missing row.
+ */
+function toCamelLetter(row) {
+  if (!row) return {};
+  return {
+    companyName: row.company_name,
+    companyNameEn: row.company_name_en,
+    address: row.address,
+    logoUrl: row.logo_url,
+    phone: row.phone,
+    telex: row.telex,
+    fax: row.fax,
+    signatoryName: row.signatory_name,
+    signatoryTitle: row.signatory_title,
+    signatureUrl: row.signature_url,
+    closingLine: row.closing_line,
+    defaultRecipient: row.default_recipient,
+  };
 }
 
 /** Remove any existing generated attachment of a given version for a doc. */
@@ -52,7 +84,7 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
        from approval_steps where document_id = $1 order by step_no`,
     [documentId]
   );
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, authorTitle: doc.author_title, auditSteps });
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');
@@ -74,8 +106,7 @@ export async function generateOriginalPdf(documentId, uploadedBy = null) {
   if (sigKey) {
     authorSignature = await getObjectBuffer(sigKey).catch(() => null);
   }
-  // the author's job title shown under their name
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, authorTitle: doc.author_title });
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');
@@ -112,7 +143,7 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     if (s.signature_url) {
       try { image = await getObjectBuffer(s.signature_url); } catch { image = null; }
     }
-    signatures.push({ image, name: s.approver_name, title: letter.signatory_title || '' });
+    signatures.push({ image, name: s.approver_name, title: letter.signatoryTitle || '' });
   }
 
   // full decision trail for the "บันทึกการพิจารณา" page

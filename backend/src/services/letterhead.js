@@ -24,7 +24,8 @@ function thaiLongDate(iso) {
  * resolve to a Buffer.
  *
  * @param {object} doc    document row: doc_number, subject, recipient, body,
- *                        date_received, work_unit, enclosures[]
+ *                        date_received, work_unit, enclosures[],
+ *                        signer_name, signer_title, preparer_name
  * @param {object} letter embedded letterhead: companyName, companyNameEn,
  *                        address, logoUrl, phone, telex, fax,
  *                        signatoryName, signatoryTitle, closingLine
@@ -137,12 +138,21 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     }
     pdf.moveDown(1);
 
-    // ---- Body ----
+    // ---- Body (auto-paginates onto extra pages when long) ----
     if (doc.body) {
       pdf.font('th').fontSize(13.5)
         .text(doc.body, left, pdf.y, { align: 'justify', lineGap: 5, indent: 48, width: contentW });
     }
     pdf.moveDown(1.2);
+
+    // Keep the closing + signature block together: if it wouldn't fit in the
+    // remaining space on this page, start a fresh page so it isn't orphaned or
+    // split across the page break (matters once the body flows multi-page).
+    const bottomLimit = pdf.page.height - pdf.page.margins.bottom;
+    const sigBlockNeeded = 150; // closing + gap + name + title + preparer line
+    if (pdf.y + sigBlockNeeded > bottomLimit) {
+      pdf.addPage();
+    }
 
     // ---- closing line, indented to the right area ----
     const closing = letter.closingLine || 'ขอแสดงความนับถือ';
@@ -183,13 +193,26 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       // letterhead's configured default signature image; else just the name text
       const sigImage = opts.authorSignature
         || (letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null);
-      // show who prepared the document in the signature slot (falls back to the
-      // letterhead's configured signatory if there's no author on the doc)
+      // the signature block shows the SIGNER (ผู้เซ็น) — which may differ from the
+      // preparer. pdfDoc.js already resolves doc.signer_name/title (falling back to
+      // the author, then the letterhead's configured signatory).
       drawSignature({
         image: sigImage,
-        name: doc.author_name || letter.signatoryName,
-        title: opts.authorTitle || letter.signatoryTitle,
+        name: doc.signer_name || letter.signatoryName,
+        title: doc.signer_title || letter.signatoryTitle,
       });
+    }
+
+    // ---- ผู้จัดทำ (preparer) line at the bottom-left — only when the preparer is
+    // a different person from the signer, so the reader can see who prepared it.
+    const preparer = doc.preparer_name;
+    const signerShown = (signatures && signatures.length)
+      ? null
+      : (doc.signer_name || letter.signatoryName);
+    if (preparer && preparer !== signerShown) {
+      pdf.moveDown(1.5);
+      pdf.font('th').fontSize(10.5).fillColor('#666')
+        .text(`ผู้จัดทำ: ${preparer}`, left, pdf.y, { width: contentW });
     }
 
     // ---- "บันทึกการพิจารณา" page (approval trail) ----

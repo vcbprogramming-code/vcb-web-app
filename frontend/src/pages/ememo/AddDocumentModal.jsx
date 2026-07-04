@@ -19,6 +19,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [enclQty, setEnclQty] = useState('');
   const [body, setBody] = useState('');
   const [remarks, setRemarks] = useState('');
+  // signer (ผู้เซ็น) — may differ from the preparer (the logged-in author). Blank
+  // = the preparer signs; typing a name here makes someone else the signer.
+  const [signerName, setSignerName] = useState('');
+  const [signerTitle, setSignerTitle] = useState('');
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
@@ -149,6 +153,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           recipient: recipient.trim() || undefined,
           reference: reference.trim() || undefined,
           cc: cc.trim() || undefined,
+          signerName: signerName.trim() || undefined,
+          signerTitle: signerTitle.trim() || undefined,
           authorSignatureUrl,
           enclosures: enclName.trim()
             ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
@@ -201,8 +207,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
       : [],
     body,
-    author_name: authorName,
-    author_title: profile?.job_title || undefined,
+    // signature block shows the signer (falls back to the preparer/author)
+    signer_name: signerName.trim() || authorName,
+    signer_title: signerTitle.trim() || profile?.job_title || undefined,
+    preparer_name: authorName,
     signature_image_url: sigMode === 'image' ? sigPreviewUrl : null,
   };
 
@@ -381,6 +389,21 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 <input type="file" className="hidden" onChange={(e) => pickFile(e.target.files?.[0])} />
               </label>
             )}
+          </div>
+
+          {/* signer (ผู้เซ็น) — defaults to the preparer; fill in to have someone else sign */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้ลงนาม (ผู้เซ็น)</label>
+            <p className="mb-3 text-xs text-slate-400">
+              เว้นว่างไว้ = ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นผู้เซ็นเอง ·
+              กรอกชื่อถ้าให้คนอื่นเป็นผู้ลงนาม (ระบบจะแสดงบรรทัด “ผู้จัดทำ” ไว้ท้ายหนังสือ)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <input value={signerName} onChange={(e) => setSignerName(e.target.value)}
+                placeholder={`ชื่อผู้เซ็น (ค่าเริ่มต้น: ${authorName})`} className={field} />
+              <input value={signerTitle} onChange={(e) => setSignerTitle(e.target.value)}
+                placeholder="ตำแหน่งผู้เซ็น (ไม่บังคับ)" className={field} />
+            </div>
           </div>
 
           {/* signature: typed name or uploaded image */}

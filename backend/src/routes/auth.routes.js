@@ -8,19 +8,25 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { verifyPassword, signToken, tokenExpiresAt } from '../utils/auth.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
+import { effectivePermissions } from '../config/permissions.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  // passwordless login (client request, round 2 #1): password is optional. When
+  // supplied it is still verified (backwards compatible); when omitted, an active
+  // account with a known email is enough. Intended for the internal tool only.
+  password: z.string().min(1).optional(),
 });
 
 /**
  * POST /api/auth/login
- * Verifies email + password (bcrypt) against the profiles table and returns
- * a signed JWT. The frontend stores the access token and sends it as a Bearer.
+ * Looks up the email in profiles and returns a signed JWT. If a password is
+ * provided it is verified against the stored bcrypt hash; if omitted, login
+ * succeeds for any active account with that email (email-only / passwordless).
+ * The frontend stores the access token and sends it as a Bearer.
  */
 router.post(
   '/login',
@@ -32,17 +38,20 @@ router.post(
     const { email, password } = parsed.data;
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, password_hash
+      `select id, full_name, email, role, unit_id, is_active, password_hash, permissions
          from profiles where lower(email) = lower($1)`,
       [email]
     );
 
-    // Same error whether the email is unknown or the password is wrong.
-    if (!profile || !profile.password_hash) {
-      throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    // Unknown email → generic error (don't reveal which emails exist).
+    if (!profile) {
+      throw new ApiError(401, 'ไม่พบบัญชีอีเมลนี้');
     }
-    const ok = await verifyPassword(password, profile.password_hash);
-    if (!ok) throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    // When a password is supplied, it must match (keeps password login working).
+    if (password) {
+      const ok = profile.password_hash && await verifyPassword(password, profile.password_hash);
+      if (!ok) throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    }
 
     if (!profile.is_active) {
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
@@ -58,6 +67,7 @@ router.post(
         role: profile.role,
         unit_id: profile.unit_id,
         is_active: profile.is_active,
+        effective_permissions: effectivePermissions(profile),
       },
       session: {
         access_token: token,
@@ -73,10 +83,12 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, job_title, signature_url
+      `select id, full_name, email, role, unit_id, is_active, job_title, signature_url, permissions
          from profiles where id = $1`,
       [req.profile.id]
     );
+    // resolved permission map for the frontend to gate UI (admin = all true)
+    profile.effective_permissions = effectivePermissions(profile);
     res.json({ user: req.auth, profile });
   })
 );

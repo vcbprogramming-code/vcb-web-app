@@ -79,6 +79,12 @@ export const adminApi = {
   resetPassword: (id, password) =>
     api(`/admin/users/${id}/reset-password`, { method: 'POST', body: { password } }),
 
+  // action-level permissions
+  permissionCatalog: () => api('/admin/permissions/catalog'),
+  getUserPermissions: (id) => api(`/admin/users/${id}/permissions`),
+  saveUserPermissions: (id, permissions) =>
+    api(`/admin/users/${id}/permissions`, { method: 'PUT', body: { permissions } }),
+
   // projects
   listProjects: () => api('/admin/projects'),
   createProject: (body) => api('/admin/projects', { method: 'POST', body }),

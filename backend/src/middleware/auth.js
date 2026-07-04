@@ -1,6 +1,7 @@
 import { query, queryOne } from '../config/db.js';
 import { verifyToken } from '../utils/auth.js';
 import { ApiError } from './errorHandler.js';
+import { hasPermission } from '../config/permissions.js';
 
 /**
  * Verifies our own JWT Bearer token, then loads the user's profile
@@ -22,7 +23,7 @@ export async function requireAuth(req, res, next) {
     }
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active
+      `select id, full_name, email, role, unit_id, is_active, permissions
          from profiles where id = $1`,
       [payload.sub]
     );
@@ -50,6 +51,20 @@ export function requireRole(...roles) {
     if (!req.profile) return next(new ApiError(401, 'Not authenticated'));
     if (!roles.includes(req.profile.role)) {
       return next(new ApiError(403, 'Insufficient permissions'));
+    }
+    next();
+  };
+}
+
+/**
+ * Restricts a route to callers holding "<module>.<action>" (see config/
+ * permissions.js). admin always passes. Use after requireAuth.
+ */
+export function requirePermission(module, action) {
+  return (req, res, next) => {
+    if (!req.profile) return next(new ApiError(401, 'Not authenticated'));
+    if (!hasPermission(req.profile, module, action)) {
+      return next(new ApiError(403, 'ไม่มีสิทธิ์ดำเนินการนี้'));
     }
     next();
   };

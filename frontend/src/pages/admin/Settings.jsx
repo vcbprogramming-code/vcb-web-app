@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import UsersTab from './UsersTab.jsx';
-import ProjectsTab from './ProjectsTab.jsx';
-import DocTypesTab from './DocTypesTab.jsx';
-import DocCodeApproversTab from './DocCodeApproversTab.jsx';
-import LetterheadTab from './LetterheadTab.jsx';
+import PermissionsTab from './PermissionsTab.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 
+// Central admin settings — only the cross-cutting concerns live here now:
+// user accounts + action-level permissions. Module-specific config (E-Memo's
+// projects / doc types / approvers) moved into each module's own settings page
+// (backlog round 2 #3).
 const TABS = [
   { key: 'users', label: 'จัดการผู้ใช้', Comp: UsersTab },
-  { key: 'projects', label: 'โครงการ', Comp: ProjectsTab },
-  { key: 'doctypes', label: 'ประเภทเอกสาร', Comp: DocTypesTab },
-  { key: 'approvers', label: 'ผู้อนุมัติตามรหัส', Comp: DocCodeApproversTab },
-  { key: 'letterhead', label: 'หัวจดหมาย (Letterhead)', Comp: LetterheadTab },
+  { key: 'permissions', label: 'สิทธิ์การใช้งาน', Comp: PermissionsTab },
 ];
 
 export default function Settings() {
@@ -20,7 +18,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="ตั้งค่าระบบ" subtitle="จัดการผู้ใช้และข้อมูลพื้นฐานของระบบ" />
+      <PageHeader title="ผู้ใช้และสิทธิ์" subtitle="จัดการบัญชีผู้ใช้และสิทธิ์การใช้งานแต่ละโมดูล" />
 
       <div className="flex gap-1 border-b border-slate-200">
         {TABS.map((t) => (

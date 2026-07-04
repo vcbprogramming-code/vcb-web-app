@@ -13,6 +13,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
     recipient: doc.recipient || '',
     reference: doc.reference || '',
     cc: doc.cc_recipients || '',
+    signerName: doc.signer_name || '',
+    signerTitle: doc.signer_title || '',
     body: doc.body || '',
     remarks: doc.remarks || '',
     docTypeId: doc.doc_type_id || '',
@@ -36,6 +38,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
         recipient: form.recipient || null,
         reference: form.reference || null,
         cc: form.cc || null,
+        signerName: form.signerName || null,
+        signerTitle: form.signerTitle || null,
         body: form.body || null,
         remarks: form.remarks || null,
         docTypeId: form.docTypeId || null,
@@ -89,6 +93,14 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>
             <input value={form.cc} onChange={(e) => set('cc', e.target.value)} className="field" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">ผู้ลงนาม (ผู้เซ็น)</label>
+            <input value={form.signerName} onChange={(e) => set('signerName', e.target.value)} placeholder="เว้นว่าง = ผู้จัดทำเซ็นเอง" className="field" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่งผู้ลงนาม</label>
+            <input value={form.signerTitle} onChange={(e) => set('signerTitle', e.target.value)} className="field" />
           </div>
         </div>
         <div>

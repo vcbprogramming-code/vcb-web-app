@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { hashPassword } from '../utils/auth.js';
+import { PERMISSION_CATALOG, effectivePermissions } from '../config/permissions.js';
 
 // Everything here is admin-only.
 const router = Router();
@@ -116,6 +117,58 @@ router.post(
     );
     if (!row) throw new ApiError(404, 'User not found');
     res.json({ data: { reset: true } });
+  })
+);
+
+// ===========================================================================
+// Permissions (action-level, backlog round 2 #3)
+// ===========================================================================
+
+/** GET /api/admin/permissions/catalog — the module/action catalogue for the UI. */
+router.get(
+  '/permissions/catalog',
+  asyncHandler(async (req, res) => {
+    res.json({ data: PERMISSION_CATALOG });
+  })
+);
+
+/** GET /api/admin/users/:id/permissions — a user's raw overrides + effective map. */
+router.get(
+  '/users/:id/permissions',
+  asyncHandler(async (req, res) => {
+    const row = await queryOne(
+      'select id, role, permissions from profiles where id = $1',
+      [req.params.id]
+    );
+    if (!row) throw new ApiError(404, 'User not found');
+    res.json({
+      data: {
+        role: row.role,
+        overrides: row.permissions || {},
+        effective: effectivePermissions(row),
+      },
+    });
+  })
+);
+
+// permission override map: { module: { action: boolean } }
+const permissionsSchema = z.object({
+  permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
+});
+
+/** PUT /api/admin/users/:id/permissions — replace a user's override map. */
+router.put(
+  '/users/:id/permissions',
+  asyncHandler(async (req, res) => {
+    const parsed = permissionsSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const row = await queryOne(
+      `update profiles set permissions = $2::jsonb where id = $1
+        returning id, role, permissions`,
+      [req.params.id, JSON.stringify(parsed.data.permissions)]
+    );
+    if (!row) throw new ApiError(404, 'User not found');
+    res.json({ data: { overrides: row.permissions, effective: effectivePermissions(row) } });
   })
 );
 

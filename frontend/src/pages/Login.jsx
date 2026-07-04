@@ -8,7 +8,6 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,7 +21,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(email);
       const dest = location.state?.from?.pathname || '/';
       navigate(dest, { replace: true });
     } catch (err) {
@@ -55,22 +54,10 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="username"
+              placeholder="you@vcb.local"
             />
+            <p className="mt-1 text-xs text-slate-400">กรอกอีเมลที่ลงทะเบียนไว้เพื่อเข้าสู่ระบบ</p>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              รหัสผ่าน
-            </label>
-            <input
-              type="password"
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-
           {error && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}

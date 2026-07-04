@@ -24,6 +24,8 @@ export default function DocumentDetail() {
   const [showEdit, setShowEdit] = useState(false);
 
   const [previewUrl, setPreviewUrl] = useState(null);
+  // which attachment the left preview panel is showing (null = auto: the letter)
+  const [previewAttId, setPreviewAttId] = useState(null);
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
@@ -31,21 +33,36 @@ export default function DocumentDetail() {
 
   useEffect(load, [load]);
 
-  // Inline preview: load the generated letterhead PDF (approved version if it
-  // exists, else the original) into an object URL for the embedded viewer.
-  useEffect(() => {
-    if (!doc) return;
-    const pdf =
+  // Files that can be shown inline in the preview panel: the generated letter
+  // (approved wins over original) plus any PDF/image supplementary attachment.
+  const previewables = doc ? (() => {
+    const letter =
       doc.attachments.find((a) => a.version === 'approved') ||
       doc.attachments.find((a) => a.version === 'original');
-    if (!pdf) {
+    const inlineKinds = doc.attachments.filter(
+      (a) => a.kind === 'upload' && /^(application\/pdf|image\/)/.test(a.content_type || '')
+    );
+    const list = [];
+    if (letter) list.push({ id: letter.id, label: letter.version === 'approved' ? 'ฉบับอนุมัติ' : 'หนังสือ (ต้นฉบับ)', isLetter: true });
+    for (const a of inlineKinds) list.push({ id: a.id, label: a.file_name, isLetter: false });
+    return list;
+  })() : [];
+
+  // pick the active preview target: the user's chosen attachment, else the letter
+  const activePreviewId = (previewAttId && previewables.some((p) => p.id === previewAttId))
+    ? previewAttId
+    : previewables[0]?.id || null;
+
+  // Inline preview: load the active attachment into an object URL for the viewer.
+  useEffect(() => {
+    if (!activePreviewId) {
       setPreviewUrl(null);
       return;
     }
     let url;
     let cancelled = false;
     ememoApi
-      .attachmentBlobUrl(id, pdf.id)
+      .attachmentBlobUrl(id, activePreviewId)
       .then((u) => {
         if (cancelled) {
           URL.revokeObjectURL(u);
@@ -59,7 +76,7 @@ export default function DocumentDetail() {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [doc, id]);
+  }, [activePreviewId, id]);
 
   const cancelDoc = async () => {
     if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
@@ -186,6 +203,24 @@ export default function DocumentDetail() {
                 </button>
               )}
             </div>
+            {/* preview source tabs: the letter + any inline-viewable attachment */}
+            {previewables.length > 1 && (
+              <div className="mb-2 flex flex-wrap gap-1.5 px-2">
+                {previewables.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPreviewAttId(p.id)}
+                    className={`inline-flex max-w-[220px] items-center gap-1.5 truncate rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      p.id === activePreviewId ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                    title={p.label}
+                  >
+                    <Icon name={p.isLetter ? 'file' : 'paperclip'} className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {previewUrl ? (
               <iframe
                 title="ตัวอย่างเอกสาร"

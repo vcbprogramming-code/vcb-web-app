@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
 import ApprovalAction from './pages/ememo/ApprovalAction.jsx';
+import EmemoSettings from './pages/ememo/EmemoSettings.jsx';
 import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
@@ -44,6 +45,14 @@ export default function App() {
 
           <Route path="memos" element={<DocumentRegister />} />
           <Route path="memos/:id" element={<DocumentDetail />} />
+          <Route
+            path="memos-settings"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <EmemoSettings />
+              </ProtectedRoute>
+            }
+          />
           <Route path="profile" element={<MyProfile />} />
 
           <Route path="performance" element={<Feature path="/performance"><Performance /></Feature>} />

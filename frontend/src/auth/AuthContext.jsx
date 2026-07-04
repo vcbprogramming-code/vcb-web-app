@@ -30,7 +30,8 @@ export function AuthProvider({ children }) {
     const res = await api('/auth/login', {
       method: 'POST',
       auth: false,
-      body: { email, password },
+      // password is optional now (email-only login); only send it if provided
+      body: password ? { email, password } : { email },
     });
     tokenStore.set(res.session.access_token);
     setUser(res.user);

@@ -37,13 +37,22 @@ export const apps = [
     enabled: false,
   },
   {
+    to: '/memos-settings',
+    title: 'ตั้งค่า E-Memo',
+    desc: 'โครงการ หัวจดหมายรายโครงการ ประเภทเอกสาร และสายอนุมัติตามรหัส',
+    icon: 'document',
+    color: 'bg-blue-50 text-blue-600',
+    roles: ['admin'],
+    enabled: true,
+  },
+  {
     to: '/admin',
-    title: 'ตั้งค่าระบบ',
-    desc: 'จัดการผู้ใช้ โครงการ ประเภทเอกสาร และหัวจดหมาย',
+    title: 'ผู้ใช้และสิทธิ์',
+    desc: 'จัดการบัญชีผู้ใช้และสิทธิ์การใช้งานแต่ละโมดูล',
     icon: 'settings',
     color: 'bg-slate-100 text-slate-600',
     roles: ['admin'],
-    enabled: true, // admin ต้องตั้งค่า E-Memo (โครงการ/หัวจดหมาย/ผู้ใช้)
+    enabled: true,
   },
 ];
 
@@ -56,7 +65,8 @@ export const moduleTitles = {
   '/performance': 'รายงานการปฏิบัติงาน',
   '/credit': 'วงเงินสินเชื่อโครงการ',
   '/onboarding': 'แนะแนวพนักงานใหม่',
-  '/admin': 'ตั้งค่าระบบ',
+  '/memos-settings': 'ตั้งค่า E-Memo',
+  '/admin': 'ผู้ใช้และสิทธิ์',
   '/dashboard': 'ภาพรวม E-Memo',
 };
 

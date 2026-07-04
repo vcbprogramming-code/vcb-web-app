@@ -10,7 +10,9 @@ services:
     region: singapore
     plan: free
     rootDir: backend
-    buildCommand: npm install
+    # migrate on every deploy — the runner records applied files in
+    # schema_migrations and skips them, so this is idempotent and safe to re-run.
+    buildCommand: npm install && npm run migrate
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true

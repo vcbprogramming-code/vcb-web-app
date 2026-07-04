@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { moduleTitles, roleLabels } from '../config/nav.js';
 import Icon from './Icon.jsx';
+import GlobeMark from './GlobeMark.jsx';
 
 /** Resolve the module title from the current path (longest matching prefix). */
 function titleFor(pathname) {
@@ -28,6 +29,8 @@ export default function ModuleShell() {
   const role = profile?.role;
   const title = titleFor(location.pathname);
   const brand = brandFor(location.pathname);
+  // E-Memo pages use the dark-navy theme; other modules keep the light theme.
+  const dark = location.pathname.startsWith('/memos') || location.pathname.startsWith('/dashboard');
 
   function handleLogout() {
     logout();
@@ -35,8 +38,8 @@ export default function ModuleShell() {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
+    <div className={`flex min-h-full flex-col ${dark ? 'ink-page' : 'bg-slate-50'}`}>
+      <header className={`sticky top-0 z-20 border-b backdrop-blur-lg ${dark ? 'border-white/10 bg-[#0a1226]/80' : 'border-slate-200/70 bg-white/80'}`}>
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -44,12 +47,14 @@ export default function ModuleShell() {
               title="กลับสู่หน้า Portal"
               className="group flex min-w-0 items-center gap-3 rounded-xl px-1 py-0.5 transition hover:opacity-90"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
-                <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl transition group-hover:scale-105 ${dark ? 'bg-gradient-to-br from-cyan-400/15 to-blue-500/10 ring-1 ring-cyan-300/30' : 'bg-white shadow-sm ring-1 ring-slate-200'}`}>
+                {dark
+                  ? <GlobeMark className="h-6 w-6" />
+                  : <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />}
               </span>
               <span className="min-w-0 text-left leading-tight">
-                <span className="block text-sm font-bold tracking-tight text-slate-900">{brand}</span>
-                {title && <span className="block truncate text-[11px] text-slate-500">{title}</span>}
+                <span className={`block text-sm font-bold tracking-tight ${dark ? 'text-white' : 'text-slate-900'}`}>{brand}</span>
+                {title && <span className={`block truncate text-[11px] ${dark ? 'text-cyan-200/50' : 'text-slate-500'}`}>{title}</span>}
               </span>
             </button>
           </div>
@@ -57,14 +62,14 @@ export default function ModuleShell() {
             <button
               onClick={() => navigate('/profile')}
               title="โปรไฟล์ของฉัน"
-              className="hidden rounded-lg px-2 py-1 text-right transition hover:bg-slate-50 sm:block"
+              className={`hidden rounded-lg px-2 py-1 text-right transition sm:block ${dark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
             >
-              <div className="text-sm font-medium text-slate-800">{profile?.full_name || user?.email}</div>
-              <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>
+              <div className={`text-sm font-medium ${dark ? 'text-slate-100' : 'text-slate-800'}`}>{profile?.full_name || user?.email}</div>
+              <div className={`text-xs ${dark ? 'text-cyan-200/50' : 'text-slate-500'}`}>{roleLabels[role] || role}</div>
             </button>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition ${dark ? 'border-white/15 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
               title="ออกจากระบบ"
             >
               <Icon name="logout" className="h-4 w-4" />

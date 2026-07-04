@@ -210,7 +210,60 @@ router.get(
     const { rows: audit } = await query(
       `select action, actor_label, detail, created_at
          from audit_log where document_id = $1 order by created_at`, [req.params.id]);
-    res.json({ data: { ...doc, attachments, approval_steps: steps, audit } });
+    // conversation thread: messages + each message's file attachments
+    const { rows: messages } = await query(
+      `select m.id, m.body, m.author_label, m.created_at,
+              pr.full_name as author_name,
+              coalesce(
+                (select json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type) order by a.created_at)
+                   from document_attachments a where a.message_id = m.id), '[]'
+              ) as attachments
+         from document_messages m
+         left join profiles pr on pr.id = m.author_id
+        where m.document_id = $1
+        order by m.created_at`, [req.params.id]);
+    res.json({ data: { ...doc, attachments, approval_steps: steps, audit, messages } });
+  })
+);
+
+// ── conversation messages (2-way communication) ──────────────────────────────
+
+const messageSchema = z.object({ body: z.string().trim().min(1) });
+
+/** POST /api/documents/:id/messages — post a text message to the thread. */
+router.post(
+  '/:id/messages',
+  asyncHandler(async (req, res) => {
+    const doc = await getDocOr404(req.params.id);
+    const parsed = messageSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const row = await queryOne(
+      `insert into document_messages (document_id, author_id, author_label, body)
+       values ($1,$2,$3,$4) returning id, body, author_label, created_at`,
+      [doc.id, req.profile.id, req.profile.full_name || req.profile.email, parsed.data.body.trim()]
+    );
+    res.status(201).json({ data: { ...row, author_name: req.profile.full_name || null, attachments: [] } });
+  })
+);
+
+/** POST /api/documents/:id/messages/:msgId/attachments — attach a file to a message. */
+router.post(
+  '/:id/messages/:msgId/attachments',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    await getDocOr404(req.params.id);
+    const msg = await queryOne('select id from document_messages where id = $1 and document_id = $2', [req.params.msgId, req.params.id]);
+    if (!msg) throw new ApiError(404, 'Message not found');
+    if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
+    const safeName = req.file.originalname.replace(/[^\w.\-ก-๙ ]/g, '_');
+    const key = `documents/${req.params.id}/msg/${crypto.randomUUID()}-${safeName}`;
+    await putObject(key, req.file.buffer, req.file.mimetype);
+    const row = await queryOne(
+      `insert into document_attachments (document_id, message_id, kind, file_name, content_type, size_bytes, storage_key, uploaded_by)
+       values ($1,$2,'message',$3,$4,$5,$6,$7) returning id, file_name, content_type, created_at`,
+      [req.params.id, req.params.msgId, req.file.originalname, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
+    );
+    res.status(201).json({ data: row });
   })
 );
 

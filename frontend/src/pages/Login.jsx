@@ -144,12 +144,15 @@ export default function Login() {
         {/* Sign in with Google (shown only when configured on the backend) */}
         {googleClientId && (
           <>
-            <div className="flex justify-center [color-scheme:dark]">
-              <div ref={googleBtnRef} />
+            {/* wrapper clips the GIS iframe's default light frame to a clean pill */}
+            <div className="flex justify-center">
+              <div className="overflow-hidden rounded-full ring-1 ring-cyan-300/25" style={{ colorScheme: 'dark', lineHeight: 0 }}>
+                <div ref={googleBtnRef} />
+              </div>
             </div>
             <div className="my-5 flex items-center gap-3">
               <span className="h-px flex-1 bg-cyan-300/15" />
-              <span className="cyber-label text-[10px] text-cyan-200/40">หรือ</span>
+              <span className="cyber-label text-[10px] text-cyan-200/50">หรือ</span>
               <span className="h-px flex-1 bg-cyan-300/15" />
             </div>
           </>
@@ -157,7 +160,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="cyber-label mb-1.5 block text-[10px] text-cyan-200/70">อีเมล</label>
+            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">อีเมล</label>
             <input
               type="email"
               className="cyber-input"
@@ -168,7 +171,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="cyber-label mb-1.5 block text-[10px] text-cyan-200/70">รหัสผ่าน</label>
+            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">รหัสผ่าน</label>
             <input
               type="password"
               className="cyber-input"

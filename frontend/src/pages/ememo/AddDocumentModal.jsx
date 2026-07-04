@@ -15,8 +15,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [recipient, setRecipient] = useState('');
   const [reference, setReference] = useState('');
   const [cc, setCc] = useState('');
-  const [enclName, setEnclName] = useState('');
-  const [enclQty, setEnclQty] = useState('');
+  // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
+  const [enclosures, setEnclosures] = useState([{ name: '', qty: '' }]);
+  const setEncl = (i, key, val) => setEnclosures((prev) => prev.map((e, idx) => (idx === i ? { ...e, [key]: val } : e)));
+  const addEncl = () => setEnclosures((prev) => [...prev, { name: '', qty: '' }]);
+  const removeEncl = (i) => setEnclosures((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
+  // rows with a name → the payload shape the API/preview expect
+  const enclList = enclosures
+    .filter((e) => e.name.trim())
+    .map((e) => ({ name: e.name.trim(), qty: e.qty ? Number(e.qty) : undefined, unit: 'ชุด' }));
   const [body, setBody] = useState('');
   const [remarks, setRemarks] = useState('');
   // signer (ผู้เซ็น) — may differ from the preparer (the logged-in author). Blank
@@ -156,9 +163,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           signerName: signerName.trim() || undefined,
           signerTitle: signerTitle.trim() || undefined,
           authorSignatureUrl,
-          enclosures: enclName.trim()
-            ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
-            : undefined,
+          enclosures: enclList.length ? enclList : undefined,
           body: body.trim() || undefined,
           remarks: remarks.trim() || undefined,
           docTypeId: docTypeId || undefined,
@@ -203,9 +208,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     recipient,
     reference,
     cc_recipients: cc,
-    enclosures: enclName.trim()
-      ? [{ name: enclName.trim(), qty: enclQty ? Number(enclQty) : undefined, unit: 'ชุด' }]
-      : [],
+    enclosures: enclList,
     body,
     // signature block shows the signer (falls back to the preparer/author)
     signer_name: signerName.trim() || authorName,
@@ -341,11 +344,20 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">สิ่งที่ส่งมาด้วย (ไม่บังคับ)</label>
-            <div className="flex gap-2">
-              <input value={enclName} onChange={(e) => setEnclName(e.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
-              <input value={enclQty} onChange={(e) => setEnclQty(e.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-28`} />
-              <span className="self-center text-sm text-slate-500">ชุด</span>
+            <div className="space-y-2">
+              {enclosures.map((e, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="w-5 shrink-0 text-center text-sm text-slate-400">{i + 1}.</span>
+                  <input value={e.name} onChange={(ev) => setEncl(i, 'name', ev.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
+                  <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-24`} />
+                  <span className="self-center text-sm text-slate-500">ชุด</span>
+                  {enclosures.length > 1 && (
+                    <button type="button" onClick={() => removeEncl(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
+                  )}
+                </div>
+              ))}
             </div>
+            <button type="button" onClick={addEncl} className="mt-2 text-sm font-medium text-blue-600 hover:underline">+ เพิ่มรายการ</button>
           </div>
           </>)}
 

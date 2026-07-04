@@ -46,18 +46,35 @@ function AuditTrail({ entries }) {
         <Icon name="clock" className="h-4 w-4" /> ประวัติการดำเนินการ (Audit Trail)
       </h4>
       <ol className="space-y-2">
-        {list.map((a, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-xs">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium text-slate-700">{AUDIT_ACTION_TH[a.action] || a.action}</span>
-                {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
-                <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
+        {list.map((a, i) => {
+          // `edited` entries carry a before→after change list in detail.changes
+          const changes = a.action === 'edited' && Array.isArray(a.detail?.changes) ? a.detail.changes : [];
+          const truncate = (s) => (s && s.length > 40 ? `${s.slice(0, 40)}…` : s);
+          return (
+            <li key={i} className="flex items-start gap-2.5 text-xs">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium text-slate-700">{AUDIT_ACTION_TH[a.action] || a.action}</span>
+                  {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
+                  <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
+                </div>
+                {changes.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
+                    {changes.map((c, j) => (
+                      <li key={j} className="text-slate-500">
+                        <span className="font-medium text-slate-600">{c.label}:</span>{' '}
+                        {c.from
+                          ? <><span className="text-rose-500 line-through">{truncate(c.from)}</span> <span className="text-slate-400">→</span> <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span></>
+                          : <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

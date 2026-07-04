@@ -442,25 +442,38 @@ router.patch(
     const f = parsed.data;
     const sets = [];
     const vals = [];
-    const add = (col, val, cast = '') => { vals.push(val); sets.push(`${col} = $${vals.length}${cast}`); };
-    if (f.subject !== undefined) add('subject', f.subject);
-    if (f.recipient !== undefined) add('recipient', f.recipient || null);
-    if (f.reference !== undefined) add('reference', f.reference || null);
-    if (f.cc !== undefined) add('cc_recipients', f.cc || null);
-    if (f.signerName !== undefined) add('signer_name', f.signerName || null);
-    if (f.signerTitle !== undefined) add('signer_title', f.signerTitle || null);
-    if (f.body !== undefined) add('body', f.body || null);
-    if (f.remarks !== undefined) add('remarks', f.remarks || null);
-    if (f.workUnit !== undefined) add('work_unit', f.workUnit || null);
-    if (f.docTypeId !== undefined) add('doc_type_id', f.docTypeId || null);
-    if (f.dateReceived !== undefined) add('date_received', f.dateReceived || null, '::date');
-    if (f.enclosures !== undefined) add('enclosures', JSON.stringify(f.enclosures), '::jsonb');
+    // Track before→after per field so the audit trail can show what changed.
+    // `label` is the Thai field name; `oldVal` reads from the pre-update row.
+    const changes = [];
+    const enclText = (e) => (Array.isArray(e) ? e.map((x, i) => `${i + 1}. ${x.name || ''}${x.qty != null ? ` (${x.qty} ${x.unit || 'ชุด'})` : ''}`).join(', ') : '');
+    const dateText = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const add = (col, val, cast = '', label = null, oldVal = undefined, format = (v) => (v == null || v === '' ? '' : String(v))) => {
+      vals.push(val);
+      sets.push(`${col} = $${vals.length}${cast}`);
+      if (label) {
+        const before = format(oldVal);
+        const after = format(val);
+        if (before !== after) changes.push({ label, from: before, to: after });
+      }
+    };
+    if (f.subject !== undefined) add('subject', f.subject, '', 'เรื่อง', doc.subject);
+    if (f.recipient !== undefined) add('recipient', f.recipient || null, '', 'เรียน', doc.recipient);
+    if (f.reference !== undefined) add('reference', f.reference || null, '', 'อ้างถึง', doc.reference);
+    if (f.cc !== undefined) add('cc_recipients', f.cc || null, '', 'สำเนาเรียน', doc.cc_recipients);
+    if (f.signerName !== undefined) add('signer_name', f.signerName || null, '', 'ผู้ลงนาม', doc.signer_name);
+    if (f.signerTitle !== undefined) add('signer_title', f.signerTitle || null, '', 'ตำแหน่งผู้ลงนาม', doc.signer_title);
+    if (f.body !== undefined) add('body', f.body || null, '', 'เนื้อความ', doc.body);
+    if (f.remarks !== undefined) add('remarks', f.remarks || null, '', 'หมายเหตุ', doc.remarks);
+    if (f.workUnit !== undefined) add('work_unit', f.workUnit || null, '', 'หน่วยงาน', doc.work_unit);
+    if (f.docTypeId !== undefined) add('doc_type_id', f.docTypeId || null); // id change — not human-meaningful in the trail
+    if (f.dateReceived !== undefined) add('date_received', f.dateReceived || null, '::date', 'วันที่รับ', doc.date_received, dateText);
+    if (f.enclosures !== undefined) add('enclosures', JSON.stringify(f.enclosures), '::jsonb', 'สิ่งที่ส่งมาด้วย', doc.enclosures, enclText);
     if (!sets.length) throw new ApiError(400, 'No fields to update');
     vals.push(req.params.id);
     await query(`update documents set ${sets.join(', ')} where id = $${vals.length}`, vals);
     await query(
       `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'edited',$4)`,
-      [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ fields: sets.length })]
+      [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ changes })]
     );
     // return the full detail
     const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,

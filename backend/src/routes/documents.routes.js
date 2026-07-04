@@ -16,6 +16,7 @@ import {
 } from '../services/docNumber.js';
 import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
 import { generateOriginalPdf } from '../services/pdfDoc.js';
+import { generateCombinedPdf } from '../services/pdfMerge.js';
 import { createApprovalChain, sendApprovalRequest } from '../services/approval.js';
 import { sendCcNotification, extractCcEmails } from '../services/email.js';
 
@@ -435,6 +436,23 @@ router.post(
     await loadDocForMutation(req);
     const row = await generateOriginalPdf(req.params.id, req.profile.id);
     res.status(201).json({ data: { id: row.id, file_name: row.file_name, version: 'original', created_at: row.created_at } });
+  })
+);
+
+/**
+ * POST /api/documents/:id/combine — build ONE combined PDF: the letter followed
+ * by every PDF/image attachment (สิ่งที่ส่งมาด้วย). Returns the new attachment
+ * meta + any skipped (non-PDF/image) file names so the UI can warn.
+ */
+router.post(
+  '/:id/combine',
+  asyncHandler(async (req, res) => {
+    await loadDocForMutation(req);
+    const row = await generateCombinedPdf(req.params.id, req.profile.id);
+    if (!row) throw new ApiError(409, 'ยังไม่มีไฟล์หนังสือ — กรุณาสร้างไฟล์หนังสือก่อน');
+    res.status(201).json({
+      data: { id: row.id, file_name: row.file_name, kind: 'combined_pdf', created_at: row.created_at, skipped: row.skipped },
+    });
   })
 );
 

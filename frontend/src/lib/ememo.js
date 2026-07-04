@@ -21,6 +21,7 @@ export const ememoApi = {
   nextNumber: (projectId, docCode) =>
     api(`/documents/next-number${qs({ projectId, docCode })}`),
   createDocument: (body) => api('/documents', { method: 'POST', body }),
+  combineDocument: (id) => api(`/documents/${id}/combine`, { method: 'POST' }),
   updateDocument: (id, body) => api(`/documents/${id}`, { method: 'PATCH', body }),
   cancelDocument: (id, reason) => api(`/documents/${id}/cancel`, { method: 'POST', body: { reason } }),
   resendApproval: (id) => api(`/documents/${id}/resend-approval`, { method: 'POST' }),

@@ -36,6 +36,7 @@ export default function DocumentDetail() {
   // Files that can be shown inline in the preview panel: the generated letter
   // (approved wins over original) plus any PDF/image supplementary attachment.
   const previewables = doc ? (() => {
+    const combined = doc.attachments.find((a) => a.kind === 'combined_pdf');
     const letter =
       doc.attachments.find((a) => a.version === 'approved') ||
       doc.attachments.find((a) => a.version === 'original');
@@ -43,6 +44,8 @@ export default function DocumentDetail() {
       (a) => a.kind === 'upload' && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
     const list = [];
+    // the combined "one file" document comes first when it exists
+    if (combined) list.push({ id: combined.id, label: 'รวมเอกสาร (ไฟล์เดียว)', isLetter: true });
     if (letter) list.push({ id: letter.id, label: letter.version === 'approved' ? 'ฉบับอนุมัติ' : 'หนังสือ (ต้นฉบับ)', isLetter: true });
     for (const a of inlineKinds) list.push({ id: a.id, label: a.file_name, isLetter: false });
     return list;
@@ -116,6 +119,26 @@ export default function DocumentDetail() {
     }
   };
 
+  const combineDoc = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { data } = await ememoApi.combineDocument(id);
+      if (data.skipped?.length) {
+        window.alert(
+          `รวมเอกสารเป็นไฟล์เดียวแล้ว\n\nไฟล์ที่ไม่ได้รวม (รองรับเฉพาะ PDF และรูปภาพ — โปรดแปลงเป็น PDF ก่อน):\n• ${data.skipped.join('\n• ')}`
+        );
+      }
+      // show the combined file in the preview right away
+      setPreviewAttId(data.id);
+      load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openAttachment = async (attId) => {
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
@@ -169,6 +192,12 @@ export default function DocumentDetail() {
             {editable && (
               <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
                 <Icon name="edit" className="h-4 w-4" /> แก้ไข
+              </button>
+            )}
+            {/* combine letter + attachments into one PDF (shown once a letter exists) */}
+            {doc.attachments.some((a) => a.kind === 'generated_pdf') && (
+              <button onClick={combineDoc} disabled={busy} className="btn-outline" title="รวมบันทึกข้อความ + ไฟล์แนบ เป็น PDF ไฟล์เดียว">
+                <Icon name="layers" className="h-4 w-4" /> รวมเป็นไฟล์เดียว
               </button>
             )}
             {canResend && (
@@ -290,6 +319,20 @@ export default function DocumentDetail() {
                     <button onClick={() => openAttachment(appr.id)} className="text-emerald-600 hover:underline text-sm break-all">{appr.file_name}</button>
                   ) : (
                     <p className="text-xs text-slate-400">จะถูกสร้างเมื่ออนุมัติครบทุกขั้น</p>
+                  );
+                })()}
+              </div>
+              {/* ฉบับรวม (บันทึก + ไฟล์แนบ ในไฟล์เดียว) */}
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Icon name="layers" className="h-4 w-4 text-brand" /> รวมเอกสาร (บันทึก + ไฟล์แนบ ไฟล์เดียว)
+                </div>
+                {(() => {
+                  const comb = doc.attachments.find((a) => a.kind === 'combined_pdf');
+                  return comb ? (
+                    <button onClick={() => openAttachment(comb.id)} className="text-brand hover:underline text-sm break-all">{comb.file_name}</button>
+                  ) : (
+                    <p className="text-xs text-slate-400">กด "รวมเป็นไฟล์เดียว" ด้านบนเพื่อสร้าง (รวมเฉพาะ PDF/รูปภาพ)</p>
                   );
                 })()}
               </div>

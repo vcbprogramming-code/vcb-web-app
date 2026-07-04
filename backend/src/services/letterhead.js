@@ -215,6 +215,47 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         .text(`ผู้จัดทำ: ${preparer}`, left, pdf.y, { width: contentW });
     }
 
+    // ---- ความเห็น / การพิจารณา box at the BOTTOM of the first page ----
+    // Mirrors the client's real memos where reviewers write their comment and
+    // sign at the foot of page 1. Shows any approver comments already recorded,
+    // plus a "ผู้ตรวจสอบ / ผู้อนุมัติ" signature row. Skipped when opts.commentBox
+    // is explicitly false (e.g. a clean original with nothing to show yet).
+    const commentSteps = Array.isArray(opts.auditSteps)
+      ? opts.auditSteps.filter((s) => s.comment && s.comment.trim())
+      : [];
+    const wantCommentBox = opts.commentBox !== false;
+    if (wantCommentBox) {
+      // put the box near the page bottom; start a new page only if there's very
+      // little room left so it never collides with the signature block
+      const bottomLimit = pdf.page.height - pdf.page.margins.bottom;
+      const boxNeed = 96 + commentSteps.length * 16;
+      if (pdf.y + boxNeed > bottomLimit) pdf.addPage();
+      else pdf.y = Math.max(pdf.y + 12, bottomLimit - boxNeed);
+
+      const boxTop = pdf.y;
+      pdf.rect(left, boxTop, contentW, boxNeed - 8).lineWidth(0.6).strokeColor('#94a3b8').stroke();
+      pdf.font('th-bold').fontSize(11).fillColor('#0f172a')
+        .text('ความเห็น / การพิจารณา', left + 10, boxTop + 8, { width: contentW - 20 });
+
+      let cy = boxTop + 26;
+      pdf.font('th').fontSize(10.5).fillColor('#334155');
+      for (const s of commentSteps) {
+        const who = s.approver_name || s.approver_email || '';
+        pdf.text(`• ${who}: ${s.comment}`, left + 12, cy, { width: contentW - 24 });
+        cy = pdf.y + 3;
+      }
+
+      // signature slots row (checker / approver)
+      const slotY = boxTop + boxNeed - 40;
+      const half = contentW / 2;
+      pdf.font('th').fontSize(10).fillColor('#475569');
+      pdf.text('ลงชื่อ ...........................................', left + 12, slotY, { width: half - 20 });
+      pdf.text('ผู้ตรวจสอบ', left + 12, slotY + 15, { width: half - 20 });
+      pdf.text('ลงชื่อ ...........................................', left + half, slotY, { width: half - 20 });
+      pdf.text('ผู้อนุมัติ', left + half, slotY + 15, { width: half - 20 });
+      pdf.y = slotY + 34;
+    }
+
     // ---- "บันทึกการพิจารณา" page (approval trail) ----
     const trail = Array.isArray(opts.auditSteps) ? opts.auditSteps.filter((s) => s.action && s.action !== 'pending') : [];
     if (trail.length) {

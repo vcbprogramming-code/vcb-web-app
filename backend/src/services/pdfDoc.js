@@ -106,7 +106,8 @@ export async function generateOriginalPdf(documentId, uploadedBy = null) {
   if (sigKey) {
     authorSignature = await getObjectBuffer(sigKey).catch(() => null);
   }
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature });
+  // original = the clean letter, no ความเห็น/การพิจารณา box yet
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, commentBox: false });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');

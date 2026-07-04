@@ -36,15 +36,8 @@ export const apps = [
     color: 'bg-violet-50 text-violet-600',
     enabled: false,
   },
-  {
-    to: '/memos-settings',
-    title: 'ตั้งค่า E-Memo',
-    desc: 'โครงการ หัวจดหมายรายโครงการ ประเภทเอกสาร และสายอนุมัติตามรหัส',
-    icon: 'document',
-    color: 'bg-blue-50 text-blue-600',
-    roles: ['admin'],
-    enabled: true,
-  },
+  // NOTE: E-Memo settings is intentionally NOT a Portal card — it lives inside
+  // the E-Memo module (a "ตั้งค่า" button on the register page → /memos-settings).
   {
     to: '/admin',
     title: 'ผู้ใช้และสิทธิ์',

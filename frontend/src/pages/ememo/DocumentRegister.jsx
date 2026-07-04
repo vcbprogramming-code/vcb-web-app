@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
 import { Avatar } from '../../components/ui/index.js';
@@ -33,6 +34,8 @@ function StatusBadge({ status }) {
 
 export default function DocumentRegister() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [projects, setProjects] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
   const [docs, setDocs] = useState([]);
@@ -138,6 +141,15 @@ export default function DocumentRegister() {
               <span className="text-lg font-bold leading-none">{total}</span>
               <span className="text-[11px] text-white/55">เอกสารทั้งหมด</span>
             </div>
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/memos-settings')}
+                title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+              >
+                <Icon name="settings" className="h-4 w-4" /> ตั้งค่า
+              </button>
+            )}
             <button
               onClick={() => setShowAdd(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"

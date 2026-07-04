@@ -120,6 +120,21 @@ router.patch(
   })
 );
 
+/** DELETE /api/admin/users/:id — remove a login account.
+ *  FK refs elsewhere are ON DELETE SET NULL, so documents/approvals keep their
+ *  data (just lose the user link). An admin cannot delete their own account. */
+router.delete(
+  '/users/:id',
+  asyncHandler(async (req, res) => {
+    if (req.params.id === req.profile.id) {
+      throw new ApiError(400, 'ไม่สามารถลบบัญชีของตนเองได้');
+    }
+    const row = await queryOne('delete from profiles where id = $1 returning id', [req.params.id]);
+    if (!row) throw new ApiError(404, 'User not found');
+    res.json({ data: { deleted: true } });
+  })
+);
+
 const pwdSchema = z.object({ password: z.string().min(6) });
 
 /** POST /api/admin/users/:id/reset-password */

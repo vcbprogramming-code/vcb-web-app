@@ -82,6 +82,7 @@ export const adminApi = {
   listUsers: () => api('/admin/users'),
   createUser: (body) => api('/admin/users', { method: 'POST', body }),
   updateUser: (id, body) => api(`/admin/users/${id}`, { method: 'PATCH', body }),
+  deleteUser: (id) => api(`/admin/users/${id}`, { method: 'DELETE' }),
   resetPassword: (id, password) =>
     api(`/admin/users/${id}/reset-password`, { method: 'POST', body: { password } }),
 

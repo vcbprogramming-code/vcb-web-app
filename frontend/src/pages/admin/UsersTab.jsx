@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminApi, ROLE_LABELS } from '../../lib/ememo.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
 
 const ROLE_CHIP = {
@@ -121,6 +122,7 @@ function UserModal({ user, onClose, onSaved }) {
 }
 
 export default function UsersTab() {
+  const { profile } = useAuth();
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [editUser, setEditUser] = useState(undefined); // undefined=closed, null=new, obj=edit
@@ -131,6 +133,16 @@ export default function UsersTab() {
   const toggleActive = async (u) => {
     try {
       await adminApi.updateUser(u.id, { isActive: !u.is_active });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const removeUser = async (u) => {
+    if (!window.confirm(`ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`)) return;
+    try {
+      await adminApi.deleteUser(u.id);
       load();
     } catch (e) {
       setError(e.message);
@@ -176,9 +188,13 @@ export default function UsersTab() {
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setEditUser(u)} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
-                  <button onClick={() => toggleActive(u)} className="text-slate-500 hover:underline text-sm">
+                  <button onClick={() => toggleActive(u)} className="text-slate-500 hover:underline text-sm mr-3">
                     {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                   </button>
+                  {/* can't delete your own account */}
+                  {u.id !== profile?.id && (
+                    <button onClick={() => removeUser(u)} className="text-sm text-red-500 hover:underline">ลบ</button>
+                  )}
                 </td>
               </tr>
             ))}

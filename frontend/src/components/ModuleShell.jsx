@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { moduleTitles, roleLabels } from '../config/nav.js';
+import { useTheme } from '../theme/ThemeContext.jsx';
 import Icon from './Icon.jsx';
 import GlobeMark from './GlobeMark.jsx';
 
@@ -24,6 +25,7 @@ function brandFor(pathname) {
  */
 export default function ModuleShell() {
   const { profile, user, logout } = useAuth();
+  const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const role = profile?.role;
@@ -63,6 +65,15 @@ export default function ModuleShell() {
             </button>
           </div>
           <div className="flex items-center gap-3">
+            {/* light/dark theme toggle */}
+            <button
+              onClick={toggle}
+              title={isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+              aria-label="สลับโหมดสว่าง/มืด"
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${navyHeader ? 'border-white/15 bg-white/[0.06] text-cyan-100 hover:bg-white/[0.12]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+              <Icon name={isDark ? 'sun' : 'moon'} className="h-4 w-4" />
+            </button>
             <button
               onClick={() => navigate('/profile')}
               title="โปรไฟล์ของฉัน"

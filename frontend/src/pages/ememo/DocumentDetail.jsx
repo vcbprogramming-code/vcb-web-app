@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { useToast } from '../../components/Toast.jsx';
 import SubmitApprovalModal from './SubmitApprovalModal.jsx';
 import EditDocumentModal from './EditDocumentModal.jsx';
+import ApprovalActionModal from './ApprovalActionModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
 function Row({ label, children }) {
@@ -19,6 +21,7 @@ export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profile, user } = useAuth();
+  const toast = useToast();
   const [doc, setDoc] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -35,8 +38,7 @@ export default function DocumentDetail() {
 
   // is the logged-in user the current pending approver?
   const [myApproval, setMyApproval] = useState({ canApprove: false });
-  const [actioning, setActioning] = useState(false);
-  const [approveComment, setApproveComment] = useState('');
+  const [approvalAction, setApprovalAction] = useState(null); // 'approved'|'returned'|'rejected' → opens the modal
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
@@ -45,21 +47,13 @@ export default function DocumentDetail() {
 
   useEffect(load, [load]);
 
-  // act on the current approval step (only shown to the current approver).
-  // comment is optional on approve, REQUIRED on return/reject.
-  const doApprove = async (action) => {
-    const labels = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };
-    const comment = approveComment.trim();
-    if (action !== 'approved' && !comment) {
-      setError(`กรุณาระบุเหตุผล/ความเห็นสำหรับ "${labels[action]}"`);
-      return;
-    }
-    setActioning(true); setError(null);
-    try {
-      await ememoApi.approveDocument(id, action, comment || undefined);
-      setApproveComment('');
-      load();
-    } catch (e) { setError(e.message); } finally { setActioning(false); }
+  // confirmed from ApprovalActionModal (comment already validated there)
+  const confirmApproval = async (comment) => {
+    const done = { approved: 'อนุมัติเอกสารเรียบร้อย', returned: 'ส่งกลับให้แก้ไขแล้ว', rejected: 'ไม่อนุมัติเอกสารแล้ว' };
+    await ememoApi.approveDocument(id, approvalAction, comment);
+    setApprovalAction(null);
+    toast.success(done[approvalAction] || 'ดำเนินการเรียบร้อย');
+    load();
   };
 
   const previewables = doc ? (() => {
@@ -93,8 +87,8 @@ export default function DocumentDetail() {
   const cancelDoc = async () => {
     if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
     setBusy(true);
-    try { await ememoApi.cancelDocument(id); load(); }
-    catch (e) { setError(e.message); } finally { setBusy(false); }
+    try { await ememoApi.cancelDocument(id); toast.success('ยกเลิกเอกสารแล้ว'); load(); }
+    catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
   };
 
   // fallback: (re)generate the letter PDF if one somehow doesn't exist yet.
@@ -113,8 +107,8 @@ export default function DocumentDetail() {
   const uploadFile = async (file) => {
     if (!file) return;
     setBusy(true);
-    try { await ememoApi.uploadAttachment(id, file); load(); }
-    catch (e) { setError(e.message); } finally { setBusy(false); }
+    try { await ememoApi.uploadAttachment(id, file); toast.success('แนบไฟล์แล้ว'); load(); }
+    catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
   };
 
   // post a message (+ optional attached file) to the conversation thread
@@ -126,7 +120,7 @@ export default function DocumentDetail() {
       if (msgFile) await ememoApi.attachMessageFile(id, data.id, msgFile);
       setMsgText(''); setMsgFile(null);
       load();
-    } catch (e) { setError(e.message); } finally { setPosting(false); }
+    } catch (e) { setError(e.message); toast.error(e.message); } finally { setPosting(false); }
   };
 
   if (error) return <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3">{error}</div>;
@@ -148,45 +142,22 @@ export default function DocumentDetail() {
         <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
       </button>
 
-      {/* ★ APPROVER CALL-TO-ACTION — the whole point of this page for an approver.
-          Big, unmissable, at the very top. Only for the current pending approver. */}
+      {/* Status banner for the current approver — informs, doesn't act. The
+          actual action buttons live in the header card below (one place). */}
       {myApproval.canApprove && (
-        <div className="rounded-2xl border-2 border-brand/40 bg-brand-tint p-5 shadow-sm ring-1 ring-brand/10">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow">
-              <Icon name="check" className="h-6 w-6" />
-            </span>
-            <div>
-              <div className="text-base font-bold text-slate-900">เอกสารนี้รอการอนุมัติจากคุณ</div>
-              <p className="text-sm text-slate-600">ตรวจเอกสารด้านล่าง เขียนความเห็น (ถ้ามี) แล้วเลือกดำเนินการ</p>
-            </div>
-          </div>
-
-          {/* inline comment — optional to approve, required to return/reject */}
-          <textarea
-            value={approveComment}
-            onChange={(e) => setApproveComment(e.target.value)}
-            rows={2}
-            placeholder="ความเห็น / เหตุผล (บังคับเมื่อส่งกลับแก้ไข หรือ ไม่อนุมัติ)"
-            className="mt-4 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-          />
-
-          <div className="mt-3 flex flex-wrap justify-end gap-2">
-            <button onClick={() => doApprove('returned')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-medium text-orange-600 transition hover:bg-orange-50 disabled:opacity-50">
-              <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
-            </button>
-            <button onClick={() => doApprove('rejected')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
-              <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
-            </button>
-            <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-50">
-              <Icon name="check" className="h-5 w-5" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติเอกสาร'}
-            </button>
+        <div className="flex items-center gap-3 rounded-2xl border border-brand/30 bg-brand-tint px-5 py-3.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
+            <Icon name="check" className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="text-sm font-bold text-slate-900">เอกสารนี้รอการอนุมัติจากคุณ</div>
+            <p className="text-xs text-slate-600">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มมุมขวาบน</p>
           </div>
         </div>
       )}
 
-      {/* header card — title + only the actions valid for THIS viewer & status */}
-      <div className="card">
+      {/* header card — title + all actions valid for THIS viewer & status, in ONE place */}
+      <div className={`card ${myApproval.canApprove ? 'ring-2 ring-brand/20' : ''}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="mb-1 flex items-center gap-2">
@@ -196,29 +167,40 @@ export default function DocumentDetail() {
             <h2 className="text-lg font-bold text-slate-800">{doc.doc_number}</h2>
             <p className="text-slate-600">{doc.subject}</p>
           </div>
-          {/* owner/admin actions, scoped to status:
-              · not submitted (ร่าง/ตีกลับ) → แก้ไข + ส่งอนุมัติ
-              · รออนุมัติ → ยกเลิก เท่านั้น
-              · อนุมัติแล้ว/ยกเลิก → ไม่มีปุ่ม (ดูอย่างเดียว) */}
-          {canManage && (notSubmitted || isPending) && (
-            <div className="flex flex-wrap justify-end gap-2">
-              {notSubmitted && (
-                <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
-                  <Icon name="edit" className="h-4 w-4" /> แก้ไข
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {/* APPROVER actions — click opens a confirm/reason modal */}
+            {myApproval.canApprove && (
+              <>
+                <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-sm font-medium text-orange-600 transition hover:bg-orange-50">
+                  <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
                 </button>
-              )}
-              {(notSubmitted || isPending) && (
-                <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
-                  <Icon name="x" className="h-4 w-4" /> ยกเลิก
+                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
+                  <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
                 </button>
-              )}
-              {notSubmitted && (
-                <button onClick={() => setShowSubmit(true)} className="btn-primary">
-                  <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500">
+                  <Icon name="check" className="h-5 w-5" /> อนุมัติ
                 </button>
-              )}
-            </div>
-          )}
+              </>
+            )}
+
+            {/* OWNER/ADMIN actions — scoped to status */}
+            {canManage && notSubmitted && (
+              <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
+                <Icon name="edit" className="h-4 w-4" /> แก้ไข
+              </button>
+            )}
+            {canManage && (notSubmitted || isPending) && (
+              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
+                <Icon name="x" className="h-4 w-4" /> ยกเลิก
+              </button>
+            )}
+            {canManage && notSubmitted && (
+              <button onClick={() => setShowSubmit(true)} className="btn-primary">
+                <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -399,7 +381,7 @@ export default function DocumentDetail() {
           documentId={id}
           docCode={doc.doc_code}
           onClose={() => setShowSubmit(false)}
-          onSubmitted={() => { setShowSubmit(false); load(); }}
+          onSubmitted={() => { setShowSubmit(false); toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
         />
       )}
 
@@ -407,7 +389,15 @@ export default function DocumentDetail() {
         <EditDocumentModal
           doc={doc}
           onClose={() => setShowEdit(false)}
-          onSaved={() => { setShowEdit(false); load(); }}
+          onSaved={() => { setShowEdit(false); toast.success('บันทึกการแก้ไขแล้ว'); load(); }}
+        />
+      )}
+
+      {approvalAction && (
+        <ApprovalActionModal
+          action={approvalAction}
+          onClose={() => setApprovalAction(null)}
+          onConfirm={confirmApproval}
         />
       )}
     </div>

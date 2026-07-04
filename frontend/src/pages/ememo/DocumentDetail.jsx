@@ -9,11 +9,56 @@ import ApprovalActionModal from './ApprovalActionModal.jsx';
 import ConsultModal from './ConsultModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
-function Row({ label, children }) {
+/** One compact metadata item (icon + label + value), used in the header card. */
+function MetaItem({ icon, label, children, className = '' }) {
   return (
-    <div className="flex gap-3 py-1.5 text-sm">
-      <div className="w-28 shrink-0 text-slate-500">{label}</div>
-      <div className="font-medium text-slate-800">{children}</div>
+    <div className={`flex min-w-0 items-start gap-2 ${className}`}>
+      <Icon name={icon} className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+      <div className="min-w-0">
+        <span className="text-slate-500">{label}: </span>
+        <span className="font-medium text-slate-800">{children}</span>
+      </div>
+    </div>
+  );
+}
+
+// Thai labels for the audit_log action codes (system activity trail).
+const AUDIT_ACTION_TH = {
+  created: 'สร้างเอกสาร',
+  edited: 'แก้ไขเอกสาร',
+  submitted: 'ส่งเข้าสายอนุมัติ',
+  approved: 'อนุมัติ',
+  rejected: 'ไม่อนุมัติ',
+  returned: 'ส่งกลับแก้ไข',
+  cancelled: 'ยกเลิกเอกสาร',
+  consulted: 'ขอความเห็น',
+  forwarded: 'ส่งต่อ',
+  resent: 'ส่งอนุมัติซ้ำ',
+};
+
+/** Full system activity log for the document (always expanded). */
+function AuditTrail({ entries }) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (list.length === 0) return null;
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-500">
+        <Icon name="clock" className="h-4 w-4" /> ประวัติการดำเนินการ (Audit Trail)
+      </h4>
+      <ol className="space-y-2">
+        {list.map((a, i) => (
+          <li key={i} className="flex items-start gap-2.5 text-xs">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-medium text-slate-700">{AUDIT_ACTION_TH[a.action] || a.action}</span>
+                {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
+                <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -162,10 +207,11 @@ export default function DocumentDetail() {
         </div>
       )}
 
-      {/* header card — title + all actions valid for THIS viewer & status, in ONE place */}
+      {/* header card — title (left) · actions + document meta (right), one row */}
       <div className={`card ${myApproval.canApprove ? 'ring-2 ring-brand/20' : ''}`}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+          {/* LEFT: identity */}
+          <div className="min-w-[240px]">
             <div className="mb-1 flex items-center gap-2">
               <span className="rounded-md px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: doc.project_color || '#64748b' }}>{doc.project_code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{status.label}</span>
@@ -174,38 +220,58 @@ export default function DocumentDetail() {
             <p className="text-slate-600">{doc.subject}</p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
-            {myApproval.canApprove && (
-              <>
-                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
-                  <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
-                </button>
-                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-                  <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
-                </button>
-                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
-                  <Icon name="check" className="h-5 w-5" /> อนุมัติ
-                </button>
-              </>
-            )}
+          {/* RIGHT: actions on top, document meta filling the space below them */}
+          <div className="flex flex-1 flex-col items-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
+              {myApproval.canApprove && (
+                <>
+                  <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
+                    <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
+                  </button>
+                  <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+                    <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
+                  </button>
+                  <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                    <Icon name="check" className="h-5 w-5" /> อนุมัติ
+                  </button>
+                </>
+              )}
 
-            {/* OWNER/ADMIN actions — scoped to status */}
-            {canManage && notSubmitted && (
-              <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
-                <Icon name="edit" className="h-4 w-4" /> แก้ไข
-              </button>
-            )}
-            {canManage && (notSubmitted || isPending) && (
-              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
-                <Icon name="x" className="h-4 w-4" /> ยกเลิก
-              </button>
-            )}
-            {canManage && notSubmitted && (
-              <button onClick={() => setShowSubmit(true)} className="btn-primary">
-                <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
-              </button>
-            )}
+              {/* OWNER/ADMIN actions — scoped to status */}
+              {canManage && notSubmitted && (
+                <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
+                  <Icon name="edit" className="h-4 w-4" /> แก้ไข
+                </button>
+              )}
+              {canManage && (notSubmitted || isPending) && (
+                <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
+                  <Icon name="x" className="h-4 w-4" /> ยกเลิก
+                </button>
+              )}
+              {canManage && notSubmitted && (
+                <button onClick={() => setShowSubmit(true)} className="btn-primary">
+                  <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+                </button>
+              )}
+            </div>
+
+            {/* document meta — relocated from the old "ข้อมูลเอกสาร" card, fills the
+                right-hand space instead of adding a new full-width row */}
+            <div className="grid w-full grid-cols-1 gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
+              <MetaItem icon="calendar" label="วันที่รับ">{formatThaiDate(doc.date_received)}</MetaItem>
+              <MetaItem icon="building" label="แผนก">{doc.department}</MetaItem>
+              {doc.recipient && <MetaItem icon="inbox" label="เรียน">{doc.recipient}</MetaItem>}
+              {doc.doc_type_name && <MetaItem icon="layers" label="ประเภท">{doc.doc_type_name}</MetaItem>}
+              {doc.reference && <MetaItem icon="file" label="อ้างถึง">{doc.reference}</MetaItem>}
+              {doc.cc_recipients && <MetaItem icon="people" label="สำเนาเรียน">{doc.cc_recipients}</MetaItem>}
+              {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
+                <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">
+                  {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
+                </MetaItem>
+              )}
+              {doc.remarks && <MetaItem icon="edit" label="หมายเหตุ" className="sm:col-span-2">{doc.remarks}</MetaItem>}
+            </div>
           </div>
         </div>
       </div>
@@ -257,27 +323,8 @@ export default function DocumentDetail() {
           </div>
         </div>
 
-        {/* RIGHT: info + files + conversation */}
+        {/* RIGHT: conversation + audit trail (info moved into the header card) */}
         <div className="space-y-5 lg:col-span-2">
-          <div className="card">
-            <h3 className="mb-3 font-bold text-slate-800">ข้อมูลเอกสาร</h3>
-            <Row label="วันที่รับ">{formatThaiDate(doc.date_received)}</Row>
-            {doc.recipient && <Row label="เรียน">{doc.recipient}</Row>}
-            {doc.reference && <Row label="อ้างถึง">{doc.reference}</Row>}
-            {doc.cc_recipients && <Row label="สำเนาเรียน">{doc.cc_recipients}</Row>}
-            {doc.doc_type_name && <Row label="ประเภท">{doc.doc_type_name}</Row>}
-            <Row label="แผนก">{doc.department}</Row>
-            {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
-              <Row label="สิ่งที่ส่งมาด้วย">
-                <span className="font-normal">
-                  {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
-                </span>
-              </Row>
-            )}
-            {doc.body && <Row label="เนื้อความ"><span className="whitespace-pre-wrap font-normal">{doc.body}</span></Row>}
-            {doc.remarks && <Row label="หมายเหตุ"><span className="font-normal">{doc.remarks}</span></Row>}
-          </div>
-
           {/* ── บันทึก: approval chain + messages merged as a timeline ── */}
           <div className="card">
             <h3 className="mb-4 font-bold text-slate-800">บันทึก</h3>
@@ -307,6 +354,9 @@ export default function DocumentDetail() {
                 </div>
               </div>
             </div>
+
+            {/* Audit Trail — full system activity log, always expanded */}
+            <AuditTrail entries={doc.audit} />
           </div>
         </div>
       </div>

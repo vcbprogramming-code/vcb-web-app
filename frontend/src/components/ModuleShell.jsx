@@ -38,7 +38,7 @@ export default function ModuleShell() {
   }
 
   return (
-    <div className={`flex min-h-full flex-col ${dark ? 'ink-page' : 'bg-slate-50'}`}>
+    <div className={`flex min-h-screen flex-col ${dark ? 'ink-page' : 'bg-slate-50'}`}>
       <header className={`sticky top-0 z-20 border-b backdrop-blur-lg ${dark ? 'border-white/10 bg-[#0a1226]/80' : 'border-slate-200/70 bg-white/80'}`}>
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex min-w-0 items-center gap-3">

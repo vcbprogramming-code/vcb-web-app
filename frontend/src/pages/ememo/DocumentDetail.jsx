@@ -33,11 +33,31 @@ export default function DocumentDetail() {
   const [msgFile, setMsgFile] = useState(null);
   const [posting, setPosting] = useState(false);
 
+  // is the logged-in user the current pending approver?
+  const [myApproval, setMyApproval] = useState({ canApprove: false });
+  const [actioning, setActioning] = useState(false);
+
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
+    ememoApi.myApproval(id).then((r) => setMyApproval(r.data)).catch(() => setMyApproval({ canApprove: false }));
   }, [id]);
 
   useEffect(load, [load]);
+
+  // act on the current approval step (only shown to the current approver)
+  const doApprove = async (action) => {
+    const labels = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };
+    let comment;
+    if (action !== 'approved') {
+      comment = window.prompt(`เหตุผล/ความเห็นสำหรับ "${labels[action]}" (ไม่บังคับ):`) ?? '';
+    }
+    if (!window.confirm(`ยืนยัน "${labels[action]}" เอกสารนี้?`)) return;
+    setActioning(true); setError(null);
+    try {
+      await ememoApi.approveDocument(id, action, comment || undefined);
+      load();
+    } catch (e) { setError(e.message); } finally { setActioning(false); }
+  };
 
   const previewables = doc ? (() => {
     const combined = doc.attachments.find((a) => a.kind === 'combined_pdf');
@@ -137,6 +157,31 @@ export default function DocumentDetail() {
       <button onClick={() => navigate('/memos')} className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-cyan-200">
         <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
       </button>
+
+      {/* approval action banner — only for the current pending approver */}
+      {myApproval.canApprove && (
+        <div className="ink-card border-cyan-300/30 bg-cyan-400/[0.06]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-cyan-100">
+                <Icon name="check" className="h-4 w-4" /> ถึงคิวพิจารณาของท่าน
+              </div>
+              <p className="text-sm text-slate-300">โปรดตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการ</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => doApprove('returned')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/20 disabled:opacity-50">
+                <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
+              </button>
+              <button onClick={() => doApprove('rejected')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50">
+                <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
+              </button>
+              <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:from-emerald-300 hover:to-teal-400 disabled:opacity-50">
+                <Icon name="check" className="h-4 w-4" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* header card */}
       <div className="ink-card">

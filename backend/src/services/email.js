@@ -88,7 +88,9 @@ function thaiDate(d) {
  * actions. The page is the source of truth, not the email.
  */
 export async function sendApprovalRequest({ step, doc }) {
-  const url = `${env.appBaseUrl}/approve/${step.action_token}`;
+  // Login-gated in-app approval: the link opens the document in the web app
+  // (redirecting through login if needed). The approver acts from the detail page.
+  const url = `${env.appBaseUrl}/memos/${doc.id}`;
   const row = (label, value) =>
     `<tr>
        <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
@@ -123,8 +125,8 @@ export async function sendApprovalRequest({ step, doc }) {
         </div>
 
         <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center">
-          คลิกปุ่มด้านบนเพื่อดูเอกสารฉบับเต็ม ไฟล์แนบ และดำเนินการอนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ<br>
-          ลิงก์นี้ใช้สำหรับเอกสารฉบับนี้เท่านั้น และไม่จำเป็นต้องเข้าสู่ระบบ
+          คลิกปุ่มด้านบนเพื่อเข้าสู่ระบบและดูเอกสารฉบับเต็ม ไฟล์แนบ แล้วดำเนินการอนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ<br>
+          กรุณาเข้าสู่ระบบด้วยบัญชีของท่าน (อีเมลนี้)
         </p>
       </div>
       <!-- footer -->

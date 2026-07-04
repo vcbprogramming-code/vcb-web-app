@@ -69,22 +69,27 @@ export async function createApprovalChain(client, { documentId, approvers, actor
  *
  * Runs inside a transaction. Returns { document, step, nextStep|null, doc }.
  */
-export async function applyApprovalAction(client, { token, action, comment, signatureUrl }) {
+export async function applyApprovalAction(client, { token, stepId, action, comment, signatureUrl }) {
   if (!['approved', 'rejected', 'returned'].includes(action)) {
     throw new Error('Invalid action');
   }
 
-  const { rows: steps } = await client.query(
-    `select s.*, d.doc_number, d.subject
-       from approval_steps s join documents d on d.id = s.document_id
-      where s.action_token = $1
-      for update`,
-    [token]
-  );
+  // The step can be located by its one-time token (email flow) OR by its id
+  // (authenticated in-app flow, where the caller's identity was already verified).
+  const { rows: steps } = stepId
+    ? await client.query(
+        `select s.*, d.doc_number, d.subject
+           from approval_steps s join documents d on d.id = s.document_id
+          where s.id = $1 for update`, [stepId])
+    : await client.query(
+        `select s.*, d.doc_number, d.subject
+           from approval_steps s join documents d on d.id = s.document_id
+          where s.action_token = $1 for update`, [token]);
   const step = steps[0];
   if (!step) return { error: 'invalid_token' };
   if (step.action !== 'pending') return { error: 'already_actioned', step };
-  if (step.token_expires_at && new Date(step.token_expires_at) < new Date()) {
+  // token expiry only applies to the email flow (stepId flow is a live session)
+  if (!stepId && step.token_expires_at && new Date(step.token_expires_at) < new Date()) {
     return { error: 'expired', step };
   }
 

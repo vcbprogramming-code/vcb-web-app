@@ -15,10 +15,10 @@ import {
   peekNextRunNo,
 } from '../services/docNumber.js';
 import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
-import { generateOriginalPdf } from '../services/pdfDoc.js';
+import { generateOriginalPdf, generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 import { generateCombinedPdf } from '../services/pdfMerge.js';
-import { createApprovalChain, sendApprovalRequest } from '../services/approval.js';
-import { sendCcNotification, extractCcEmails } from '../services/email.js';
+import { createApprovalChain, sendApprovalRequest, applyApprovalAction } from '../services/approval.js';
+import { sendCcNotification, extractCcEmails, sendAuthorNotification } from '../services/email.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -142,6 +142,18 @@ router.get(
     res.setHeader('Content-Disposition', 'attachment; filename="documents-register.xlsx"');
     await wb.xlsx.write(res);
     res.end();
+  })
+);
+
+/** GET /api/documents/approvers — active accounts, for the approver picker.
+ *  Defined BEFORE '/:id' so "approvers" isn't parsed as a document id. */
+router.get(
+  '/approvers',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `select full_name, email from profiles where is_active = true order by full_name`
+    );
+    res.json({ data: rows });
   })
 );
 
@@ -506,6 +518,107 @@ router.post(
     res.status(201).json({
       data: { id: row.id, file_name: row.file_name, kind: 'combined_pdf', created_at: row.created_at, skipped: row.skipped },
     });
+  })
+);
+
+/**
+ * GET /api/documents/:id/my-approval — is the logged-in user the current pending
+ * approver for this document? Returns { canApprove, step } so the detail page can
+ * show approve/return/reject controls only to the right person.
+ */
+router.get(
+  '/:id/my-approval',
+  asyncHandler(async (req, res) => {
+    const step = await queryOne(
+      `select id, step_no, approver_name, approver_email
+         from approval_steps
+        where document_id = $1 and action = 'pending' and action_token is not null
+        order by step_no limit 1`,
+      [req.params.id]
+    );
+    const canApprove = Boolean(step) && step.approver_email
+      && step.approver_email.toLowerCase() === (req.profile.email || '').toLowerCase();
+    res.json({ data: { canApprove, step: canApprove ? step : null } });
+  })
+);
+
+const approveSchema = z.object({
+  action: z.enum(['approved', 'rejected', 'returned']),
+  comment: z.string().optional(),
+});
+
+/**
+ * POST /api/documents/:id/approve — the logged-in user acts on the current
+ * pending step, IF their email matches that step's approver. This is the
+ * in-app (login-gated) replacement for the public /approve/:token flow.
+ */
+router.post(
+  '/:id/approve',
+  requirePermission('ememo', 'submit'),
+  asyncHandler(async (req, res) => {
+    const parsed = approveSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+
+    const step = await queryOne(
+      `select id, approver_email from approval_steps
+        where document_id = $1 and action = 'pending' and action_token is not null
+        order by step_no limit 1`,
+      [req.params.id]
+    );
+    if (!step) throw new ApiError(409, 'เอกสารนี้ไม่มีขั้นที่รออนุมัติอยู่');
+    if ((step.approver_email || '').toLowerCase() !== (req.profile.email || '').toLowerCase()) {
+      throw new ApiError(403, 'คุณไม่ใช่ผู้อนุมัติของขั้นนี้');
+    }
+
+    // use the approver's saved profile signature (if they have one) on the doc
+    const sig = await queryOne('select signature_url from profiles where id = $1', [req.profile.id]);
+
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('begin');
+      result = await applyApprovalAction(client, {
+        stepId: step.id,
+        action: parsed.data.action,
+        comment: parsed.data.comment,
+        signatureUrl: sig?.signature_url || null,
+      });
+      if (result.error) {
+        await client.query('rollback');
+        throw new ApiError(409, result.error === 'already_actioned' ? 'รายการนี้ถูกดำเนินการไปแล้ว' : 'ไม่สามารถดำเนินการได้');
+      }
+      await client.query('commit');
+    } catch (err) {
+      if (!(err instanceof ApiError)) await client.query('rollback').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    // side effects (same as the email flow): next approver email, PDFs, notify author
+    if (result.nextStep) {
+      await sendApprovalRequest({ step: result.nextStep, doc: result.document }).catch((e) => console.error('next-approver email failed:', e.message));
+    }
+    if (result.finalized) {
+      await generateApprovedPdf(result.document.id).catch((e) => console.error('approved-pdf failed:', e.message));
+    } else if (parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
+      await regenerateOriginalWithAudit(result.document.id).catch((e) => console.error('audit-pdf failed:', e.message));
+    }
+    if (result.finalized || parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
+      const author = await queryOne(
+        `select pr.full_name, pr.email from documents d join profiles pr on pr.id = d.created_by where d.id = $1`,
+        [result.document.id]
+      ).catch(() => null);
+      if (author?.email) {
+        await sendAuthorNotification({
+          toEmail: author.email, authorName: author.full_name, doc: result.document,
+          outcome: result.finalized ? 'approved' : parsed.data.action,
+          actorName: req.profile.full_name || req.profile.email, comment: parsed.data.comment,
+        }).catch((e) => console.error('author notification failed:', e.message));
+      }
+    }
+
+    res.json({ data: { action: parsed.data.action, documentStatus: result.document.status, finalized: Boolean(result.finalized), advanced: Boolean(result.nextStep) } });
   })
 );
 

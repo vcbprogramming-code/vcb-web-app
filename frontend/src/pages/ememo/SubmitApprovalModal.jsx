@@ -5,8 +5,14 @@ import Icon from '../../components/Icon.jsx';
 export default function SubmitApprovalModal({ documentId, docCode, onClose, onSubmitted }) {
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [locked, setLocked] = useState(false);
+  const [users, setUsers] = useState([]); // system accounts, for the picker
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // load the accounts that can be picked as approvers (must have a system account)
+  useEffect(() => {
+    ememoApi.listApprovers().then((r) => setUsers(r.data)).catch(() => setUsers([]));
+  }, []);
 
   // prefill + lock the approver chain from the doc-code config (same as create)
   useEffect(() => {
@@ -20,8 +26,11 @@ export default function SubmitApprovalModal({ documentId, docCode, onClose, onSu
     }).catch(() => {});
   }, [docCode]);
 
-  const update = (i, field, value) =>
-    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, [field]: value } : a)));
+  // pick a user by email → fill name+email for that row
+  const pick = (i, email) => {
+    const u = users.find((x) => x.email === email);
+    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { name: u?.full_name || '', email } : a)));
+  };
   const add = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
   const remove = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
 
@@ -32,7 +41,7 @@ export default function SubmitApprovalModal({ documentId, docCode, onClose, onSu
       .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
       .filter((a) => a.email);
     if (cleaned.length === 0) {
-      setError('กรุณาระบุอีเมลผู้อนุมัติอย่างน้อย 1 คน');
+      setError('กรุณาเลือกผู้อนุมัติอย่างน้อย 1 คน');
       return;
     }
     setSubmitting(true);
@@ -58,16 +67,24 @@ export default function SubmitApprovalModal({ documentId, docCode, onClose, onSu
         <form onSubmit={submit} className="p-6 space-y-4">
           <p className="text-sm text-slate-500">
             {locked
-              ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่าระบบ → ผู้อนุมัติตามรหัส)'
-              : 'ระบุผู้อนุมัติตามลำดับขั้น — ระบบจะส่งอีเมลพร้อมลิงก์อนุมัติให้ทีละคนตามลำดับ'}
+              ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่า E-Memo → ผู้อนุมัติตามรหัส)'
+              : 'เลือกผู้อนุมัติตามลำดับขั้น — ระบบจะส่งอีเมลให้เข้ามาอนุมัติในเว็บทีละคน (ผู้อนุมัติต้องมีบัญชีในระบบ)'}
           </p>
 
           <div className="space-y-2">
             {approvers.map((a, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-6 text-center text-slate-400 font-semibold">{i + 1}</span>
-                <input value={a.name} onChange={(e) => update(i, 'name', e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className={`${field} w-32 ${locked ? 'bg-slate-100' : ''}`} readOnly={locked} />
-                <input value={a.email} onChange={(e) => update(i, 'email', e.target.value)} placeholder="อีเมล *" type="email" className={`${field} flex-1 ${locked ? 'bg-slate-100' : ''}`} readOnly={locked} />
+                {locked ? (
+                  <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />
+                ) : (
+                  <select value={a.email} onChange={(e) => pick(i, e.target.value)} className={`${field} flex-1`}>
+                    <option value="">— เลือกผู้อนุมัติ —</option>
+                    {users.map((u) => (
+                      <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
+                    ))}
+                  </select>
+                )}
                 {!locked && approvers.length > 1 && (
                   <button type="button" onClick={() => remove(i)} className="text-slate-400 hover:text-red-600 px-1"><Icon name="x" className="h-4 w-4" /></button>
                 )}

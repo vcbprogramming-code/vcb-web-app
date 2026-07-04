@@ -36,6 +36,7 @@ export default function DocumentDetail() {
   // is the logged-in user the current pending approver?
   const [myApproval, setMyApproval] = useState({ canApprove: false });
   const [actioning, setActioning] = useState(false);
+  const [approveComment, setApproveComment] = useState('');
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
@@ -44,17 +45,19 @@ export default function DocumentDetail() {
 
   useEffect(load, [load]);
 
-  // act on the current approval step (only shown to the current approver)
+  // act on the current approval step (only shown to the current approver).
+  // comment is optional on approve, REQUIRED on return/reject.
   const doApprove = async (action) => {
     const labels = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };
-    let comment;
-    if (action !== 'approved') {
-      comment = window.prompt(`เหตุผล/ความเห็นสำหรับ "${labels[action]}" (ไม่บังคับ):`) ?? '';
+    const comment = approveComment.trim();
+    if (action !== 'approved' && !comment) {
+      setError(`กรุณาระบุเหตุผล/ความเห็นสำหรับ "${labels[action]}"`);
+      return;
     }
-    if (!window.confirm(`ยืนยัน "${labels[action]}" เอกสารนี้?`)) return;
     setActioning(true); setError(null);
     try {
       await ememoApi.approveDocument(id, action, comment || undefined);
+      setApproveComment('');
       load();
     } catch (e) { setError(e.message); } finally { setActioning(false); }
   };
@@ -149,27 +152,35 @@ export default function DocumentDetail() {
           Big, unmissable, at the very top. Only for the current pending approver. */}
       {myApproval.canApprove && (
         <div className="rounded-2xl border border-cyan-300/40 bg-gradient-to-br from-cyan-400/[0.12] to-blue-500/[0.06] p-5 shadow-[0_0_40px_-12px_rgba(34,211,238,0.5)]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-200 ring-1 ring-inset ring-cyan-300/40">
-                <Icon name="check" className="h-6 w-6" />
-              </span>
-              <div>
-                <div className="text-base font-bold text-white">เอกสารนี้รอการอนุมัติจากคุณ</div>
-                <p className="text-sm text-slate-300">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการ</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-200 ring-1 ring-inset ring-cyan-300/40">
+              <Icon name="check" className="h-6 w-6" />
+            </span>
+            <div>
+              <div className="text-base font-bold text-white">เอกสารนี้รอการอนุมัติจากคุณ</div>
+              <p className="text-sm text-slate-300">ตรวจเอกสารด้านล่าง เขียนความเห็น (ถ้ามี) แล้วเลือกดำเนินการ</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => doApprove('returned')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/20 disabled:opacity-50">
-                <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
-              </button>
-              <button onClick={() => doApprove('rejected')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50">
-                <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
-              </button>
-              <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-6 py-2.5 text-sm font-bold text-slate-900 shadow-lg transition hover:from-emerald-300 hover:to-teal-400 disabled:opacity-50">
-                <Icon name="check" className="h-5 w-5" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติเอกสาร'}
-              </button>
-            </div>
+          </div>
+
+          {/* inline comment — optional to approve, required to return/reject */}
+          <textarea
+            value={approveComment}
+            onChange={(e) => setApproveComment(e.target.value)}
+            rows={2}
+            placeholder="ความเห็น / เหตุผล (บังคับเมื่อส่งกลับแก้ไข หรือ ไม่อนุมัติ)"
+            className="mt-4 w-full resize-none rounded-xl border border-white/15 bg-white/[0.05] px-3 py-2.5 text-sm text-slate-100 placeholder-slate-400 outline-none focus:border-cyan-300/60"
+          />
+
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button onClick={() => doApprove('returned')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-orange-400/40 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/20 disabled:opacity-50">
+              <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
+            </button>
+            <button onClick={() => doApprove('rejected')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50">
+              <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
+            </button>
+            <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-6 py-2.5 text-sm font-bold text-slate-900 shadow-lg transition hover:from-emerald-300 hover:to-teal-400 disabled:opacity-50">
+              <Icon name="check" className="h-5 w-5" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติเอกสาร'}
+            </button>
           </div>
         </div>
       )}

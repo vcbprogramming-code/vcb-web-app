@@ -29,8 +29,11 @@ export default function ModuleShell() {
   const role = profile?.role;
   const title = titleFor(location.pathname);
   const brand = brandFor(location.pathname);
-  // E-Memo pages use the dark-navy theme; other modules keep the light theme.
-  const dark = location.pathname.startsWith('/memos') || location.pathname.startsWith('/dashboard');
+  // E-Memo pages + the admin/settings pages use the dark-navy theme; other
+  // modules keep the light theme.
+  const dark = location.pathname.startsWith('/memos')
+    || location.pathname.startsWith('/dashboard')
+    || location.pathname.startsWith('/admin');
 
   function handleLogout() {
     logout();

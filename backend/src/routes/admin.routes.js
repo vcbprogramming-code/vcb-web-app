@@ -72,13 +72,14 @@ router.post(
 
 const updateUserSchema = z.object({
   fullName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
   role: z.enum(ROLES).optional(),
   unitId: z.string().uuid().optional().nullable(),
   isActive: z.boolean().optional(),
   loginMethod: z.enum(['email', 'google']).optional(),
 });
 
-/** PATCH /api/admin/users/:id — update name/role/unit/active. */
+/** PATCH /api/admin/users/:id — update name/email/role/unit/active/login-method. */
 router.patch(
   '/users/:id',
   asyncHandler(async (req, res) => {
@@ -91,10 +92,17 @@ router.patch(
       throw new ApiError(400, 'ไม่สามารถปิดการใช้งานหรือลดสิทธิ์บัญชีของตนเองได้');
     }
 
+    // changing the email: make sure it isn't already used by ANOTHER account
+    if (f.email !== undefined) {
+      const dup = await queryOne('select id from profiles where lower(email) = lower($1) and id <> $2', [f.email, req.params.id]);
+      if (dup) throw new ApiError(409, 'อีเมลนี้ถูกใช้งานแล้ว');
+    }
+
     const sets = [];
     const vals = [];
     const add = (col, val) => { vals.push(val); sets.push(`${col} = $${vals.length}`); };
     if (f.fullName !== undefined) add('full_name', f.fullName);
+    if (f.email !== undefined) add('email', f.email);
     if (f.role !== undefined) add('role', f.role);
     if (f.unitId !== undefined) add('unit_id', f.unitId);
     if (f.isActive !== undefined) add('is_active', f.isActive);

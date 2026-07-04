@@ -60,7 +60,7 @@ function ProjectModal({ project, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col">
+      <div className="bg-[#0f1b33] border border-white/10 rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col text-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขโครงการ' : 'เพิ่มโครงการ'}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>

@@ -26,7 +26,7 @@ function UserModal({ user, onClose, onSaved }) {
     setBusy(true);
     try {
       if (editing) {
-        await adminApi.updateUser(user.id, { fullName, role, loginMethod });
+        await adminApi.updateUser(user.id, { fullName, email, role, loginMethod });
         // password only applies to email accounts
         if (!isGoogle && password) await adminApi.resetPassword(user.id, password);
       } else {
@@ -53,7 +53,7 @@ function UserModal({ user, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-[#0f1b33] border border-white/10 rounded-2xl shadow-xl w-full max-w-md text-slate-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
@@ -65,9 +65,8 @@ function UserModal({ user, onClose, onSaved }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">อีเมล <span className="text-red-500">*</span></label>
-            <input type="email" value={email} disabled={editing} onChange={(e) => setEmail(e.target.value)}
-              className={`${field} ${editing ? 'bg-slate-50 text-slate-400' : ''}`} />
-            {isGoogle && !editing && <p className="mt-1 text-xs text-slate-400">ต้องเป็นอีเมล Google (Gmail/Workspace) ที่จะใช้ Sign in with Google</p>}
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
+            {isGoogle && <p className="mt-1 text-xs text-slate-400">ต้องเป็นอีเมล Google (Gmail/Workspace) ที่จะใช้ Sign in with Google</p>}
           </div>
 
           {/* login method — how this account signs in */}

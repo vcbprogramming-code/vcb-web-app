@@ -94,27 +94,12 @@ export default function DocumentDetail() {
     catch (e) { setError(e.message); } finally { setBusy(false); }
   };
 
-  const resendApproval = async () => {
-    setBusy(true);
-    try { const { data } = await ememoApi.resendApproval(id); window.alert(`ส่งอีเมลอนุมัติซ้ำไปที่ ${data.to} แล้ว`); }
-    catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
-
+  // fallback: (re)generate the letter PDF if one somehow doesn't exist yet.
+  // Normally the PDF + combined file are produced automatically on create/edit.
   const generatePdf = async () => {
     setBusy(true); setError(null);
     try { await ememoApi.generatePdf(id); load(); }
     catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
-
-  const combineDoc = async () => {
-    setBusy(true); setError(null);
-    try {
-      const { data } = await ememoApi.combineDocument(id);
-      if (data.skipped?.length) {
-        window.alert(`รวมเอกสารเป็นไฟล์เดียวแล้ว\n\nไฟล์ที่ไม่ได้รวม (รองรับเฉพาะ PDF และรูปภาพ — โปรดแปลงเป็น PDF ก่อน):\n• ${data.skipped.join('\n• ')}`);
-      }
-      setPreviewAttId(data.id); load();
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
 
   const openAttachment = async (attId) => {
@@ -145,11 +130,13 @@ export default function DocumentDetail() {
   if (!doc) return <div className="text-slate-400">กำลังโหลด…</div>;
 
   const status = STATUS_META[doc.status] || STATUS_META.pending;
-  const editable = ['draft', 'pending', 'returned'].includes(doc.status);
-  const canSubmit = editable;
-  const canCancel = doc.status !== 'approved' && doc.status !== 'cancelled';
-  const hasPendingStep = (doc.approval_steps || []).some((s) => s.action === 'pending');
-  const canResend = doc.status === 'pending' && hasPendingStep;
+  // journey-aware permissions: only the owner (or admin) manages the document,
+  // and only actions valid for the current status are shown.
+  const isOwner = doc.created_by && doc.created_by === profile?.id;
+  const isAdmin = profile?.role === 'admin';
+  const canManage = isOwner || isAdmin;
+  const notSubmitted = ['draft', 'returned'].includes(doc.status); // owner can still edit + send
+  const isPending = doc.status === 'pending';
   const me = profile?.full_name || user?.email || 'ฉัน';
 
   return (
@@ -158,15 +145,19 @@ export default function DocumentDetail() {
         <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
       </button>
 
-      {/* approval action banner — only for the current pending approver */}
+      {/* ★ APPROVER CALL-TO-ACTION — the whole point of this page for an approver.
+          Big, unmissable, at the very top. Only for the current pending approver. */}
       {myApproval.canApprove && (
-        <div className="ink-card border-cyan-300/30 bg-cyan-400/[0.06]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 font-semibold text-cyan-100">
-                <Icon name="check" className="h-4 w-4" /> ถึงคิวพิจารณาของท่าน
+        <div className="rounded-2xl border border-cyan-300/40 bg-gradient-to-br from-cyan-400/[0.12] to-blue-500/[0.06] p-5 shadow-[0_0_40px_-12px_rgba(34,211,238,0.5)]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-200 ring-1 ring-inset ring-cyan-300/40">
+                <Icon name="check" className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="text-base font-bold text-white">เอกสารนี้รอการอนุมัติจากคุณ</div>
+                <p className="text-sm text-slate-300">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการ</p>
               </div>
-              <p className="text-sm text-slate-300">โปรดตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการ</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => doApprove('returned')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-4 py-2.5 text-sm font-medium text-orange-200 transition hover:bg-orange-500/20 disabled:opacity-50">
@@ -175,15 +166,15 @@ export default function DocumentDetail() {
               <button onClick={() => doApprove('rejected')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50">
                 <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
               </button>
-              <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:from-emerald-300 hover:to-teal-400 disabled:opacity-50">
-                <Icon name="check" className="h-4 w-4" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติ'}
+              <button onClick={() => doApprove('approved')} disabled={actioning} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-6 py-2.5 text-sm font-bold text-slate-900 shadow-lg transition hover:from-emerald-300 hover:to-teal-400 disabled:opacity-50">
+                <Icon name="check" className="h-5 w-5" /> {actioning ? 'กำลังบันทึก…' : 'อนุมัติเอกสาร'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* header card */}
+      {/* header card — title + only the actions valid for THIS viewer & status */}
       <div className="ink-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -194,33 +185,29 @@ export default function DocumentDetail() {
             <h2 className="text-lg font-bold text-white">{doc.doc_number}</h2>
             <p className="text-slate-300">{doc.subject}</p>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {editable && (
-              <button onClick={() => setShowEdit(true)} disabled={busy} className="ink-btn-outline">
-                <Icon name="edit" className="h-4 w-4" /> แก้ไข
-              </button>
-            )}
-            {doc.attachments.some((a) => a.kind === 'generated_pdf') && (
-              <button onClick={combineDoc} disabled={busy} className="ink-btn-outline" title="รวมบันทึกข้อความ + ไฟล์แนบ เป็น PDF ไฟล์เดียว">
-                <Icon name="layers" className="h-4 w-4" /> รวมเป็นไฟล์เดียว
-              </button>
-            )}
-            {canResend && (
-              <button onClick={resendApproval} disabled={busy} className="ink-btn-outline">
-                <Icon name="undo" className="h-4 w-4" /> ส่งเมลซ้ำ
-              </button>
-            )}
-            {canCancel && (
-              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50">
-                <Icon name="x" className="h-4 w-4" /> ยกเลิก
-              </button>
-            )}
-            {canSubmit && (
-              <button onClick={() => setShowSubmit(true)} className="ink-btn">
-                <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
-              </button>
-            )}
-          </div>
+          {/* owner/admin actions, scoped to status:
+              · not submitted (ร่าง/ตีกลับ) → แก้ไข + ส่งอนุมัติ
+              · รออนุมัติ → ยกเลิก เท่านั้น
+              · อนุมัติแล้ว/ยกเลิก → ไม่มีปุ่ม (ดูอย่างเดียว) */}
+          {canManage && (notSubmitted || isPending) && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {notSubmitted && (
+                <button onClick={() => setShowEdit(true)} disabled={busy} className="ink-btn-outline">
+                  <Icon name="edit" className="h-4 w-4" /> แก้ไข
+                </button>
+              )}
+              {(notSubmitted || isPending) && (
+                <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50">
+                  <Icon name="x" className="h-4 w-4" /> ยกเลิก
+                </button>
+              )}
+              {notSubmitted && (
+                <button onClick={() => setShowSubmit(true)} className="ink-btn">
+                  <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -318,17 +305,19 @@ export default function DocumentDetail() {
                     : <p className="text-xs text-slate-500">จะถูกสร้างเมื่ออนุมัติครบทุกขั้น</p>;
                 })()}
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
-                  <Icon name="layers" className="h-4 w-4 text-cyan-300" /> รวมเอกสาร (บันทึก + ไฟล์แนบ ไฟล์เดียว)
-                </div>
-                {(() => {
-                  const comb = doc.attachments.find((a) => a.kind === 'combined_pdf');
-                  return comb
-                    ? <button onClick={() => openAttachment(comb.id)} className="break-all text-sm text-cyan-300 hover:underline">{comb.file_name}</button>
-                    : <p className="text-xs text-slate-500">กด "รวมเป็นไฟล์เดียว" ด้านบนเพื่อสร้าง (รวมเฉพาะ PDF/รูปภาพ)</p>;
-                })()}
-              </div>
+              {/* combined "one file" — auto-generated when there are attachments */}
+              {(() => {
+                const comb = doc.attachments.find((a) => a.kind === 'combined_pdf');
+                if (!comb) return null;
+                return (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+                      <Icon name="layers" className="h-4 w-4 text-cyan-300" /> รวมเอกสาร (บันทึก + ไฟล์แนบ ไฟล์เดียว)
+                    </div>
+                    <button onClick={() => openAttachment(comb.id)} className="break-all text-sm text-cyan-300 hover:underline">{comb.file_name}</button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

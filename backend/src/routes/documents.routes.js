@@ -206,7 +206,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
-              d.signer_name, d.signer_title, pr.full_name as preparer_name
+              d.signer_name, d.signer_title, d.created_by, pr.full_name as preparer_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
         where d.id = $1`,
@@ -392,7 +392,7 @@ router.patch(
     );
     // return the full detail
     const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
-              d.signer_name, d.signer_title, pr.full_name as preparer_name
+              d.signer_name, d.signer_title, d.created_by, pr.full_name as preparer_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
         where d.id = $1`, [req.params.id]);
@@ -458,6 +458,7 @@ router.post(
        values ($1,'upload',$2,$3,$4,$5,$6) returning id, file_name, content_type, size_bytes, created_at`,
       [req.params.id, req.file.originalname, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
     );
+    autoCombine(req.params.id, req.profile.id); // background: fold the new file into the combined PDF
     res.status(201).json({ data: row });
   })
 );
@@ -494,12 +495,35 @@ router.delete(
 
 // ── generate PDF / submit ───────────────────────────────────────────────────
 
+/**
+ * Auto-rebuild the combined "one file" PDF when there's something to combine —
+ * i.e. at least one PDF/image supplementary attachment. Runs in the background
+ * (fire-and-forget) so it never blocks the request. No-op when there are no
+ * inline attachments, so a plain letter doesn't get a redundant combined copy.
+ */
+async function autoCombine(documentId, uploadedBy) {
+  try {
+    const hasInline = await queryOne(
+      `select 1 from document_attachments
+        where document_id = $1 and kind = 'upload'
+          and (content_type ilike 'application/pdf%' or content_type ilike 'image/%')
+        limit 1`,
+      [documentId]
+    );
+    if (!hasInline) return;
+    await generateCombinedPdf(documentId, uploadedBy);
+  } catch (e) {
+    console.error('auto-combine failed:', e.message);
+  }
+}
+
 /** POST /api/documents/:id/generate-pdf — build the letter, return attachment meta. */
 router.post(
   '/:id/generate-pdf',
   asyncHandler(async (req, res) => {
     await loadDocForMutation(req);
     const row = await generateOriginalPdf(req.params.id, req.profile.id);
+    autoCombine(req.params.id, req.profile.id); // background: refresh combined file
     res.status(201).json({ data: { id: row.id, file_name: row.file_name, version: 'original', created_at: row.created_at } });
   })
 );

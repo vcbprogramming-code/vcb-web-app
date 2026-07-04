@@ -7,6 +7,7 @@ import SubmitApprovalModal from './SubmitApprovalModal.jsx';
 import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
 import ConsultModal from './ConsultModal.jsx';
+import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
 
 /** One compact metadata item (icon + label + value), used in the header card. */
@@ -90,6 +91,9 @@ export default function DocumentDetail() {
   const [busy, setBusy] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  // "สร้างจากใบนี้" (duplicate) — loads reference data, then opens AddDocumentModal
+  const [dupData, setDupData] = useState(null); // { projects, docTypes, initial }
+  const [dupLoading, setDupLoading] = useState(false);
 
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewAttId, setPreviewAttId] = useState(null);
@@ -164,6 +168,29 @@ export default function DocumentDetail() {
     setBusy(true);
     try { await ememoApi.cancelDocument(id); toast.success('ยกเลิกเอกสารแล้ว'); load(); }
     catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
+  };
+
+  // "สร้างจากใบนี้" — copy all fields + uploaded attachments into a new draft.
+  // Loads projects/doc-types (AddDocumentModal needs them), then opens the modal
+  // prefilled. Running number, status, signatures and history are NOT copied.
+  const duplicateDoc = async () => {
+    setDupLoading(true); setError(null);
+    try {
+      const [p, t] = await Promise.all([ememoApi.listProjects(), ememoApi.listDocumentTypes()]);
+      const copyAttachments = (doc.attachments || []).filter((a) => a.kind === 'upload');
+      setDupData({
+        projects: p.data,
+        docTypes: t.data,
+        initial: {
+          project_id: doc.project_id, company_id: doc.company_id, doc_code: doc.doc_code,
+          doc_type_id: doc.doc_type_id, subject: doc.subject, recipient: doc.recipient,
+          reference: doc.reference, cc_recipients: doc.cc_recipients, body: doc.body,
+          remarks: doc.remarks, signer_name: doc.signer_name, signer_title: doc.signer_title,
+          enclosures: doc.enclosures, sourceId: id, copyAttachments,
+        },
+      });
+    } catch (e) { setError(e.message); toast.error(e.message); }
+    finally { setDupLoading(false); }
   };
 
   // fallback: (re)generate the letter PDF if one somehow doesn't exist yet.
@@ -286,6 +313,11 @@ export default function DocumentDetail() {
                 <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
               </button>
             )}
+
+            {/* create a new document from this one (copy fields + attachments) */}
+            <button onClick={duplicateDoc} disabled={dupLoading} className="btn-outline">
+              <Icon name="layers" className="h-4 w-4" /> {dupLoading ? 'กำลังเตรียม…' : 'สร้างจากใบนี้'}
+            </button>
           </div>
         </div>
       </div>
@@ -374,6 +406,20 @@ export default function DocumentDetail() {
           </div>
         </div>
       </div>
+
+      {dupData && (
+        <AddDocumentModal
+          projects={dupData.projects}
+          docTypes={dupData.docTypes}
+          initial={dupData.initial}
+          onClose={() => setDupData(null)}
+          onCreated={(newId) => {
+            setDupData(null);
+            toast.success('สร้างเอกสารจากใบเดิมแล้ว');
+            if (newId) navigate(`/memos/${newId}`);
+          }}
+        />
+      )}
 
       {showSubmit && (
         <SubmitApprovalModal

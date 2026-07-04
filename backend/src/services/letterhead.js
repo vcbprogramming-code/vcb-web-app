@@ -55,13 +55,8 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     const logoSource = Buffer.isBuffer(letter.logoBuffer)
       ? letter.logoBuffer
       : (existsSync(LOGO_PATH) ? LOGO_PATH : null);
-    let textX = left;
-    if (logoSource) {
-      try {
-        pdf.image(logoSource, left, headerTop, { fit: [58, 58], align: 'center', valign: 'center' });
-        textX = left + 70;
-      } catch { /* ignore bad logo */ }
-    }
+    const LOGO_SIZE = 58;
+    const textX = logoSource ? left + LOGO_SIZE + 12 : left;
 
     // contact block (right) — drawn first so we know its width
     const contactW = 172;
@@ -79,10 +74,28 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       cy += 14;
     }
 
-    // company name (between logo and contact block)
+    // Measure the company-name text block height first so the logo can be
+    // vertically centered against it (logo + text share a common center line).
     const nameW = contactX - textX - 12;
+    const nameH = pdf.font('th-bold').fontSize(16).heightOfString(
+      letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', { width: nameW, lineBreak: false });
+    const enH = letter.companyNameEn ? pdf.font('th').fontSize(10.5).heightOfString(letter.companyNameEn, { width: nameW, lineBreak: false }) + 1 : 0;
+    const addrH = letter.address ? pdf.font('th').fontSize(8.5).heightOfString(letter.address, { width: nameW }) + 2 : 0;
+    const textBlockH = nameH + enH + addrH;
+    // the header row is as tall as the taller of logo / text block
+    const rowH = Math.max(logoSource ? LOGO_SIZE : 0, textBlockH);
+    const textTop = headerTop + (rowH - textBlockH) / 2;
+
+    if (logoSource) {
+      try {
+        // center the logo vertically within the row
+        pdf.image(logoSource, left, headerTop + (rowH - LOGO_SIZE) / 2, { fit: [LOGO_SIZE, LOGO_SIZE], align: 'center', valign: 'center' });
+      } catch { /* ignore bad logo */ }
+    }
+
+    // company name (vertically centered against the logo)
     pdf.font('th-bold').fontSize(16).fillColor(INK)
-      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, headerTop + 4, { width: nameW, lineBreak: false });
+      .text(letter.companyName || 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด', textX, textTop, { width: nameW, lineBreak: false });
     if (letter.companyNameEn) {
       pdf.font('th').fontSize(10.5).fillColor(MUTED)
         .text(letter.companyNameEn, textX, pdf.y + 1, { width: nameW, lineBreak: false });
@@ -92,8 +105,8 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         .text(letter.address, textX, pdf.y + 2, { width: nameW });
     }
 
-    // move below the tallest of: logo, company name block, contact block
-    const headerBottom = Math.max(headerTop + 62, pdf.y + 4, cy + 2);
+    // move below the tallest of: logo/text row, contact block
+    const headerBottom = Math.max(headerTop + rowH + 4, pdf.y + 4, cy + 2);
     // double rule under the masthead — the classic official-letter look
     pdf.moveTo(left, headerBottom).lineTo(right, headerBottom).lineWidth(1.4).strokeColor(RULE).stroke();
     pdf.moveTo(left, headerBottom + 2.6).lineTo(right, headerBottom + 2.6).lineWidth(0.5).strokeColor(RULE).stroke();

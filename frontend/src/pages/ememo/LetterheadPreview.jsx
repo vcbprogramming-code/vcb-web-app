@@ -48,7 +48,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       <div className="aspect-[1/1.414] w-full overflow-hidden rounded-lg bg-white px-[8%] py-[6%] text-[13px] leading-relaxed text-slate-900 shadow-lg ring-1 ring-slate-200">
         {/* header: logo + company name (left) + contact (right) */}
         <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <img src={logoSrc} alt="" className="h-14 w-14 shrink-0 object-contain" />
             <div className="min-w-0">
               <div className="whitespace-nowrap text-[16px] font-bold leading-tight text-slate-900">

@@ -4,21 +4,26 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 
-export default function AddDocumentModal({ projects, docTypes, onClose, onCreated }) {
+export default function AddDocumentModal({ projects, docTypes, onClose, onCreated, initial = null }) {
   const { profile, user } = useAuth();
   const authorName = profile?.full_name || user?.email || '';
-  const [projectId, setProjectId] = useState('');
-  const [companyId, setCompanyId] = useState('');
+  // when duplicating ("สร้างจากใบเดิม"), `initial` prefills the form fields
+  const [projectId, setProjectId] = useState(initial?.project_id || '');
+  const [companyId, setCompanyId] = useState(initial?.company_id || '');
   const [companies, setCompanies] = useState([]);
-  const [docCode, setDocCode] = useState('');
+  const [docCode, setDocCode] = useState(initial?.doc_code || '');
   const [docCodes, setDocCodes] = useState([]);
-  const [docTypeId, setDocTypeId] = useState('');
-  const [subject, setSubject] = useState('');
-  const [recipient, setRecipient] = useState('');
-  const [reference, setReference] = useState('');
-  const [cc, setCc] = useState('');
+  const [docTypeId, setDocTypeId] = useState(initial?.doc_type_id || '');
+  const [subject, setSubject] = useState(initial?.subject || '');
+  const [recipient, setRecipient] = useState(initial?.recipient || '');
+  const [reference, setReference] = useState(initial?.reference || '');
+  const [cc, setCc] = useState(initial?.cc_recipients || '');
   // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
-  const [enclosures, setEnclosures] = useState([{ name: '', qty: '' }]);
+  const [enclosures, setEnclosures] = useState(
+    Array.isArray(initial?.enclosures) && initial.enclosures.length
+      ? initial.enclosures.map((e) => ({ name: e.name || '', qty: e.qty != null ? String(e.qty) : '' }))
+      : [{ name: '', qty: '' }]
+  );
   const setEncl = (i, key, val) => setEnclosures((prev) => prev.map((e, idx) => (idx === i ? { ...e, [key]: val } : e)));
   const addEncl = () => setEnclosures((prev) => [...prev, { name: '', qty: '' }]);
   const removeEncl = (i) => setEnclosures((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
@@ -26,14 +31,14 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const enclList = enclosures
     .filter((e) => e.name.trim())
     .map((e) => ({ name: e.name.trim(), qty: e.qty ? Number(e.qty) : undefined, unit: 'ชุด' }));
-  const [body, setBody] = useState('');
-  const [remarks, setRemarks] = useState('');
+  const [body, setBody] = useState(initial?.body || '');
+  const [remarks, setRemarks] = useState(initial?.remarks || '');
   // signer (ผู้เซ็น) — may differ from the preparer (the logged-in author). Blank
   // = the preparer signs; typing a name here makes someone else the signer.
-  const [signerName, setSignerName] = useState('');
-  const [signerTitle, setSignerTitle] = useState('');
+  const [signerName, setSignerName] = useState(initial?.signer_name || '');
+  const [signerTitle, setSignerTitle] = useState(initial?.signer_title || '');
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]); // supplementary attachments (multiple)
   const [dragOver, setDragOver] = useState(false);
   const [sigMode, setSigMode] = useState('text'); // 'text' = พิมพ์ชื่อ · 'image' = อัปโหลดลายเซ็น
   const [sigFile, setSigFile] = useState(null);
@@ -49,10 +54,35 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [error, setError] = useState(null);
   const [createdDocId, setCreatedDocId] = useState(null); // resume target if a later step fails
 
+  const [copyingFiles, setCopyingFiles] = useState(false);
+
   // load the configured doc-code → department options once
   useEffect(() => {
     ememoApi.listDocCodes().then((r) => setDocCodes(r.data)).catch(() => setDocCodes([]));
   }, []);
+
+  // when duplicating, copy the source doc's uploaded attachments into `files`
+  // (fetch each as a blob → File so they re-upload like freshly-picked files)
+  useEffect(() => {
+    const src = Array.isArray(initial?.copyAttachments) ? initial.copyAttachments : [];
+    if (!initial?.sourceId || src.length === 0) return;
+    let cancelled = false;
+    setCopyingFiles(true);
+    (async () => {
+      const collected = [];
+      for (const a of src) {
+        try {
+          const url = await ememoApi.attachmentBlobUrl(initial.sourceId, a.id);
+          const blob = await fetch(url).then((r) => r.blob());
+          URL.revokeObjectURL(url);
+          collected.push(new File([blob], a.file_name || 'attachment', { type: blob.type || a.content_type }));
+        } catch { /* skip a file that fails to copy */ }
+      }
+      if (!cancelled) setFiles((prev) => [...prev, ...collected]);
+      if (!cancelled) setCopyingFiles(false);
+    })();
+    return () => { cancelled = true; };
+  }, [initial]);
 
   // load companies (บริษัท/ตรา) and pre-select the default (main company)
   useEffect(() => {
@@ -102,15 +132,19 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   }, [projectId, docCode]);
 
   const MAX_BYTES = 7 * 1024 * 1024;
-  const pickFile = (f) => {
-    if (!f) return;
-    if (f.size > MAX_BYTES) {
-      setError('ไฟล์ใหญ่เกิน 7 MB');
-      return;
-    }
-    setError(null);
-    setFile(f);
+  // add one or more files (from picker or drop); reject oversized ones + dedupe
+  const pickFiles = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const tooBig = incoming.filter((f) => f.size > MAX_BYTES);
+    const ok = incoming.filter((f) => f.size <= MAX_BYTES);
+    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 7 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
+      return [...prev, ...ok.filter((f) => !seen.has(`${f.name}:${f.size}`))];
+    });
   };
+  const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx));
 
   const pickSignature = (f) => {
     if (!f) return;
@@ -188,9 +222,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         setCreatedDocId(doc.id);
       }
 
-      // upload the supplementary file (if any) — streamed into GridFS via the API
-      if (file) {
-        await ememoApi.uploadAttachment(doc.id, file);
+      // upload each supplementary file (streamed into storage via the API)
+      for (const f of files) {
+        await ememoApi.uploadAttachment(doc.id, f);
       }
 
       // always generate the letterhead PDF right away so the document is ready
@@ -205,7 +239,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         await ememoApi.submitForApproval(doc.id, cleanedApprovers);
       }
 
-      onCreated();
+      onCreated(doc.id);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -252,7 +286,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-4">
-            <h3 className="text-lg font-bold text-slate-800">เพิ่มเอกสารใหม่</h3>
+            <h3 className="text-lg font-bold text-slate-800">{initial ? 'สร้างเอกสารจากใบเดิม' : 'เพิ่มเอกสารใหม่'}</h3>
             {/* stepper */}
             <div className="hidden items-center gap-1.5 sm:flex">
               {STEPS.map((label, i) => {
@@ -412,36 +446,47 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={field} />
           </div>
 
-          {/* supplementary file upload */}
+          {/* supplementary file upload — multiple files allowed */}
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">
               แนบไฟล์เพิ่มเติม (ไม่บังคับ)
             </label>
-            <p className="text-xs text-slate-400 mb-2">เอกสารประกอบ — แนบเพิ่มเติมจากตัวหนังสือ ไม่ได้แทนที่กัน</p>
-            {file ? (
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm">
-                <span className="flex items-center gap-2 min-w-0">
-                  <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="truncate text-slate-700">{file.name}</span>
-                  <span className="text-slate-400 text-xs shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
-                </span>
-                <button type="button" onClick={() => setFile(null)} className="text-red-500 hover:underline text-sm shrink-0">ลบ</button>
+            <p className="text-xs text-slate-400 mb-2">เอกสารประกอบ — แนบได้หลายไฟล์ เพิ่มเติมจากตัวหนังสือ ไม่ได้แทนที่กัน</p>
+
+            {copyingFiles && (
+              <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand-border bg-brand-tint px-4 py-2.5 text-sm text-brand">
+                <Icon name="paperclip" className="h-4 w-4" /> กำลังคัดลอกไฟล์แนบจากใบเดิม…
               </div>
-            ) : (
-              <label
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0]); }}
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed py-8 cursor-pointer transition-colors ${
-                  dragOver ? 'border-brand bg-brand/5' : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <Icon name="download" className="h-7 w-7 text-slate-400" />
-                <span className="text-sm text-slate-600">คลิกหรือลากไฟล์มาวางที่นี่</span>
-                <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · สูงสุด 7 MB</span>
-                <input type="file" className="hidden" onChange={(e) => pickFile(e.target.files?.[0])} />
-              </label>
             )}
+
+            {files.length > 0 && (
+              <ul className="mb-2 space-y-2">
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
+                      <span className="truncate text-slate-700">{f.name}</span>
+                      <span className="shrink-0 text-xs text-slate-400">({(f.size / 1024).toFixed(0)} KB)</span>
+                    </span>
+                    <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-sm text-red-500 hover:underline">ลบ</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFiles(e.dataTransfer.files); }}
+              className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed py-6 transition-colors ${
+                dragOver ? 'border-brand bg-brand/5' : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <Icon name="download" className="h-6 w-6 text-slate-400" />
+              <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
+              <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · เลือกได้หลายไฟล์ · สูงสุด 7 MB/ไฟล์</span>
+              <input type="file" multiple className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
+            </label>
           </div>
 
           {/* signer (ผู้เซ็น) — defaults to the preparer; fill in to have someone else sign */}

@@ -11,6 +11,12 @@ function titleFor(pathname) {
   return match ? moduleTitles[match] : '';
 }
 
+/** Brand name in the header — per active module (E-Memo shows "VCB E-Memo"). */
+function brandFor(pathname) {
+  if (pathname.startsWith('/memos') || pathname.startsWith('/dashboard')) return 'VCB E-Memo';
+  return 'VCB Connect';
+}
+
 /**
  * Shell for module pages: a slim top bar with "back to Portal", the module
  * title, and the user/logout block. No sidebar.
@@ -21,6 +27,7 @@ export default function ModuleShell() {
   const location = useLocation();
   const role = profile?.role;
   const title = titleFor(location.pathname);
+  const brand = brandFor(location.pathname);
 
   function handleLogout() {
     logout();
@@ -41,7 +48,7 @@ export default function ModuleShell() {
                 <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />
               </span>
               <span className="min-w-0 text-left leading-tight">
-                <span className="block text-sm font-bold tracking-tight text-slate-900">VCB ONLINE</span>
+                <span className="block text-sm font-bold tracking-tight text-slate-900">{brand}</span>
                 {title && <span className="block truncate text-[11px] text-slate-500">{title}</span>}
               </span>
             </button>

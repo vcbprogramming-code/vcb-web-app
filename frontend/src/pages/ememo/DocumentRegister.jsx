@@ -4,7 +4,6 @@ import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
-import { Avatar } from '../../components/ui/index.js';
 
 function ProjectChip({ code, color, active, onClick }) {
   return (
@@ -43,7 +42,6 @@ export default function DocumentRegister() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [viewer, setViewer] = useState(null); // { url, title } for the inline PDF modal
 
   // filters
   const [projectId, setProjectId] = useState('');
@@ -92,23 +90,6 @@ export default function DocumentRegister() {
     setFrom('');
     setTo('');
   };
-
-  // open the document's generated PDF (approved version if present, else
-  // original) in an inline modal viewer — no new browser tab
-  const openFile = async (doc) => {
-    try {
-      const { data } = await ememoApi.getDocument(doc.id);
-      const pdf =
-        data.attachments?.find((a) => a.version === 'approved') ||
-        data.attachments?.find((a) => a.version === 'original');
-      if (!pdf) { navigate(`/memos/${doc.id}`); return; }
-      const url = await ememoApi.attachmentBlobUrl(doc.id, pdf.id);
-      setViewer({ url, title: doc.doc_number });
-    } catch {
-      navigate(`/memos/${doc.id}`);
-    }
-  };
-  const closeViewer = () => setViewer((v) => { if (v?.url) URL.revokeObjectURL(v.url); return null; });
 
   const quickRange = (days) => {
     const today = new Date();
@@ -246,33 +227,23 @@ export default function DocumentRegister() {
                   <td className="tbl-td text-slate-400">{(page - 1) * pageSize + i + 1}</td>
                   <td className="tbl-td whitespace-nowrap text-slate-600">{formatThaiDate(d.date_received)}</td>
                   <td className="tbl-td">
-                    <div className="flex items-center gap-3">
-                      <Avatar icon="document" color="bg-brand/10 text-brand" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
-                            style={{ backgroundColor: d.project_color || '#64748b' }}
-                          >
-                            {d.project_code}
-                          </span>
-                          <span className="font-semibold text-slate-800">{d.doc_number}</span>
-                        </div>
-                        <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
+                          style={{ backgroundColor: d.project_color || '#64748b' }}
+                        >
+                          {d.project_code}
+                        </span>
+                        <span className="font-semibold text-slate-800">{d.doc_number}</span>
                       </div>
+                      <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
                     </div>
                   </td>
                   <td className="tbl-td text-slate-600">{d.doc_code}</td>
                   <td className="tbl-td"><StatusBadge status={d.status} /></td>
                   <td className="tbl-td text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openFile(d); }}
-                        title="เปิดไฟล์เอกสาร (PDF)"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                      >
-                        <Icon name="file" className="h-3.5 w-3.5" /> เปิดไฟล์
-                      </button>
+                    <div className="flex items-center justify-end">
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/memos/${d.id}`); }}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-light"
@@ -298,28 +269,6 @@ export default function DocumentRegister() {
           </div>
         </div>
       </div>
-
-      {/* inline PDF viewer modal — opens without a new tab */}
-      {viewer && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/60 p-4" onClick={closeViewer}>
-          <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <Icon name="file" className="h-4 w-4 text-brand" /> {viewer.title}
-              </div>
-              <div className="flex items-center gap-2">
-                <a href={viewer.url} download={`${viewer.title.replace(/\//g, '-')}.pdf`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
-                  <Icon name="download" className="h-4 w-4" /> ดาวน์โหลด
-                </a>
-                <button onClick={closeViewer} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                  <Icon name="x" className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-            <iframe title={viewer.title} src={viewer.url} className="min-h-0 flex-1 bg-slate-50" />
-          </div>
-        </div>
-      )}
 
       {showAdd && (
         <AddDocumentModal

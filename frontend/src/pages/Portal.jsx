@@ -4,6 +4,7 @@ import { apps, roleLabels } from '../config/nav.js';
 import { formatThaiLongDate } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
+import GlobeMark from '../components/GlobeMark.jsx';
 
 export default function Portal() {
   const { profile, user, logout } = useAuth();
@@ -28,8 +29,8 @@ export default function Portal() {
       <header className="sticky top-0 z-30 border-b border-cyan-300/10 bg-[#060b18]/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3 md:px-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white/5 ring-1 ring-cyan-300/25">
-              <img src="/logo.png" alt="VCB" className="h-8 w-8 object-contain" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400/15 to-blue-500/10 ring-1 ring-cyan-300/30 shadow-[0_0_18px_-6px_rgba(34,211,238,0.7)]">
+              <GlobeMark className="h-6 w-6" />
             </div>
             <div className="leading-tight">
               <div className="cyber-title text-sm font-bold text-white">

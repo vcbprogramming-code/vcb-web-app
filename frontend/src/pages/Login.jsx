@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
+import GlobeMark from '../components/GlobeMark.jsx';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -126,8 +127,8 @@ export default function Login() {
         <span className="pointer-events-none absolute bottom-3 right-3 h-4 w-4 border-b border-r border-cyan-300/40" />
 
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/25 to-blue-500/15 text-cyan-200 ring-1 ring-inset ring-cyan-300/40 shadow-[0_0_30px_-6px_rgba(34,211,238,0.6)]">
-            <Icon name="layers" className="h-8 w-8" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/25 to-blue-500/15 ring-1 ring-inset ring-cyan-300/40 shadow-[0_0_30px_-6px_rgba(34,211,238,0.6)]">
+            <GlobeMark className="h-9 w-9" />
           </div>
           <h1 className="cyber-title text-2xl font-extrabold tracking-wide text-white">
             VCB <span className="text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.5)]">CONNECT</span>

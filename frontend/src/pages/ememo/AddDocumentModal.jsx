@@ -334,7 +334,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
-              <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="เช่น ฝ่ายบัญชี, ฝ่ายบุคคล" className={field} />
+              <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="เช่น ฝ่ายบัญชี, somchai@vcb.co.th" className={field} />
+              <p className="mt-1 text-xs text-slate-400">ถ้าใส่อีเมล ระบบจะส่ง “เพื่อทราบ/ปรึกษา” ให้ตอนส่งอนุมัติ (ผู้รับสำเนาไม่ต้องอนุมัติ)</p>
             </div>
           </div>
 

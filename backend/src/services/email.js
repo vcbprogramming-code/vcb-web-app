@@ -143,6 +143,84 @@ export async function sendApprovalRequest({ step, doc }) {
 }
 
 /**
+ * Extract valid email addresses from a free-text "สำเนาเรียน / CC" field.
+ * The field may hold names, emails, or a mix separated by comma / semicolon /
+ * newline (e.g. "ฝ่ายบัญชี, somchai@vcb.co.th"). Only the emails are returned.
+ */
+export function extractCcEmails(ccText) {
+  if (!ccText) return [];
+  const found = String(ccText).match(/[^\s,;<>()]+@[^\s,;<>()]+\.[^\s,;<>()]+/g) || [];
+  // de-dupe, lowercase-compare, keep original form
+  const seen = new Set();
+  const out = [];
+  for (const e of found) {
+    const key = e.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); out.push(e); }
+  }
+  return out;
+}
+
+/**
+ * Send a "for your information / please advise" copy to the CC recipients when a
+ * document is submitted for approval. This is NOT an approval request — the CC
+ * people are consulted, they do not approve and get no action link. `toEmails`
+ * is an array; one email is sent per recipient.
+ */
+export async function sendCcNotification({ toEmails, doc, actorName }) {
+  const emails = Array.isArray(toEmails) ? toEmails.filter(Boolean) : [];
+  if (!emails.length) return { skipped: true };
+  const url = `${env.appBaseUrl}/memos`;
+  const row = (label, value) =>
+    `<tr>
+       <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
+       <td style="padding:8px 0;color:#0f172a;font-weight:500">${value}</td>
+     </tr>`;
+
+  const html = `
+  <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:#0f766e;background:linear-gradient(135deg,#0d9488,#0f766e);padding:24px 28px;color:#fff">
+        <div style="font-size:13px;letter-spacing:.5px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">สำเนาเรียน (เพื่อทราบ / ปรึกษา)</div>
+      </div>
+      <div style="padding:28px">
+        <p style="margin:0 0 16px;font-size:15px;color:#334155">
+          เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบหรือขอปรึกษา
+          <b>ท่านไม่จำเป็นต้องอนุมัติ</b> เอกสารนี้อยู่ระหว่างการพิจารณาตามสายอนุมัติปกติ
+        </p>
+        <table style="border-collapse:collapse;width:100%;font-size:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px">
+          ${row('เลขที่หนังสือ', `<b style="font-size:15px">${esc(doc.doc_number)}</b>`)}
+          ${row('เรื่อง', esc(doc.subject))}
+          ${doc.recipient ? row('เรียน', esc(doc.recipient)) : ''}
+          ${doc.date_received ? row('วันที่', thaiDate(doc.date_received)) : ''}
+          ${actorName ? row('ผู้ส่งเรื่อง', esc(actorName)) : ''}
+        </table>
+        <div style="text-align:center;margin:8px 0 4px">
+          <a href="${url}" style="display:inline-block;background:#0d9488;color:#fff;font-size:15px;font-weight:600;padding:12px 30px;border-radius:10px;text-decoration:none">
+            เปิดดูเอกสาร
+          </a>
+        </div>
+      </div>
+      <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
+        อีเมลฉบับนี้ส่งโดยอัตโนมัติเพื่อทราบ — ไม่ต้องดำเนินการอนุมัติ · กรุณาอย่าตอบกลับ
+      </div>
+    </div>
+  </div>`;
+
+  const results = [];
+  for (const to of emails) {
+    const r = await sendEmail({
+      to,
+      subject: `[สำเนาเรียน] ${doc.doc_number} — ${doc.subject}`,
+      html,
+      text: `เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู: ${url}`,
+    }).catch((e) => ({ error: e.message, to }));
+    results.push(r);
+  }
+  return { sent: emails.length, results };
+}
+
+/**
  * Notify the document author of an approval outcome (approved / returned /
  * rejected). `outcome` ∈ 'approved'|'returned'|'rejected'.
  */

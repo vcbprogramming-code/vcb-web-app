@@ -17,6 +17,7 @@ import {
 import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
 import { generateOriginalPdf } from '../services/pdfDoc.js';
 import { createApprovalChain, sendApprovalRequest } from '../services/approval.js';
+import { sendCcNotification, extractCcEmails } from '../services/email.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -482,7 +483,19 @@ router.post(
       client.release();
     }
     await sendApprovalRequest({ step: firstStep, doc }).catch((e) => console.error('approval email failed:', e.message));
-    res.json({ data: { status: 'pending', firstApprover: firstStep.approver_email } });
+
+    // CC "for your information / please advise" — send a copy to any email in the
+    // สำเนาเรียน field. CC recipients are consulted, NOT in the approval chain.
+    const ccEmails = extractCcEmails(doc.cc_recipients);
+    if (ccEmails.length) {
+      await sendCcNotification({
+        toEmails: ccEmails,
+        doc,
+        actorName: req.profile.full_name || req.profile.email,
+      }).catch((e) => console.error('cc notification failed:', e.message));
+    }
+
+    res.json({ data: { status: 'pending', firstApprover: firstStep.approver_email, ccNotified: ccEmails.length } });
   })
 );
 

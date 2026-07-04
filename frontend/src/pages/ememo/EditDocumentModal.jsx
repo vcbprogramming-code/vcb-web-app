@@ -92,7 +92,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>
-            <input value={form.cc} onChange={(e) => set('cc', e.target.value)} className="field" />
+            <input value={form.cc} onChange={(e) => set('cc', e.target.value)} placeholder="เช่น ฝ่ายบัญชี, somchai@vcb.co.th" className="field" />
+            <p className="mt-1 text-xs text-slate-400">ใส่อีเมลได้ — จะส่ง “เพื่อทราบ” ให้ตอนส่งอนุมัติ (ไม่ต้องอนุมัติ)</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">ผู้ลงนาม (ผู้เซ็น)</label>

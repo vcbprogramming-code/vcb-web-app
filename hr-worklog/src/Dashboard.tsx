@@ -131,16 +131,16 @@ export default function Dashboard({ cur, setCur, openSite }:
             <h1 style={{ margin: 0 }}>{t('แดชบอร์ด')}</h1>
             <div className="sub" style={{ margin: 0 }}>{t('ภาพรวมการบันทึกการทำงานรายหน่วยงาน')} · {mname(cur.m)} {be(cur.y)}</div>
           </div>
-          <div className="fld" style={{ marginLeft: 'auto' }}>
-            <label>{t('มุมมอง')}</label>
-            <div className="viewseg">
-              {seg.map(([v, l]) => (
-                <button key={v} className={dashView === v ? 'on' : ''} onClick={() => setDashView(v)}>{l}</button>
-              ))}
+          <div className="dash-mrow" style={{ marginLeft: 'auto' }}>
+            <div className="fld">
+              <label>{t('มุมมอง')}</label>
+              <div className="viewseg">
+                {seg.map(([v, l]) => (
+                  <button key={v} className={dashView === v ? 'on' : ''} onClick={() => setDashView(v)}>{l}</button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="dash-mrow">
-            <div className="fld" style={{ maxWidth: 230 }}>
+            <div className="fld">
               <label>{t('เดือน')}</label>
               <MonthNav cur={cur} setCur={setCur} />
             </div>

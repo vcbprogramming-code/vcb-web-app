@@ -499,6 +499,17 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
             <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ
           </div>
+          {/* warn when the chosen project has no company name — the header falls
+              back to the default, which is wrong for JV/other-company projects */}
+          {projectId && !letter?.company_name && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                โครงการนี้ยังไม่ได้ตั้งชื่อบริษัทบนหัวจดหมาย — ระบบจะใช้ชื่อเริ่มต้น
+                ตั้งได้ที่ <b>ตั้งค่า E-Memo → โครงการ → แก้ไข</b>
+              </span>
+            </div>
+          )}
           <LetterheadPreview letter={letter} doc={previewDoc} />
         </div>
         </div>

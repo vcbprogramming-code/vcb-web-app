@@ -37,6 +37,11 @@ export const env = {
 
   // Public URL of the frontend, used to build approval links in emails.
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:5173',
+
+  // Google OAuth client id for "Sign in with Google" (public value — no secret
+  // needed; the backend only verifies Google ID tokens against it). When unset,
+  // the Google login route returns 501 and only email login works.
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
 };
 
 export const isProd = env.nodeEnv === 'production';

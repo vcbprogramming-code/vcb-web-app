@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import multer from 'multer';
+import { OAuth2Client } from 'google-auth-library';
 import { queryOne } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -9,9 +10,33 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { verifyPassword, signToken, tokenExpiresAt } from '../utils/auth.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
 import { effectivePermissions } from '../config/permissions.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
+
+// Google ID-token verifier (lazily constructed; only used when a client id is set).
+const googleClient = env.googleClientId ? new OAuth2Client(env.googleClientId) : null;
+
+/** Build the standard login response (JWT + profile + effective permissions). */
+function loginResponse(profile) {
+  return {
+    user: { id: profile.id, email: profile.email },
+    profile: {
+      id: profile.id,
+      full_name: profile.full_name,
+      email: profile.email,
+      role: profile.role,
+      unit_id: profile.unit_id,
+      is_active: profile.is_active,
+      effective_permissions: effectivePermissions(profile),
+    },
+    session: {
+      access_token: signToken(profile.id),
+      expires_at: tokenExpiresAt(),
+    },
+  };
+}
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -57,23 +82,64 @@ router.post(
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
     }
 
-    const token = signToken(profile.id);
-    res.json({
-      user: { id: profile.id, email: profile.email },
-      profile: {
-        id: profile.id,
-        full_name: profile.full_name,
-        email: profile.email,
-        role: profile.role,
-        unit_id: profile.unit_id,
-        is_active: profile.is_active,
-        effective_permissions: effectivePermissions(profile),
-      },
-      session: {
-        access_token: token,
-        expires_at: tokenExpiresAt(),
-      },
-    });
+    res.json(loginResponse(profile));
+  })
+);
+
+const googleSchema = z.object({ credential: z.string().min(10) });
+
+/**
+ * POST /api/auth/google
+ * Verifies a Google ID token (from "Sign in with Google") against our client id,
+ * then logs the user in IF their (Google-verified) email exists as an active
+ * profile. We never trust the email from the client — only the one Google signed.
+ * No new accounts are created here; the admin provisions users.
+ */
+router.post(
+  '/google',
+  asyncHandler(async (req, res) => {
+    if (!googleClient) {
+      throw new ApiError(501, 'ยังไม่ได้ตั้งค่า Google Sign-In (ไม่มี GOOGLE_CLIENT_ID)');
+    }
+    const parsed = googleSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: parsed.data.credential,
+        audience: env.googleClientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new ApiError(401, 'ยืนยัน Google ไม่สำเร็จ');
+    }
+    if (!payload?.email || !payload.email_verified) {
+      throw new ApiError(401, 'บัญชี Google นี้ยังไม่ได้ยืนยันอีเมล');
+    }
+
+    const profile = await queryOne(
+      `select id, full_name, email, role, unit_id, is_active, permissions
+         from profiles where lower(email) = lower($1)`,
+      [payload.email]
+    );
+    // Only pre-provisioned emails may enter (client chose "เฉพาะอีเมลที่อยู่ในระบบ").
+    if (!profile) {
+      throw new ApiError(403, `บัญชี ${payload.email} ยังไม่ได้รับสิทธิ์ใช้งานระบบ — โปรดติดต่อผู้ดูแล`);
+    }
+    if (!profile.is_active) {
+      throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
+    }
+
+    res.json(loginResponse(profile));
+  })
+);
+
+/** GET /api/auth/config — public auth config for the frontend (Google enabled?). */
+router.get(
+  '/config',
+  asyncHandler(async (req, res) => {
+    res.json({ data: { googleEnabled: Boolean(env.googleClientId), googleClientId: env.googleClientId || null } });
   })
 );
 

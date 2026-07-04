@@ -56,3 +56,8 @@ services:
         sync: false
       - key: MAIL_FROM
         sync: false
+      # Google Sign-In client id (Web application, from Google Cloud Console).
+      # When set, the login page shows "Sign in with Google". Leave unset to keep
+      # email-only login.
+      - key: GOOGLE_CLIENT_ID
+        sync: false

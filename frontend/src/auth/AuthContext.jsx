@@ -39,6 +39,19 @@ export function AuthProvider({ children }) {
     return res;
   }, []);
 
+  // Sign in with Google: exchange the Google ID token (credential) for our JWT.
+  const loginWithGoogle = useCallback(async (credential) => {
+    const res = await api('/auth/google', {
+      method: 'POST',
+      auth: false,
+      body: { credential },
+    });
+    tokenStore.set(res.session.access_token);
+    setUser(res.user);
+    setProfile(res.profile);
+    return res;
+  }, []);
+
   const logout = useCallback(() => {
     tokenStore.clear();
     setUser(null);
@@ -46,7 +59,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -271,7 +271,20 @@ export default function DocumentDetail() {
             <MetaItem icon="building" label="แผนก">{doc.department}</MetaItem>
             {doc.recipient && <MetaItem icon="inbox" label="เรียน">{doc.recipient}</MetaItem>}
             {doc.doc_type_name && <MetaItem icon="layers" label="ประเภท">{doc.doc_type_name}</MetaItem>}
-            {doc.reference && <MetaItem icon="file" label="อ้างถึง">{doc.reference}</MetaItem>}
+            {doc.reference && (
+              <MetaItem icon="file" label="อ้างถึง">
+                {doc.reference_doc ? (
+                  <button
+                    onClick={() => navigate(`/memos/${doc.reference_doc.id}`)}
+                    className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
+                    title="เปิดเอกสารที่อ้างถึง"
+                  >
+                    {doc.reference}
+                    <Icon name="arrowRight" className="h-3.5 w-3.5" />
+                  </button>
+                ) : doc.reference}
+              </MetaItem>
+            )}
             {doc.cc_recipients && <MetaItem icon="people" label="สำเนาเรียน">{doc.cc_recipients}</MetaItem>}
             {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
               <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">

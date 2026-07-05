@@ -261,7 +261,20 @@ router.get(
          left join profiles pr on pr.id = m.author_id
         where m.document_id = $1
         order by m.created_at`, [req.params.id]);
-    res.json({ data: { ...doc, attachments, approval_steps: steps, audit, messages } });
+
+    // resolve a "อ้างถึง" reference to an in-system document so the UI can link
+    // to it. The reference is free text (e.g. "BV/วิศวะ/02A/018 ลว. 26 มิ.ย. 69");
+    // pull out the doc-number token (PREFIX/แผนก/CODE/NNN) and look it up.
+    let referenceDoc = null;
+    if (doc.reference) {
+      const m = String(doc.reference).match(/[^\s]+\/[^\s]+\/[^\s]+\/\d+/);
+      if (m) {
+        referenceDoc = await queryOne(
+          'select id, doc_number from documents where doc_number = $1 limit 1', [m[0]]);
+      }
+    }
+
+    res.json({ data: { ...doc, attachments, approval_steps: steps, audit, messages, reference_doc: referenceDoc } });
   })
 );
 

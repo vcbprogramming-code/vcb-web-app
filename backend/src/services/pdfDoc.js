@@ -1,6 +1,18 @@
+import QRCode from 'qrcode';
 import { query, queryOne } from '../config/db.js';
 import { putObject, deleteObject, getObjectBuffer } from '../config/storage.js';
 import { generateLetterPdf } from './letterhead.js';
+import { env } from '../config/env.js';
+
+/** Build the QR PNG buffer that links to the public verify page (#6). Returns
+ *  null on any failure so PDF generation never breaks over the QR. */
+async function buildVerifyQr(doc) {
+  if (!doc?.verify_token) return null;
+  const url = `${env.appBaseUrl.replace(/\/$/, '')}/verify/${doc.verify_token}`;
+  try {
+    return { buffer: await QRCode.toBuffer(url, { margin: 1, width: 160, errorCorrectionLevel: 'M' }), url };
+  } catch { return null; }
+}
 
 /** Load a document row (+ author name) + its project letterhead config. */
 async function loadDocAndLetter(documentId) {
@@ -110,7 +122,8 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
        from approval_steps where document_id = $1 order by step_no`,
     [documentId]
   );
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps });
+  const qr = await buildVerifyQr(doc);
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');
@@ -133,7 +146,8 @@ export async function generateOriginalPdf(documentId, uploadedBy = null) {
     authorSignature = await getObjectBuffer(sigKey).catch(() => null);
   }
   // original = the clean letter, no ความเห็น/การพิจารณา box yet
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, commentBox: false });
+  const qr = await buildVerifyQr(doc);
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, commentBox: false, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');
@@ -180,7 +194,8 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
 
-  const pdf = await generateLetterPdf(doc, letter, { signatures, auditSteps });
+  const qr = await buildVerifyQr(doc);
+  const pdf = await generateLetterPdf(doc, letter, { signatures, auditSteps, qr });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'approved');

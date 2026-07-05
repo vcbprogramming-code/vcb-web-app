@@ -260,7 +260,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
-              d.signer_name, d.signer_title, d.created_by, pr.full_name as preparer_name
+              d.signer_name, d.signer_title, d.created_by, d.verify_token, pr.full_name as preparer_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
         where d.id = $1`,

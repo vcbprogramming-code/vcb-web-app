@@ -4,6 +4,7 @@ import orgRoutes from './org.routes.js';
 import projectRoutes from './projects.routes.js';
 import documentRoutes from './documents.routes.js';
 import approvalRoutes from './approvals.routes.js';
+import verifyRoutes from './verify.routes.js';
 import adminRoutes from './admin.routes.js';
 import performanceRoutes from './performance.routes.js';
 import creditRoutes from './credit.routes.js';
@@ -20,6 +21,7 @@ router.use('/org', orgRoutes);
 router.use('/projects', projectRoutes);
 router.use('/documents', documentRoutes);
 router.use('/approvals', approvalRoutes); // public (token-based) approval actions
+router.use('/verify', verifyRoutes); // public (token-based) document authenticity check
 router.use('/admin', adminRoutes); // admin-only: users + config
 
 // Module 2: Reporting & Analytics (daily work + OT)

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
 import ApprovalAction from './pages/ememo/ApprovalAction.jsx';
+import VerifyDocument from './pages/ememo/VerifyDocument.jsx';
 import EmemoSettings from './pages/ememo/EmemoSettings.jsx';
 import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
@@ -28,6 +29,8 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       {/* public approval page — reached from the email link, no login */}
       <Route path="/approve/:token" element={<ApprovalAction />} />
+      {/* public document verification — reached by scanning the QR, no login */}
+      <Route path="/verify/:token" element={<VerifyDocument />} />
 
       <Route
         element={

@@ -54,6 +54,9 @@ export const ememoApi = {
   submitForApproval: (id, approvers) =>
     api(`/documents/${id}/submit`, { method: 'POST', body: { approvers } }),
 
+  // public document verification (no auth — QR/token from a printed copy)
+  verifyDocument: (token) => api(`/verify/${token}`, { auth: false }),
+
   // public approval (no auth — token from email link)
   lookupApproval: (token) => api(`/approvals/${token}`, { auth: false }),
   // open an attachment from the public approval page (token-gated, no login)

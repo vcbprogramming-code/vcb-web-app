@@ -243,6 +243,22 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         .text(`ผู้จัดทำ: ${preparer}`, left, pdf.y, { width: contentW });
     }
 
+    // ---- verification QR (#6) — bottom-left of page 1. Scanning it opens the
+    // public /verify/<token> page (status + approval trail + audit) so a printed
+    // or exported copy can be proven genuine. Drawn at an absolute position so it
+    // doesn't disturb the letter flow.
+    if (opts.qr?.buffer) {
+      const qrSize = 58;
+      const qrY = pdf.page.height - pdf.page.margins.bottom - qrSize - 6;
+      try {
+        pdf.image(opts.qr.buffer, left, qrY, { fit: [qrSize, qrSize] });
+        pdf.font('th').fontSize(7).fillColor('#64748b')
+          .text('สแกนเพื่อตรวจสอบความถูกต้องของเอกสาร', left + qrSize + 6, qrY + 8, { width: 150 });
+        pdf.font('th').fontSize(6.5).fillColor('#94a3b8')
+          .text(`เลขที่ ${doc.doc_number}`, left + qrSize + 6, pdf.y + 1, { width: 150 });
+      } catch { /* ignore QR draw failure */ }
+    }
+
     // ---- ความเห็น / การพิจารณา box at the BOTTOM of the first page ----
     // Mirrors the client's real memos where reviewers write their comment and
     // sign at the foot of page 1. Shows any approver comments already recorded,

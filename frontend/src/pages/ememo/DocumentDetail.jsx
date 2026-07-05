@@ -332,6 +332,13 @@ export default function DocumentDetail() {
             <button onClick={duplicateDoc} disabled={dupLoading} className="btn-outline">
               <Icon name="layers" className="h-4 w-4" /> {dupLoading ? 'กำลังเตรียม…' : 'สร้างจากใบนี้'}
             </button>
+
+            {/* public verification page (same as scanning the PDF's QR) */}
+            {doc.verify_token && (
+              <a href={`/verify/${doc.verify_token}`} target="_blank" rel="noreferrer" className="btn-outline">
+                <Icon name="eye" className="h-4 w-4" /> ตรวจสอบ (QR)
+              </a>
+            )}
           </div>
         </div>
       </div>

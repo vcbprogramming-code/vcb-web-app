@@ -210,6 +210,60 @@ router.put(
   })
 );
 
+// ── per-user document visibility (#8) ────────────────────────────────────────
+
+/** GET /api/admin/users/:id/visibility — the user's allowed projects + codes. */
+router.get(
+  '/users/:id/visibility',
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      'select scope_type, scope_value from document_visibility where profile_id = $1',
+      [req.params.id]
+    );
+    res.json({
+      data: {
+        projectIds: rows.filter((r) => r.scope_type === 'project').map((r) => r.scope_value),
+        docCodes: rows.filter((r) => r.scope_type === 'doc_code').map((r) => r.scope_value),
+      },
+    });
+  })
+);
+
+const visibilitySchema = z.object({
+  projectIds: z.array(z.string().uuid()).default([]),
+  docCodes: z.array(z.string()).default([]),
+});
+
+/** PUT /api/admin/users/:id/visibility — replace the user's visibility scopes.
+ *  Empty arrays = no restriction (the user sees everything). */
+router.put(
+  '/users/:id/visibility',
+  asyncHandler(async (req, res) => {
+    const parsed = visibilitySchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    const user = await queryOne('select id from profiles where id = $1', [req.params.id]);
+    if (!user) throw new ApiError(404, 'User not found');
+    const { projectIds, docCodes } = parsed.data;
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      await client.query('delete from document_visibility where profile_id = $1', [req.params.id]);
+      for (const pid of projectIds) {
+        await client.query(
+          `insert into document_visibility (profile_id, scope_type, scope_value)
+           values ($1,'project',$2) on conflict do nothing`, [req.params.id, pid]);
+      }
+      for (const code of docCodes) {
+        await client.query(
+          `insert into document_visibility (profile_id, scope_type, scope_value)
+           values ($1,'doc_code',$2) on conflict do nothing`, [req.params.id, code]);
+      }
+      await client.query('commit');
+    } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
+    res.json({ data: { projectIds, docCodes } });
+  })
+);
+
 // ===========================================================================
 // Config: Companies (บริษัท / ตรา) — selectable letterhead identity
 // ===========================================================================

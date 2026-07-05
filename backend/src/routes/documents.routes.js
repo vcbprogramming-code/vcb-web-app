@@ -75,8 +75,28 @@ const STATUS_TH = {
   rejected: 'ไม่อนุมัติ', returned: 'ตีกลับ', cancelled: 'ยกเลิก',
 };
 
-/** Build the WHERE clause + params from register filters (shared by list/export). */
-function buildWhere(q) {
+/**
+ * Load a user's document-visibility scopes (#8). Returns null when the user has
+ * NO scopes or is an admin — meaning "can see everything" (backwards compatible).
+ * Otherwise returns { projectIds:[], docCodes:[] } — an empty dimension means
+ * "not restricted on that dimension".
+ */
+async function loadVisibility(profile) {
+  if (!profile || profile.role === 'admin') return null;
+  const { rows } = await query(
+    'select scope_type, scope_value from document_visibility where profile_id = $1',
+    [profile.id]
+  );
+  if (rows.length === 0) return null;
+  return {
+    projectIds: rows.filter((r) => r.scope_type === 'project').map((r) => r.scope_value),
+    docCodes: rows.filter((r) => r.scope_type === 'doc_code').map((r) => r.scope_value),
+  };
+}
+
+/** Build the WHERE clause + params from register filters (shared by list/export).
+ *  `visibility` (from loadVisibility) further restricts rows to allowed scopes. */
+function buildWhere(q, visibility = null) {
   const where = [];
   const params = [];
   const add = (clause, value) => { params.push(value); where.push(clause.replace('$$', `$${params.length}`)); };
@@ -90,6 +110,11 @@ function buildWhere(q) {
     const i = params.length;
     where.push(`(d.subject ilike $${i} or d.doc_number ilike $${i} or d.recipient ilike $${i} or d.remarks ilike $${i})`);
   }
+  // per-user visibility scoping (#8)
+  if (visibility) {
+    if (visibility.projectIds.length) add('d.project_id = any($$::uuid[])', visibility.projectIds);
+    if (visibility.docCodes.length) add('d.doc_code = any($$::text[])', visibility.docCodes);
+  }
   return { whereSql: where.length ? `where ${where.join(' and ')}` : '', params };
 }
 
@@ -100,7 +125,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
-    const { whereSql, params } = buildWhere(req.query);
+    const visibility = await loadVisibility(req.profile);
+    const { whereSql, params } = buildWhere(req.query, visibility);
 
     const countRow = await queryOne(`select count(*)::int as total ${LIST_FROM} ${whereSql}`, params);
     const offset = (page - 1) * pageSize;
@@ -119,7 +145,8 @@ router.get(
 router.get(
   '/export',
   asyncHandler(async (req, res) => {
-    const { whereSql, params } = buildWhere(req.query);
+    const visibility = await loadVisibility(req.profile);
+    const { whereSql, params } = buildWhere(req.query, visibility);
     const { rows } = await query(
       `select d.doc_number, d.date_received, d.subject, d.recipient, d.remarks, d.status,
               p.code as project_code, t.name as doc_type_name
@@ -240,6 +267,14 @@ router.get(
       [req.params.id]
     );
     if (!doc) throw new ApiError(404, 'Document not found');
+    // enforce per-user visibility (#8): a scoped user can't open a doc outside
+    // their allowed projects/codes
+    const vis = await loadVisibility(req.profile);
+    if (vis) {
+      const projOk = !vis.projectIds.length || vis.projectIds.includes(doc.project_id);
+      const codeOk = !vis.docCodes.length || vis.docCodes.includes(doc.doc_code);
+      if (!projOk || !codeOk) throw new ApiError(403, 'ไม่มีสิทธิ์เข้าถึงเอกสารนี้');
+    }
     const { rows: attachments } = await query(
       `select id, kind, version, file_name, content_type, size_bytes, created_at
          from document_attachments where document_id = $1 order by created_at`, [req.params.id]);

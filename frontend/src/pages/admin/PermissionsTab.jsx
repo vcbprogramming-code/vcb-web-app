@@ -17,21 +17,41 @@ export default function PermissionsTab() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+  // per-user document visibility (#8)
+  const [projects, setProjects] = useState([]);
+  const [docCodes, setDocCodes] = useState([]);
+  const [visProjects, setVisProjects] = useState([]); // allowed project ids ([] = all)
+  const [visCodes, setVisCodes] = useState([]);        // allowed doc codes ([] = all)
+  const [visBusy, setVisBusy] = useState(false);
+  const [visSaved, setVisSaved] = useState(false);
 
   useEffect(() => {
-    Promise.all([adminApi.listUsers(), adminApi.permissionCatalog()])
-      .then(([u, c]) => { setUsers(u.data); setCatalog(c.data); })
+    Promise.all([adminApi.listUsers(), adminApi.permissionCatalog(), adminApi.listProjects(), adminApi.listDocCodeApprovers()])
+      .then(([u, c, p, dc]) => { setUsers(u.data); setCatalog(c.data); setProjects(p.data); setDocCodes(dc.data); })
       .catch((e) => setError(e.message));
   }, []);
 
   const selectUser = (id) => {
     setSelectedId(id);
     setSaved(false);
+    setVisSaved(false);
     setError(null);
-    if (!id) { setEffective({}); setRole(null); return; }
+    if (!id) { setEffective({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
     adminApi.getUserPermissions(id)
       .then((r) => { setEffective(r.data.effective || {}); setRole(r.data.role); })
       .catch((e) => setError(e.message));
+    adminApi.getUserVisibility(id)
+      .then((r) => { setVisProjects(r.data.projectIds || []); setVisCodes(r.data.docCodes || []); })
+      .catch(() => { setVisProjects([]); setVisCodes([]); });
+  };
+
+  const toggleVisProject = (pid) => { setVisSaved(false); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
+  const toggleVisCode = (code) => { setVisSaved(false); setVisCodes((prev) => prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]); };
+  const saveVisibility = async () => {
+    setVisBusy(true); setError(null);
+    try { await adminApi.saveUserVisibility(selectedId, visProjects, visCodes); setVisSaved(true); }
+    catch (e) { setError(e.message); }
+    finally { setVisBusy(false); }
   };
 
   const toggle = (module, action) => {
@@ -113,6 +133,62 @@ export default function PermissionsTab() {
                 <Icon name="check" className="h-4 w-4" /> บันทึกแล้ว
               </span>
             )}
+          </div>
+
+          {/* per-user document visibility (#8) */}
+          <div className="mt-6 rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 border-b border-slate-200">
+              การมองเห็นเอกสาร (E-Memo)
+            </div>
+            <div className="space-y-4 p-4">
+              <p className="text-xs text-slate-400">
+                เลือกโครงการ/ประเภทที่ผู้ใช้คนนี้มองเห็นได้ — <b>ถ้าไม่เลือกเลย = เห็นทุกเอกสาร</b> ·
+                ถ้าเลือกบางอัน จะเห็นเฉพาะเอกสารที่ตรงกับที่เลือกเท่านั้น
+              </p>
+
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-slate-500">โครงการที่เห็นได้ {visProjects.length === 0 && <span className="text-emerald-600">(ทุกโครงการ)</span>}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {projects.map((p) => {
+                    const on = visProjects.includes(p.id);
+                    return (
+                      <button key={p.id} type="button" onClick={() => toggleVisProject(p.id)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${on ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`}>
+                        {p.code}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-slate-500">ประเภท/รหัสที่เห็นได้ {visCodes.length === 0 && <span className="text-emerald-600">(ทุกประเภท)</span>}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {docCodes.map((c) => {
+                    const on = visCodes.includes(c.code);
+                    return (
+                      <button key={c.code} type="button" onClick={() => toggleVisCode(c.code)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${on ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`}
+                        title={c.department || ''}>
+                        {c.code}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={saveVisibility} disabled={visBusy} className="btn-primary">{visBusy ? 'กำลังบันทึก…' : 'บันทึกการมองเห็น'}</button>
+                {(visProjects.length > 0 || visCodes.length > 0) && (
+                  <button onClick={() => { setVisProjects([]); setVisCodes([]); setVisSaved(false); }} className="text-sm text-slate-500 hover:text-slate-800">ล้าง (เห็นทุกเอกสาร)</button>
+                )}
+                {visSaved && (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 text-sm">
+                    <Icon name="check" className="h-4 w-4" /> บันทึกแล้ว
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </>
       )}

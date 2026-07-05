@@ -96,6 +96,11 @@ export const adminApi = {
   saveUserPermissions: (id, permissions) =>
     api(`/admin/users/${id}/permissions`, { method: 'PUT', body: { permissions } }),
 
+  // per-user document visibility (#8) — allowed projects + doc codes ([] = all)
+  getUserVisibility: (id) => api(`/admin/users/${id}/visibility`),
+  saveUserVisibility: (id, projectIds, docCodes) =>
+    api(`/admin/users/${id}/visibility`, { method: 'PUT', body: { projectIds, docCodes } }),
+
   // projects
   listProjects: () => api('/admin/projects'),
   createProject: (body) => api('/admin/projects', { method: 'POST', body }),

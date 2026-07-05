@@ -26,6 +26,20 @@ router.use(requireAuth);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
 
 /**
+ * Fix a multipart filename that arrived UTF-8 but was decoded as latin1 by the
+ * multipart parser (busboy/multer default) — this is why Thai names showed up as
+ * mojibake ("CVE-à¸..."). Re-decode latin1→utf8. If the result contains the
+ * replacement char (i.e. it was NOT double-encoded), keep the original.
+ */
+function decodeFilename(name) {
+  if (!name) return name;
+  try {
+    const fixed = Buffer.from(name, 'latin1').toString('utf8');
+    return fixed.includes('�') ? name : fixed;
+  } catch { return name; }
+}
+
+/**
  * Load a document and ensure the caller may MUTATE it: the creator or an admin.
  * Everyone can read (list/detail stay open), but edit/cancel/submit/attach are
  * owner-or-admin only. Returns the document row.
@@ -342,13 +356,14 @@ router.post(
     const msg = await queryOne('select id from document_messages where id = $1 and document_id = $2', [req.params.msgId, req.params.id]);
     if (!msg) throw new ApiError(404, 'Message not found');
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
-    const safeName = req.file.originalname.replace(/[^\w.\-ก-๙ ]/g, '_');
+    const fileName = decodeFilename(req.file.originalname);
+    const safeName = fileName.replace(/[^\w.\-ก-๙ ]/g, '_');
     const key = `documents/${req.params.id}/msg/${crypto.randomUUID()}-${safeName}`;
     await putObject(key, req.file.buffer, req.file.mimetype);
     const row = await queryOne(
       `insert into document_attachments (document_id, message_id, kind, file_name, content_type, size_bytes, storage_key, uploaded_by)
        values ($1,$2,'message',$3,$4,$5,$6,$7) returning id, file_name, content_type, created_at`,
-      [req.params.id, req.params.msgId, req.file.originalname, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
+      [req.params.id, req.params.msgId, fileName, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
     );
     res.status(201).json({ data: row });
   })
@@ -584,13 +599,14 @@ router.post(
   asyncHandler(async (req, res) => {
     await loadDocForMutation(req);
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
-    const safeName = req.file.originalname.replace(/[^\w.\-ก-๙ ]/g, '_');
+    const fileName = decodeFilename(req.file.originalname);
+    const safeName = fileName.replace(/[^\w.\-ก-๙ ]/g, '_');
     const key = `documents/${req.params.id}/${crypto.randomUUID()}-${safeName}`;
     await putObject(key, req.file.buffer, req.file.mimetype);
     const row = await queryOne(
       `insert into document_attachments (document_id, kind, file_name, content_type, size_bytes, storage_key, uploaded_by)
        values ($1,'upload',$2,$3,$4,$5,$6) returning id, file_name, content_type, size_bytes, created_at`,
-      [req.params.id, req.file.originalname, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
+      [req.params.id, fileName, req.file.mimetype || null, req.file.size ?? null, key, req.profile.id]
     );
     autoCombine(req.params.id, req.profile.id); // background: fold the new file into the combined PDF
     res.status(201).json({ data: row });

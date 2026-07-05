@@ -40,9 +40,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
   const [files, setFiles] = useState([]); // supplementary attachments (multiple)
   const [dragOver, setDragOver] = useState(false);
-  const [sigMode, setSigMode] = useState('text'); // 'text' = พิมพ์ชื่อ · 'image' = อัปโหลดลายเซ็น
-  const [sigFile, setSigFile] = useState(null);
-  const [sigPreviewUrl, setSigPreviewUrl] = useState(null); // local object URL for preview
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
   const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
@@ -96,16 +93,27 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       .catch(() => setCompanies([]));
   }, []);
 
-  // load the project's letterhead so the live A4 preview renders the real header
+  // load the project's letterhead so the live A4 preview renders the real header.
+  // The letterhead's signatory IS the project manager — the required signer under
+  // "ขอแสดงความนับถือ" (#5). Auto-fill the signer from it so the clerk can't
+  // choose someone else; the preparer only drafts, the manager signs.
   useEffect(() => {
     if (!projectId) {
       setLetter({});
+      setSignerName('');
+      setSignerTitle('');
       return;
     }
     let cancelled = false;
     adminApi
       .getLetterhead(projectId)
-      .then((r) => !cancelled && setLetter(r.data || {}))
+      .then((r) => {
+        if (cancelled) return;
+        const lh = r.data || {};
+        setLetter(lh);
+        setSignerName(lh.signatory_name || '');
+        setSignerTitle(lh.signatory_title || '');
+      })
       .catch(() => !cancelled && setLetter({}));
     return () => { cancelled = true; };
   }, [projectId]);
@@ -145,15 +153,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     });
   };
   const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx));
-
-  const pickSignature = (f) => {
-    if (!f) return;
-    if (!f.type.startsWith('image/')) { setError('ลายเซ็นต้องเป็นไฟล์รูปภาพ'); return; }
-    if (f.size > 2 * 1024 * 1024) { setError('รูปลายเซ็นใหญ่เกิน 2 MB'); return; }
-    setError(null);
-    setSigFile(f);
-    setSigPreviewUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(f); });
-  };
 
   const updateApprover = (i, key, value) =>
     setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)));
@@ -195,12 +194,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       // avoids creating a duplicate (and burning a running number) on retry
       let doc = createdDocId ? { id: createdDocId } : null;
       if (!doc) {
-        // upload the author signature image first (if chosen), to get its storage key
-        let authorSignatureUrl;
-        if (sigMode === 'image' && sigFile) {
-          const { data } = await ememoApi.uploadSignature(sigFile);
-          authorSignatureUrl = data.key;
-        }
         const res = await ememoApi.createDocument({
           projectId,
           companyId: companyId || undefined,
@@ -211,7 +204,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           cc: cc.trim() || undefined,
           signerName: signerName.trim() || undefined,
           signerTitle: signerTitle.trim() || undefined,
-          authorSignatureUrl,
           enclosures: enclList.length ? enclList : undefined,
           body: body.trim() || undefined,
           remarks: remarks.trim() || undefined,
@@ -263,7 +255,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     signer_name: signerName.trim() || authorName,
     signer_title: signerTitle.trim() || profile?.job_title || undefined,
     preparer_name: authorName,
-    signature_image_url: sigMode === 'image' ? sigPreviewUrl : null,
+    signature_image_url: null, // clerk can't paste a signature at create time (#4)
   };
 
   // the selected company overrides the letterhead identity (name/logo/contact),
@@ -441,11 +433,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} placeholder="รายละเอียดเนื้อความ (จะแสดงในหนังสือฝั่งขวา)" className={field} />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">หมายเหตุ</label>
-            <input value={remarks} onChange={(e) => setRemarks(e.target.value)} className={field} />
-          </div>
-
           {/* supplementary file upload — multiple files allowed */}
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">
@@ -489,51 +476,38 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             </label>
           </div>
 
-          {/* signer (ผู้เซ็น) — defaults to the preparer; fill in to have someone else sign */}
+          {/* signer (ผู้ลงนาม) = the PROJECT MANAGER, auto-filled from the project's
+              letterhead (#5). Read-only: the clerk (preparer) can't pick someone
+              else — they only draft; the manager signs under "ขอแสดงความนับถือ". */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้ลงนาม (ผู้เซ็น)</label>
-            <p className="mb-3 text-xs text-slate-400">
-              เว้นว่างไว้ = ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นผู้เซ็นเอง ·
-              กรอกชื่อถ้าให้คนอื่นเป็นผู้ลงนาม (ระบบจะแสดงบรรทัด “ผู้จัดทำ” ไว้ท้ายหนังสือ)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <input value={signerName} onChange={(e) => setSignerName(e.target.value)}
-                placeholder={`ชื่อผู้เซ็น (ค่าเริ่มต้น: ${authorName})`} className={field} />
-              <input value={signerTitle} onChange={(e) => setSignerTitle(e.target.value)}
-                placeholder="ตำแหน่งผู้เซ็น (ไม่บังคับ)" className={field} />
-            </div>
-          </div>
-
-          {/* signature: typed name or uploaded image */}
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็น (ใต้ขอแสดงความนับถือ)</label>
-            <div className="mb-2 inline-flex rounded-xl border border-slate-200 p-0.5 text-sm">
-              <button type="button" onClick={() => setSigMode('text')}
-                className={`rounded-lg px-3 py-1.5 font-medium transition ${sigMode === 'text' ? 'bg-brand text-white' : 'text-slate-600'}`}>
-                พิมพ์ชื่อ
-              </button>
-              <button type="button" onClick={() => setSigMode('image')}
-                className={`rounded-lg px-3 py-1.5 font-medium transition ${sigMode === 'image' ? 'bg-brand text-white' : 'text-slate-600'}`}>
-                อัปโหลดลายเซ็น
-              </button>
-            </div>
-            {sigMode === 'text' ? (
-              <p className="text-xs text-slate-400">ระบบจะแสดงชื่อผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นตัวพิมพ์</p>
-            ) : sigFile ? (
-              <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3">
-                <img src={sigPreviewUrl} alt="ลายเซ็น" className="h-12 w-auto object-contain" />
-                <span className="flex-1 truncate text-sm text-slate-600">{sigFile.name}</span>
-                <button type="button" onClick={() => { setSigFile(null); setSigPreviewUrl((o) => { if (o) URL.revokeObjectURL(o); return null; }); }} className="text-sm text-red-500 hover:underline">ลบ</button>
-              </div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้ลงนาม (ใต้ขอแสดงความนับถือ)</label>
+            {signerName ? (
+              <>
+                <p className="mb-2 text-xs text-slate-400">
+                  ผู้ลงนามคือ <b className="text-slate-600">ผู้จัดการโครงการ</b> ของโครงการที่เลือก (กำหนดอัตโนมัติ) ·
+                  ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นเพียงผู้ร่างเอกสาร
+                </p>
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-800">{signerName}</span>
+                  {signerTitle && <span className="text-sm text-slate-500">· {signerTitle}</span>}
+                </div>
+              </>
             ) : (
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 py-5 hover:border-slate-300">
-                <Icon name="signature" className="h-6 w-6 text-slate-400" />
-                <span className="text-sm text-slate-600">คลิกเพื่ออัปโหลดรูปลายเซ็น</span>
-                <span className="text-xs text-slate-400">PNG/JPG พื้นหลังโปร่งใสจะดูดีที่สุด · สูงสุด 2 MB</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => pickSignature(e.target.files?.[0])} />
-              </label>
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  {projectId
+                    ? 'โครงการนี้ยังไม่ได้ตั้งชื่อผู้จัดการโครงการ (ผู้ลงนาม) — ตั้งได้ที่ ตั้งค่า E-Memo → โครงการ → ผู้ลงนาม'
+                    : 'เลือกโครงการก่อน ระบบจะกำหนดผู้ลงนาม (ผู้จัดการโครงการ) ให้อัตโนมัติ'}
+                </span>
+              </div>
             )}
           </div>
+
+          {/* NOTE (#4): the preparer (clerk) can NOT paste an approver's signature
+              here. The signature is applied by the real signer/approver when they
+              sign in-app — so no signature-image upload at create time. */}
           </>)}
 
           {step === 3 && (<>

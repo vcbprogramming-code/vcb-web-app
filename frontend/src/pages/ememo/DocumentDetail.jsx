@@ -548,10 +548,15 @@ function Timeline({ doc, openAttachment }) {
               </div>
               <div className={`mt-1 whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
               {Array.isArray(m.attachments) && m.attachments.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-2">
+                <div className="mt-1.5 space-y-1">
                   {m.attachments.map((a) => (
-                    <button key={a.id} onClick={() => openAttachment(a.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-brand hover:bg-slate-50">
-                      <Icon name="paperclip" className="h-3.5 w-3.5" /> <span className="max-w-[160px] truncate">{a.file_name}</span>
+                    <button
+                      key={a.id}
+                      onClick={() => openAttachment(a.id)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
+                    >
+                      <Icon name="eye" className="h-3.5 w-3.5 shrink-0" />
+                      <span className="max-w-[220px] truncate">เปิดดูเอกสาร: {a.file_name}</span>
                     </button>
                   ))}
                 </div>

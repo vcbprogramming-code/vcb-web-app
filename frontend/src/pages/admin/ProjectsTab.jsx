@@ -125,12 +125,13 @@ function ProjectModal({ project, onClose, onSaved }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อผู้ลงนามเริ่มต้น</label>
-                  <input value={letter.signatoryName} onChange={(e) => setL('signatoryName', e.target.value)} className={field} />
+                  <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ / ผู้ลงนาม</label>
+                  <input value={letter.signatoryName} onChange={(e) => setL('signatoryName', e.target.value)} placeholder="ชื่อผู้จัดการโครงการ" className={field} />
+                  <p className="mt-1 text-[11px] text-slate-400">ชื่อนี้จะไปอยู่ใต้ “ขอแสดงความนับถือ” ของทุกเอกสารในโครงการนี้</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">ตำแหน่งผู้ลงนาม</label>
-                  <input value={letter.signatoryTitle} onChange={(e) => setL('signatoryTitle', e.target.value)} className={field} />
+                  <input value={letter.signatoryTitle} onChange={(e) => setL('signatoryTitle', e.target.value)} placeholder="เช่น ผู้จัดการโครงการ" className={field} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

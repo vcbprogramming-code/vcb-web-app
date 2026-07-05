@@ -298,6 +298,7 @@ export default function DocumentRegister() {
             <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">
               <th className="tbl-th w-12 font-semibold">#</th>
               <th className="tbl-th font-semibold">วันที่</th>
+              <th className="tbl-th font-semibold">รหัส</th>
               <th className="tbl-th font-semibold">เอกสาร</th>
               <th className="tbl-th font-semibold">สถานะ</th>
               <th className="tbl-th text-right font-semibold">จัดการ</th>
@@ -305,14 +306,20 @@ export default function DocumentRegister() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center"><span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span></td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center"><span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span></td></tr>
             ) : docs.length === 0 ? (
-              <tr><td colSpan={5} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
             ) : (
               docs.map((d, i) => (
                 <tr key={d.id} onClick={() => navigate(`/memos/${d.id}`)} className="tbl-row cursor-pointer">
                   <td className="tbl-td text-slate-400">{(page - 1) * pageSize + i + 1}</td>
                   <td className="tbl-td whitespace-nowrap text-slate-600">{formatThaiDate(d.date_received)}</td>
+                  {/* รหัส — its own column, before เอกสาร */}
+                  <td className="tbl-td">
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                      {d.doc_code}
+                    </span>
+                  </td>
                   <td className="tbl-td">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -321,10 +328,6 @@ export default function DocumentRegister() {
                           style={{ backgroundColor: d.project_color || '#64748b' }}
                         >
                           {d.project_code}
-                        </span>
-                        {/* doc code (รหัส) in front of the document number */}
-                        <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
-                          {d.doc_code}
                         </span>
                         <span className="font-semibold text-slate-800">{d.doc_number}</span>
                       </div>

@@ -4,6 +4,7 @@ import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
+import Spinner from '../../components/Spinner.jsx';
 import { useHeaderSlot } from '../../components/HeaderSlot.jsx';
 
 // English status labels for the "All statuses" dropdown (client's mockup uses EN)
@@ -298,16 +299,15 @@ export default function DocumentRegister() {
               <th className="tbl-th w-12 font-semibold">#</th>
               <th className="tbl-th font-semibold">วันที่</th>
               <th className="tbl-th font-semibold">เอกสาร</th>
-              <th className="tbl-th font-semibold">รหัส</th>
               <th className="tbl-th font-semibold">สถานะ</th>
               <th className="tbl-th text-right font-semibold">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+              <tr><td colSpan={5} className="px-5 py-10 text-center"><span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span></td></tr>
             ) : docs.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
+              <tr><td colSpan={5} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
             ) : (
               docs.map((d, i) => (
                 <tr key={d.id} onClick={() => navigate(`/memos/${d.id}`)} className="tbl-row cursor-pointer">
@@ -322,12 +322,15 @@ export default function DocumentRegister() {
                         >
                           {d.project_code}
                         </span>
+                        {/* doc code (รหัส) in front of the document number */}
+                        <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                          {d.doc_code}
+                        </span>
                         <span className="font-semibold text-slate-800">{d.doc_number}</span>
                       </div>
                       <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
                     </div>
                   </td>
-                  <td className="tbl-td text-slate-600">{d.doc_code}</td>
                   <td className="tbl-td"><StatusBadge status={d.status} /></td>
                   <td className="tbl-td text-right">
                     <div className="flex items-center justify-end">

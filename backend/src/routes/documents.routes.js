@@ -106,7 +106,8 @@ router.get(
     const offset = (page - 1) * pageSize;
     const { rows } = await query(
       `select ${LIST_SELECT} ${LIST_FROM} ${whereSql}
-        order by d.date_received desc, d.created_at desc
+        order by (case when d.status = 'pending' then 0 else 1 end),
+                 d.date_received desc, d.created_at desc
         limit ${pageSize} offset ${offset}`,
       params
     );

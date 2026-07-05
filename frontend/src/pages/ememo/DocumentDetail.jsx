@@ -8,6 +8,7 @@ import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
 import ConsultModal from './ConsultModal.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
+import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 
 /** One compact metadata item (icon + label + value), used in the header card. */
@@ -219,7 +220,7 @@ export default function DocumentDetail() {
   };
 
   if (error) return <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3">{error}</div>;
-  if (!doc) return <div className="text-slate-400">กำลังโหลด…</div>;
+  if (!doc) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
 
   const status = STATUS_META[doc.status] || STATUS_META.pending;
   // journey-aware permissions: only the owner (or admin) manages the document,

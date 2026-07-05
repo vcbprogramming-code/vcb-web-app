@@ -18,12 +18,17 @@ export default function GlowOrb({ size = 340, className = '' }) {
         style={{ background: 'radial-gradient(circle, rgba(34,211,238,0.35), rgba(59,130,246,0.12) 55%, transparent 72%)' }}
       />
 
-      {/* orbiting rings (tilted ellipses) */}
-      <div className="absolute inset-0 animate-orbit-spin" style={{ transform: 'rotateX(72deg)' }}>
-        <div className="absolute inset-[8%] rounded-full border border-cyan-300/30" />
+      {/* orbiting rings — outer div holds the static tilt, inner div spins (so the
+          animation's rotate isn't overridden by the inline tilt transform) */}
+      <div className="absolute inset-0" style={{ transform: 'rotateX(72deg)' }}>
+        <div className="absolute inset-0 animate-orbit-spin">
+          <div className="absolute inset-[8%] rounded-full border border-cyan-300/30" />
+        </div>
       </div>
-      <div className="absolute inset-0 animate-orbit-spin-rev" style={{ transform: 'rotateX(60deg) rotateZ(30deg)' }}>
-        <div className="absolute inset-[2%] rounded-full border border-blue-400/25" />
+      <div className="absolute inset-0" style={{ transform: 'rotateX(60deg) rotateZ(30deg)' }}>
+        <div className="absolute inset-0 animate-orbit-spin-rev">
+          <div className="absolute inset-[2%] rounded-full border border-blue-400/25" />
+        </div>
       </div>
 
       {/* the wireframe sphere */}
@@ -42,8 +47,12 @@ export default function GlowOrb({ size = 340, className = '' }) {
 
         <circle cx="100" cy="100" r="72" fill="url(#orb-fill)" stroke="url(#orb-stroke)" strokeOpacity="0.55" strokeWidth="0.8" />
 
-        {/* longitude ellipses */}
-        <g stroke="url(#orb-stroke)" strokeOpacity="0.4" strokeWidth="0.6" fill="none">
+        {/* longitude ellipses — animate scaleX to sweep the meridians (rotation illusion) */}
+        <g
+          className="animate-globe-spin"
+          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          stroke="url(#orb-stroke)" strokeOpacity="0.4" strokeWidth="0.6" fill="none"
+        >
           <ellipse cx="100" cy="100" rx="24" ry="72" />
           <ellipse cx="100" cy="100" rx="48" ry="72" />
           <ellipse cx="100" cy="100" rx="68" ry="72" />

@@ -44,12 +44,20 @@ export default {
           '0%,100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' },
         },
+        // sweep the longitude meridians across the sphere: rx contracts to 0 (edge-on)
+        // then expands, giving the illusion of the globe rotating on its axis
+        'globe-spin': {
+          '0%': { transform: 'scaleX(1)' },
+          '50%': { transform: 'scaleX(0.05)' },
+          '100%': { transform: 'scaleX(1)' },
+        },
       },
       animation: {
         'orbit-spin': 'orbit-spin 26s linear infinite',
         'orbit-spin-rev': 'orbit-spin-rev 40s linear infinite',
         'pulse-glow': 'pulse-glow 3.5s ease-in-out infinite',
         'float-slow': 'float-slow 7s ease-in-out infinite',
+        'globe-spin': 'globe-spin 8s ease-in-out infinite',
       },
     },
   },

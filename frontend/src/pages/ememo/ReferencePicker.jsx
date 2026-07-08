@@ -19,7 +19,11 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
   const [loading, setLoading] = useState(false);
   const boxRef = useRef(null);
 
-  const selected = value?.docId ? { doc_number: value.text } : null;
+  // Show a chip when EITHER a document is linked (docId) OR a legacy free-text
+  // reference exists (text without an id, from docs created before feature #3).
+  // Legacy text still needs to be visible and clearable — not hidden behind a
+  // blank search box. `isLinked` distinguishes a real in-system link from text.
+  const selected = (value?.docId || value?.text) ? { doc_number: value.text, isLinked: !!value?.docId } : null;
 
   // debounce the search query
   useEffect(() => {
@@ -54,10 +58,13 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
   return (
     <div className="relative" ref={boxRef}>
       {selected ? (
-        // a document is chosen — show it as a chip with a clear button
+        // a reference is set — show it as a chip with a clear button. A linked
+        // in-system doc gets the brand file icon; a legacy free-text reference is
+        // shown in muted style so it's clear it isn't a live link.
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-          <Icon name="file" className="h-4 w-4 shrink-0 text-brand" />
+          <Icon name={selected.isLinked ? 'file' : 'edit'} className={`h-4 w-4 shrink-0 ${selected.isLinked ? 'text-brand' : 'text-slate-400'}`} />
           <span className="truncate text-sm font-medium text-slate-800">{selected.doc_number}</span>
+          {!selected.isLinked && <span className="shrink-0 text-[11px] text-slate-400">(ข้อความเดิม — ไม่ได้ลิงก์)</span>}
           <button type="button" onClick={clear} className="ml-auto text-slate-400 hover:text-red-600">
             <Icon name="x" className="h-4 w-4" />
           </button>

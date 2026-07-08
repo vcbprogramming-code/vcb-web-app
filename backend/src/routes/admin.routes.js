@@ -538,7 +538,9 @@ const letterheadSchema = z.object({
   companyNameEn: z.string().optional(),
   address: z.string().optional(),
   logoUrl: z.string().optional(),
-  companyId: z.string().uuid().optional().nullable(),
+  // the form's "— use system default —" option sends '' — coerce it to null so the
+  // whole save doesn't 400 (which would also discard a just-uploaded signature).
+  companyId: z.preprocess((v) => (v === '' ? null : v), z.string().uuid().nullable().optional()),
   phone: z.string().optional(),
   telex: z.string().optional(),
   fax: z.string().optional(),

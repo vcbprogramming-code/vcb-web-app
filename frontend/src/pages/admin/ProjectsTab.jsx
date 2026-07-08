@@ -69,8 +69,14 @@ function ProjectModal({ project, onClose, onSaved }) {
       const projectId = editing
         ? (await adminApi.updateProject(project.id, body), project.id)
         : (await adminApi.createProject(body)).data.id;
-      // save the per-project letterhead (company name etc.) alongside
-      await adminApi.saveLetterhead(projectId, letter);
+      // save the per-project letterhead (company name etc.) alongside. Empty
+      // company/signature selections must go as null (not '') so the UUID field
+      // validates — otherwise the save 400s and a just-uploaded signature is lost.
+      await adminApi.saveLetterhead(projectId, {
+        ...letter,
+        companyId: letter.companyId || null,
+        signatureUrl: letter.signatureUrl || null,
+      });
       onSaved();
     } catch (err) {
       setError(err.message);

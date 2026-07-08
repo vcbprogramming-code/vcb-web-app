@@ -287,10 +287,22 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       : [];
     const wantCommentBox = opts.commentBox !== false;
     if (wantCommentBox) {
-      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // keep clear of the QR strip
-      const boxNeed = 96 + commentSteps.length * 16;
-      // start a fresh page only if the box won't fit in the remaining space;
-      // otherwise place it right below the current content (natural flow)
+      // measure the real wrapped height of each comment line first, so the box
+      // rectangle is tall enough and long comments never spill outside its border.
+      pdf.font('th').fontSize(10.5);
+      const commentLines = commentSteps.map((s) => {
+        const who = s.approver_name || s.approver_email || '';
+        const textLine = `• ${who}: ${s.comment}`;
+        const h = pdf.heightOfString(textLine, { width: contentW - 24 });
+        return { text: textLine, h };
+      });
+      const commentsH = commentLines.reduce((sum, c) => sum + c.h + 3, 0);
+      const headerH = 26;   // "ความเห็น / การพิจารณา" title band
+      const sigRowH = 40;   // checker / approver signature slots
+      const boxNeed = headerH + commentsH + sigRowH + 12;
+
+      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
+      // start a fresh page only if the box won't fit in the remaining space
       if (pdf.y + boxNeed > bottomLimit) pdf.addPage();
       else pdf.y = pdf.y + 18;
 
@@ -299,16 +311,15 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       pdf.font('th-bold').fontSize(11).fillColor('#0f172a')
         .text('ความเห็น / การพิจารณา', left + 10, boxTop + 8, { width: contentW - 20 });
 
-      let cy = boxTop + 26;
+      let cy = boxTop + headerH;
       pdf.font('th').fontSize(10.5).fillColor('#334155');
-      for (const s of commentSteps) {
-        const who = s.approver_name || s.approver_email || '';
-        pdf.text(`• ${who}: ${s.comment}`, left + 12, cy, { width: contentW - 24 });
+      for (const c of commentLines) {
+        pdf.text(c.text, left + 12, cy, { width: contentW - 24 });
         cy = pdf.y + 3;
       }
 
-      // signature slots row (checker / approver)
-      const slotY = boxTop + boxNeed - 40;
+      // signature slots row (checker / approver) — anchored to the box bottom
+      const slotY = boxTop + boxNeed - sigRowH;
       const half = contentW / 2;
       pdf.font('th').fontSize(10).fillColor('#475569');
       pdf.text('ลงชื่อ ...........................................', left + 12, slotY, { width: half - 20 });

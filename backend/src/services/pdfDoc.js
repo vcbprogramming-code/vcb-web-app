@@ -129,7 +129,9 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
     [documentId]
   );
   const qr = await buildVerifyQr(doc);
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps, qr });
+  // keep the "original" clean like generateOriginalPdf — the reviewer comments live
+  // on the appended "บันทึกการพิจารณา" trail page, not a page-1 box.
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps, commentBox: false, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original');

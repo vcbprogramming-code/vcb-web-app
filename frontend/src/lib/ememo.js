@@ -28,6 +28,10 @@ export const ememoApi = {
   postMessage: (id, body) => api(`/documents/${id}/messages`, { method: 'POST', body: { body } }),
   attachMessageFile: (id, msgId, file) => apiUpload(`/documents/${id}/messages/${msgId}/attachments`, file),
   listApprovers: () => api('/documents/approvers'),
+  // documents waiting for the logged-in user to approve (home/register alert) (#8)
+  awaitingMe: () => api('/documents/awaiting-me'),
+  // search existing documents by number/subject (for the อ้างถึง picker) (#3)
+  searchDocuments: (q) => api(`/documents/search${qs({ q })}`),
   myApproval: (id) => api(`/documents/${id}/my-approval`),
   approveDocument: (id, action, comment) => api(`/documents/${id}/approve`, { method: 'POST', body: { action, comment } }),
   consultDocument: (id, email, name, question) => api(`/documents/${id}/consult`, { method: 'POST', body: { email, name, question } }),
@@ -127,6 +131,9 @@ export const adminApi = {
   getLetterhead: (projectId) => api(`/admin/projects/${projectId}/letterhead`),
   saveLetterhead: (projectId, body) =>
     api(`/admin/projects/${projectId}/letterhead`, { method: 'PUT', body }),
+  // signatory's signature image (auto-stamped on every memo of the project) (#6)
+  uploadProjectSignature: (projectId, file) =>
+    apiUpload(`/admin/projects/${projectId}/signature`, file),
 
   // doc-code → default approver chain
   listDocCodeApprovers: () => api('/admin/doc-codes'),

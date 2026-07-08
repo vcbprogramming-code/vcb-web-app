@@ -390,8 +390,12 @@ router.get(
   '/projects',
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `select id, code, name, doc_prefix, color, sort_order, is_active
-         from projects order by sort_order, code`
+      `select p.id, p.code, p.name, p.doc_prefix, p.color, p.sort_order, p.is_active,
+              lh.signatory_name, lh.signatory_title, lh.company_name,
+              lh.signature_url is not null as has_signature
+         from projects p
+         left join project_letterhead lh on lh.project_id = p.id
+        order by p.sort_order, p.code`
     );
     res.json({ data: rows });
   })
@@ -512,17 +516,35 @@ router.get(
   })
 );
 
+/** POST /api/admin/projects/:id/signature — upload the signatory's signature
+ *  image (#6). Returns { key }; the caller then saves it via the letterhead PUT.
+ *  Stored per project so every memo of that project auto-stamps this signature. */
+router.post(
+  '/projects/:id/signature',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+      throw new ApiError(400, 'ลายเซ็นต้องเป็นไฟล์รูปภาพ');
+    }
+    const key = `projects/${req.params.id}/signature/${crypto.randomUUID()}`;
+    await putObject(key, req.file.buffer, req.file.mimetype);
+    res.status(201).json({ data: { key } });
+  })
+);
+
 const letterheadSchema = z.object({
   companyName: z.string().optional(),
   companyNameEn: z.string().optional(),
   address: z.string().optional(),
   logoUrl: z.string().optional(),
+  companyId: z.string().uuid().optional().nullable(),
   phone: z.string().optional(),
   telex: z.string().optional(),
   fax: z.string().optional(),
   signatoryName: z.string().optional(),
   signatoryTitle: z.string().optional(),
-  signatureUrl: z.string().optional(),
+  signatureUrl: z.string().optional().nullable(),
   closingLine: z.string().optional(),
   defaultRecipient: z.string().optional(),
 });
@@ -536,15 +558,16 @@ router.put(
     const f = parsed.data;
     const row = await queryOne(
       `insert into project_letterhead
-         (project_id, company_name, company_name_en, address, logo_url,
+         (project_id, company_name, company_name_en, address, logo_url, company_id,
           phone, telex, fax, signatory_name, signatory_title, signature_url,
           closing_line, default_recipient)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        on conflict (project_id) do update set
          company_name = excluded.company_name,
          company_name_en = excluded.company_name_en,
          address = excluded.address,
          logo_url = excluded.logo_url,
+         company_id = excluded.company_id,
          phone = excluded.phone,
          telex = excluded.telex,
          fax = excluded.fax,
@@ -557,6 +580,7 @@ router.put(
        returning *`,
       [
         req.params.id, f.companyName || null, f.companyNameEn || null, f.address || null, f.logoUrl || null,
+        f.companyId || null,
         f.phone || null, f.telex || null, f.fax || null,
         f.signatoryName || null, f.signatoryTitle || null, f.signatureUrl || null,
         f.closingLine || null, f.defaultRecipient || null,

@@ -146,14 +146,17 @@ export default function DocumentDetail() {
       (a) => (a.kind === 'upload') && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
     const list = [];
-    if (primary) list.push({ id: primary.id, label: 'เอกสาร', isLetter: true });
-    for (const a of inlineKinds) list.push({ id: a.id, label: `ไฟล์แนบ: ${a.file_name}`, isLetter: false });
+    if (primary) list.push({ id: primary.id, label: 'เอกสาร', isLetter: true, contentType: primary.content_type });
+    // number the supplementary files so it's clear which is attachment #1, #2… (#2)
+    inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type }));
     return list;
   })() : [];
 
   const activePreviewId = (previewAttId && previewables.some((p) => p.id === previewAttId))
     ? previewAttId
     : previewables[0]?.id || null;
+  const activePreview = previewables.find((p) => p.id === activePreviewId) || null;
+  const activeIsImage = /^image\//.test(activePreview?.contentType || '');
 
   useEffect(() => {
     if (!activePreviewId) { setPreviewUrl(null); return; }
@@ -185,7 +188,7 @@ export default function DocumentDetail() {
         initial: {
           project_id: doc.project_id, company_id: doc.company_id, doc_code: doc.doc_code,
           doc_type_id: doc.doc_type_id, subject: doc.subject, recipient: doc.recipient,
-          reference: doc.reference, cc_recipients: doc.cc_recipients, body: doc.body,
+          reference: doc.reference, reference_doc_id: doc.reference_doc_id, cc_recipients: doc.cc_recipients, body: doc.body,
           remarks: doc.remarks, signer_name: doc.signer_name, signer_title: doc.signer_title,
           enclosures: doc.enclosures, sourceId: id, copyAttachments,
         },
@@ -373,11 +376,19 @@ export default function DocumentDetail() {
               </div>
             )}
             {previewUrl ? (
-              <iframe
-                title="เอกสาร"
-                src={previewUrl}
-                className="h-[calc(100vh-220px)] min-h-[560px] w-full rounded-xl border border-slate-200 bg-slate-50"
-              />
+              activeIsImage ? (
+                // images: fit to the panel width so they don't open zoomed-in (#1)
+                <div className="h-[calc(100vh-220px)] min-h-[560px] w-full overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <img src={previewUrl} alt="ไฟล์แนบ" className="mx-auto h-auto max-w-full" />
+                </div>
+              ) : (
+                <iframe
+                  title="เอกสาร"
+                  // #view=FitH tells the PDF viewer to fit page width (no over-zoom) (#1)
+                  src={`${previewUrl}#view=FitH`}
+                  className="h-[calc(100vh-220px)] min-h-[560px] w-full rounded-xl border border-slate-200 bg-slate-50"
+                />
+              )
             ) : (
               <div className="flex h-[560px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 text-center">
                 <Icon name="file" className="h-10 w-10 text-slate-300" />

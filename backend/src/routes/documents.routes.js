@@ -269,11 +269,68 @@ router.get(
   })
 );
 
+/**
+ * GET /api/documents/awaiting-me — documents whose CURRENT pending step is
+ * assigned to the logged-in user (by email). Powers the home/register alert (#8)
+ * so a reviewer sees "N ฉบับรอคุณอนุมัติ" without going through email.
+ * Defined BEFORE '/:id' so "awaiting-me" isn't parsed as a document id.
+ */
+router.get(
+  '/awaiting-me',
+  asyncHandler(async (req, res) => {
+    const email = (req.profile.email || '').toLowerCase();
+    if (!email) return res.json({ data: { count: 0, items: [] } });
+    // the current pending step = the earliest pending step of a pending doc.
+    const { rows } = await query(
+      `select d.id, d.doc_number, d.subject, d.date_received,
+              pr.code as project_code, pr.color as project_color
+         from approval_steps s
+         join documents d on d.id = s.document_id and d.status = 'pending'
+         left join projects pr on pr.id = d.project_id
+        where s.action = 'pending' and s.action_token is not null
+          and lower(s.approver_email) = $1
+          and s.step_no = (
+            select min(s2.step_no) from approval_steps s2
+             where s2.document_id = s.document_id and s2.action = 'pending'
+          )
+        order by d.date_received asc`,
+      [email]
+    );
+    res.json({ data: { count: rows.length, items: rows } });
+  })
+);
+
+/**
+ * GET /api/documents/search?q= — typeahead for the "อ้างถึง" picker (#3). Returns
+ * up to 15 documents whose number or subject matches, so the clerk selects a real
+ * in-system document instead of typing a free-text reference. Before '/:id'.
+ */
+router.get(
+  '/search',
+  asyncHandler(async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 1) return res.json({ data: [] });
+    const like = `%${q}%`;
+    const { rows } = await query(
+      `select d.id, d.doc_number, d.subject, d.date_received,
+              pr.code as project_code, pr.color as project_color
+         from documents d
+         left join projects pr on pr.id = d.project_id
+        where d.status <> 'cancelled'
+          and (d.doc_number ilike $1 or d.subject ilike $1)
+        order by d.date_received desc
+        limit 15`,
+      [like]
+    );
+    res.json({ data: rows });
+  })
+);
+
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
-      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
+      `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
               d.signer_name, d.signer_title, d.created_by, d.verify_token, pr.full_name as preparer_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
@@ -312,10 +369,13 @@ router.get(
         order by m.created_at`, [req.params.id]);
 
     // resolve a "อ้างถึง" reference to an in-system document so the UI can link
-    // to it. The reference is free text (e.g. "BV/วิศวะ/02A/018 ลว. 26 มิ.ย. 69");
-    // pull out the doc-number token (PREFIX/แผนก/CODE/NNN) and look it up.
+    // to it (#3). Prefer the explicitly-chosen document (reference_doc_id, the new
+    // enforced picker); fall back to the old free-text regex for legacy rows.
     let referenceDoc = null;
-    if (doc.reference) {
+    if (doc.reference_doc_id) {
+      referenceDoc = await queryOne(
+        'select id, doc_number from documents where id = $1 limit 1', [doc.reference_doc_id]);
+    } else if (doc.reference) {
       const m = String(doc.reference).match(/[^\s]+\/[^\s]+\/[^\s]+\/\d+/);
       if (m) {
         referenceDoc = await queryOne(
@@ -423,6 +483,7 @@ const createSchema = z.object({
   subject: z.string().min(1),
   recipient: z.string().optional(),
   reference: z.string().optional(),
+  referenceDocId: z.string().uuid().optional().nullable(),
   cc: z.string().optional(),
   signerName: z.string().optional(),
   signerTitle: z.string().optional(),
@@ -452,12 +513,12 @@ router.post(
       const { rows } = await client.query(
         `insert into documents
            (project_id, company_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
-            recipient, reference, cc_recipients, signer_name, signer_title, author_signature_url,
+            recipient, reference, reference_doc_id, cc_recipients, signer_name, signer_title, author_signature_url,
             body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,coalesce($17::date,current_date),$18,$19::jsonb,'manual','pending',$20)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,coalesce($18::date,current_date),$19,$20::jsonb,'manual','pending',$21)
          returning id, doc_number, run_no, department, status, date_received`,
         [project.id, input.companyId || null, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
-         input.recipient || null, input.reference || null, input.cc || null,
+         input.recipient || null, input.reference || null, input.referenceDocId || null, input.cc || null,
          input.signerName || null, input.signerTitle || null, input.authorSignatureUrl || null,
          input.body || null, input.remarks || null,
          input.dateReceived || null, input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
@@ -482,6 +543,7 @@ const editSchema = z.object({
   subject: z.string().min(1).optional(),
   recipient: z.string().optional().nullable(),
   reference: z.string().optional().nullable(),
+  referenceDocId: z.string().uuid().optional().nullable(),
   cc: z.string().optional().nullable(),
   signerName: z.string().optional().nullable(),
   signerTitle: z.string().optional().nullable(),
@@ -523,6 +585,7 @@ router.patch(
     if (f.subject !== undefined) add('subject', f.subject, '', 'เรื่อง', doc.subject);
     if (f.recipient !== undefined) add('recipient', f.recipient || null, '', 'เรียน', doc.recipient);
     if (f.reference !== undefined) add('reference', f.reference || null, '', 'อ้างถึง', doc.reference);
+    if (f.referenceDocId !== undefined) add('reference_doc_id', f.referenceDocId || null); // link change — not human-meaningful in the trail
     if (f.cc !== undefined) add('cc_recipients', f.cc || null, '', 'สำเนาเรียน', doc.cc_recipients);
     if (f.signerName !== undefined) add('signer_name', f.signerName || null, '', 'ผู้ลงนาม', doc.signer_name);
     if (f.signerTitle !== undefined) add('signer_title', f.signerTitle || null, '', 'ตำแหน่งผู้ลงนาม', doc.signer_title);

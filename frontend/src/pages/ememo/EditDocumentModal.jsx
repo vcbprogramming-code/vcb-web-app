@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
+import ReferencePicker from './ReferencePicker.jsx';
 
 /**
  * Edit a document's content (subject / recipient / body / remarks / type /
@@ -12,6 +13,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
     subject: doc.subject || '',
     recipient: doc.recipient || '',
     reference: doc.reference || '',
+    referenceDocId: doc.reference_doc_id || '',
     cc: doc.cc_recipients || '',
     signerName: doc.signer_name || '',
     signerTitle: doc.signer_title || '',
@@ -37,6 +39,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
         subject: form.subject,
         recipient: form.recipient || null,
         reference: form.reference || null,
+        referenceDocId: form.referenceDocId || null,
         cc: form.cc || null,
         signerName: form.signerName || null,
         signerTitle: form.signerTitle || null,
@@ -88,7 +91,12 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">อ้างถึง</label>
-            <input value={form.reference} onChange={(e) => set('reference', e.target.value)} className="field" />
+            {/* #3: pick a real in-system document */}
+            <ReferencePicker
+              value={{ docId: form.referenceDocId, text: form.reference }}
+              onChange={({ docId, text }) => setForm((f) => ({ ...f, referenceDocId: docId, reference: text }))}
+              excludeId={doc.id}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>

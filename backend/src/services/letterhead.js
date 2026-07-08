@@ -32,7 +32,11 @@ function thaiLongDate(iso) {
  */
 export function generateLetterPdf(doc, letter = {}, opts = {}) {
   return new Promise((resolvePromise, reject) => {
-    const pdf = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 64, right: 56 } });
+    // bottom margin reserves room for the per-page QR strip (#7) so body text
+    // auto-paginates above it instead of overlapping it. bufferPages lets us walk
+    // every page at the end to stamp the QR (drawing inside a pageAdded handler
+    // corrupts pdfkit's page state, so we stamp after all content is laid out).
+    const pdf = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 74, left: 64, right: 56 }, bufferPages: true });
     const chunks = [];
     pdf.on('data', (c) => chunks.push(c));
     pdf.on('end', () => resolvePromise(Buffer.concat(chunks)));
@@ -44,6 +48,33 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     const left = pdf.page.margins.left;
     const right = pdf.page.width - pdf.page.margins.right;
     const contentW = right - left;
+
+    // ---- QR stamp on EVERY page (#7) — stamps the verification QR at the bottom
+    // of every buffered page (incl. pages a long body flows onto). Called once at
+    // the very end, after all content is laid out, so it never disturbs text flow.
+    const stampQrAllPages = () => {
+      if (!opts.qr?.buffer) return;
+      const range = pdf.bufferedPageRange(); // { start, count }
+      for (let i = range.start; i < range.start + range.count; i += 1) {
+        pdf.switchToPage(i);
+        const qrSize = 52;
+        // sit inside the reserved bottom margin band (below the text region)
+        const qrBottom = pdf.page.margins.bottom;
+        const qrY = pdf.page.height - qrBottom + 14;
+        // Drawing text near the page bottom makes pdfkit auto-add a page (the flow
+        // sees no room), cascading into dozens of blank pages. Temporarily zero the
+        // bottom margin so the absolute-positioned caption never triggers that.
+        pdf.page.margins.bottom = 0;
+        try {
+          pdf.image(opts.qr.buffer, left, qrY, { fit: [qrSize, qrSize] });
+          pdf.font('th').fontSize(6.5).fillColor('#94a3b8')
+            .text('สแกนเพื่อตรวจสอบ', left + qrSize + 4, qrY + qrSize / 2 - 8, { width: 90, lineBreak: false });
+          pdf.font('th').fontSize(6).fillColor('#cbd5e1')
+            .text(doc.doc_number || '', left + qrSize + 4, qrY + qrSize / 2 + 1, { width: 90, lineBreak: false });
+        } catch { /* ignore QR draw failure */ }
+        pdf.page.margins.bottom = qrBottom;
+      }
+    };
 
     const INK = '#1a1a1a';
     const MUTED = '#5b6472';
@@ -217,10 +248,11 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     if (signatures && signatures.length) {
       signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
     } else {
-      // the author's uploaded signature image (Buffer) takes precedence; else the
-      // letterhead's configured default signature image; else just the name text
+      // the project signatory's configured signature (#6) is stamped automatically
+      // on every memo; the author's own uploaded signature takes precedence if any;
+      // else just the printed name.
       const sigImage = opts.authorSignature
-        || (letter.signatureUrl && existsSync(letter.signatureUrl) ? letter.signatureUrl : null);
+        || (Buffer.isBuffer(letter.signatureBuffer) ? letter.signatureBuffer : null);
       // the signature block shows the SIGNER (ผู้เซ็น) — which may differ from the
       // preparer. pdfDoc.js already resolves doc.signer_name/title (falling back to
       // the author, then the letterhead's configured signatory).
@@ -243,38 +275,24 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         .text(`ผู้จัดทำ: ${preparer}`, left, pdf.y, { width: contentW });
     }
 
-    // ---- verification QR (#6) — bottom-left of page 1. Scanning it opens the
-    // public /verify/<token> page (status + approval trail + audit) so a printed
-    // or exported copy can be proven genuine. Drawn at an absolute position so it
-    // doesn't disturb the letter flow.
-    if (opts.qr?.buffer) {
-      const qrSize = 58;
-      const qrY = pdf.page.height - pdf.page.margins.bottom - qrSize - 6;
-      try {
-        pdf.image(opts.qr.buffer, left, qrY, { fit: [qrSize, qrSize] });
-        pdf.font('th').fontSize(7).fillColor('#64748b')
-          .text('สแกนเพื่อตรวจสอบความถูกต้องของเอกสาร', left + qrSize + 6, qrY + 8, { width: 150 });
-        pdf.font('th').fontSize(6.5).fillColor('#94a3b8')
-          .text(`เลขที่ ${doc.doc_number}`, left + qrSize + 6, pdf.y + 1, { width: 150 });
-      } catch { /* ignore QR draw failure */ }
-    }
+    // (verification QR is now stamped on EVERY page via stampQr/pageAdded — see top)
 
-    // ---- ความเห็น / การพิจารณา box at the BOTTOM of the first page ----
-    // Mirrors the client's real memos where reviewers write their comment and
-    // sign at the foot of page 1. Shows any approver comments already recorded,
-    // plus a "ผู้ตรวจสอบ / ผู้อนุมัติ" signature row. Skipped when opts.commentBox
-    // is explicitly false (e.g. a clean original with nothing to show yet).
+    // ---- ความเห็น / การพิจารณา box — moved to the LAST page (#7) ----
+    // The client wants the body to flow naturally across 1–2 pages and this box to
+    // appear at the END (not forced onto the foot of page 1, where it used to push
+    // the content up). Shows any approver comments recorded, plus a checker/approver
+    // signature row. Skipped when opts.commentBox === false (clean original).
     const commentSteps = Array.isArray(opts.auditSteps)
       ? opts.auditSteps.filter((s) => s.comment && s.comment.trim())
       : [];
     const wantCommentBox = opts.commentBox !== false;
     if (wantCommentBox) {
-      // put the box near the page bottom; start a new page only if there's very
-      // little room left so it never collides with the signature block
-      const bottomLimit = pdf.page.height - pdf.page.margins.bottom;
+      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // keep clear of the QR strip
       const boxNeed = 96 + commentSteps.length * 16;
+      // start a fresh page only if the box won't fit in the remaining space;
+      // otherwise place it right below the current content (natural flow)
       if (pdf.y + boxNeed > bottomLimit) pdf.addPage();
-      else pdf.y = Math.max(pdf.y + 12, bottomLimit - boxNeed);
+      else pdf.y = pdf.y + 18;
 
       const boxTop = pdf.y;
       pdf.rect(left, boxTop, contentW, boxNeed - 8).lineWidth(0.6).strokeColor('#94a3b8').stroke();
@@ -331,6 +349,9 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         pdf.moveDown(0.8);
       });
     }
+
+    // stamp the verification QR on every page now that all content is laid out (#7)
+    stampQrAllPages();
 
     pdf.end();
   });

@@ -107,6 +107,9 @@ export default function DocumentRegister() {
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
+  // documents awaiting the logged-in user's approval — the home alert (#8)
+  const [awaiting, setAwaiting] = useState({ count: 0, items: [] });
+
   // load reference data once
   useEffect(() => {
     Promise.all([ememoApi.listProjects(), ememoApi.listDocumentTypes()])
@@ -115,6 +118,7 @@ export default function DocumentRegister() {
         setDocTypes(t.data);
       })
       .catch((e) => setError(e.message));
+    ememoApi.awaitingMe().then((r) => setAwaiting(r.data)).catch(() => {});
   }, []);
 
   const loadDocs = useCallback(() => {
@@ -199,6 +203,30 @@ export default function DocumentRegister() {
     <div className="space-y-4">
       {error && (
         <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
+      )}
+
+      {/* รออนุมัติจากคุณ — action alert so a reviewer doesn't rely on email (#8) */}
+      {awaiting.count > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+            <Icon name="clock" className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-amber-900">
+              มีเอกสารรอการอนุมัติจากคุณ {awaiting.count} ฉบับ
+            </div>
+            <p className="truncate text-xs text-amber-700">
+              {awaiting.items.slice(0, 3).map((d) => d.doc_number).join('  ·  ')}
+              {awaiting.count > 3 ? '  · …' : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate(`/memos/${awaiting.items[0].id}`)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
+          >
+            ดำเนินการ <Icon name="arrowRight" className="h-4 w-4" />
+          </button>
+        </div>
       )}
 
       {/* filter bar — search · type · status · project chips, then a date row */}

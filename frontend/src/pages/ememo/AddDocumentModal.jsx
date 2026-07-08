@@ -3,6 +3,7 @@ import { ememoApi, adminApi } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
+import ReferencePicker from './ReferencePicker.jsx';
 
 export default function AddDocumentModal({ projects, docTypes, onClose, onCreated, initial = null }) {
   const { profile, user } = useAuth();
@@ -17,6 +18,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [subject, setSubject] = useState(initial?.subject || '');
   const [recipient, setRecipient] = useState(initial?.recipient || '');
   const [reference, setReference] = useState(initial?.reference || '');
+  const [referenceDocId, setReferenceDocId] = useState(initial?.reference_doc_id || '');
   const [cc, setCc] = useState(initial?.cc_recipients || '');
   // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
   const [enclosures, setEnclosures] = useState(
@@ -113,6 +115,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         setLetter(lh);
         setSignerName(lh.signatory_name || '');
         setSignerTitle(lh.signatory_title || '');
+        // the letterhead (บริษัท/ตรา) is FIXED per project (#4): lock the company
+        // to the one bound in settings so the clerk can't pick another brand.
+        if (lh.company_id) setCompanyId(lh.company_id);
       })
       .catch(() => !cancelled && setLetter({}));
     return () => { cancelled = true; };
@@ -201,6 +206,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           subject: subject.trim(),
           recipient: recipient.trim() || undefined,
           reference: reference.trim() || undefined,
+          referenceDocId: referenceDocId || undefined,
           cc: cc.trim() || undefined,
           signerName: signerName.trim() || undefined,
           signerTitle: signerTitle.trim() || undefined,
@@ -309,11 +315,23 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {companies.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">บริษัท / ตราหัวจดหมาย</label>
-              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
-                ))}
-              </select>
+              {/* letterhead is fixed by the project (#4). When the selected project
+                  binds a company, lock it so the header can't be switched. */}
+              {letter?.company_id ? (
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5">
+                  <Icon name="lock" className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-700">
+                    {companies.find((c) => c.id === companyId)?.name || 'หัวกระดาษของโครงการ'}
+                  </span>
+                  <span className="ml-auto text-[11px] text-slate-400">กำหนดตามโครงการ</span>
+                </div>
+              ) : (
+                <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
@@ -399,7 +417,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">อ้างถึง (ไม่บังคับ)</label>
-              <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="เช่น BV/วิศวะ/02A/018 ลว. 26 มิ.ย. 69" className={field} />
+              {/* #3: reference must be a real in-system document (search & pick) */}
+              <ReferencePicker
+                value={{ docId: referenceDocId, text: reference }}
+                onChange={({ docId, text }) => { setReferenceDocId(docId); setReference(text); }}
+                excludeId={initial?.sourceId}
+              />
+              <p className="mt-1 text-xs text-slate-400">เลือกจากเอกสารที่มีอยู่ในระบบ (กดแล้วลิงก์ไปเอกสารตัวจริงได้) · เอกสารอื่นที่ไม่มีในระบบให้แนบเป็นไฟล์แทน</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>

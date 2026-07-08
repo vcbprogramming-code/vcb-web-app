@@ -8,6 +8,7 @@ const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed'
 // "หัวจดหมาย" tab was removed; this is the single place to edit it)
 const emptyLetter = {
   companyName: '', companyNameEn: '', address: '', phone: '', telex: '', fax: '',
+  companyId: '', signatureUrl: '',
   signatoryName: '', signatoryTitle: '', closingLine: '', defaultRecipient: '',
 };
 
@@ -21,6 +22,14 @@ function ProjectModal({ project, onClose, onSaved }) {
   const setL = (k, v) => setLetter((f) => ({ ...f, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [companies, setCompanies] = useState([]);
+  const [sigUploading, setSigUploading] = useState(false);
+  const [sigPreview, setSigPreview] = useState(null); // object URL of the current signature
+
+  // list of บริษัท/ตรา to bind this project to (#4)
+  useEffect(() => {
+    adminApi.listCompanies().then((r) => setCompanies(r.data || [])).catch(() => setCompanies([]));
+  }, []);
 
   // when editing an existing project, load its per-project letterhead config
   useEffect(() => {
@@ -30,11 +39,25 @@ function ProjectModal({ project, onClose, onSaved }) {
       setLetter({
         companyName: d.company_name || '', companyNameEn: d.company_name_en || '',
         address: d.address || '', phone: d.phone || '', telex: d.telex || '', fax: d.fax || '',
+        companyId: d.company_id || '', signatureUrl: d.signature_url || '',
         signatoryName: d.signatory_name || '', signatoryTitle: d.signatory_title || '',
         closingLine: d.closing_line || '', defaultRecipient: d.default_recipient || '',
       });
     }).catch(() => {});
   }, [editing, project?.id]);
+
+  // upload a new signature image (#6) — store its key, save happens with the form
+  const uploadSignature = async (file) => {
+    if (!file) return;
+    if (!editing) { setError('บันทึกโครงการก่อน จึงจะอัปโหลดลายเซ็นได้'); return; }
+    setSigUploading(true); setError(null);
+    try {
+      const { data } = await adminApi.uploadProjectSignature(project.id, file);
+      setL('signatureUrl', data.key);
+      setSigPreview(URL.createObjectURL(file));
+    } catch (e) { setError(e.message); }
+    finally { setSigUploading(false); }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -97,6 +120,17 @@ function ProjectModal({ project, onClose, onSaved }) {
             <h4 className="text-sm font-bold text-slate-700">หัวจดหมายของโครงการนี้</h4>
             <p className="mb-3 text-xs text-slate-400">ชื่อบริษัท/หน่วยงานและข้อมูลนี้จะแสดงบนหนังสือของโครงการนี้ (แต่ละโครงการตั้งได้ต่างกัน)</p>
             <div className="space-y-3">
+              {/* บริษัท/ตราหัวจดหมายเริ่มต้น — ล็อกตราของโครงการนี้ (#4) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">หัวกระดาษเริ่มต้น (บริษัท / ตรา)</label>
+                <select value={letter.companyId} onChange={(e) => setL('companyId', e.target.value)} className={field}>
+                  <option value="">— ใช้ค่าเริ่มต้นของระบบ —</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">เอกสารทุกใบของโครงการนี้จะใช้หัวกระดาษนี้โดยอัตโนมัติ (ผู้สร้างเอกสารเปลี่ยนตราไม่ได้)</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อบริษัท / หน่วยงาน (ไทย)</label>
                 <input value={letter.companyName} onChange={(e) => setL('companyName', e.target.value)} placeholder="เช่น กิจการร่วมค้า ซีวีอี" className={field} />
@@ -132,6 +166,34 @@ function ProjectModal({ project, onClose, onSaved }) {
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">ตำแหน่งผู้ลงนาม</label>
                   <input value={letter.signatoryTitle} onChange={(e) => setL('signatoryTitle', e.target.value)} placeholder="เช่น ผู้จัดการโครงการ" className={field} />
+                </div>
+              </div>
+
+              {/* ลายเซ็นของผู้ลงนาม — ประทับอัตโนมัติบนทุกเอกสารของโครงการ (#6) */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็นผู้ลงนาม (อัตโนมัติ)</label>
+                <p className="mb-2 text-[11px] text-slate-400">อัปโหลดรูปลายเซ็น (พื้นหลังโปร่งใส .png จะสวยที่สุด) — ระบบจะประทับลายเซ็นนี้ใต้ “ขอแสดงความนับถือ” ให้อัตโนมัติทุกเอกสาร ไม่ต้องรอเซ็นทีละใบ</p>
+                <div className="flex items-center gap-3">
+                  {(sigPreview || letter.signatureUrl) ? (
+                    <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-slate-200 bg-white">
+                      {sigPreview
+                        ? <img src={sigPreview} alt="ลายเซ็น" className="max-h-12 max-w-[120px] object-contain" />
+                        : <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> มีลายเซ็นแล้ว</span>}
+                    </div>
+                  ) : (
+                    <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-400">ยังไม่มี</div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={`btn-outline cursor-pointer ${!editing ? 'pointer-events-none opacity-50' : ''}`}>
+                      <Icon name="download" className="h-4 w-4" /> {sigUploading ? 'กำลังอัปโหลด…' : 'อัปโหลดลายเซ็น'}
+                      <input type="file" accept="image/*" className="hidden" disabled={!editing || sigUploading}
+                        onChange={(e) => { uploadSignature(e.target.files?.[0]); e.target.value = ''; }} />
+                    </label>
+                    {(sigPreview || letter.signatureUrl) && (
+                      <button type="button" onClick={() => { setL('signatureUrl', ''); setSigPreview(null); }} className="text-xs text-red-500 hover:underline">ลบลายเซ็น</button>
+                    )}
+                    {!editing && <span className="text-[11px] text-amber-600">บันทึกโครงการก่อน จึงจะอัปโหลดลายเซ็นได้</span>}
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -186,6 +248,7 @@ export default function ProjectsTab() {
               <th className="tbl-th">โครงการ</th>
               <th className="tbl-th">ชื่อ</th>
               <th className="tbl-th">Prefix</th>
+              <th className="tbl-th">ผู้จัดการโครงการ (ผู้ลงนาม)</th>
               <th className="tbl-th">สถานะ</th>
               <th className="tbl-th text-right">จัดการ</th>
             </tr>
@@ -198,6 +261,18 @@ export default function ProjectsTab() {
                 </td>
                 <td className="tbl-td text-slate-700">{p.name}</td>
                 <td className="tbl-td text-slate-600">{p.doc_prefix}</td>
+                <td className="tbl-td">
+                  {p.signatory_name ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-700">{p.signatory_name}</span>
+                      {p.has_signature
+                        ? <span className="chip bg-emerald-50 text-emerald-700" title="ตั้งลายเซ็นแล้ว"><Icon name="check" className="h-3 w-3" /> ลายเซ็น</span>
+                        : <span className="chip bg-amber-50 text-amber-700" title="ยังไม่ได้ตั้งลายเซ็น">ยังไม่มีลายเซ็น</span>}
+                    </div>
+                  ) : (
+                    <span className="chip bg-amber-50 text-amber-700">ยังไม่ได้ตั้ง</span>
+                  )}
+                </td>
                 <td className="tbl-td">
                   <span className={`chip ${p.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{p.is_active ? 'ใช้งาน' : 'ปิด'}</span>
                 </td>

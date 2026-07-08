@@ -62,6 +62,12 @@ async function loadDocAndLetter(documentId) {
   if (letter.logoUrl) {
     letter.logoBuffer = await getObjectBuffer(letter.logoUrl).catch(() => null);
   }
+  // Per-project signature image (#6): the signatory's saved signature is stamped
+  // automatically under "ขอแสดงความนับถือ" on every memo — no need to sign each
+  // one. Fetch its bytes here so letterhead.js can embed it.
+  if (letter.signatureUrl) {
+    letter.signatureBuffer = await getObjectBuffer(letter.signatureUrl).catch(() => null);
+  }
   return { doc, letter };
 }
 

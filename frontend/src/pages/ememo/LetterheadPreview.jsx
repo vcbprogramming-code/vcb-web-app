@@ -49,9 +49,11 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
   const frameRef = useRef(null);    // A4-width frame (measures page width)
   const measureRef = useRef(null);  // hidden, spacer-free layout (stable measurement)
   const sigRef = useRef(null);      // signature block inside the measurer
+  const bodyRef = useRef(null);     // body paragraph — read its line-height
   const [pageH, setPageH] = useState(0);
   const [contentH, setContentH] = useState(0);
   const [sigSpacer, setSigSpacer] = useState(0);
+  const [usableH, setUsableH] = useState(0); // printable height per page, SNAPPED to line-height
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -60,7 +62,14 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       if (ph) setPageH((prev) => (Math.abs(prev - ph) > 0.5 ? ph : prev));
       if (!ph || !measureRef.current) return;
 
-      const usable = ph - ph * PAD_TOP - ph * FOOTER; // printable height per page
+      const rawUsable = ph - ph * PAD_TOP - ph * FOOTER; // printable height per page
+      // Snap the usable height DOWN to a whole number of body lines so a page break
+      // never bisects a line of text (the PDF breaks at line boundaries too).
+      const lh = bodyRef.current
+        ? parseFloat(getComputedStyle(bodyRef.current).lineHeight) || 20
+        : 20;
+      const usable = Math.max(lh, Math.floor(rawUsable / lh) * lh);
+      setUsableH((prev) => (Math.abs(prev - usable) > 0.5 ? usable : prev));
 
       // sig block straddle check — measured on the SPACER-FREE layout so it can't
       // feed back on itself. `top` is relative to the printable origin.
@@ -93,9 +102,8 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
   const padTop = pageH * PAD_TOP;
   const padX = pageH * PAD_X;
   const footerH = pageH * FOOTER;
-  const usableH = Math.max(1, pageH - padTop - footerH);
   const flowH = Math.max(0, contentH - padTop); // contentH includes one padTop
-  const pageCount = pageH > 0 ? Math.max(1, Math.ceil(flowH / usableH)) : 1;
+  const pageCount = (pageH > 0 && usableH > 0) ? Math.max(1, Math.ceil(flowH / usableH)) : 1;
 
   // The letter markup — rendered in the hidden measurer (withSigRef) and in each
   // visible page slice. `spacer` pushes the signature block down when needed.
@@ -148,7 +156,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       </div>
 
       {/* body — break-words so long unbroken strings still wrap (no overflow) */}
-      <div className="mt-3 whitespace-pre-wrap break-words text-justify indent-10">
+      <div ref={withSigRef ? bodyRef : undefined} className="mt-3 whitespace-pre-wrap break-words text-justify indent-10">
         {doc.body || <span className="text-slate-300">(เนื้อความของหนังสือจะแสดงที่นี่)</span>}
       </div>
 
@@ -196,8 +204,11 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
           className="relative w-full overflow-hidden rounded-lg bg-white text-[13px] leading-relaxed text-slate-900 shadow-lg ring-1 ring-slate-200"
           style={{ height: pageH }}
         >
-          {/* printable window: top margin + usable band; content shifted to this page */}
-          <div style={{ height: padTop + usableH, overflow: 'hidden', paddingTop: padTop }}>
+          {/* top margin (blank) on EVERY page — genuine padding above the clip box */}
+          <div style={{ height: padTop }} />
+          {/* printable window: clips to exactly the usable band; content is shifted
+              up so this page shows its slice, WITH the top margin preserved above */}
+          <div style={{ height: usableH, overflow: 'hidden' }}>
             <div style={{ transform: `translateY(-${p * usableH}px)` }}>
               <Letter spacer={sigSpacer} />
             </div>

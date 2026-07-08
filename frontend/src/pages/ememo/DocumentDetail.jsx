@@ -16,7 +16,7 @@ function MetaItem({ icon, label, children, className = '' }) {
   return (
     <div className={`flex min-w-0 items-start gap-2 ${className}`}>
       <Icon name={icon} className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-      <div className="min-w-0">
+      <div className="min-w-0 break-words">
         <span className="text-slate-500">{label}: </span>
         <span className="font-medium text-slate-800">{children}</span>
       </div>
@@ -557,7 +557,7 @@ function Timeline({ doc, openAttachment }) {
                 {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ขอความเห็น</span>}
                 <span className="text-[11px] text-slate-500">{formatThaiDateTime(m.created_at)}</span>
               </div>
-              <div className={`mt-1 whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
+              <div className={`mt-1 whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
               {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                 <div className="mt-1.5 space-y-1">
                   {m.attachments.map((a) => (

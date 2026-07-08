@@ -100,8 +100,8 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
           )}
         </div>
 
-        {/* body */}
-        <div className="mt-3 min-h-[120px] whitespace-pre-wrap text-justify indent-10">
+        {/* body — break-words so long unbroken strings still wrap (no overflow) */}
+        <div className="mt-3 min-h-[120px] whitespace-pre-wrap break-words text-justify indent-10">
           {doc.body || <span className="text-slate-300">(เนื้อความของหนังสือจะแสดงที่นี่)</span>}
         </div>
 
@@ -139,7 +139,7 @@ function FieldRow({ label, value, placeholder }) {
   return (
     <div className="flex gap-2">
       <div className="w-24 shrink-0 font-bold">{label}</div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 break-words">
         {value || <span className="text-slate-300">{placeholder}</span>}
       </div>
     </div>

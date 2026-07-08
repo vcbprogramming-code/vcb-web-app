@@ -53,7 +53,8 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
   const [pageH, setPageH] = useState(0);
   const [contentH, setContentH] = useState(0);
   const [sigSpacer, setSigSpacer] = useState(0);
-  const [usableH, setUsableH] = useState(0); // printable height per page, SNAPPED to line-height
+  const [usableH, setUsableH] = useState(0);   // printable height per page
+  const [offsets, setOffsets] = useState([0]); // flow-Y where each page's slice starts
 
   useLayoutEffect(() => {
     const measure = () => {
@@ -62,35 +63,53 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       if (ph) setPageH((prev) => (Math.abs(prev - ph) > 0.5 ? ph : prev));
       if (!ph || !measureRef.current) return;
 
-      const rawUsable = ph - ph * PAD_TOP - ph * FOOTER; // printable height per page
-      // Snap the usable height DOWN to a whole number of body lines so a page break
-      // never bisects a line of text (the PDF breaks at line boundaries too).
-      const lh = bodyRef.current
-        ? parseFloat(getComputedStyle(bodyRef.current).lineHeight) || 20
-        : 20;
-      const usable = Math.max(lh, Math.floor(rawUsable / lh) * lh);
+      const usable = ph - ph * PAD_TOP - ph * FOOTER; // printable height per page
       setUsableH((prev) => (Math.abs(prev - usable) > 0.5 ? usable : prev));
+      const origin = measureRef.current.getBoundingClientRect().top + ph * PAD_TOP;
 
-      // sig block straddle check — measured on the SPACER-FREE layout so it can't
-      // feed back on itself. `top` is relative to the printable origin.
+      // sig block straddle check — measured on the SPACER-FREE layout.
       let spacer = 0;
       if (sigRef.current) {
-        const cTop = measureRef.current.getBoundingClientRect().top + ph * PAD_TOP;
         const r = sigRef.current.getBoundingClientRect();
-        const top = r.top - cTop;
+        const top = r.top - origin;
         const startPage = Math.floor(top / usable);
         const endPage = Math.floor((top + r.height - 0.5) / usable);
         if (endPage > startPage && r.height <= usable) {
-          // push the block's top to the next page's printable origin (+2 so its
-          // first line clears the previous page's clip edge)
           spacer = (startPage + 1) * usable - top + 2;
         }
       }
       setSigSpacer((prev) => (Math.abs(prev - spacer) > 0.5 ? spacer : prev));
 
-      // content height (spacer-free) + the spacer we will apply → drives page count
-      const h = (measureRef.current.scrollHeight || 0) + spacer;
-      setContentH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+      // Collect candidate break positions = the bottom Y (flow coords, spacer-free)
+      // of every text line in the body, so a page can end exactly at a line gap and
+      // never slice through a line. The body is the only long multi-line element.
+      const breaks = [];
+      if (bodyRef.current) {
+        const range = document.createRange();
+        range.selectNodeContents(bodyRef.current);
+        for (const rect of range.getClientRects()) breaks.push(rect.bottom - origin);
+        range.detach?.();
+      }
+      // total flow height (spacer-free letter) + the spacer that pushes the sig block
+      const totalH = (measureRef.current.scrollHeight || 0) - ph * PAD_TOP + spacer;
+
+      // Walk pages: each page ends at the largest body line-bottom ≤ (start+usable);
+      // if none falls in range (short content or a non-body block), hard-cut at
+      // +usable. Break positions are spacer-free (the body sits before the sig block,
+      // so the spacer doesn't move body lines).
+      const offs = [0];
+      let start = 0;
+      let guard = 0;
+      while (start + usable < totalH && guard < 60) {
+        const limit = start + usable;
+        let brk = 0;
+        for (const b of breaks) if (b > start + 1 && b <= limit) brk = b;
+        const next = brk > start ? brk : limit;
+        offs.push(next);
+        start = next;
+        guard += 1;
+      }
+      setOffsets((prev) => (prev.length !== offs.length || prev.some((v, i) => Math.abs(v - offs[i]) > 0.5) ? offs : prev));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -102,8 +121,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
   const padTop = pageH * PAD_TOP;
   const padX = pageH * PAD_X;
   const footerH = pageH * FOOTER;
-  const flowH = Math.max(0, contentH - padTop); // contentH includes one padTop
-  const pageCount = (pageH > 0 && usableH > 0) ? Math.max(1, Math.ceil(flowH / usableH)) : 1;
+  const pageCount = offsets.length;
 
   // The letter markup — rendered in the hidden measurer (withSigRef) and in each
   // visible page slice. `spacer` pushes the signature block down when needed.
@@ -206,10 +224,11 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
         >
           {/* top margin (blank) on EVERY page — genuine padding above the clip box */}
           <div style={{ height: padTop }} />
-          {/* printable window: clips to exactly the usable band; content is shifted
-              up so this page shows its slice, WITH the top margin preserved above */}
-          <div style={{ height: usableH, overflow: 'hidden' }}>
-            <div style={{ transform: `translateY(-${p * usableH}px)` }}>
+          {/* printable window: clips to this page's slice [offsets[p] … offsets[p+1]],
+              which ends at a line gap so no line is bisected and pages don't overlap.
+              Slice height = next offset − this offset (usableH for the last page). */}
+          <div style={{ height: (p + 1 < offsets.length ? offsets[p + 1] - offsets[p] : usableH), overflow: 'hidden' }}>
+            <div style={{ transform: `translateY(-${offsets[p] || 0}px)` }}>
               <Letter spacer={sigSpacer} />
             </div>
           </div>

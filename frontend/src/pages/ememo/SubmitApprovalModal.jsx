@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 
-export default function SubmitApprovalModal({ documentId, docCode, onClose, onSubmitted }) {
+export default function SubmitApprovalModal({ documentId, docCode, projectManager, onClose, onSubmitted }) {
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [locked, setLocked] = useState(false);
   const [users, setUsers] = useState([]); // system accounts, for the picker
@@ -14,17 +14,24 @@ export default function SubmitApprovalModal({ documentId, docCode, onClose, onSu
     ememoApi.listApprovers().then((r) => setUsers(r.data)).catch(() => setUsers([]));
   }, []);
 
-  // prefill + lock the approver chain from the doc-code config (same as create)
+  // prefill + lock the approver chain from the doc-code config (same as create).
+  // When the code has no configured chain, fall back to the project manager (#3)
+  // so approval auto-routes to them without hand-picking every time.
   useEffect(() => {
-    if (!docCode) return;
+    const prefillManager = () => {
+      if (projectManager?.email) setApprovers([{ name: projectManager.name || '', email: projectManager.email }]);
+    };
+    if (!docCode) { prefillManager(); return; }
     ememoApi.listDocCodes().then((r) => {
       const cfg = r.data.find((c) => c.code === docCode)?.default_approvers;
       if (Array.isArray(cfg) && cfg.length) {
         setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
         setLocked(true);
+      } else {
+        prefillManager();
       }
-    }).catch(() => {});
-  }, [docCode]);
+    }).catch(() => prefillManager());
+  }, [docCode, projectManager]);
 
   // pick a user by email → fill name+email for that row
   const pick = (i, email) => {

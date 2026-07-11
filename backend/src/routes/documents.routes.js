@@ -144,12 +144,26 @@ router.get(
 
     const countRow = await queryOne(`select count(*)::int as total ${LIST_FROM} ${whereSql}`, params);
     const offset = (page - 1) * pageSize;
+    // #2: flag rows whose CURRENT pending step awaits the logged-in user, and float
+    // them to the very top of the register so a reviewer sees them first (server-side
+    // sort works across pagination — the alert banner used to only link one doc).
+    const email = (req.profile?.email || '').toLowerCase();
+    const listParams = [...params, email];
+    const meIdx = listParams.length;
+    const awaitingExpr = `exists (
+      select 1 from approval_steps s
+       where s.document_id = d.id and s.action = 'pending' and s.action_token is not null
+         and lower(s.approver_email) = $${meIdx}
+         and s.step_no = (select min(s2.step_no) from approval_steps s2
+                            where s2.document_id = s.document_id and s2.action = 'pending')
+    )`;
     const { rows } = await query(
-      `select ${LIST_SELECT} ${LIST_FROM} ${whereSql}
-        order by (case when d.status = 'pending' then 0 else 1 end),
+      `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me ${LIST_FROM} ${whereSql}
+        order by is_awaiting_me desc,
+                 (case when d.status = 'pending' then 0 else 1 end),
                  d.date_received desc, d.created_at desc
         limit ${pageSize} offset ${offset}`,
-      params
+      listParams
     );
     res.json({ data: rows, total: countRow.total, page, pageSize });
   })
@@ -331,9 +345,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
-              d.signer_name, d.signer_title, d.created_by, d.verify_token, pr.full_name as preparer_name
+              d.signer_name, d.signer_title, d.created_by, d.verify_token, pr.full_name as preparer_name,
+              lh.manager_email, lh.signatory_name as manager_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
+         left join project_letterhead lh on lh.project_id = d.project_id
         where d.id = $1`,
       [req.params.id]
     );

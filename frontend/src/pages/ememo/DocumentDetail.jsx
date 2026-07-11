@@ -210,12 +210,15 @@ export default function DocumentDetail() {
     catch (e) { setError(e.message); }
   };
 
-  // post a message (+ optional attached file) to the conversation thread
+  // post a message (+ optional attached file) to the conversation thread.
+  // A file-only message is allowed (#7): when there's no text, use the file name
+  // as the body so the thread bubble isn't blank (backend requires a body).
   const postMessage = async () => {
-    if (!msgText.trim()) return;
+    if (!msgText.trim() && !msgFile) return;
     setPosting(true); setError(null);
     try {
-      const { data } = await ememoApi.postMessage(id, msgText.trim());
+      const body = msgText.trim() || `แนบไฟล์: ${msgFile.name}`;
+      const { data } = await ememoApi.postMessage(id, body);
       if (msgFile) await ememoApi.attachMessageFile(id, data.id, msgFile);
       setMsgText(''); setMsgFile(null);
       load();
@@ -426,7 +429,7 @@ export default function DocumentDetail() {
                 </label>
                 <div className="flex items-center gap-2">
                   {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">ลบไฟล์</button>}
-                  <button onClick={postMessage} disabled={posting || !msgText.trim()} className="btn-primary px-3 py-1.5 text-xs">
+                  <button onClick={postMessage} disabled={posting || (!msgText.trim() && !msgFile)} className="btn-primary px-3 py-1.5 text-xs">
                     {posting ? 'กำลังส่ง…' : 'ส่งข้อความ'}
                   </button>
                 </div>
@@ -457,6 +460,7 @@ export default function DocumentDetail() {
         <SubmitApprovalModal
           documentId={id}
           docCode={doc.doc_code}
+          projectManager={doc.manager_email ? { name: doc.manager_name, email: doc.manager_email } : null}
           onClose={() => setShowSubmit(false)}
           onSubmitted={() => { setShowSubmit(false); toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
         />

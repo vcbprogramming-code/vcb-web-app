@@ -391,7 +391,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `select p.id, p.code, p.name, p.doc_prefix, p.color, p.sort_order, p.is_active,
-              lh.signatory_name, lh.signatory_title, lh.company_name,
+              lh.signatory_name, lh.signatory_title, lh.company_name, lh.manager_email,
               lh.signature_url is not null as has_signature
          from projects p
          left join project_letterhead lh on lh.project_id = p.id
@@ -547,6 +547,9 @@ const letterheadSchema = z.object({
   signatoryName: z.string().optional(),
   signatoryTitle: z.string().optional(),
   signatureUrl: z.string().optional().nullable(),
+  // #3: the project manager's system-account email (approval auto-routes here).
+  // '' from the "— none —" option is coerced to null so the save doesn't 400.
+  managerEmail: z.preprocess((v) => (v === '' ? null : v), z.string().email().nullable().optional()),
   closingLine: z.string().optional(),
   defaultRecipient: z.string().optional(),
 });
@@ -562,8 +565,8 @@ router.put(
       `insert into project_letterhead
          (project_id, company_name, company_name_en, address, logo_url, company_id,
           phone, telex, fax, signatory_name, signatory_title, signature_url,
-          closing_line, default_recipient)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          closing_line, default_recipient, manager_email)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        on conflict (project_id) do update set
          company_name = excluded.company_name,
          company_name_en = excluded.company_name_en,
@@ -578,6 +581,7 @@ router.put(
          signature_url = excluded.signature_url,
          closing_line = excluded.closing_line,
          default_recipient = excluded.default_recipient,
+         manager_email = excluded.manager_email,
          updated_at = now()
        returning *`,
       [
@@ -585,7 +589,7 @@ router.put(
         f.companyId || null,
         f.phone || null, f.telex || null, f.fax || null,
         f.signatoryName || null, f.signatoryTitle || null, f.signatureUrl || null,
-        f.closingLine || null, f.defaultRecipient || null,
+        f.closingLine || null, f.defaultRecipient || null, f.managerEmail || null,
       ]
     );
     res.json({ data: row });

@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { moduleTitles, roleLabels } from '../config/nav.js';
@@ -31,6 +32,18 @@ export default function ModuleShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const role = profile?.role;
+  // user menu (#4): logout/theme/profile are tucked behind the name so they can't
+  // be hit by accident while reaching for the prominent "add document" button.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
   const title = titleFor(location.pathname);
   const brand = brandFor(location.pathname);
   // Light page everywhere; E-Memo + admin/settings get a dark-navy HEADER only
@@ -72,32 +85,52 @@ export default function ModuleShell() {
               {headerSlot}
             </div>
           )}
-          <div className="flex items-center gap-3">
-            {/* light/dark theme toggle */}
+          {/* user menu (#4): one avatar/name button opens a dropdown holding
+              profile, theme toggle and logout — declutters the bar and prevents
+              accidental logout next to the "add document" action. */}
+          <div className="relative flex shrink-0 items-center" ref={menuRef}>
             <button
-              onClick={toggle}
-              title={isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
-              aria-label="สลับโหมดสว่าง/มืด"
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${navyHeader ? 'border-white/15 bg-white/[0.06] text-cyan-100 hover:bg-white/[0.12]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label="เมนูผู้ใช้"
+              className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${navyHeader ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
             >
-              <Icon name={isDark ? 'sun' : 'moon'} className="h-4 w-4" />
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${navyHeader ? 'bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/30' : 'bg-brand/10 text-brand'}`}>
+                {(profile?.full_name || user?.email || '?').trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="hidden text-left leading-tight sm:block">
+                <span className={`block max-w-[160px] truncate text-sm font-medium ${navyHeader ? 'text-slate-100' : 'text-slate-800'}`}>{profile?.full_name || user?.email}</span>
+                <span className={`block text-xs ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{roleLabels[role] || role}</span>
+              </span>
+              <Icon name="chevronDown" className={`h-4 w-4 shrink-0 transition ${menuOpen ? 'rotate-180' : ''} ${navyHeader ? 'text-cyan-200/70' : 'text-slate-400'}`} />
             </button>
-            <button
-              onClick={() => navigate('/profile')}
-              title="โปรไฟล์ของฉัน"
-              className={`hidden rounded-lg px-2 py-1 text-right transition sm:block ${navyHeader ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
-            >
-              <div className={`text-sm font-medium ${navyHeader ? 'text-slate-100' : 'text-slate-800'}`}>{profile?.full_name || user?.email}</div>
-              <div className={`text-xs ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{roleLabels[role] || role}</div>
-            </button>
-            <button
-              onClick={handleLogout}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition ${navyHeader ? 'border-white/15 bg-white/[0.06] text-slate-200 hover:bg-white/[0.12]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-              title="ออกจากระบบ"
-            >
-              <Icon name="logout" className="h-4 w-4" />
-              <span className="hidden md:inline">ออกจากระบบ</span>
-            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-xl">
+                <div className="border-b border-slate-100 px-4 py-2.5 sm:hidden">
+                  <div className="truncate text-sm font-medium text-slate-800">{profile?.full_name || user?.email}</div>
+                  <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>
+                </div>
+                <button
+                  onClick={() => { setMenuOpen(false); navigate('/profile'); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Icon name="user" className="h-4 w-4 text-slate-400" /> โปรไฟล์ของฉัน
+                </button>
+                <button
+                  onClick={toggle}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Icon name={isDark ? 'sun' : 'moon'} className="h-4 w-4 text-slate-400" /> {isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
+                </button>
+                <div className="my-1 border-t border-slate-100" />
+                <button
+                  onClick={() => { setMenuOpen(false); handleLogout(); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  <Icon name="logout" className="h-4 w-4" /> ออกจากระบบ
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adminApi } from '../../lib/ememo.js';
+import { adminApi, ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 
 const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#0d9488'];
@@ -8,7 +8,7 @@ const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed'
 // "หัวจดหมาย" tab was removed; this is the single place to edit it)
 const emptyLetter = {
   companyName: '', companyNameEn: '', address: '', phone: '', telex: '', fax: '',
-  companyId: '', signatureUrl: '',
+  companyId: '', signatureUrl: '', managerEmail: '',
   signatoryName: '', signatoryTitle: '', closingLine: '', defaultRecipient: '',
 };
 
@@ -23,12 +23,15 @@ function ProjectModal({ project, onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [companies, setCompanies] = useState([]);
+  const [users, setUsers] = useState([]); // system accounts, for the manager picker (#3)
   const [sigUploading, setSigUploading] = useState(false);
   const [sigPreview, setSigPreview] = useState(null); // object URL of the current signature
 
-  // list of บริษัท/ตรา to bind this project to (#4)
+  // list of บริษัท/ตรา to bind this project to (#4) + system accounts for the
+  // project-manager (approver) picker (#3)
   useEffect(() => {
     adminApi.listCompanies().then((r) => setCompanies(r.data || [])).catch(() => setCompanies([]));
+    ememoApi.listApprovers().then((r) => setUsers(r.data || [])).catch(() => setUsers([]));
   }, []);
 
   // when editing an existing project, load its per-project letterhead config
@@ -39,7 +42,7 @@ function ProjectModal({ project, onClose, onSaved }) {
       setLetter({
         companyName: d.company_name || '', companyNameEn: d.company_name_en || '',
         address: d.address || '', phone: d.phone || '', telex: d.telex || '', fax: d.fax || '',
-        companyId: d.company_id || '', signatureUrl: d.signature_url || '',
+        companyId: d.company_id || '', signatureUrl: d.signature_url || '', managerEmail: d.manager_email || '',
         signatoryName: d.signatory_name || '', signatoryTitle: d.signatory_title || '',
         closingLine: d.closing_line || '', defaultRecipient: d.default_recipient || '',
       });
@@ -76,6 +79,7 @@ function ProjectModal({ project, onClose, onSaved }) {
         ...letter,
         companyId: letter.companyId || null,
         signatureUrl: letter.signatureUrl || null,
+        managerEmail: letter.managerEmail || null,
       });
       onSaved();
     } catch (err) {
@@ -175,6 +179,28 @@ function ProjectModal({ project, onClose, onSaved }) {
                 </div>
               </div>
 
+              {/* ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ) — auto-route approval here (#3) */}
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+                <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ)</label>
+                <p className="mb-2 text-[11px] text-slate-400">เลือกบัญชีผู้ใช้ในระบบที่เป็นผู้จัดการโครงการ — เวลาสร้าง/ส่งอนุมัติเอกสารของโครงการนี้ ระบบจะส่งให้ท่านนี้อนุมัติโดยอัตโนมัติ (แก้เปลี่ยนได้ตอนส่ง)</p>
+                <select
+                  value={letter.managerEmail}
+                  onChange={(e) => {
+                    const email = e.target.value;
+                    setL('managerEmail', email);
+                    // if no printed signatory name yet, borrow the picked account's name
+                    const u = users.find((x) => x.email === email);
+                    if (u && !letter.signatoryName.trim()) setL('signatoryName', u.full_name || '');
+                  }}
+                  className={field}
+                >
+                  <option value="">— ยังไม่กำหนด (เลือกผู้อนุมัติเองตอนส่ง) —</option>
+                  {users.map((u) => (
+                    <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
+                  ))}
+                </select>
+              </div>
+
               {/* ลายเซ็นของผู้ลงนาม — ประทับอัตโนมัติบนทุกเอกสารของโครงการ (#6) */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                 <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็นผู้ลงนาม (อัตโนมัติ)</label>
@@ -269,11 +295,14 @@ export default function ProjectsTab() {
                 <td className="tbl-td text-slate-600">{p.doc_prefix}</td>
                 <td className="tbl-td">
                   {p.signatory_name ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-slate-700">{p.signatory_name}</span>
                       {p.has_signature
                         ? <span className="chip bg-emerald-50 text-emerald-700" title="ตั้งลายเซ็นแล้ว"><Icon name="check" className="h-3 w-3" /> ลายเซ็น</span>
                         : <span className="chip bg-amber-50 text-amber-700" title="ยังไม่ได้ตั้งลายเซ็น">ยังไม่มีลายเซ็น</span>}
+                      {p.manager_email
+                        ? <span className="chip bg-blue-50 text-blue-700" title={`อนุมัติอัตโนมัติไปที่ ${p.manager_email}`}><Icon name="check" className="h-3 w-3" /> ผูกอีเมลอนุมัติ</span>
+                        : <span className="chip bg-slate-100 text-slate-400" title="ยังไม่ผูกบัญชีสำหรับอนุมัติ">ยังไม่ผูกอีเมล</span>}
                     </div>
                   ) : (
                     <span className="chip bg-amber-50 text-amber-700">ยังไม่ได้ตั้ง</span>

@@ -115,9 +115,17 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         setLetter(lh);
         setSignerName(lh.signatory_name || '');
         setSignerTitle(lh.signatory_title || '');
-        // the letterhead (บริษัท/ตรา) is FIXED per project (#4): lock the company
-        // to the one bound in settings so the clerk can't pick another brand.
+        // the project's bound company is a DEFAULT (#6): pre-select it so the
+        // header matches the project, but the clerk can still switch it — the
+        // client asked to stop the hard Auto-lock (some projects don't want it).
         if (lh.company_id) setCompanyId(lh.company_id);
+        // auto-route approval to the project manager (#3): if the project has a
+        // designated manager account and no approver is picked yet, prefill it.
+        if (lh.manager_email) {
+          setApprovers((prev) => (prev.some((a) => a.email.trim())
+            ? prev
+            : [{ name: lh.signatory_name || '', email: lh.manager_email }]));
+        }
       })
       .catch(() => !cancelled && setLetter({}));
     return () => { cancelled = true; };
@@ -315,22 +323,16 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {companies.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">บริษัท / ตราหัวจดหมาย</label>
-              {/* letterhead is fixed by the project (#4). When the selected project
-                  binds a company, lock it so the header can't be switched. */}
-              {letter?.company_id ? (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5">
-                  <Icon name="lock" className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-700">
-                    {companies.find((c) => c.id === companyId)?.name || 'หัวกระดาษของโครงการ'}
-                  </span>
-                  <span className="ml-auto text-[11px] text-slate-400">กำหนดตามโครงการ</span>
-                </div>
-              ) : (
-                <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
-                  ))}
-                </select>
+              {/* The project's bound company is only a DEFAULT now (#6) — the clerk
+                  can still switch the header if a document needs a different brand.
+                  (Previously this was hard-locked; the client asked to drop Auto-lock.) */}
+              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
+                ))}
+              </select>
+              {letter?.company_id && (
+                <p className="mt-1 text-[11px] text-slate-400">ค่าเริ่มต้นของโครงการนี้ถูกเลือกให้แล้ว — เปลี่ยนได้หากต้องการ</p>
               )}
             </div>
           )}

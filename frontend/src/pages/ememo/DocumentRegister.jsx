@@ -109,6 +109,15 @@ export default function DocumentRegister() {
 
   // documents awaiting the logged-in user's approval — the home alert (#8)
   const [awaiting, setAwaiting] = useState({ count: 0, items: [] });
+  // #5: on the free hosting tier the API sleeps when idle and the first request
+  // wakes it (~30s). Show a "warming up" hint if loading drags so the user knows
+  // it isn't frozen (and understands the one-time first-load delay).
+  const [wakeHint, setWakeHint] = useState(false);
+  useEffect(() => {
+    if (!loading) { setWakeHint(false); return; }
+    const t = setTimeout(() => setWakeHint(true), 5000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   // load reference data once
   useEffect(() => {
@@ -174,29 +183,41 @@ export default function DocumentRegister() {
   useHeaderSlot(
     (
       <>
+        {/* #2: informational "awaiting me" count — clicking clears filters so the
+            pinned (top-sorted) awaiting rows are guaranteed visible on page 1. */}
+        {awaiting.count > 0 && (
+          <button
+            onClick={() => { setStatus(''); setProjectId(''); setDocTypeId(''); setSearch(''); setPage(1); }}
+            title="เอกสารที่รอการอนุมัติจากคุณ — จัดเรียงไว้บนสุดของตาราง"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/90 px-3 py-2 text-sm font-bold text-white ring-1 ring-inset ring-amber-300/40 transition hover:bg-amber-500"
+          >
+            <Icon name="clock" className="h-4 w-4" /> รออนุมัติ {awaiting.count}
+          </button>
+        )}
         <div className="hidden rounded-lg bg-white/10 px-3.5 py-1.5 text-sm text-cyan-100/80 ring-1 ring-inset ring-white/15 md:block">
-          <span className="font-bold text-white">{total}</span> documents
-          <span className="mx-1.5 text-white/30">·</span>
-          <span className="font-bold text-white">{total}</span> linked
+          <span className="font-bold text-white">{total}</span> เอกสาร
         </div>
         {isAdmin && (
           <button
             onClick={() => navigate('/memos-settings')}
             title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
-            className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+            aria-label="ตั้งค่า E-Memo"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
-            <Icon name="settings" className="h-4 w-4" /> <span className="hidden sm:inline">Settings</span>
+            <Icon name="settings" className="h-4 w-4" />
           </button>
         )}
+        {/* #4: the primary "add document" action — made prominent (bright + ring)
+            and set apart from the secondary buttons so it isn't hit by accident. */}
         <button
           onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-900 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300"
         >
-          <Icon name="plus" className="h-4 w-4" /> <span className="hidden sm:inline">Add Document</span>
+          <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> เพิ่มเอกสาร
         </button>
       </>
     ),
-    [total, isAdmin]
+    [total, isAdmin, awaiting.count]
   );
 
   return (
@@ -205,29 +226,9 @@ export default function DocumentRegister() {
         <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
       )}
 
-      {/* รออนุมัติจากคุณ — action alert so a reviewer doesn't rely on email (#8) */}
-      {awaiting.count > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
-            <Icon name="clock" className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-amber-900">
-              มีเอกสารรอการอนุมัติจากคุณ {awaiting.count} ฉบับ
-            </div>
-            <p className="truncate text-xs text-amber-700">
-              {awaiting.items.slice(0, 3).map((d) => d.doc_number).join('  ·  ')}
-              {awaiting.count > 3 ? '  · …' : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate(`/memos/${awaiting.items[0].id}`)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600"
-          >
-            ดำเนินการ <Icon name="arrowRight" className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      {/* #2: the single-action alert was replaced by a per-row "รออนุมัติจากคุณ"
+          marker + server-side sort that floats those docs to the TOP of the table,
+          so a reviewer can pick which one to open (no forced first-doc redirect). */}
 
       {/* filter bar — search · type · status · project chips, then a date row */}
       <div className="card-sm !p-3 space-y-2">
@@ -334,13 +335,24 @@ export default function DocumentRegister() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center"><span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span></td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center">
+                <span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span>
+                {wakeHint && (
+                  <p className="mx-auto mt-3 max-w-md text-xs text-slate-400">
+                    เซิร์ฟเวอร์กำลังเริ่มทำงาน (โหมดประหยัดพลังงาน) — การโหลดครั้งแรกหลังพักอาจใช้เวลาสักครู่ ครั้งต่อไปจะเร็วขึ้น
+                  </p>
+                )}
+              </td></tr>
             ) : docs.length === 0 ? (
               <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
             ) : (
               docs.map((d, i) => (
-                <tr key={d.id} onClick={() => navigate(`/memos/${d.id}`)} className="tbl-row cursor-pointer">
-                  <td className="tbl-td text-slate-400">{(page - 1) * pageSize + i + 1}</td>
+                <tr
+                  key={d.id}
+                  onClick={() => navigate(`/memos/${d.id}`)}
+                  className={`tbl-row cursor-pointer ${d.is_awaiting_me ? 'bg-amber-50/70 hover:bg-amber-50' : ''}`}
+                >
+                  <td className={`tbl-td text-slate-400 ${d.is_awaiting_me ? 'border-l-4 border-amber-400' : ''}`}>{(page - 1) * pageSize + i + 1}</td>
                   <td className="tbl-td whitespace-nowrap text-slate-600">{formatThaiDate(d.date_received)}</td>
                   {/* รหัส — its own column, before เอกสาร */}
                   <td className="tbl-td">
@@ -350,7 +362,7 @@ export default function DocumentRegister() {
                   </td>
                   <td className="tbl-td">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span
                           className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
                           style={{ backgroundColor: d.project_color || '#64748b' }}
@@ -358,6 +370,12 @@ export default function DocumentRegister() {
                           {d.project_code}
                         </span>
                         <span className="font-semibold text-slate-800">{d.doc_number}</span>
+                        {/* #2: "รออนุมัติจากคุณ" marker right beside the doc number */}
+                        {d.is_awaiting_me && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                            <Icon name="clock" className="h-3 w-3" /> รออนุมัติจากคุณ
+                          </span>
+                        )}
                       </div>
                       <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
                     </div>
@@ -367,9 +385,9 @@ export default function DocumentRegister() {
                     <div className="flex items-center justify-end">
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/memos/${d.id}`); }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-light"
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${d.is_awaiting_me ? 'bg-amber-500 hover:bg-amber-600' : 'bg-brand hover:bg-brand-light'}`}
                       >
-                        ดูรายละเอียด <Icon name="arrowRight" className="h-3.5 w-3.5" />
+                        {d.is_awaiting_me ? 'อนุมัติ' : 'ดูรายละเอียด'} <Icon name="arrowRight" className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>

@@ -11,10 +11,12 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `select id, code, name, doc_prefix, color, is_active
-         from projects
-        where is_active = true
-        order by sort_order, code`
+      `select p.id, p.code, p.name, p.doc_prefix, p.color, p.is_active,
+              lh.manager_email, lh.signatory_name as manager_name
+         from projects p
+         left join project_letterhead lh on lh.project_id = p.id
+        where p.is_active = true
+        order by p.sort_order, p.code`
     );
     res.json({ data: rows });
   })

@@ -1,0 +1,37 @@
+name: keep-warm
+
+# Keeps the Render free-tier API awake. Render spins the service down after ~15 min
+# of no traffic, and the cold start (~30-50s) makes the first E-Memo page load slow.
+# This public repo gets unlimited free Actions minutes, so a periodic health ping is
+# a free way to keep it warm. (For DOWN alerts, add UptimeRobot on top — this only
+# pings, it doesn't notify.) See the project-production-deploy memory.
+
+on:
+  schedule:
+    # every 5 minutes — GitHub's tightest allowed interval (runs may be delayed a few
+    # minutes under load, which is fine: Render only sleeps after 15 min idle).
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+# never run two pings at once, and let a new one cancel a stuck older one
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API health (wake + keep warm)
+        run: |
+          URL="https://vcb-hr-api.onrender.com/api/health"
+          for i in 1 2 3 4; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "healthy ($code) on attempt $i"
+              exit 0
+            fi
+            echo "attempt $i -> $code (server may be waking); retrying in 20s"
+            sleep 20
+          done
+          echo "::warning::health ping did not return 200 after 4 attempts"

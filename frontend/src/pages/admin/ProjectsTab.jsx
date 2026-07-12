@@ -195,6 +195,11 @@ function ProjectModal({ project, onClose, onSaved }) {
                   className={field}
                 >
                   <option value="">— ยังไม่กำหนด (เลือกผู้อนุมัติเองตอนส่ง) —</option>
+                  {/* keep the saved manager visible even if that account was since
+                      deactivated (listApprovers only returns active users) */}
+                  {letter.managerEmail && !users.some((u) => u.email === letter.managerEmail) && (
+                    <option value={letter.managerEmail}>{letter.managerEmail} (บัญชีถูกปิดใช้งาน)</option>
+                  )}
                   {users.map((u) => (
                     <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
                   ))}

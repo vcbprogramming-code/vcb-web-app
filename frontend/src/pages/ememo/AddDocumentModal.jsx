@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ememoApi, adminApi } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
@@ -44,6 +44,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [dragOver, setDragOver] = useState(false);
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
+  // mirror `approversLocked` into a ref so the projectId effect (deps: [projectId])
+  // can read the CURRENT lock state without a stale closure, to avoid clobbering a
+  // doc-code-locked chain with the project-manager auto-fill (#3).
+  const approversLockedRef = useRef(false);
+  useEffect(() => { approversLockedRef.current = approversLocked; }, [approversLocked]);
   const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
   const [step, setStep] = useState(1); // wizard step: 1 ข้อมูล · 2 เนื้อหา · 3 ผู้อนุมัติ
 
@@ -119,12 +124,15 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         // header matches the project, but the clerk can still switch it — the
         // client asked to stop the hard Auto-lock (some projects don't want it).
         if (lh.company_id) setCompanyId(lh.company_id);
-        // auto-route approval to the project manager (#3): if the project has a
-        // designated manager account and no approver is picked yet, prefill it.
-        if (lh.manager_email) {
-          setApprovers((prev) => (prev.some((a) => a.email.trim())
-            ? prev
-            : [{ name: lh.signatory_name || '', email: lh.manager_email }]));
+        // auto-route approval to the project manager (#3): the approver follows the
+        // selected project — set it to the new project's manager, or clear it when
+        // the project has none, so it never disagrees with the (project-driven)
+        // signer. Skip only when a doc-code chain is locked in (that takes
+        // precedence and isn't project-scoped).
+        if (!approversLockedRef.current) {
+          setApprovers(lh.manager_email
+            ? [{ name: lh.signatory_name || '', email: lh.manager_email }]
+            : [{ name: '', email: '' }]);
         }
       })
       .catch(() => !cancelled && setLetter({}));
@@ -327,6 +335,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   can still switch the header if a document needs a different brand.
                   (Previously this was hard-locked; the client asked to drop Auto-lock.) */}
               <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className={field}>
+                {/* keep a synthetic option if the bound company is inactive/removed,
+                    so the select shows the real saved value instead of silently
+                    snapping to the first company */}
+                {companyId && !companies.some((c) => c.id === companyId) && (
+                  <option value={companyId}>หัวกระดาษที่บันทึกไว้ (บริษัทถูกปิดใช้งาน)</option>
+                )}
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
                 ))}

@@ -31,7 +31,10 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
         prefillManager();
       }
     }).catch(() => prefillManager());
-  }, [docCode, projectManager]);
+    // depend on primitives, not the projectManager object (DocumentDetail builds a
+    // fresh object each render — depending on it would re-run this effect on every
+    // parent re-render and reset the user's approver edits).
+  }, [docCode, projectManager?.email, projectManager?.name]);
 
   // pick a user by email → fill name+email for that row
   const pick = (i, email) => {

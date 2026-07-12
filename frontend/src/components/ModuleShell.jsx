@@ -92,6 +92,8 @@ export default function ModuleShell() {
             <button
               onClick={() => setMenuOpen((o) => !o)}
               aria-label="เมนูผู้ใช้"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
               className={`flex items-center gap-2 rounded-xl px-2 py-1.5 transition ${navyHeader ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
             >
               <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${navyHeader ? 'bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/30' : 'bg-brand/10 text-brand'}`}>
@@ -105,7 +107,7 @@ export default function ModuleShell() {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-xl">
+              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-xl">
                 <div className="border-b border-slate-100 px-4 py-2.5 sm:hidden">
                   <div className="truncate text-sm font-medium text-slate-800">{profile?.full_name || user?.email}</div>
                   <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>

@@ -187,7 +187,7 @@ export default function DocumentRegister() {
             pinned (top-sorted) awaiting rows are guaranteed visible on page 1. */}
         {awaiting.count > 0 && (
           <button
-            onClick={() => { setStatus(''); setProjectId(''); setDocTypeId(''); setSearch(''); setPage(1); }}
+            onClick={() => { setStatus(''); setProjectId(''); setDocTypeId(''); setSearch(''); setFrom(''); setTo(''); setPage(1); }}
             title="เอกสารที่รอการอนุมัติจากคุณ — จัดเรียงไว้บนสุดของตาราง"
             className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/90 px-3 py-2 text-sm font-bold text-white ring-1 ring-inset ring-amber-300/40 transition hover:bg-amber-500"
           >

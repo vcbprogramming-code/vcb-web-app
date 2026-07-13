@@ -178,21 +178,24 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
 
   const { rows: steps } = await query(
-    `select approver_name, signature_url
-       from approval_steps
-      where document_id = $1 and action = 'approved'
-      order by step_no`,
+    `select s.approver_name, s.signature_url, pr.job_title as approver_title
+       from approval_steps s
+       left join profiles pr on pr.id = s.approver_id
+      where s.document_id = $1 and s.action = 'approved'
+      order by s.step_no`,
     [documentId]
   );
 
-  // fetch each signature image from S3 (skip ones without an image)
+  // fetch each signature image from S3 (skip ones without an image). Use each
+  // approver's own job title so a multi-signer chain shows the right roles;
+  // fall back to the letterhead's default title when a step has none.
   const signatures = [];
   for (const s of steps) {
     let image = null;
     if (s.signature_url) {
       try { image = await getObjectBuffer(s.signature_url); } catch { image = null; }
     }
-    signatures.push({ image, name: s.approver_name, title: letter.signatoryTitle || '' });
+    signatures.push({ image, name: s.approver_name, title: s.approver_title || letter.signatoryTitle || '' });
   }
 
   // full decision trail for the "บันทึกการพิจารณา" page

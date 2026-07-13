@@ -175,6 +175,9 @@ export default function ApprovalAction() {
     }
   };
   const closeViewer = () => setViewerUrl((u) => { if (u) URL.revokeObjectURL(u); return null; });
+  // revoke the viewer blob when it's replaced or the component unmounts (e.g. the
+  // approver acts and the page redirects while the viewer is still open)
+  useEffect(() => () => { if (viewerUrl) URL.revokeObjectURL(viewerUrl); }, [viewerUrl]);
 
   if (error && !info) return <Wrap><p className="text-red-600">{error}</p></Wrap>;
   if (!info) return <Wrap><p className="text-slate-400">กำลังโหลด…</p></Wrap>;

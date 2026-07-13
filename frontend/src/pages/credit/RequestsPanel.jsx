@@ -54,7 +54,11 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
   };
 
   const decide = async (id, decision) => {
-    const note = decision === 'ไม่อนุมัติ' ? window.prompt('เหตุผล (ถ้ามี)') : null;
+    let note = null;
+    if (decision === 'ไม่อนุมัติ') {
+      note = window.prompt('เหตุผล (ถ้ามี)');
+      if (note === null) return; // user cancelled the prompt — don't reject
+    }
     try {
       await creditApi.decideRequest(id, decision, note || undefined);
       load();

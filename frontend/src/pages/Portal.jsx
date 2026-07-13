@@ -11,8 +11,12 @@ export default function Portal() {
   const navigate = useNavigate();
   const role = profile?.role;
 
+  // hide an app when its permission is explicitly off (backend enforces it too);
+  // if we have no permission map yet, don't hide (backwards safe).
+  const eff = profile?.effective_permissions;
+  const permOk = (a) => !a.perm || !eff || eff[a.perm[0]]?.[a.perm[1]] === true;
   const visible = apps.filter(
-    (a) => a.enabled !== false && (!a.roles || (role && a.roles.includes(role)))
+    (a) => a.enabled !== false && (!a.roles || (role && a.roles.includes(role))) && permOk(a)
   );
 
   const displayName = profile?.full_name || user?.email || 'ผู้ใช้งาน';

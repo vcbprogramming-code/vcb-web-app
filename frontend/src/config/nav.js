@@ -9,6 +9,7 @@ export const apps = [
     desc: 'จัดทำหนังสือ ออกเลขอัตโนมัติ และอนุมัติออนไลน์พร้อมลายเซ็น',
     icon: 'document',
     color: 'bg-blue-50 text-blue-600',
+    perm: ['ememo', 'view'], // hidden when the user's ememo.view is turned off
     enabled: true,
   },
   {

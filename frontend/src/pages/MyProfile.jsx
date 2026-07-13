@@ -30,6 +30,9 @@ export default function MyProfile() {
     }).catch((e) => setError(e.message));
   }, []);
 
+  // revoke the signature blob URL when it's replaced or on unmount (prevents a leak)
+  useEffect(() => () => { if (sigUrl?.startsWith('blob:')) URL.revokeObjectURL(sigUrl); }, [sigUrl]);
+
   const pickSig = (f) => {
     if (!f) return;
     if (!f.type.startsWith('image/')) { setError('ลายเซ็นต้องเป็นรูปภาพ'); return; }

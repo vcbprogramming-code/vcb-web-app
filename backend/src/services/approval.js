@@ -186,13 +186,20 @@ export async function forwardApprovalStep(client, { token, toEmail, toName, comm
     return { error: 'expired' };
   }
 
+  // The forwardee must be an active account: the emailed link is login-gated, so
+  // delegating to a non-account address would send a dead link no one can act on.
+  const acct = await client
+    .query('select id, full_name from profiles where lower(email) = lower($1) and is_active = true', [toEmail])
+    .then((r) => r.rows[0]);
+  if (!acct) return { error: 'no_account' };
+
   const { rows: updated } = await client.query(
     `update approval_steps
-        set approver_name = $1, approver_email = $2, approver_id = null,
-            action_token = $3, token_expires_at = $4
-      where id = $5
+        set approver_name = $1, approver_email = $2, approver_id = $3,
+            action_token = $4, token_expires_at = $5
+      where id = $6
       returning id, step_no, approver_name, approver_email, action_token`,
-    [toName || null, toEmail, makeToken(), tokenExpiry(), step.id]
+    [toName || acct.full_name || null, toEmail, acct.id, makeToken(), tokenExpiry(), step.id]
   );
 
   await client.query(

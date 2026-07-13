@@ -206,8 +206,12 @@ export default function DocumentDetail() {
   };
 
   const openAttachment = async (attId) => {
-    try { const url = await ememoApi.attachmentBlobUrl(id, attId); window.open(url, '_blank'); }
-    catch (e) { setError(e.message); }
+    try {
+      const url = await ememoApi.attachmentBlobUrl(id, attId);
+      window.open(url, '_blank');
+      // revoke once the new tab has had time to load the blob (else it leaks for the session)
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) { setError(e.message); }
   };
 
   // post a message (+ optional attached file) to the conversation thread.

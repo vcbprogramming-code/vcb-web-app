@@ -150,7 +150,7 @@ router.post(
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const hash = await hashPassword(parsed.data.password);
     const row = await queryOne(
-      'update profiles set password_hash = $1 where id = $2 returning id',
+      'update profiles set password_hash = $1, password_changed_at = now() where id = $2 returning id',
       [hash, req.params.id]
     );
     if (!row) throw new ApiError(404, 'User not found');

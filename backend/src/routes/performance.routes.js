@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { query, queryOne } from '../config/db.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
@@ -36,7 +36,14 @@ function isLocked(ymdStr, lockDays) {
 }
 const unitOut = (u) => ({ id: u.id, name: u.name, code: u.code, company: u.company, color: u.color, lock_days: u.lock_days });
 const empOut = (e) => ({ id: e.id, full_name: e.full_name, employee_code: e.employee_code, unit_id: e.unit_id, kind: e.kind, team: e.team, is_active: e.is_active });
-const dateStr = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+// Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts.
+// Using toISOString() here would shift the day on any server with a +UTC offset
+// (e.g. Asia/Bangkok), breaking coverage/export key matching against ymd().
+const dateStr = (d) => {
+  if (!d) return null;
+  const dt = new Date(d);
+  return ymd(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+};
 const logOut = (l) => ({
   id: l.id, employee_id: l.employee_id, ymd: dateStr(l.ymd), kind: l.kind, team: l.team,
   work_type_id: l.work_type_id, work_type_name: l.work_type_name,
@@ -103,7 +110,7 @@ const employeeSchema = z.object({
   employeeCode: z.string().optional().nullable(), kind: z.enum(EMPLOYEE_KINDS),
   team: z.string().optional().nullable(),
 });
-router.post('/employees', asyncHandler(async (req, res) => {
+router.post('/employees', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const parsed = employeeSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   assertUnitInScope(scopedUnitIds(req.profile), parsed.data.unitId);
@@ -115,7 +122,7 @@ router.post('/employees', asyncHandler(async (req, res) => {
   );
   res.status(201).json({ data: empOut(row) });
 }));
-router.patch('/employees/:id', asyncHandler(async (req, res) => {
+router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const parsed = employeeSchema.partial().extend({ isActive: z.boolean().optional() }).safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const f = parsed.data;
@@ -180,7 +187,7 @@ const cellSchema = z.object({
   reason: z.string().optional().nullable(), detail: z.string().optional().nullable(),
   note: z.string().optional().nullable(), status: z.enum(['', 'leave', 'off']).optional(),
 });
-router.post('/grid/save', asyncHandler(async (req, res) => {
+router.post('/grid/save', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const body = z.object({ unitId: z.string().uuid(), cells: z.array(cellSchema).min(1).max(500), adminUnlock: z.boolean().optional() }).safeParse(req.body);
   if (!body.success) throw new ApiError(400, 'Invalid input', body.error.flatten());
   const { unitId, cells, adminUnlock } = body.data;
@@ -189,6 +196,16 @@ router.post('/grid/save', asyncHandler(async (req, res) => {
   if (!unit) throw new ApiError(404, 'Site not found');
   const lockDays = unit.lock_days ?? 3;
   const canUnlock = req.profile.role === 'admin' && adminUnlock;
+
+  // guard: every cell's employee must belong to this unit, otherwise a user
+  // scoped to unit A could overwrite unit B's logs by passing a foreign employeeId
+  // (work_logs.unique(employee_id, ymd) ignores unit_id on conflict).
+  const empIds = [...new Set(cells.map((c) => c.employeeId))];
+  const { rows: unitEmps } = await query('select id from employees where unit_id = $1 and id = any($2::uuid[])', [unitId, empIds]);
+  const allowedEmp = new Set(unitEmps.map((e) => e.id));
+  for (const c of cells) {
+    if (!allowedEmp.has(c.employeeId)) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  }
 
   const saved = [];
   for (const c of cells) {

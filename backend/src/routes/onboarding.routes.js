@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import multer from 'multer';
 import { pool, query, queryOne } from '../config/db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
@@ -47,7 +47,7 @@ router.get('/resources', asyncHandler(async (req, res) => {
     : await query('select * from onboarding_resources where is_active = true order by category, sort_order');
   res.json({ data: rows.map(resourceOut) });
 }));
-router.post('/resources', upload.single('file'), asyncHandler(async (req, res) => {
+router.post('/resources', requirePermission('onboarding', 'edit'), upload.single('file'), asyncHandler(async (req, res) => {
   const body = { ...req.body };
   if (body.requiresSignature !== undefined) body.requiresSignature = body.requiresSignature === 'true' || body.requiresSignature === true;
   if (body.sortOrder !== undefined) body.sortOrder = Number(body.sortOrder);
@@ -80,7 +80,7 @@ router.get('/resources/:id/download', asyncHandler(async (req, res) => {
   obj.stream.on('error', () => res.destroy());
   obj.stream.pipe(res);
 }));
-router.delete('/resources/:id', asyncHandler(async (req, res) => {
+router.delete('/resources/:id', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const r = await queryOne('select storage_key from onboarding_resources where id = $1', [req.params.id]);
   if (!r) throw new ApiError(404, 'Resource not found');
   if (r.storage_key) await deleteObject(r.storage_key).catch(() => {});
@@ -94,14 +94,14 @@ router.get('/templates', asyncHandler(async (req, res) => {
   res.json({ data: rows.map(templateOut) });
 }));
 const templateSchema = z.object({ phase: z.union([z.literal(30), z.literal(60), z.literal(90)]), title: z.string().min(1), description: z.string().optional().nullable(), owner: z.string().optional().nullable(), sortOrder: z.number().int().optional() });
-router.post('/templates', asyncHandler(async (req, res) => {
+router.post('/templates', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const parsed = templateSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
   const row = await queryOne('insert into onboarding_plan_templates (phase, title, description, owner, sort_order) values ($1,$2,$3,$4,$5) returning *', [d.phase, d.title, d.description || null, d.owner || null, d.sortOrder ?? 0]);
   res.status(201).json({ data: templateOut(row) });
 }));
-router.patch('/templates/:id', asyncHandler(async (req, res) => {
+router.patch('/templates/:id', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const parsed = templateSchema.partial().safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
@@ -114,7 +114,7 @@ router.patch('/templates/:id', asyncHandler(async (req, res) => {
   if (!row) throw new ApiError(404, 'Template not found');
   res.json({ data: templateOut(row) });
 }));
-router.delete('/templates/:id', asyncHandler(async (req, res) => {
+router.delete('/templates/:id', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   await query('delete from onboarding_plan_templates where id = $1', [req.params.id]);
   res.json({ data: { deleted: true } });
 }));
@@ -133,7 +133,7 @@ router.get('/journeys/:id', asyncHandler(async (req, res) => {
   if (!j) throw new ApiError(404, 'Journey not found');
   res.json({ data: j });
 }));
-router.post('/journeys', asyncHandler(async (req, res) => {
+router.post('/journeys', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const parsed = z.object({ fullName: z.string().min(1), employeeCode: z.string().optional().nullable(),
     position: z.string().optional().nullable(), unitId: z.string().uuid().optional().nullable(),
     email: z.string().optional().nullable(), phone: z.string().optional().nullable(), startDate: z.string().min(1) }).safeParse(req.body);
@@ -162,7 +162,7 @@ router.post('/journeys', asyncHandler(async (req, res) => {
     client.release();
   }
 }));
-router.patch('/journeys/:id/tasks/:taskId', asyncHandler(async (req, res) => {
+router.patch('/journeys/:id/tasks/:taskId', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const parsed = z.object({ done: z.boolean() }).safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const r = await queryOne(
@@ -173,7 +173,7 @@ router.patch('/journeys/:id/tasks/:taskId', asyncHandler(async (req, res) => {
   if (!r) throw new ApiError(404, 'Task not found');
   res.json({ data: await journeyDetail(req.params.id) });
 }));
-router.put('/journeys/:id/review', asyncHandler(async (req, res) => {
+router.put('/journeys/:id/review', requirePermission('onboarding', 'edit'), asyncHandler(async (req, res) => {
   const parsed = z.object({ reviewer: z.string().optional().nullable(), scores: z.record(z.string(), z.number()).optional().nullable(),
     strengths: z.string().optional().nullable(), improvements: z.string().optional().nullable(),
     result: z.enum(['pass', 'extend', 'fail']).optional().nullable(), note: z.string().optional().nullable() }).safeParse(req.body);

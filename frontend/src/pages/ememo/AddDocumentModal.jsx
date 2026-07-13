@@ -39,7 +39,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // = the preparer signs; typing a name here makes someone else the signer.
   const [signerName, setSignerName] = useState(initial?.signer_name || '');
   const [signerTitle, setSignerTitle] = useState(initial?.signer_title || '');
-  const [dateReceived, setDateReceived] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateReceived, setDateReceived] = useState(() => {
+    // local date, not UTC — toISOString() would show yesterday late at night in Thailand
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
   const [files, setFiles] = useState([]); // supplementary attachments (multiple)
   const [dragOver, setDragOver] = useState(false);
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
@@ -48,6 +53,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // can read the CURRENT lock state without a stale closure, to avoid clobbering a
   // doc-code-locked chain with the project-manager auto-fill (#3).
   const approversLockedRef = useRef(false);
+  const initialCompanyRef = useRef(initial?.company_id || null); // keep a duplicated doc's company on first letterhead load
   useEffect(() => { approversLockedRef.current = approversLocked; }, [approversLocked]);
   const [letter, setLetter] = useState({}); // selected project's letterhead, for live preview
   const [step, setStep] = useState(1); // wizard step: 1 ข้อมูล · 2 เนื้อหา · 3 ผู้อนุมัติ
@@ -57,6 +63,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [createdDocId, setCreatedDocId] = useState(null); // resume target if a later step fails
+  const submittingRef = useRef(false);   // synchronous re-entrancy guard (state flush isn't instant)
+  const uploadedRef = useRef(new Set());  // File objects already uploaded — retry-safe, no dupes
 
   const [copyingFiles, setCopyingFiles] = useState(false);
 
@@ -123,7 +131,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         // the project's bound company is a DEFAULT (#6): pre-select it so the
         // header matches the project, but the clerk can still switch it — the
         // client asked to stop the hard Auto-lock (some projects don't want it).
-        if (lh.company_id) setCompanyId(lh.company_id);
+        // On the first load of a duplicated doc, keep the company it was copied
+        // from instead of overwriting it with the project default.
+        if (initialCompanyRef.current) {
+          initialCompanyRef.current = null;
+        } else if (lh.company_id) {
+          setCompanyId(lh.company_id);
+        }
         // auto-route approval to the project manager (#3): the approver follows the
         // selected project — set it to the new project's manager, or clear it when
         // the project has none, so it never disagrees with the (project-driven)
@@ -209,6 +223,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       setStep(1);
       return;
     }
+    // synchronous guard: a fast double-click / Enter+click can fire submit twice
+    // before setSubmitting(true) commits, which would create two documents.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       // resume an already-created doc if a previous attempt failed after create —
@@ -236,9 +254,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         setCreatedDocId(doc.id);
       }
 
-      // upload each supplementary file (streamed into storage via the API)
+      // upload each supplementary file (streamed into storage via the API).
+      // skip files already uploaded on a previous attempt so a retry after a
+      // mid-loop failure doesn't create duplicate attachments.
       for (const f of files) {
+        if (uploadedRef.current.has(f)) continue;
         await ememoApi.uploadAttachment(doc.id, f);
+        uploadedRef.current.add(f);
       }
 
       // always generate the letterhead PDF right away so the document is ready
@@ -250,13 +272,20 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
         .filter((a) => a.email);
       if (cleanedApprovers.length > 0) {
-        await ememoApi.submitForApproval(doc.id, cleanedApprovers);
+        try {
+          await ememoApi.submitForApproval(doc.id, cleanedApprovers);
+        } catch (err) {
+          // a prior attempt may have created the chain server-side but lost the
+          // response; a retry then 409s "already pending" — treat that as success
+          if (!/รออนุมัติแล้ว/.test(err.message || '')) throw err;
+        }
       }
 
       onCreated(doc.id);
     } catch (err) {
       setError(err.message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };

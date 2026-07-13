@@ -14,6 +14,14 @@ const router = Router();
 router.use(requireAuth, requireRole('admin', 'executive'));
 
 const num = (v) => (v != null ? Number(v) : null);
+// Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts.
+// toISOString() would shift the day on any +UTC server (e.g. Asia/Bangkok).
+const dateStr = (d) => {
+  if (!d) return '';
+  const dt = new Date(d);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+};
 const ledgerOut = (l) => ({
   id: l.id, facility_id: l.facility_id, project_id: l.project_id, amount: Number(l.amount), status: l.status,
   start_date: l.start_date, due_date: l.due_date, settled_date: l.settled_date, ref: l.ref, source: l.source,
@@ -329,14 +337,14 @@ router.get('/export', asyncHandler(async (req, res) => {
   fs.addRow(['โครงการ', 'บริษัท', 'ธนาคาร', 'เลขที่วงเงิน', 'ประเภท', 'วงเงิน', 'ใช้ไป', 'คงเหลือ', 'ดอกเบี้ย%', 'ครบกำหนด']);
   for (const f of facilities) {
     const v = facilityView(f, usedMap.get(f.id) || 0);
-    fs.addRow([f.project_name || f.project_code, f.company || '', f.bank || '', f.facility_no || '', f.type, v.limit, v.used, v.available, f.interest_rate ?? '', f.due_date ? new Date(f.due_date).toISOString().slice(0, 10) : '']);
+    fs.addRow([f.project_name || f.project_code, f.company || '', f.bank || '', f.facility_no || '', f.type, v.limit, v.used, v.available, f.interest_rate ?? '', dateStr(f.due_date)]);
   }
   fs.getRow(1).font = { bold: true };
   const facIds = facilities.map((f) => f.id);
   const ledger = facIds.length ? (await query('select l.*, p.name as project_name from credit_ledger l join projects p on p.id=l.project_id where l.facility_id = any($1) order by l.start_date desc nulls last', [facIds])).rows : [];
   const ts = wb.addWorksheet('รายการสินเชื่อ');
   ts.addRow(['โครงการ', 'จำนวนเงิน', 'สถานะ', 'วันเริ่ม', 'ครบกำหนด', 'อ้างอิง', 'หมายเหตุ']);
-  for (const l of ledger) ts.addRow([l.project_name, Number(l.amount), l.status, l.start_date ? new Date(l.start_date).toISOString().slice(0, 10) : '', l.due_date ? new Date(l.due_date).toISOString().slice(0, 10) : '', l.ref || '', l.note || '']);
+  for (const l of ledger) ts.addRow([l.project_name, Number(l.amount), l.status, dateStr(l.start_date), dateStr(l.due_date), l.ref || '', l.note || '']);
   ts.getRow(1).font = { bold: true };
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="credit-facilities.xlsx"');

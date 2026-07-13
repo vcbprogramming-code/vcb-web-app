@@ -7,14 +7,19 @@ function useCompanyLogo(company) {
   const [src, setSrc] = useState('/logo.png');
   useEffect(() => {
     let url;
+    let cancelled = false;
     if (company?.id && company?.logo_url) {
       ememoApi.companyLogoUrl(company.id)
-        .then((u) => { url = u; setSrc(u); })
-        .catch(() => setSrc('/logo.png'));
+        .then((u) => {
+          // company changed before this resolved → drop the now-stale logo, don't leak it
+          if (cancelled) { URL.revokeObjectURL(u); return; }
+          url = u; setSrc(u);
+        })
+        .catch(() => { if (!cancelled) setSrc('/logo.png'); });
     } else {
       setSrc('/logo.png');
     }
-    return () => { if (url) URL.revokeObjectURL(url); };
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [company?.id, company?.logo_url]);
   return src;
 }

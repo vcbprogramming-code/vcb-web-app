@@ -6,6 +6,9 @@ import EmployeesPanel from './EmployeesPanel.jsx';
 import CoverageView from './CoverageView.jsx';
 
 const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+// weekday from a 'YYYY-MM-DD' string in LOCAL time; new Date(str) parses as UTC
+// and would shift the day (and weekend shading) for viewers at a negative offset.
+const dowOf = (ymd) => { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
 
 export default function PerformanceGrid({ site, month, onBack }) {
   const { profile } = useAuth();
@@ -17,12 +20,14 @@ export default function PerformanceGrid({ site, month, onBack }) {
   const [weekStart, setWeekStart] = useState(0); // index into days, multiples of 7
   const [adminUnlock, setAdminUnlock] = useState(false);
   const [showEmployees, setShowEmployees] = useState(false);
-  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const [saveErr, setSaveErr] = useState(null);
 
   // local edits: { `${empId}_${ymd}`: cell }
   const [edits, setEdits] = useState({});
   const dirtyRef = useRef({});
   const saveTimer = useRef(null);
+  const mounted = useRef(true);
 
   const load = useCallback(() => {
     performanceApi.grid(site.id, month).then((r) => {
@@ -50,14 +55,20 @@ export default function PerformanceGrid({ site, month, onBack }) {
     if (!keys.length) return;
     const cells = keys.map((k) => dirty[k]);
     dirtyRef.current = {};
-    setSaveState('saving');
+    if (mounted.current) setSaveState('saving');
     try {
       await performanceApi.saveGrid(site.id, cells, isAdmin && adminUnlock);
+      if (!mounted.current) return;
+      setSaveErr(null);
       setSaveState('saved');
-      setTimeout(() => setSaveState('idle'), 1500);
+      setTimeout(() => { if (mounted.current) setSaveState('idle'); }, 1500);
     } catch (e) {
-      setError(e.message);
-      setSaveState('idle');
+      // Re-queue the cells that failed so they aren't lost; any newer edit
+      // the user made during the in-flight save wins over the stale copy.
+      for (const k of keys) if (!(k in dirtyRef.current)) dirtyRef.current[k] = dirty[k];
+      if (!mounted.current) return;
+      setSaveErr(e.message);
+      setSaveState('error');
     }
   }, [site.id, isAdmin, adminUnlock]);
 
@@ -66,6 +77,16 @@ export default function PerformanceGrid({ site, month, onBack }) {
     setSaveState('saving');
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(flush, 1000);
+  }, [flush]);
+
+  // Flush any pending edits on unmount and stop touching state afterwards.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(saveTimer.current);
+      if (Object.keys(dirtyRef.current).length) flush();
+    };
   }, [flush]);
 
   const updateCell = (emp, day, patch) => {
@@ -134,9 +155,17 @@ export default function PerformanceGrid({ site, month, onBack }) {
                 </label>
               )}
             </div>
-            <span className="text-xs text-slate-400">
-              {saveState === 'saving' ? '💾 กำลังบันทึก…' : saveState === 'saved' ? '✓ บันทึกแล้ว' : ''}
-            </span>
+            {saveState === 'error' ? (
+              <span className="inline-flex items-center gap-2 text-xs text-red-600">
+                <Icon name="warning" className="h-4 w-4" />
+                บันทึกไม่สำเร็จ{saveErr ? ` (${saveErr})` : ''} — แก้ค้างไว้
+                <button onClick={flush} className="rounded-md border border-red-300 px-2 py-0.5 font-medium hover:bg-red-50">ลองใหม่</button>
+              </span>
+            ) : (
+              <span className="text-xs text-slate-400">
+                {saveState === 'saving' ? '💾 กำลังบันทึก…' : saveState === 'saved' ? '✓ บันทึกแล้ว' : ''}
+              </span>
+            )}
           </div>
 
           {/* grid */}
@@ -147,7 +176,7 @@ export default function PerformanceGrid({ site, month, onBack }) {
                   <th className="tbl-th sticky left-0 z-10 bg-slate-50 min-w-[180px]">พนักงาน</th>
                   {weekDays.map((d) => (
                     <th key={d.ymd} className={`px-2 py-2 text-center font-semibold ${d.today ? 'bg-brand/10 text-brand' : d.weekend ? 'text-slate-300' : 'text-slate-500'}`}>
-                      <div>{DOW[new Date(d.ymd).getDay()]}</div>
+                      <div>{DOW[dowOf(d.ymd)]}</div>
                       <div className="text-base">{d.day}</div>
                     </th>
                   ))}

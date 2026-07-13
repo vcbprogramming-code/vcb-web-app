@@ -108,6 +108,23 @@ async function loadVisibility(profile) {
   };
 }
 
+/** True if `vis` (from loadVisibility) permits a doc with this project/code. */
+function visibilityAllows(vis, projectId, docCode) {
+  if (!vis) return true;
+  const projOk = !vis.projectIds.length || vis.projectIds.includes(projectId);
+  const codeOk = !vis.docCodes.length || vis.docCodes.includes(docCode);
+  return projOk && codeOk;
+}
+
+/** Throw 403 if this scoped user may not access the given document (#8).
+ *  `doc` must carry project_id and doc_code. */
+async function assertDocVisible(profile, doc) {
+  const vis = await loadVisibility(profile);
+  if (!visibilityAllows(vis, doc.project_id, doc.doc_code)) {
+    throw new ApiError(403, 'ไม่มีสิทธิ์เข้าถึงเอกสารนี้');
+  }
+}
+
 /** Build the WHERE clause + params from register filters (shared by list/export).
  *  `visibility` (from loadVisibility) further restricts rows to allowed scopes. */
 function buildWhere(q, visibility = null) {
@@ -136,6 +153,7 @@ function buildWhere(q, visibility = null) {
 
 router.get(
   '/',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 25));
@@ -172,6 +190,7 @@ router.get(
 /** GET /api/documents/export — the register (same filters) as .xlsx */
 router.get(
   '/export',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const visibility = await loadVisibility(req.profile);
     const { whereSql, params } = buildWhere(req.query, visibility);
@@ -255,6 +274,7 @@ router.get(
 
 router.get(
   '/stats',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const [byStatus, byProject, recent, pending, thisMonth] = await Promise.all([
       query('select status, count(*)::int as count from documents group by status'),
@@ -291,6 +311,7 @@ router.get(
  */
 router.get(
   '/awaiting-me',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const email = (req.profile.email || '').toLowerCase();
     if (!email) return res.json({ data: { count: 0, items: [] } });
@@ -321,10 +342,19 @@ router.get(
  */
 router.get(
   '/search',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const q = String(req.query.q || '').trim();
     if (q.length < 1) return res.json({ data: [] });
     const like = `%${q}%`;
+    const params = [like];
+    const scope = [];
+    // per-user visibility (#8): a scoped user must not see other projects'/codes' docs
+    const vis = await loadVisibility(req.profile);
+    if (vis) {
+      if (vis.projectIds.length) { params.push(vis.projectIds); scope.push(`d.project_id = any($${params.length}::uuid[])`); }
+      if (vis.docCodes.length) { params.push(vis.docCodes); scope.push(`d.doc_code = any($${params.length}::text[])`); }
+    }
     const { rows } = await query(
       `select d.id, d.doc_number, d.subject, d.date_received,
               pr.code as project_code, pr.color as project_color
@@ -332,9 +362,10 @@ router.get(
          left join projects pr on pr.id = d.project_id
         where d.status <> 'cancelled'
           and (d.doc_number ilike $1 or d.subject ilike $1)
+          ${scope.length ? 'and ' + scope.join(' and ') : ''}
         order by d.date_received desc
         limit 15`,
-      [like]
+      params
     );
     res.json({ data: rows });
   })
@@ -342,6 +373,7 @@ router.get(
 
 router.get(
   '/:id',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
@@ -356,12 +388,7 @@ router.get(
     if (!doc) throw new ApiError(404, 'Document not found');
     // enforce per-user visibility (#8): a scoped user can't open a doc outside
     // their allowed projects/codes
-    const vis = await loadVisibility(req.profile);
-    if (vis) {
-      const projOk = !vis.projectIds.length || vis.projectIds.includes(doc.project_id);
-      const codeOk = !vis.docCodes.length || vis.docCodes.includes(doc.doc_code);
-      if (!projOk || !codeOk) throw new ApiError(403, 'ไม่มีสิทธิ์เข้าถึงเอกสารนี้');
-    }
+    await assertDocVisible(req.profile, doc);
     const { rows: attachments } = await query(
       `select id, kind, version, file_name, content_type, size_bytes, created_at
          from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
@@ -412,6 +439,7 @@ router.post(
   '/:id/messages',
   asyncHandler(async (req, res) => {
     const doc = await getDocOr404(req.params.id);
+    await assertDocVisible(req.profile, doc);
     const parsed = messageSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const row = await queryOne(
@@ -428,7 +456,7 @@ router.post(
   '/:id/messages/:msgId/attachments',
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    await getDocOr404(req.params.id);
+    await assertDocVisible(req.profile, await getDocOr404(req.params.id));
     const msg = await queryOne('select id from document_messages where id = $1 and document_id = $2', [req.params.msgId, req.params.id]);
     if (!msg) throw new ApiError(404, 'Message not found');
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
@@ -461,6 +489,7 @@ router.post(
   '/:id/consult',
   asyncHandler(async (req, res) => {
     const doc = await getDocOr404(req.params.id);
+    await assertDocVisible(req.profile, doc);
     const parsed = consultSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const { email, name, question } = parsed.data;
@@ -531,7 +560,7 @@ router.post(
            (project_id, company_id, doc_code, department, run_no, doc_number, doc_type_id, subject,
             recipient, reference, reference_doc_id, cc_recipients, signer_name, signer_title, author_signature_url,
             body, remarks, date_received, work_unit, enclosures, source, status, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,coalesce($18::date,current_date),$19,$20::jsonb,'manual','pending',$21)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,coalesce($18::date,current_date),$19,$20::jsonb,'manual','draft',$21)
          returning id, doc_number, run_no, department, status, date_received`,
         [project.id, input.companyId || null, input.docCode, department, runNo, docNumber, input.docTypeId || null, input.subject,
          input.recipient || null, input.reference || null, input.referenceDocId || null, input.cc || null,
@@ -695,7 +724,11 @@ router.post(
 /** GET /api/documents/:id/attachments/:attId/download — stream bytes (inline). */
 router.get(
   '/:id/attachments/:attId/download',
+  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
+    const doc = await queryOne('select project_id, doc_code from documents where id = $1', [req.params.id]);
+    if (!doc) throw new ApiError(404, 'Document not found');
+    await assertDocVisible(req.profile, doc);
     const att = await queryOne(
       'select storage_key, file_name, content_type from document_attachments where id = $1 and document_id = $2',
       [req.params.attId, req.params.id]);

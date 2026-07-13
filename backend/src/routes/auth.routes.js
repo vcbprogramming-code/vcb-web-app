@@ -181,7 +181,16 @@ router.patch(
     const add = (col, val) => { vals.push(val); sets.push(`${col} = $${vals.length}`); };
     if (f.fullName !== undefined) add('full_name', f.fullName);
     if (f.jobTitle !== undefined) add('job_title', f.jobTitle || null);
-    if (f.signatureUrl !== undefined) add('signature_url', f.signatureUrl || null);
+    if (f.signatureUrl !== undefined) {
+      const sig = f.signatureUrl || null;
+      // Only accept null (clear) or a key this user uploaded via POST /me/signature.
+      // Without this, a caller could store any bucket key (another user's signature,
+      // a document PDF) and stream it back through GET /me/signature.
+      if (sig !== null && !sig.startsWith(`signatures/profile/${req.profile.id}-`)) {
+        throw new ApiError(400, 'ลายเซ็นไม่ถูกต้อง');
+      }
+      add('signature_url', sig);
+    }
     if (!sets.length) throw new ApiError(400, 'No fields to update');
     vals.push(req.profile.id);
     const profile = await queryOne(

@@ -225,6 +225,7 @@ router.post(
           invalid_token: 'ไม่พบรายการอนุมัติ',
           already_actioned: 'รายการนี้ถูกดำเนินการไปแล้ว',
           expired: 'ลิงก์หมดอายุแล้ว',
+          no_account: 'ผู้รับมอบต้องมีบัญชีในระบบก่อน จึงจะส่งต่อให้อนุมัติได้',
         }[result.error] || 'ไม่สามารถดำเนินการได้';
         throw new ApiError(409, msg);
       }

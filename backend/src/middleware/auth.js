@@ -23,12 +23,20 @@ export async function requireAuth(req, res, next) {
     }
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, permissions
+      `select id, full_name, email, role, unit_id, is_active, permissions, password_changed_at
          from profiles where id = $1`,
       [payload.sub]
     );
     if (!profile) throw new ApiError(403, 'No profile found for this account');
     if (!profile.is_active) throw new ApiError(403, 'Account is disabled');
+
+    // Session revocation: reject tokens issued before the last password change,
+    // so an admin password reset immediately invalidates existing tokens.
+    // Second-granularity compare (iat is in seconds) avoids a same-second false reject.
+    if (profile.password_changed_at && payload.iat) {
+      const changedSec = Math.floor(new Date(profile.password_changed_at).getTime() / 1000);
+      if (payload.iat < changedSec) throw new ApiError(401, 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+    }
 
     const { rows: units } = await query(
       'select unit_id from profile_units where profile_id = $1',

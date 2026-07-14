@@ -178,7 +178,6 @@ router.get(
     const { rows } = await query(
       `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me ${LIST_FROM} ${whereSql}
         order by is_awaiting_me desc,
-                 (case when d.status = 'pending' then 0 else 1 end),
                  d.date_received desc, d.created_at desc
         limit ${pageSize} offset ${offset}`,
       listParams

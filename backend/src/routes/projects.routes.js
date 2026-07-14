@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { query } from '../config/db.js';
+import { query, queryOne } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -41,6 +41,22 @@ router.get(
       `select id, name from document_types order by sort_order, name`
     );
     res.json({ data: rows });
+  })
+);
+
+/**
+ * GET /api/projects/:id/letterhead — READ-ONLY letterhead config for the create
+ * form (signatory/manager/company). Any authenticated user may read it; editing
+ * stays admin-only (PUT /api/admin/projects/:id/letterhead). This is the non-admin
+ * counterpart to the admin GET so clerks see the project manager / signer too.
+ * Same response shape as the admin endpoint. Placed after the literal routes so
+ * '/doc-codes' and '/document-types' still match first.
+ */
+router.get(
+  '/:id/letterhead',
+  asyncHandler(async (req, res) => {
+    const row = await queryOne('select * from project_letterhead where project_id = $1', [req.params.id]);
+    res.json({ data: row || null });
   })
 );
 

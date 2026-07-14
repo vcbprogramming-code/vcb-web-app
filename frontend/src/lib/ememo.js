@@ -14,6 +14,8 @@ export const ememoApi = {
   listProjects: () => api('/projects'),
   listDocCodes: () => api('/projects/doc-codes'),
   listDocumentTypes: () => api('/projects/document-types'),
+  // read-only letterhead (signer/manager) for the create form — works for non-admins
+  getLetterhead: (projectId) => api(`/projects/${projectId}/letterhead`),
 
   stats: () => api('/documents/stats'),
   listDocuments: (filters = {}) => api(`/documents${qs(filters)}`),

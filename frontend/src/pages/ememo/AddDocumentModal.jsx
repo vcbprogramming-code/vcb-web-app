@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ememoApi, adminApi } from '../../lib/ememo.js';
+import { ememoApi } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
@@ -120,7 +120,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       return;
     }
     let cancelled = false;
-    adminApi
+    ememoApi
       .getLetterhead(projectId)
       .then((r) => {
         if (cancelled) return;
@@ -174,14 +174,14 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     };
   }, [projectId, docCode]);
 
-  const MAX_BYTES = 7 * 1024 * 1024;
+  const MAX_BYTES = 25 * 1024 * 1024; // must match backend MAX_UPLOAD_BYTES (env.js)
   // add one or more files (from picker or drop); reject oversized ones + dedupe
   const pickFiles = (fileList) => {
     const incoming = Array.from(fileList || []);
     if (!incoming.length) return;
     const tooBig = incoming.filter((f) => f.size > MAX_BYTES);
     const ok = incoming.filter((f) => f.size <= MAX_BYTES);
-    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 7 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
+    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 25 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
     setFiles((prev) => {
       const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
       return [...prev, ...ok.filter((f) => !seen.has(`${f.name}:${f.size}`))];
@@ -402,7 +402,16 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   // auto-fill + lock approvers from the code's configured chain
                   const cfg = Array.isArray(c?.default_approvers) ? c.default_approvers : [];
                   if (cfg.length) {
-                    setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
+                    let chain = cfg.map((a) => ({ name: a.name || '', email: a.email || '' }));
+                    // route to the project manager FIRST, then the code's chain, so the
+                    // PM is never skipped (client). Dedupe by email; if the PM is already
+                    // in the chain, move them to the front.
+                    if (letter.manager_email) {
+                      const pmEmail = letter.manager_email.toLowerCase();
+                      chain = [{ name: letter.signatory_name || '', email: letter.manager_email },
+                               ...chain.filter((a) => (a.email || '').toLowerCase() !== pmEmail)];
+                    }
+                    setApprovers(chain);
                     setApproversLocked(true);
                   } else {
                     // switching to a code with no config: clear any previously-locked rows
@@ -540,7 +549,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             >
               <Icon name="download" className="h-6 w-6 text-slate-400" />
               <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
-              <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · เลือกได้หลายไฟล์ · สูงสุด 7 MB/ไฟล์</span>
+              <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · เลือกได้หลายไฟล์ · สูงสุด 25 MB/ไฟล์</span>
               <input type="file" multiple className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
             </label>
           </div>

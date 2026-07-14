@@ -25,7 +25,15 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
     ememoApi.listDocCodes().then((r) => {
       const cfg = r.data.find((c) => c.code === docCode)?.default_approvers;
       if (Array.isArray(cfg) && cfg.length) {
-        setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
+        let chain = cfg.map((a) => ({ name: a.name || '', email: a.email || '' }));
+        // route to the project manager FIRST, then the code's chain (client: PM must
+        // not be skipped). Dedupe by email; move an in-chain PM to the front.
+        if (projectManager?.email) {
+          const pmEmail = projectManager.email.toLowerCase();
+          chain = [{ name: projectManager.name || '', email: projectManager.email },
+                   ...chain.filter((a) => (a.email || '').toLowerCase() !== pmEmail)];
+        }
+        setApprovers(chain);
         setLocked(true);
       } else {
         prefillManager();

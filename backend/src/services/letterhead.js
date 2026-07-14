@@ -275,10 +275,11 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // approval — previously every block looked identical and ran together.
     const signatures = Array.isArray(opts.signatures) ? opts.signatures : null;
     if (signatures && signatures.length) {
-      // keep the whole approval group on one page rather than splitting a block
-      const groupH = 18 + signatures.length * (SIG_BOX_H + 34 + BLOCK_GAP);
       const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
-      if (pdf.y + groupH > bottomLimit) pdf.addPage();
+      const blockH = SIG_BOX_H + 34 + BLOCK_GAP; // caption + image + name + title + gap
+
+      // the rule and at least the first approver belong together
+      if (pdf.y + 18 + blockH > bottomLimit) pdf.addPage();
 
       pdf.y += BLOCK_GAP;
       const ruleY = pdf.y;
@@ -287,6 +288,8 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       pdf.y = ruleY + 10;
 
       signatures.forEach((s, i) => {
+        // fill the page, then carry on overleaf — but never cut a block in half
+        if (pdf.y + blockH > bottomLimit) pdf.addPage();
         drawSignature({
           image: s.image,
           name: s.name,

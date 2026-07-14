@@ -181,7 +181,8 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
 
   const { rows: steps } = await query(
-    `select s.approver_name, s.signature_url, pr.job_title as approver_title
+    `select s.approver_name, s.signature_url, pr.job_title as approver_title,
+            pr.signature_url as profile_signature
        from approval_steps s
        left join profiles pr on pr.id = s.approver_id
       where s.document_id = $1 and s.action = 'approved'
@@ -189,15 +190,19 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
 
-  // fetch each signature image from S3 (skip ones without an image). Print each
-  // approver's OWN job title. If they haven't set one, print no title at all —
-  // borrowing the letterhead's signatory title (the project manager's) would put a
+  // Signature image: the one captured when they approved, else the one saved on
+  // their profile. The step's copy is empty for anyone who approved before adding a
+  // signature to their profile — falling back here means their signature still shows
+  // (this is the same profile signature the approve flow would have used).
+  // Title: each approver's OWN job title. If they haven't set one, print no title —
+  // borrowing the letterhead's signatory title (the project manager's) would stamp a
   // role under their name that isn't theirs.
   const signatures = [];
   for (const s of steps) {
     let image = null;
-    if (s.signature_url) {
-      try { image = await getObjectBuffer(s.signature_url); } catch { image = null; }
+    const sigKey = s.signature_url || s.profile_signature;
+    if (sigKey) {
+      try { image = await getObjectBuffer(sigKey); } catch { image = null; }
     }
     signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
   }

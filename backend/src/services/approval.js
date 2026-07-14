@@ -27,17 +27,24 @@ export async function createApprovalChain(client, { documentId, approvers, actor
   for (let i = 0; i < approvers.length; i++) {
     const a = approvers[i];
     const isFirst = i === 0;
+    // Link the step to the approver's account (matched by email) so the approved
+    // PDF prints THEIR job title under the signature (not the letterhead default)
+    // and their saved profile signature can be used. Null for external emails.
+    const acct = await client
+      .query('select id from profiles where lower(email) = lower($1) and is_active = true limit 1', [a.email])
+      .then((r) => r.rows[0]);
     const { rows } = await client.query(
       `insert into approval_steps
-         (document_id, step_no, approver_name, approver_email, action,
+         (document_id, step_no, approver_name, approver_email, approver_id, action,
           action_token, token_expires_at)
-       values ($1,$2,$3,$4,'pending',$5,$6)
+       values ($1,$2,$3,$4,$5,'pending',$6,$7)
        returning id, step_no, approver_name, approver_email, action_token`,
       [
         documentId,
         i + 1,
         a.name || null,
         a.email,
+        acct?.id || null,
         // only the active (first) step gets a live token; later steps get theirs
         // when the chain advances to them
         isFirst ? makeToken() : null,

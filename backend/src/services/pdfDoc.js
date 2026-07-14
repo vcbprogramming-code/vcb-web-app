@@ -97,14 +97,17 @@ function toCamelLetter(row) {
 }
 
 /** Remove any existing generated attachment of a given version for a doc. */
-async function clearVersion(documentId, version) {
+async function clearVersion(documentId, version, keepKey = null) {
   const old = await query(
     `select id, storage_key from document_attachments
       where document_id = $1 and version = $2 and kind = 'generated_pdf'`,
     [documentId, version]
   );
   for (const o of old.rows) {
-    await deleteObject(o.storage_key).catch(() => {});
+    // Never delete the object we just wrote: the storage key is deterministic
+    // (original-<run_no>.pdf), so on a regenerate the old row's key == the new
+    // key. Deleting it would orphan the fresh PDF → 404 on download.
+    if (o.storage_key !== keepKey) await deleteObject(o.storage_key).catch(() => {});
     await query('delete from document_attachments where id = $1', [o.id]);
   }
 }
@@ -134,7 +137,7 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
   const pdf = await generateLetterPdf(doc, letter, { authorSignature, auditSteps, commentBox: false, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
-  await clearVersion(doc.id, 'original');
+  await clearVersion(doc.id, 'original', key);
   return queryOne(
     `insert into document_attachments
        (document_id, kind, version, file_name, content_type, size_bytes, storage_key, uploaded_by)
@@ -158,7 +161,7 @@ export async function generateOriginalPdf(documentId, uploadedBy = null) {
   const pdf = await generateLetterPdf(doc, letter, { authorSignature, commentBox: false, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
-  await clearVersion(doc.id, 'original');
+  await clearVersion(doc.id, 'original', key);
 
   return queryOne(
     `insert into document_attachments
@@ -209,7 +212,7 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   const pdf = await generateLetterPdf(doc, letter, { signatures, auditSteps, qr });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
-  await clearVersion(doc.id, 'approved');
+  await clearVersion(doc.id, 'approved', key);
 
   return queryOne(
     `insert into document_attachments

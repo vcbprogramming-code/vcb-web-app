@@ -108,7 +108,9 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
   for (const o of old.rows) {
-    await deleteObject(o.storage_key).catch(() => {});
+    // don't delete the object we just wrote (combined key is deterministic, so an
+    // old combined row shares the same key) — that would orphan the fresh file → 404
+    if (o.storage_key !== key) await deleteObject(o.storage_key).catch(() => {});
     await query('delete from document_attachments where id = $1', [o.id]);
   }
 
@@ -120,4 +122,26 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
     [doc.id, `${doc.doc_number.replace(/\//g, '-')}-รวมเอกสาร.pdf`, merged.length, key, uploadedBy]
   );
   return { ...row, skipped };
+}
+
+/**
+ * Auto-rebuild the combined "one file" PDF when there's something to combine —
+ * at least one PDF/image supplementary attachment. Fire-and-forget (never blocks
+ * the request); no-op when there are no inline attachments. Re-run it after the
+ * letter changes (edit, approval) so the merged file reflects the latest letter.
+ */
+export async function autoCombine(documentId, uploadedBy = null) {
+  try {
+    const hasInline = await queryOne(
+      `select 1 from document_attachments
+        where document_id = $1 and kind = 'upload'
+          and (content_type ilike 'application/pdf%' or content_type ilike 'image/%')
+        limit 1`,
+      [documentId]
+    );
+    if (!hasInline) return;
+    await generateCombinedPdf(documentId, uploadedBy);
+  } catch (e) {
+    console.error('auto-combine failed:', e.message);
+  }
 }

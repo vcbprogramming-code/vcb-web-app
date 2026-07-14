@@ -64,8 +64,8 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
     }
     setSubmitting(true);
     try {
-      await ememoApi.submitForApproval(documentId, cleaned);
-      onSubmitted();
+      const res = await ememoApi.submitForApproval(documentId, cleaned);
+      onSubmitted(res?.data?.emailSent === false);
     } catch (err) {
       setError(err.message);
     } finally {

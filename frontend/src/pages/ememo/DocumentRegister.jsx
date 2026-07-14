@@ -159,7 +159,12 @@ export default function DocumentRegister() {
     setTo('');
   };
 
-  const iso = (d) => d.toISOString().slice(0, 10);
+  // local date, not UTC — toISOString() shifts to the previous day for UTC+7 users,
+  // which made "Last month"/"Last N days" drop the last day and add an extra earlier day
+  const iso = (d) => {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
   const quickRange = (days) => {
     const today = new Date();
     const start = new Date();

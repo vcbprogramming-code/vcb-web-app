@@ -5,6 +5,7 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
+import { hasPermission } from '../config/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
@@ -16,7 +17,7 @@ import {
 } from '../services/docNumber.js';
 import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
 import { generateOriginalPdf, generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
-import { generateCombinedPdf } from '../services/pdfMerge.js';
+import { generateCombinedPdf, autoCombine } from '../services/pdfMerge.js';
 import { createApprovalChain, sendApprovalRequest, applyApprovalAction } from '../services/approval.js';
 import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsultRequest } from '../services/email.js';
 
@@ -123,6 +124,23 @@ async function assertDocVisible(profile, doc) {
   if (!visibilityAllows(vis, doc.project_id, doc.doc_code)) {
     throw new ApiError(403, 'ไม่มีสิทธิ์เข้าถึงเอกสารนี้');
   }
+}
+
+/** Gate for opening/downloading a single document. An assigned pending approver
+ *  can ALWAYS reach the doc they must act on (even if ememo.view is off or the
+ *  doc is outside their visibility scope) — otherwise the approval stalls.
+ *  Everyone else needs ememo.view + passing visibility. `doc` needs id/project_id/
+ *  doc_code. */
+async function assertCanView(profile, doc) {
+  const approver = await queryOne(
+    `select 1 from approval_steps
+      where document_id = $1 and action = 'pending' and lower(approver_email) = lower($2)
+      limit 1`,
+    [doc.id, profile.email || '']
+  );
+  if (approver) return;
+  if (!hasPermission(profile, 'ememo', 'view')) throw new ApiError(403, 'ไม่มีสิทธิ์ดูเอกสาร');
+  await assertDocVisible(profile, doc);
 }
 
 /** Build the WHERE clause + params from register filters (shared by list/export).
@@ -275,21 +293,32 @@ router.get(
   '/stats',
   requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
+    // per-user visibility (#8): scoped users must not see other projects'/codes'
+    // doc numbers, subjects or counts on the dashboard.
+    const vis = await loadVisibility(req.profile);
+    const vp = [];
+    const vparts = [];
+    if (vis) {
+      if (vis.projectIds.length) { vp.push(vis.projectIds); vparts.push(`d.project_id = any($${vp.length}::uuid[])`); }
+      if (vis.docCodes.length) { vp.push(vis.docCodes); vparts.push(`d.doc_code = any($${vp.length}::text[])`); }
+    }
+    const vAnd = vparts.length ? ' and ' + vparts.join(' and ') : '';
+    const vWhere = vparts.length ? ' where ' + vparts.join(' and ') : '';
     const [byStatus, byProject, recent, pending, thisMonth] = await Promise.all([
-      query('select status, count(*)::int as count from documents group by status'),
+      query(`select d.status, count(*)::int as count from documents d${vWhere} group by d.status`, vp),
       query(`select p.code, p.color, count(d.*)::int as count
-               from projects p left join documents d on d.project_id = p.id
-              group by p.id, p.code, p.color order by count desc, p.sort_order`),
+               from projects p left join documents d on d.project_id = p.id${vAnd}
+              group by p.id, p.code, p.color order by count desc, p.sort_order`, vp),
       query(`select d.id, d.doc_number, d.subject, d.status, d.date_received,
                     p.code as project_code, p.color as project_color
-               from documents d join projects p on p.id = d.project_id
-              order by d.created_at desc limit 5`),
+               from documents d join projects p on p.id = d.project_id${vWhere}
+              order by d.created_at desc limit 5`, vp),
       query(`select d.id, d.doc_number, d.subject, d.date_received,
                     p.code as project_code, p.color as project_color
                from documents d join projects p on p.id = d.project_id
-              where d.status = 'pending' order by d.date_received asc limit 5`),
-      queryOne(`select count(*)::int as count from documents
-                 where date_trunc('month', date_received) = date_trunc('month', current_date)`),
+              where d.status = 'pending'${vAnd} order by d.date_received asc limit 5`, vp),
+      queryOne(`select count(*)::int as count from documents d
+                 where date_trunc('month', date_received) = date_trunc('month', current_date)${vAnd}`, vp),
     ]);
     const total = byStatus.rows.reduce((s, r) => s + r.count, 0);
     const statusMap = Object.fromEntries(byStatus.rows.map((r) => [r.status, r.count]));
@@ -372,7 +401,6 @@ router.get(
 
 router.get(
   '/:id',
-  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
@@ -385,9 +413,8 @@ router.get(
       [req.params.id]
     );
     if (!doc) throw new ApiError(404, 'Document not found');
-    // enforce per-user visibility (#8): a scoped user can't open a doc outside
-    // their allowed projects/codes
-    await assertDocVisible(req.profile, doc);
+    // enforce ememo.view + per-user visibility, but never lock out an assigned approver
+    await assertCanView(req.profile, doc);
     const { rows: attachments } = await query(
       `select id, kind, version, file_name, content_type, size_bytes, created_at
          from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
@@ -646,6 +673,15 @@ router.patch(
       `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'edited',$4)`,
       [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ changes })]
     );
+    // Regenerate the letter PDF so it reflects the edit (otherwise the preview/print
+    // and any approver keep seeing the pre-edit content). Best-effort: the edit is
+    // already saved, so a PDF failure must not fail the request.
+    try {
+      await generateOriginalPdf(req.params.id, req.profile.id);
+      await autoCombine(req.params.id, req.profile.id);
+    } catch (e) {
+      console.error('regenerate-after-edit failed:', e.message);
+    }
     // return the full detail
     const detail = await queryOne(`select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.cc_recipients,
               d.signer_name, d.signer_title, d.created_by, pr.full_name as preparer_name
@@ -723,11 +759,10 @@ router.post(
 /** GET /api/documents/:id/attachments/:attId/download — stream bytes (inline). */
 router.get(
   '/:id/attachments/:attId/download',
-  requirePermission('ememo', 'view'),
   asyncHandler(async (req, res) => {
-    const doc = await queryOne('select project_id, doc_code from documents where id = $1', [req.params.id]);
+    const doc = await queryOne('select id, project_id, doc_code from documents where id = $1', [req.params.id]);
     if (!doc) throw new ApiError(404, 'Document not found');
-    await assertDocVisible(req.profile, doc);
+    await assertCanView(req.profile, doc);
     const att = await queryOne(
       'select storage_key, file_name, content_type from document_attachments where id = $1 and document_id = $2',
       [req.params.attId, req.params.id]);
@@ -755,28 +790,6 @@ router.delete(
 );
 
 // ── generate PDF / submit ───────────────────────────────────────────────────
-
-/**
- * Auto-rebuild the combined "one file" PDF when there's something to combine —
- * i.e. at least one PDF/image supplementary attachment. Runs in the background
- * (fire-and-forget) so it never blocks the request. No-op when there are no
- * inline attachments, so a plain letter doesn't get a redundant combined copy.
- */
-async function autoCombine(documentId, uploadedBy) {
-  try {
-    const hasInline = await queryOne(
-      `select 1 from document_attachments
-        where document_id = $1 and kind = 'upload'
-          and (content_type ilike 'application/pdf%' or content_type ilike 'image/%')
-        limit 1`,
-      [documentId]
-    );
-    if (!hasInline) return;
-    await generateCombinedPdf(documentId, uploadedBy);
-  } catch (e) {
-    console.error('auto-combine failed:', e.message);
-  }
-}
 
 /** POST /api/documents/:id/generate-pdf — build the letter, return attachment meta. */
 router.post(
@@ -886,8 +899,11 @@ router.post(
     }
     if (result.finalized) {
       await generateApprovedPdf(result.document.id).catch((e) => console.error('approved-pdf failed:', e.message));
+      // rebuild the combined "one file" so it merges the SIGNED letter, not the original
+      await autoCombine(result.document.id);
     } else if (parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
       await regenerateOriginalWithAudit(result.document.id).catch((e) => console.error('audit-pdf failed:', e.message));
+      await autoCombine(result.document.id);
     }
     if (result.finalized || parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
       const author = await queryOne(
@@ -951,7 +967,17 @@ router.post(
     } finally {
       client.release();
     }
-    await sendApprovalRequest({ step: firstStep, doc }).catch((e) => console.error('approval email failed:', e.message));
+    // Track whether the approver was actually notified. On failure, record it in
+    // the document's history (visible in the detail timeline) and tell the caller,
+    // so "submitted" doesn't silently hide that no email went out.
+    let emailSent = true;
+    await sendApprovalRequest({ step: firstStep, doc }).catch((e) => { emailSent = false; console.error('approval email failed:', e.message); });
+    if (!emailSent) {
+      await query(
+        `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'email_failed',$4)`,
+        [doc.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ to: firstStep.approver_email })]
+      ).catch(() => {});
+    }
 
     // CC "for your information / please advise" — send a copy to any email in the
     // สำเนาเรียน field. CC recipients are consulted, NOT in the approval chain.
@@ -964,7 +990,7 @@ router.post(
       }).catch((e) => console.error('cc notification failed:', e.message));
     }
 
-    res.json({ data: { status: 'pending', firstApprover: firstStep.approver_email, ccNotified: ccEmails.length } });
+    res.json({ data: { status: 'pending', firstApprover: firstStep.approver_email, ccNotified: ccEmails.length, emailSent } });
   })
 );
 

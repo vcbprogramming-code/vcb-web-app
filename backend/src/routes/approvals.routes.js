@@ -8,6 +8,7 @@ import { applyApprovalAction, forwardApprovalStep, sendApprovalRequest } from '.
 import { sendAuthorNotification } from '../services/email.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
 import { generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
+import { autoCombine } from '../services/pdfMerge.js';
 
 // PUBLIC routes — reached from email links, so NO requireAuth.
 // Security comes from the unguessable one-time token, not a login session.
@@ -156,11 +157,13 @@ router.post(
       await generateApprovedPdf(result.document.id).catch((e) =>
         console.error('approved-pdf generation failed:', e.message)
       );
+      await autoCombine(result.document.id); // merge the SIGNED letter into the combined file
     } else if (parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
       // append the decision/reason to the document's PDF
       await regenerateOriginalWithAudit(result.document.id).catch((e) =>
         console.error('audit-pdf regeneration failed:', e.message)
       );
+      await autoCombine(result.document.id);
     }
 
     // notify the document author of a terminal outcome (approved / returned / rejected)

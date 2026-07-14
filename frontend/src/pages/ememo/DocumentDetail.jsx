@@ -36,6 +36,7 @@ const AUDIT_ACTION_TH = {
   consulted: 'ขอความเห็น',
   forwarded: 'ส่งต่อ',
   resent: 'ส่งอนุมัติซ้ำ',
+  email_failed: '⚠️ ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ',
 };
 
 /** Full system activity log for the document (always expanded). */
@@ -466,7 +467,7 @@ export default function DocumentDetail() {
           docCode={doc.doc_code}
           projectManager={doc.manager_email ? { name: doc.manager_name, email: doc.manager_email } : null}
           onClose={() => setShowSubmit(false)}
-          onSubmitted={() => { setShowSubmit(false); toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
+          onSubmitted={(emailFailed) => { setShowSubmit(false); if (emailFailed) toast.error('ส่งเข้าสายอนุมัติแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'); else toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
         />
       )}
 

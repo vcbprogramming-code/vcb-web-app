@@ -242,33 +242,29 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       }
     };
 
-    // Approved version passes `signatures` (one per approver, with image Buffer).
-    // Otherwise fall back to the letterhead's default single signatory block.
+    // The SIGNER (ผู้ลงนาม) ALWAYS signs under "ขอแสดงความนับถือ" — they are the person
+    // issuing the memo, so their block appears on every version. The project
+    // signatory's configured signature is stamped automatically; the author's own
+    // uploaded signature takes precedence. pdfDoc.js resolves doc.signer_name/title.
+    const sigImage = opts.authorSignature
+      || (Buffer.isBuffer(letter.signatureBuffer) ? letter.signatureBuffer : null);
+    drawSignature({
+      image: sigImage,
+      name: doc.signer_name || letter.signatoryName,
+      title: doc.signer_title || letter.signatoryTitle,
+    });
+
+    // The APPROVED version additionally stamps each approver's signature below the
+    // signer's, in approval order — so the letter carries signer + every approver.
     const signatures = Array.isArray(opts.signatures) ? opts.signatures : null;
     if (signatures && signatures.length) {
       signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
-    } else {
-      // the project signatory's configured signature (#6) is stamped automatically
-      // on every memo; the author's own uploaded signature takes precedence if any;
-      // else just the printed name.
-      const sigImage = opts.authorSignature
-        || (Buffer.isBuffer(letter.signatureBuffer) ? letter.signatureBuffer : null);
-      // the signature block shows the SIGNER (ผู้เซ็น) — which may differ from the
-      // preparer. pdfDoc.js already resolves doc.signer_name/title (falling back to
-      // the author, then the letterhead's configured signatory).
-      drawSignature({
-        image: sigImage,
-        name: doc.signer_name || letter.signatoryName,
-        title: doc.signer_title || letter.signatoryTitle,
-      });
     }
 
     // ---- ผู้จัดทำ (preparer) line at the bottom-left — only when the preparer is
     // a different person from the signer, so the reader can see who prepared it.
     const preparer = doc.preparer_name;
-    const signerShown = (signatures && signatures.length)
-      ? null
-      : (doc.signer_name || letter.signatoryName);
+    const signerShown = doc.signer_name || letter.signatoryName;
     if (preparer && preparer !== signerShown) {
       pdf.moveDown(1.5);
       pdf.font('th').fontSize(10.5).fillColor('#666')

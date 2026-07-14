@@ -189,16 +189,17 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
 
-  // fetch each signature image from S3 (skip ones without an image). Use each
-  // approver's own job title so a multi-signer chain shows the right roles;
-  // fall back to the letterhead's default title when a step has none.
+  // fetch each signature image from S3 (skip ones without an image). Print each
+  // approver's OWN job title. If they haven't set one, print no title at all —
+  // borrowing the letterhead's signatory title (the project manager's) would put a
+  // role under their name that isn't theirs.
   const signatures = [];
   for (const s of steps) {
     let image = null;
     if (s.signature_url) {
       try { image = await getObjectBuffer(s.signature_url); } catch { image = null; }
     }
-    signatures.push({ image, name: s.approver_name, title: s.approver_title || letter.signatoryTitle || '' });
+    signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
   }
 
   // full decision trail for the "บันทึกการพิจารณา" page

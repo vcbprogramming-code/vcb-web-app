@@ -275,29 +275,64 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // approval — previously every block looked identical and ran together.
     const signatures = Array.isArray(opts.signatures) ? opts.signatures : null;
     if (signatures && signatures.length) {
-      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
-      const blockH = SIG_BOX_H + 34 + BLOCK_GAP; // caption + image + name + title + gap
+      /** One approver, drawn inside its own column of a horizontal row. */
+      const drawApproverCell = (s, no, colX, colW) => {
+        const cx = colX + colW / 2;
+        let y = pdf.y;
+        pdf.font('th').fontSize(9.5).fillColor('#64748b')
+          .text(signatures.length > 1 ? `ผู้อนุมัติลำดับที่ ${no}` : 'ผู้อนุมัติ', colX, y, { width: colW, align: 'center' });
+        y = pdf.y + 2;
+        if (s.image) {
+          // `fit` keeps the signature's own aspect ratio inside the cell
+          try { pdf.image(s.image, cx - 48, y, { fit: [96, SIG_BOX_H - 8], align: 'center' }); } catch { /* leave blank */ }
+        }
+        y += SIG_BOX_H;
+        pdf.font('th').fontSize(12.5).fillColor('#000')
+          .text(`(${s.name || ''})`, colX, y, { width: colW, align: 'center' });
+        y = pdf.y;
+        if (s.title) {
+          pdf.font('th').fontSize(11).fillColor('#334155')
+            .text(s.title, colX, y, { width: colW, align: 'center' });
+          y = pdf.y;
+        }
+        pdf.fillColor('#000');
+        return y; // bottom of this cell
+      };
 
-      // the rule and at least the first approver belong together
-      if (pdf.y + 18 + blockH > bottomLimit) pdf.addPage();
+      // Approvers sign SIDE BY SIDE across the page, the way a paper memo carries a
+      // row of signature slots. Cap a row at 3 so a long Thai name/title still fits;
+      // 4 splits 2+2 rather than leaving a lone signature stranded on its own row.
+      const n = signatures.length;
+      const perRow = n <= 3 ? n : (n === 4 ? 2 : 3);
+      const rows = [];
+      for (let i = 0; i < n; i += perRow) rows.push(signatures.slice(i, i + perRow));
+
+      const rowH = SIG_BOX_H + 48;  // caption + image + name + title
+      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
 
       pdf.y += BLOCK_GAP;
-      const ruleY = pdf.y;
-      pdf.moveTo(sigBlockX + 26, ruleY).lineTo(sigBlockX + sigBlockW - 26, ruleY)
-        .lineWidth(0.5).strokeColor('#cbd5e1').stroke();
-      pdf.y = ruleY + 10;
+      // the rule and the first row of approvers belong together
+      if (pdf.y + 14 + rowH > bottomLimit) pdf.addPage();
 
-      signatures.forEach((s, i) => {
-        // fill the page, then carry on overleaf — but never cut a block in half
-        if (pdf.y + blockH > bottomLimit) pdf.addPage();
-        drawSignature({
-          image: s.image,
-          name: s.name,
-          title: s.title,
-          caption: signatures.length > 1 ? `ผู้อนุมัติลำดับที่ ${i + 1}` : 'ผู้อนุมัติ',
+      const ruleY = pdf.y;
+      pdf.moveTo(left, ruleY).lineTo(left + contentW, ruleY)
+        .lineWidth(0.5).strokeColor('#cbd5e1').stroke();
+      pdf.y = ruleY + 12;
+
+      let no = 1;
+      for (const row of rows) {
+        if (pdf.y + rowH > bottomLimit) pdf.addPage();
+        const colW = contentW / row.length;
+        const rowTop = pdf.y;
+        let rowBottom = rowTop;
+        row.forEach((s, j) => {
+          pdf.y = rowTop; // every cell in the row starts level
+          const bottom = drawApproverCell(s, no + j, left + j * colW, colW);
+          if (bottom > rowBottom) rowBottom = bottom;
         });
-        if (i < signatures.length - 1) pdf.y += BLOCK_GAP;
-      });
+        no += row.length;
+        pdf.y = rowBottom + BLOCK_GAP;
+      }
     }
 
     // ---- ผู้จัดทำ (preparer) line at the bottom-left — only when the preparer is

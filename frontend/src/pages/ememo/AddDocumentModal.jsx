@@ -48,6 +48,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [files, setFiles] = useState([]); // supplementary attachments (multiple)
   const [dragOver, setDragOver] = useState(false);
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
+  const [approverUsers, setApproverUsers] = useState([]); // system accounts, for the picker
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
   // mirror `approversLocked` into a ref so the projectId effect (deps: [projectId])
   // can read the CURRENT lock state without a stale closure, to avoid clobbering a
@@ -107,6 +108,19 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       })
       .catch(() => setCompanies([]));
   }, []);
+
+  // Approvers must be system accounts: the approval email opens a login-gated page,
+  // and the account is what links a signature + job title to the step. Load the list
+  // so the clerk picks a real person instead of typing an address by hand.
+  useEffect(() => {
+    ememoApi.listApprovers().then((r) => setApproverUsers(r.data || [])).catch(() => setApproverUsers([]));
+  }, []);
+
+  // pick a user by email → fill name + email for that row
+  const pickApprover = (i, email) => {
+    const u = approverUsers.find((x) => x.email === email);
+    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { name: u?.full_name || '', email } : a)));
+  };
 
   // load the project's letterhead so the live A4 preview renders the real header.
   // The letterhead's signatory IS the project manager — the required signer under
@@ -189,8 +203,6 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   };
   const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx));
 
-  const updateApprover = (i, key, value) =>
-    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, [key]: value } : a)));
   const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
   const removeApprover = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
 
@@ -602,14 +614,27 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <p className="mb-3 text-xs text-slate-400">
               {approversLocked
                 ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่าระบบ → รหัสเอกสาร)'
-                : 'ระบุผู้อนุมัติตามลำดับขั้น — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ หากเว้นว่างไว้ เอกสารจะถูกบันทึกอย่างเดียว'}
+                : 'เลือกผู้อนุมัติตามลำดับขั้น (ต้องมีบัญชีในระบบ) — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ หากเว้นว่างไว้ เอกสารจะถูกบันทึกเป็นฉบับร่าง'}
             </p>
             <div className="space-y-2">
               {approvers.map((a, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="w-6 shrink-0 text-center font-semibold text-slate-400">{i + 1}</span>
-                  <input value={a.name} onChange={(e) => updateApprover(i, 'name', e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className={`${field} w-32 ${approversLocked ? 'bg-slate-100' : ''}`} readOnly={approversLocked} />
-                  <input value={a.email} onChange={(e) => updateApprover(i, 'email', e.target.value)} placeholder="อีเมล" type="email" className={`${field} flex-1 ${approversLocked ? 'bg-slate-100' : ''}`} readOnly={approversLocked} />
+                  {approversLocked ? (
+                    <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />
+                  ) : (
+                    <select value={a.email} onChange={(e) => pickApprover(i, e.target.value)} className={`${field} flex-1`}>
+                      <option value="">— เลือกผู้อนุมัติ —</option>
+                      {/* keep a pre-filled address (e.g. the project manager) selectable
+                          even if it isn't in the account list, so it never silently blanks */}
+                      {a.email && !approverUsers.some((u) => u.email === a.email) && (
+                        <option value={a.email}>{a.name ? `${a.name} (${a.email})` : a.email}</option>
+                      )}
+                      {approverUsers.map((u) => (
+                        <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
+                      ))}
+                    </select>
+                  )}
                   {!approversLocked && approvers.length > 1 && (
                     <button type="button" onClick={() => removeApprover(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
                   )}

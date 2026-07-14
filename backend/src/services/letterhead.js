@@ -281,7 +281,12 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     const commentSteps = Array.isArray(opts.auditSteps)
       ? opts.auditSteps.filter((s) => s.comment && s.comment.trim())
       : [];
-    const wantCommentBox = opts.commentBox !== false;
+    // Approvers now sign digitally (their signature blocks are stamped above), so the
+    // box no longer carries blank "ลงชื่อ ..... ผู้ตรวจสอบ / ผู้อนุมัติ" slots for a wet
+    // signature — that implied the memo still needed signing by hand. It now only
+    // reports what the approvers actually wrote, and is skipped entirely when nobody
+    // left a comment (an empty titled box says nothing).
+    const wantCommentBox = opts.commentBox !== false && commentSteps.length > 0;
     if (wantCommentBox) {
       // measure the real wrapped height of each comment line first, so the box
       // rectangle is tall enough and long comments never spill outside its border.
@@ -294,8 +299,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       });
       const commentsH = commentLines.reduce((sum, c) => sum + c.h + 3, 0);
       const headerH = 26;   // "ความเห็น / การพิจารณา" title band
-      const sigRowH = 40;   // checker / approver signature slots
-      const boxNeed = headerH + commentsH + sigRowH + 12;
+      const boxNeed = headerH + commentsH + 18;
 
       const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
       // start a fresh page only if the box won't fit in the remaining space
@@ -313,16 +317,7 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
         pdf.text(c.text, left + 12, cy, { width: contentW - 24 });
         cy = pdf.y + 3;
       }
-
-      // signature slots row (checker / approver) — anchored to the box bottom
-      const slotY = boxTop + boxNeed - sigRowH;
-      const half = contentW / 2;
-      pdf.font('th').fontSize(10).fillColor('#475569');
-      pdf.text('ลงชื่อ ...........................................', left + 12, slotY, { width: half - 20 });
-      pdf.text('ผู้ตรวจสอบ', left + 12, slotY + 15, { width: half - 20 });
-      pdf.text('ลงชื่อ ...........................................', left + half, slotY, { width: half - 20 });
-      pdf.text('ผู้อนุมัติ', left + half, slotY + 15, { width: half - 20 });
-      pdf.y = slotY + 34;
+      pdf.y = boxTop + boxNeed;
     }
 
     // ---- "บันทึกการพิจารณา" page (approval trail) ----

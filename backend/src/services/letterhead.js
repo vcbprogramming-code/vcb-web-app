@@ -222,23 +222,39 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     const sigBlockW = contentW * 0.48;
     const sigCenterX = sigBlockX + sigBlockW / 2;
 
-    /** Draw one signature block (image or blank line) + name + title. */
-    const drawSignature = ({ image, name, title }) => {
-      pdf.moveDown(0.3);
-      const sigY = pdf.y;
+    const SIG_BOX_H = 46;   // height reserved for the signature image / blank signing space
+    const BLOCK_GAP = 14;   // breathing room between two signature blocks
+
+    /**
+     * Draw one signature block: optional caption, the signature image (or blank
+     * signing space), the name in parentheses, then the job title. Blocks are spaced
+     * apart so a reader can tell one signatory from the next at a glance.
+     */
+    const drawSignature = ({ image, name, title, caption }) => {
+      if (caption) {
+        pdf.font('th').fontSize(9.5).fillColor('#64748b')
+          .text(caption, sigBlockX, pdf.y, { width: sigBlockW, align: 'center' });
+        pdf.fillColor('#000');
+      }
+      const sigY = pdf.y + 2;
       let drew = false;
       if (image) {
-        // `image` is a Buffer (approver sig) or a local path
-        try { pdf.image(image, sigCenterX - 45, sigY, { width: 90, height: 42 }); drew = true; } catch { /* ignore */ }
+        // `fit` keeps the image's own aspect ratio — width+height would squash a
+        // signature that isn't exactly the box's proportions.
+        try {
+          pdf.image(image, sigCenterX - 55, sigY, { fit: [110, SIG_BOX_H - 6], align: 'center' });
+          drew = true;
+        } catch { /* ignore an unreadable image and leave blank signing space */ }
       }
-      if (drew) pdf.y = sigY + 46; else pdf.moveDown(2.5);
+      pdf.y = sigY + SIG_BOX_H;
       if (name) {
-        pdf.font('th').fontSize(13.5)
+        pdf.font('th').fontSize(13.5).fillColor('#000')
           .text(`(${name})`, sigBlockX, pdf.y, { width: sigBlockW, align: 'center' });
       }
       if (title) {
-        pdf.font('th').fontSize(13.5)
+        pdf.font('th').fontSize(12).fillColor('#334155')
           .text(title, sigBlockX, pdf.y, { width: sigBlockW, align: 'center' });
+        pdf.fillColor('#000');
       }
     };
 
@@ -254,11 +270,31 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       title: doc.signer_title || letter.signatoryTitle,
     });
 
-    // The APPROVED version additionally stamps each approver's signature below the
-    // signer's, in approval order — so the letter carries signer + every approver.
+    // The APPROVED version stamps each approver below the signer. They are captioned
+    // and set off by a rule, so the issuer's signature is never mistaken for an
+    // approval — previously every block looked identical and ran together.
     const signatures = Array.isArray(opts.signatures) ? opts.signatures : null;
     if (signatures && signatures.length) {
-      signatures.forEach((s) => drawSignature({ image: s.image, name: s.name, title: s.title }));
+      // keep the whole approval group on one page rather than splitting a block
+      const groupH = 18 + signatures.length * (SIG_BOX_H + 34 + BLOCK_GAP);
+      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
+      if (pdf.y + groupH > bottomLimit) pdf.addPage();
+
+      pdf.y += BLOCK_GAP;
+      const ruleY = pdf.y;
+      pdf.moveTo(sigBlockX + 26, ruleY).lineTo(sigBlockX + sigBlockW - 26, ruleY)
+        .lineWidth(0.5).strokeColor('#cbd5e1').stroke();
+      pdf.y = ruleY + 10;
+
+      signatures.forEach((s, i) => {
+        drawSignature({
+          image: s.image,
+          name: s.name,
+          title: s.title,
+          caption: signatures.length > 1 ? `ผู้อนุมัติลำดับที่ ${i + 1}` : 'ผู้อนุมัติ',
+        });
+        if (i < signatures.length - 1) pdf.y += BLOCK_GAP;
+      });
     }
 
     // ---- ผู้จัดทำ (preparer) line at the bottom-left — only when the preparer is

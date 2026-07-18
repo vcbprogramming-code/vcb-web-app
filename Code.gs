@@ -708,7 +708,7 @@ body.dark .settings-card .users-toggle .chev{ color:#9dc4f0; background:rgba(157
 .vis-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.5rem .1rem;border-bottom:1px solid var(--line);cursor:pointer}
 .vis-row:last-child{border-bottom:0}
 .vis-name{font-size:.9rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vis-tog{appearance:none;-webkit-appearance:none;width:46px;height:26px;border-radius:13px;background:#cfd6e0;position:relative;cursor:pointer;transition:background .15s;flex:0 0 46px;margin:0}
+.vis-tog{appearance:none;-webkit-appearance:none;width:46px;height:26px;border-radius:13px;background:#cfd6e0;position:relative;cursor:pointer;transition:background .15s;flex:0 0 46px;margin:0;padding:0;border:0}
 .vis-tog::before{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
 .vis-tog:checked{background:var(--blue)}
 .vis-tog:checked::before{left:22px}
@@ -1137,6 +1137,7 @@ var CELL_NAMES = _ls('hr_cellnames', 'code');  // weekly grid: 'code' (A-1 / 5) 
 // Hidden sites drop out of the dashboard and the entry site dropdown.
 var HIDDEN_SITES = (function(){ try { return JSON.parse(_ls('hr_hidden_sites','[]')) || []; } catch(e){ return []; } })();
 var _sitesVisChanged = false;
+var _lockDaysChanged = false;
 function isSiteHidden(k){ return HIDDEN_SITES.indexOf(k) >= 0; }
 function setSiteHidden(k, hide){
   var i = HIDDEN_SITES.indexOf(k);
@@ -3577,6 +3578,14 @@ function closeSettings(){
     _sitesVisChanged = false;
     if(window._curView && window._curView !== 'dashboard') go(window._curView);
   }
+  // Lock-days affects which cells are editable/locked on the entry grid and the
+  // dashboard's lock status — both are stale (rendered with the old value) until
+  // the underlying data is re-fetched, so force a reload of whichever is open.
+  if(_lockDaysChanged){
+    _lockDaysChanged = false;
+    if(window._curView === 'dashboard' && typeof loadDash === 'function') loadDash();
+    else if(window._curView) go(window._curView);
+  }
 }
 function _settingsEsc(e){ if(e.key === 'Escape' && !$('auditOverlay') && !$('howtoOverlay')) closeSettings(); }
 
@@ -3695,9 +3704,9 @@ function renderSettings(target, opts){
         +'<h2>'+t('ระยะเวลาแก้ย้อนหลัง')+'</h2>'
         +'<p class="desc">'+esc(t('Manager แก้ไขเซลล์ย้อนหลังได้กี่วัน · admin แก้ได้ตลอด · บังคับใช้ทั้งระบบ'))+'</p>'
         +'<div class="lockrow">'
-          +'<input id="lockDaysInput" type="number" min="0" max="30" step="1" value="">'
+          +'<input id="lockDaysInput" type="number" min="0" max="30" step="1" value="" placeholder="…" disabled>'
           +'<span class="muted">'+t('วัน')+'</span>'
-          +'<button class="btn sec" id="lockDaysSave">'+t('บันทึก')+'</button>'
+          +'<button class="btn sec" id="lockDaysSave" disabled>'+t('บันทึก')+'</button>'
         +'</div>'
       +'</div>';
   var auditSect =
@@ -3806,7 +3815,7 @@ function renderSettings(target, opts){
     withBtnLoading(lockBtn, t('กำลังบันทึก…'), function(done){
       call('api_adminSetLockDays', [n], function(r){
         done();
-        if(r && r.ok){ lockInput.value = r.lockDays; flash(t('บันทึกแล้ว'), 'ok'); }
+        if(r && r.ok){ lockInput.value = r.lockDays; _lockDaysChanged = true; flash(t('บันทึกแล้ว'), 'ok'); }
         else flash(t('บันทึกไม่สำเร็จ'), 'error');
       });
     });

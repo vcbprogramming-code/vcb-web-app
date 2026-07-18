@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { adminApi, ROLE_LABELS } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 
 const ROLE_CHIP = {
@@ -99,7 +101,7 @@ function UserModal({ user, onClose, onSaved }) {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท (Role) <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท <span className="text-red-500">*</span></label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
               <option value="hr">เจ้าหน้าที่ HR</option>
               <option value="executive">ผู้บริหาร</option>
@@ -123,30 +125,36 @@ function UserModal({ user, onClose, onSaved }) {
 
 export default function UsersTab() {
   const { profile } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editUser, setEditUser] = useState(undefined); // undefined=closed, null=new, obj=edit
 
-  const load = () => adminApi.listUsers().then((r) => setUsers(r.data)).catch((e) => setError(e.message));
+  const load = () => { setLoading(true); return adminApi.listUsers().then((r) => setUsers(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const toggleActive = async (u) => {
+    if (u.is_active) {
+      const ok = await confirm({ title: 'ปิดใช้งานผู้ใช้', message: `ปิดใช้งาน "${u.full_name}"?\nผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`, confirmLabel: 'ปิดใช้งาน' });
+      if (!ok) return;
+    }
     try {
       await adminApi.updateUser(u.id, { isActive: !u.is_active });
+      toast.success(u.is_active ? 'ปิดใช้งานผู้ใช้แล้ว' : 'เปิดใช้งานผู้ใช้แล้ว');
       load();
-    } catch (e) {
-      setError(e.message);
-    }
+    } catch (e) { toast.error(e.message); }
   };
 
   const removeUser = async (u) => {
-    if (!window.confirm(`ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`)) return;
+    const ok = await confirm({ title: 'ลบผู้ใช้', message: `ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`, confirmLabel: 'ลบผู้ใช้' });
+    if (!ok) return;
     try {
       await adminApi.deleteUser(u.id);
+      toast.success('ลบผู้ใช้แล้ว');
       load();
-    } catch (e) {
-      setError(e.message);
-    }
+    } catch (e) { toast.error(e.message); }
   };
 
   return (
@@ -169,7 +177,11 @@ export default function UsersTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((u) => (
+            {loading ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+            ) : users.length === 0 ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ยังไม่มีผู้ใช้ — กด “เพิ่มผู้ใช้” เพื่อเริ่ม</td></tr>
+            ) : users.map((u) => (
               <tr key={u.id} className="tbl-row">
                 <td className="tbl-td font-medium text-slate-800">{u.full_name}</td>
                 <td className="tbl-td text-slate-600">{u.email}</td>
@@ -203,7 +215,7 @@ export default function UsersTab() {
       </div>
 
       {editUser !== undefined && (
-        <UserModal user={editUser} onClose={() => setEditUser(undefined)} onSaved={() => { setEditUser(undefined); load(); }} />
+        <UserModal user={editUser} onClose={() => setEditUser(undefined)} onSaved={() => { setEditUser(undefined); toast.success('บันทึกผู้ใช้แล้ว'); load(); }} />
       )}
     </div>
   );

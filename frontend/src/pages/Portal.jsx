@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { apps, roleLabels } from '../config/nav.js';
-import { formatThaiLongDate } from '../lib/ememo.js';
+import { formatThaiLongDate, ememoApi } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
@@ -21,6 +22,12 @@ export default function Portal() {
 
   const displayName = profile?.full_name || user?.email || 'ผู้ใช้งาน';
   const firstName = displayName.split(' ')[0];
+
+  // "waiting for you" count, so the landing page prompts the approver to act
+  const [awaiting, setAwaiting] = useState(0);
+  useEffect(() => {
+    ememoApi.awaitingMe().then((r) => setAwaiting(r.data?.count || 0)).catch(() => {});
+  }, []);
 
   function handleLogout() {
     logout();
@@ -128,6 +135,14 @@ export default function Portal() {
               <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/20 to-blue-500/10 text-cyan-200 ring-1 ring-inset ring-cyan-300/30 transition-transform duration-300 group-hover:scale-105">
                 <Icon name={app.icon} className="h-7 w-7" />
               </div>
+
+              {/* "waiting for you" badge on the E-Memo card — turns the landing page
+                  into an action prompt for whoever needs to approve something */}
+              {app.to === '/memos' && awaiting > 0 && (
+                <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-slate-900 shadow-[0_0_16px_-4px_rgba(251,191,36,0.8)]">
+                  <Icon name="clock" className="h-3.5 w-3.5" /> รออนุมัติ {awaiting}
+                </span>
+              )}
 
               <h3 className="relative mt-5 text-base font-bold text-white">{app.title}</h3>
               <p className="relative mt-1.5 flex-1 text-sm leading-relaxed text-slate-400">{app.desc}</p>

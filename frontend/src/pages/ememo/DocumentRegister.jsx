@@ -8,15 +8,10 @@ import Spinner from '../../components/Spinner.jsx';
 import { useHeaderSlot } from '../../components/HeaderSlot.jsx';
 import { useToast } from '../../components/Toast.jsx';
 
-// English status labels for the "All statuses" dropdown (client's mockup uses EN)
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'returned', label: 'Returned' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+// Status options driven from the SAME source as the table chips (STATUS_META),
+// so the filter vocabulary and the rows always match (Thai, single source).
+const STATUS_OPTIONS = ['draft', 'pending', 'approved', 'rejected', 'returned', 'cancelled']
+  .map((value) => ({ value, label: STATUS_META[value].label }));
 
 function ProjectChip({ code, color, active, onClick }) {
   return (
@@ -160,6 +155,14 @@ export default function DocumentRegister() {
     setFrom('');
     setTo('');
   };
+  // is any filter narrowing the list? (drives the "clear all" control + empty state)
+  const anyFilter = Boolean(projectId || docTypeId || status || search.trim() || from || to);
+  const clearAllFilters = () => {
+    setProjectId(''); setDocTypeId(''); setStatus(''); setSearch(''); setFrom(''); setTo(''); setPage(1);
+  };
+  // "แสดง 1–10 จาก 45 ฉบับ" range for the pager
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
 
   // local date, not UTC — toISOString() shifts to the previous day for UTC+7 users,
   // which made "Last month"/"Last N days" drop the last day and add an extra earlier day
@@ -245,20 +248,20 @@ export default function DocumentRegister() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search document"
+              placeholder="ค้นหาเลขที่ / เรื่อง / รหัสเอกสาร"
               className="field !py-1.5 pl-9"
             />
           </div>
 
-          {/* All document types */}
-          <FilterDropdown label="All document types" value={activeDocType?.name} active={!!docTypeId} width="w-56">
+          {/* ประเภทเอกสาร */}
+          <FilterDropdown label="ทุกประเภทเอกสาร" value={activeDocType?.name} active={!!docTypeId} width="w-56">
             {(close) => (
               <div className="max-h-72 overflow-auto">
                 <button
                   onClick={() => { setDocTypeId(''); close(); }}
                   className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!docTypeId ? 'font-semibold text-brand' : 'text-slate-600'}`}
                 >
-                  All document types
+                  ทุกประเภทเอกสาร
                 </button>
                 {docTypes.map((t) => (
                   <button
@@ -273,15 +276,15 @@ export default function DocumentRegister() {
             )}
           </FilterDropdown>
 
-          {/* All statuses */}
-          <FilterDropdown label="All statuses" value={activeStatus?.label} active={!!status} width="w-48">
+          {/* สถานะ */}
+          <FilterDropdown label="ทุกสถานะ" value={activeStatus?.label} active={!!status} width="w-48">
             {(close) => (
               <div>
                 <button
                   onClick={() => { setStatus(''); close(); }}
                   className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!status ? 'font-semibold text-brand' : 'text-slate-600'}`}
                 >
-                  All statuses
+                  ทุกสถานะ
                 </button>
                 {STATUS_OPTIONS.map((s) => (
                   <button
@@ -296,40 +299,54 @@ export default function DocumentRegister() {
             )}
           </FilterDropdown>
 
-          {/* project chips — shown inline (client's design) */}
-          <ProjectChip code="All Projects" active={!projectId} onClick={() => setProjectId('')} />
-          {projects.map((p) => (
-            <ProjectChip
-              key={p.id}
-              code={p.code}
-              color={p.color}
-              active={projectId === p.id}
-              onClick={() => setProjectId(p.id)}
-            />
-          ))}
+          {/* project chips — scroll horizontally on narrow screens instead of walling up */}
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">
+            <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => setProjectId('')} />
+            {projects.map((p) => (
+              <ProjectChip
+                key={p.id}
+                code={p.code}
+                color={p.color}
+                active={projectId === p.id}
+                onClick={() => setProjectId(p.id)}
+              />
+            ))}
+          </div>
+
+          {anyFilter && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
+            >
+              <Icon name="x" className="h-3.5 w-3.5" /> ล้างตัวกรองทั้งหมด
+            </button>
+          )}
         </div>
 
-        {/* date row (+ result count on the far right) */}
+        {/* date row */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-500">Date received:</span>
+          <span className="text-slate-500">วันที่รับ (ค.ศ.):</span>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
           <Icon name="arrowRight" className="h-3.5 w-3.5 text-slate-400" />
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
-          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last 7 days</button>
-          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last 30 days</button>
-          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Last month</button>
+          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">7 วันล่าสุด</button>
+          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">30 วันล่าสุด</button>
+          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">เดือนก่อน</button>
           {(from || to) && (
-            <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> Clear dates</button>
+            <>
+              <span className="text-slate-400">(พ.ศ. {from ? formatThaiDate(from) : '…'} – {to ? formatThaiDate(to) : '…'})</span>
+              <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
+            </>
           )}
-          <span className="ml-auto italic text-slate-400">Showing {docs.length} of {total} documents</span>
         </div>
       </div>
 
-      {/* table */}
-      <div className="card !p-0 overflow-hidden">
-        <table className="tbl">
+      {/* table — wraps in an x-scroll container so it never clips on mobile */}
+      <div className="card !p-0">
+        <div className="overflow-x-auto">
+        <table className="tbl min-w-[700px]">
           <thead>
             <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">
               <th className="tbl-th w-12 font-semibold">#</th>
@@ -342,16 +359,37 @@ export default function DocumentRegister() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center">
-                <span className="inline-flex justify-center"><Spinner label="กำลังโหลด…" /></span>
-                {wakeHint && (
-                  <p className="mx-auto mt-3 max-w-md text-xs text-slate-400">
-                    เซิร์ฟเวอร์กำลังเริ่มทำงาน (โหมดประหยัดพลังงาน) — การโหลดครั้งแรกหลังพักอาจใช้เวลาสักครู่ ครั้งต่อไปจะเร็วขึ้น
-                  </p>
+              // skeleton rows — keep the layout stable instead of a jumping spinner
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`sk-${i}`} className="animate-pulse">
+                  <td className="tbl-td"><div className="h-3 w-5 rounded bg-slate-100" /></td>
+                  <td className="tbl-td"><div className="h-3 w-20 rounded bg-slate-100" /></td>
+                  <td className="tbl-td"><div className="h-4 w-12 rounded bg-slate-100" /></td>
+                  <td className="tbl-td"><div className="h-4 w-56 max-w-full rounded bg-slate-100" /></td>
+                  <td className="tbl-td"><div className="h-5 w-16 rounded-full bg-slate-100" /></td>
+                  <td className="tbl-td text-right"><div className="ml-auto h-6 w-24 rounded-lg bg-slate-100" /></td>
+                </tr>
+              ))
+            ) : docs.length === 0 ? (
+              <tr><td colSpan={6} className="px-5 py-14 text-center">
+                {anyFilter ? (
+                  <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                    <Icon name="search" className="h-9 w-9 text-slate-300" />
+                    <p className="text-sm text-slate-500">ไม่พบเอกสารที่ตรงกับตัวกรอง{search.trim() ? ` “${search.trim()}”` : ''}</p>
+                    <button onClick={clearAllFilters} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                      <Icon name="x" className="h-4 w-4" /> ล้างตัวกรองทั้งหมด
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
+                    <Icon name="document" className="h-10 w-10 text-slate-300" />
+                    <p className="text-sm text-slate-500">ยังไม่มีเอกสารในระบบ — เริ่มสร้างเอกสารฉบับแรกได้เลย</p>
+                    <button onClick={() => setShowAdd(true)} className="btn-primary">
+                      <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> เพิ่มเอกสาร
+                    </button>
+                  </div>
                 )}
               </td></tr>
-            ) : docs.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ไม่พบเอกสาร</td></tr>
             ) : (
               docs.map((d, i) => (
                 <tr
@@ -403,11 +441,21 @@ export default function DocumentRegister() {
             )}
           </tbody>
         </table>
+        </div>
+
+        {wakeHint && loading && (
+          <p className="border-t border-slate-100 px-5 py-2 text-center text-xs text-slate-400">
+            เซิร์ฟเวอร์กำลังเริ่มทำงาน (โหมดประหยัดพลังงาน) — การโหลดครั้งแรกหลังพักอาจใช้เวลาสักครู่ ครั้งต่อไปจะเร็วขึ้น
+          </p>
+        )}
 
         {/* pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-sm">
-          <span className="text-slate-500">หน้า {page} / {totalPages}</span>
-          <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-t border-slate-100 text-sm">
+          <span className="text-slate-500">
+            {total > 0 ? <>แสดง <span className="font-medium text-slate-700">{rangeStart}–{rangeEnd}</span> จาก {total} ฉบับ</> : 'ไม่มีเอกสาร'}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">หน้า {page} / {totalPages}</span>
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
               className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">ก่อนหน้า</button>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}

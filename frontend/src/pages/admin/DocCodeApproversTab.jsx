@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/ememo.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 
 /**
@@ -8,7 +10,10 @@ import Icon from '../../components/Icon.jsx';
  * approvers set, the create-document form auto-fills and locks them.
  */
 export default function DocCodeApproversTab() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [codes, setCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editCode, setEditCode] = useState(null);   // code whose approvers are being edited
   const [rows, setRows] = useState([]);             // approver rows in the editor
@@ -20,8 +25,7 @@ export default function DocCodeApproversTab() {
   const [editMeta, setEditMeta] = useState(null);   // code whose meta is being edited
   const [metaForm, setMetaForm] = useState({ department: '', recipientTitle: '' });
 
-  const load = () =>
-    adminApi.listDocCodeApprovers().then((r) => setCodes(r.data)).catch((e) => setError(e.message));
+  const load = () => { setLoading(true); return adminApi.listDocCodeApprovers().then((r) => setCodes(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   // ---- approver chain editor ----
@@ -45,6 +49,7 @@ export default function DocCodeApproversTab() {
         .filter((r) => r.email);
       await adminApi.saveDocCodeApprovers(editCode, cleaned);
       setEditCode(null);
+      toast.success('บันทึกสายอนุมัติแล้ว');
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -66,6 +71,7 @@ export default function DocCodeApproversTab() {
       });
       setShowAdd(false);
       setAddForm({ code: '', department: '', recipientTitle: '' });
+      toast.success('เพิ่มรหัสเอกสารแล้ว');
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -88,6 +94,7 @@ export default function DocCodeApproversTab() {
         recipientTitle: metaForm.recipientTitle.trim() || undefined,
       });
       setEditMeta(null);
+      toast.success('บันทึกรหัสเอกสารแล้ว');
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -95,13 +102,15 @@ export default function DocCodeApproversTab() {
 
   // ---- delete a code ----
   const removeCode = async (code) => {
-    if (!window.confirm(`ลบรหัสเอกสาร "${code}"? (ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`)) return;
+    const ok = await confirm({ title: 'ลบรหัสเอกสาร', message: `ลบรหัสเอกสาร "${code}"?\n(ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`, confirmLabel: 'ลบรหัส' });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
       await adminApi.deleteDocCode(code);
+      toast.success('ลบรหัสเอกสารแล้ว');
       load();
-    } catch (e) { setError(e.message); }
+    } catch (e) { toast.error(e.message); }
     finally { setBusy(false); }
   };
 
@@ -146,8 +155,10 @@ export default function DocCodeApproversTab() {
       )}
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-        {codes.length === 0 ? (
-          <p className="p-5 text-sm text-slate-400">ยังไม่มีรหัสเอกสาร</p>
+        {loading ? (
+          <p className="p-5 text-sm text-slate-400">กำลังโหลด…</p>
+        ) : codes.length === 0 ? (
+          <p className="p-5 text-sm text-slate-400">ยังไม่มีรหัสเอกสาร — กด “เพิ่มรหัสเอกสาร” เพื่อเริ่ม</p>
         ) : codes.map((c) => {
           const count = Array.isArray(c.default_approvers) ? c.default_approvers.length : 0;
           return (

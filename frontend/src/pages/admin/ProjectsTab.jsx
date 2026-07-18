@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, ememoApi } from '../../lib/ememo.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 
 const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#0d9488'];
@@ -105,7 +107,7 @@ function ProjectModal({ project, onClose, onSaved }) {
               <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="เช่น BT1" className={field} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Prefix เลขเอกสาร <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">อักษรนำหน้าเลขเอกสาร <span className="text-red-500">*</span></label>
               <input value={docPrefix} onChange={(e) => setDocPrefix(e.target.value)} placeholder="เช่น BT" className={field} />
             </div>
           </div>
@@ -122,7 +124,7 @@ function ProjectModal({ project, onClose, onSaved }) {
                   style={{ backgroundColor: c }} />
               ))}
             </div>
-            <div className="mt-2 text-sm text-slate-500">ตัวอย่าง: <span className="px-2 py-0.5 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: color }}>{code || 'CODE'}</span></div>
+            <div className="mt-2 text-sm text-slate-500">ตัวอย่าง: <span className="px-2 py-0.5 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: color }}>{code || 'รหัส'}</span></div>
           </div>
 
           {/* ── หัวจดหมายของโครงการนี้ (per-project letterhead) ── */}
@@ -259,16 +261,23 @@ function ProjectModal({ project, onClose, onSaved }) {
 }
 
 export default function ProjectsTab() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [edit, setEdit] = useState(undefined);
 
-  const load = () => adminApi.listProjects().then((r) => setProjects(r.data)).catch((e) => setError(e.message));
+  const load = () => { setLoading(true); return adminApi.listProjects().then((r) => setProjects(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const toggleActive = async (p) => {
-    try { await adminApi.updateProject(p.id, { isActive: !p.is_active }); load(); }
-    catch (e) { setError(e.message); }
+    if (p.is_active) {
+      const ok = await confirm({ title: 'ปิดใช้งานโครงการ', message: `ปิดใช้งานโครงการ "${p.code}"?\nจะไม่แสดงให้เลือกตอนสร้างเอกสารใหม่`, confirmLabel: 'ปิดใช้งาน' });
+      if (!ok) return;
+    }
+    try { await adminApi.updateProject(p.id, { isActive: !p.is_active }); toast.success(p.is_active ? 'ปิดใช้งานโครงการแล้ว' : 'เปิดใช้งานโครงการแล้ว'); load(); }
+    catch (e) { toast.error(e.message); }
   };
 
   return (
@@ -284,14 +293,18 @@ export default function ProjectsTab() {
             <tr className="tbl-head">
               <th className="tbl-th">โครงการ</th>
               <th className="tbl-th">ชื่อ</th>
-              <th className="tbl-th">Prefix</th>
+              <th className="tbl-th">อักษรนำหน้า</th>
               <th className="tbl-th">ผู้จัดการโครงการ (ผู้ลงนาม)</th>
               <th className="tbl-th">สถานะ</th>
               <th className="tbl-th text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {projects.map((p) => (
+            {loading ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+            ) : projects.length === 0 ? (
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ยังไม่มีโครงการ — กด “เพิ่มโครงการ” เพื่อเริ่ม</td></tr>
+            ) : projects.map((p) => (
               <tr key={p.id} className="tbl-row">
                 <td className="tbl-td">
                   <span className="px-2.5 py-1 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: p.color || '#64748b' }}>{p.code}</span>
@@ -327,7 +340,7 @@ export default function ProjectsTab() {
       </div>
 
       {edit !== undefined && (
-        <ProjectModal project={edit} onClose={() => setEdit(undefined)} onSaved={() => { setEdit(undefined); load(); }} />
+        <ProjectModal project={edit} onClose={() => setEdit(undefined)} onSaved={() => { setEdit(undefined); toast.success('บันทึกโครงการแล้ว'); load(); }} />
       )}
     </div>
   );

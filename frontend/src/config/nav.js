@@ -62,6 +62,7 @@ export const moduleTitles = {
   '/memos-settings': 'ตั้งค่า E-Memo',
   '/admin': 'ผู้ใช้และสิทธิ์',
   '/dashboard': 'ภาพรวม E-Memo',
+  '/profile': 'โปรไฟล์ของฉัน',
 };
 
 export const roleLabels = {

@@ -78,6 +78,28 @@ export default function ModuleShell() {
                 {title && <span className={`block truncate text-[11px] ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{title}</span>}
               </span>
             </button>
+
+            {/* in-module nav — so the Dashboard/overview is reachable (was orphaned) */}
+            {brand === 'VCB E-Memo' && (
+              <nav className="ml-1 hidden items-center gap-1 md:flex">
+                {[
+                  { to: '/dashboard', label: 'ภาพรวม', active: location.pathname.startsWith('/dashboard') },
+                  { to: '/memos', label: 'ทะเบียนเอกสาร', active: location.pathname === '/memos' || location.pathname.startsWith('/memos/') },
+                ].map((t) => (
+                  <button
+                    key={t.to}
+                    onClick={() => navigate(t.to)}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                      t.active
+                        ? (navyHeader ? 'bg-white/10 text-white' : 'bg-brand/10 text-brand')
+                        : (navyHeader ? 'text-cyan-100/70 hover:bg-white/5 hover:text-white' : 'text-slate-500 hover:bg-slate-100')
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
+            )}
           </div>
           {/* page-injected actions/stats (fills the old blue banner's role) */}
           {headerSlot && (

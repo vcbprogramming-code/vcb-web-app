@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { profileApi, ROLE_LABELS } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
 import { PageHeader } from '../components/ui/index.js';
@@ -9,6 +10,7 @@ import { PageHeader } from '../components/ui/index.js';
  * image above it).
  */
 export default function MyProfile() {
+  const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
   const [fullName, setFullName] = useState('');
@@ -97,6 +99,9 @@ export default function MyProfile() {
 
   return (
     <div className="max-w-2xl space-y-5">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-slate-800">
+        <Icon name="arrowLeft" className="h-4 w-4" /> ย้อนกลับ
+      </button>
       <PageHeader title="โปรไฟล์ของฉัน" subtitle="ตั้งค่าชื่อ ตำแหน่ง และลายเซ็นที่จะแสดงในเอกสาร" />
 
       <div className="card space-y-4">

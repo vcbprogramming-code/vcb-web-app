@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/ememo.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 
 export default function DocTypesTab() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [types, setTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState('');
 
-  const load = () => adminApi.listDocTypes().then((r) => setTypes(r.data)).catch((e) => setError(e.message));
+  const load = () => { setLoading(true); return adminApi.listDocTypes().then((r) => setTypes(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const add = async (e) => {
@@ -20,20 +25,22 @@ export default function DocTypesTab() {
     try {
       await adminApi.createDocType({ name: newName.trim() });
       setNewName('');
+      toast.success('เพิ่มประเภทเอกสารแล้ว');
       load();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
 
   const saveEdit = async (id) => {
-    try { await adminApi.updateDocType(id, { name: editName.trim() }); setEditId(null); load(); }
-    catch (err) { setError(err.message); }
+    try { await adminApi.updateDocType(id, { name: editName.trim() }); setEditId(null); toast.success('บันทึกแล้ว'); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   const remove = async (id, name) => {
-    if (!window.confirm(`ลบประเภทเอกสาร "${name}"?`)) return;
-    try { await adminApi.deleteDocType(id); load(); }
-    catch (err) { setError(err.message); }
+    const ok = await confirm({ title: 'ลบประเภทเอกสาร', message: `ลบประเภทเอกสาร "${name}"?`, confirmLabel: 'ลบ' });
+    if (!ok) return;
+    try { await adminApi.deleteDocType(id); toast.success('ลบประเภทเอกสารแล้ว'); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   const field = 'field';
@@ -47,8 +54,10 @@ export default function DocTypesTab() {
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {types.length === 0 ? (
-          <p className="text-sm text-slate-400 p-5">ยังไม่มีประเภทเอกสาร</p>
+        {loading ? (
+          <p className="text-sm text-slate-400 p-5">กำลังโหลด…</p>
+        ) : types.length === 0 ? (
+          <p className="text-sm text-slate-400 p-5">ยังไม่มีประเภทเอกสาร — เพิ่มด้านบนได้เลย</p>
         ) : types.map((t) => (
           <div key={t.id} className="flex items-center justify-between px-5 py-3">
             {editId === t.id ? (

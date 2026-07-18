@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/ememo.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 
 const EMPTY = { name: '', nameEn: '', address: '', phone: '', fax: '', telex: '', logoUrl: '', isDefault: false };
@@ -29,7 +31,10 @@ function LogoThumb({ companyId, logoUrl, size = 44 }) {
 }
 
 export default function CompaniesTab() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editId, setEditId] = useState(null); // 'new' | uuid | null
   const [form, setForm] = useState(EMPTY);
@@ -37,7 +42,7 @@ export default function CompaniesTab() {
   const [busy, setBusy] = useState(false);
   const [localLogo, setLocalLogo] = useState(null); // preview for a freshly-picked logo
 
-  const load = () => adminApi.listCompanies().then((r) => setCompanies(r.data)).catch((e) => setError(e.message));
+  const load = () => { setLoading(true); return adminApi.listCompanies().then((r) => setCompanies(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
 
   const startNew = () => { setEditId('new'); setForm(EMPTY); setLocalLogo(null); setError(null); };
@@ -79,6 +84,7 @@ export default function CompaniesTab() {
     try {
       if (editId === 'new') await adminApi.createCompany(body);
       else await adminApi.updateCompany(editId, body);
+      toast.success('บันทึกบริษัทแล้ว');
       cancel();
       load();
     } catch (err) { setError(err.message); }
@@ -86,14 +92,15 @@ export default function CompaniesTab() {
   };
 
   const makeDefault = async (id) => {
-    try { await adminApi.updateCompany(id, { isDefault: true }); load(); }
-    catch (err) { setError(err.message); }
+    try { await adminApi.updateCompany(id, { isDefault: true }); toast.success('ตั้งเป็นบริษัทหลักแล้ว'); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   const remove = async (c) => {
-    if (!window.confirm(`ลบบริษัท "${c.name}" ?`)) return;
-    try { await adminApi.deleteCompany(c.id); load(); }
-    catch (err) { setError(err.message); }
+    const ok = await confirm({ title: 'ลบบริษัท', message: `ลบบริษัท "${c.name}"?`, confirmLabel: 'ลบบริษัท' });
+    if (!ok) return;
+    try { await adminApi.deleteCompany(c.id); toast.success('ลบบริษัทแล้ว'); load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   const field = 'field';
@@ -169,8 +176,10 @@ export default function CompaniesTab() {
       )}
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-        {companies.length === 0 ? (
-          <p className="p-5 text-sm text-slate-400">ยังไม่มีบริษัท</p>
+        {loading ? (
+          <p className="p-5 text-sm text-slate-400">กำลังโหลด…</p>
+        ) : companies.length === 0 ? (
+          <p className="p-5 text-sm text-slate-400">ยังไม่มีบริษัท — กด “เพิ่มบริษัท” เพื่อเริ่ม</p>
         ) : companies.map((c) => (
           <div key={c.id} className="flex items-center gap-4 px-5 py-3.5">
             <LogoThumb companyId={c.id} logoUrl={c.logo_url} />

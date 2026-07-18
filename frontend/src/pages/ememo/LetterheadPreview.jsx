@@ -86,30 +86,40 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       setSigSpacer((prev) => (Math.abs(prev - spacer) > 0.5 ? spacer : prev));
 
       // Collect candidate break positions = the bottom Y (flow coords, spacer-free)
-      // of every text line in the body, so a page can end exactly at a line gap and
-      // never slice through a line. The body is the only long multi-line element.
+      // of every text line in the body, plus the body line height, so a page can end
+      // at a line gap and never slice through a line. The body is the only long
+      // multi-line element.
       const breaks = [];
+      let lineH = 20;
       if (bodyRef.current) {
         const range = document.createRange();
         range.selectNodeContents(bodyRef.current);
-        for (const rect of range.getClientRects()) breaks.push(rect.bottom - origin);
+        for (const rect of range.getClientRects()) {
+          breaks.push(rect.bottom - origin);
+          if (rect.height > lineH) lineH = rect.height;
+        }
         range.detach?.();
       }
       // total flow height (spacer-free letter) + the spacer that pushes the sig block
       const totalH = (measureRef.current.scrollHeight || 0) - ph * PAD_TOP + spacer;
 
-      // Walk pages: each page ends at the largest body line-bottom ≤ (start+usable);
-      // if none falls in range (short content or a non-body block), hard-cut at
-      // +usable. Break positions are spacer-free (the body sits before the sig block,
-      // so the spacer doesn't move body lines).
+      // Walk pages. Each page fills DOWN TO the printable edge (start+usable) so that
+      // trailing blocks (e.g. the signature) stay on the page while space remains —
+      // we only pull the break back to the last clean line gap when a BODY line would
+      // actually be sliced at that edge. (The sig block never gets sliced: the spacer
+      // above pushes it whole to the next page when it would straddle.)
       const offs = [0];
       let start = 0;
       let guard = 0;
       while (start + usable < totalH && guard < 60) {
         const limit = start + usable;
-        let brk = 0;
-        for (const b of breaks) if (b > start + 1 && b <= limit) brk = b;
-        const next = brk > start ? brk : limit;
+        let brk = 0;          // last body line-bottom at/under the edge
+        let bisects = false;  // does a body line straddle the edge?
+        for (const b of breaks) {
+          if (b > start + 1 && b <= limit) brk = b;
+          if (b > limit + 0.5 && b - lineH < limit - 0.5) bisects = true;
+        }
+        const next = bisects && brk > start ? brk : limit;
         offs.push(next);
         start = next;
         guard += 1;

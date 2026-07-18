@@ -41,6 +41,23 @@ function decodeFilename(name) {
 }
 
 /**
+ * Build an ASCII-safe slug for a storage (S3) key. Supabase Storage rejects keys
+ * containing non-ASCII (e.g. Thai) or spaces with "Invalid key", so the object
+ * key must be sanitised — the human-readable original name is preserved
+ * separately in document_attachments.file_name for display/download.
+ */
+function storageSafeName(name) {
+  const raw = name || 'file';
+  const dot = raw.lastIndexOf('.');
+  const ext = dot > 0 ? raw.slice(dot).replace(/[^A-Za-z0-9.]/g, '').slice(0, 12) : '';
+  const base = (dot > 0 ? raw.slice(0, dot) : raw)
+    .replace(/[^A-Za-z0-9._-]+/g, '_') // drop Thai/spaces/other → underscore
+    .replace(/^[-_.]+|[-_.]+$/g, '')
+    .slice(0, 40);
+  return (base || 'file') + ext;
+}
+
+/**
  * Load a document and ensure the caller may MUTATE it: the creator or an admin.
  * Everyone can read (list/detail stay open), but edit/cancel/submit/attach are
  * owner-or-admin only. Returns the document row.
@@ -490,7 +507,7 @@ router.post(
     if (!msg) throw new ApiError(404, 'Message not found');
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
     const fileName = decodeFilename(req.file.originalname);
-    const safeName = fileName.replace(/[^\w.\-ก-๙ ]/g, '_');
+    const safeName = storageSafeName(fileName);
     const key = `documents/${req.params.id}/msg/${crypto.randomUUID()}-${safeName}`;
     await putObject(key, req.file.buffer, req.file.mimetype);
     const row = await queryOne(
@@ -746,7 +763,7 @@ router.post(
     await loadDocForMutation(req);
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
     const fileName = decodeFilename(req.file.originalname);
-    const safeName = fileName.replace(/[^\w.\-ก-๙ ]/g, '_');
+    const safeName = storageSafeName(fileName);
     const key = `documents/${req.params.id}/${crypto.randomUUID()}-${safeName}`;
     await putObject(key, req.file.buffer, req.file.mimetype);
     const row = await queryOne(

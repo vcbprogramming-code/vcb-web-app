@@ -8,8 +8,14 @@ import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
 import ConsultModal from './ConsultModal.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
+import SheetPreview from './SheetPreview.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+
+/** .xlsx attachment → previewable as a table (parsed server-side). */
+const isSheet = (a) =>
+  /spreadsheetml|officedocument\.spreadsheet/i.test(a.content_type || '') ||
+  /\.xlsx$/i.test(a.file_name || '');
 
 /** One compact metadata item (icon + label + value), used in the header card. */
 function MetaItem({ icon, label, children, className = '' }) {
@@ -149,17 +155,20 @@ export default function DocumentDetail() {
     const inlineKinds = doc.attachments.filter(
       (a) => (a.kind === 'upload') && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
+    // .xlsx spreadsheets: previewable as a table (parsed server-side)
+    const sheetKinds = doc.attachments.filter((a) => a.kind === 'upload' && isSheet(a));
     const list = [];
     if (primary) list.push({ id: primary.id, label: 'เอกสาร', isLetter: true, contentType: primary.content_type });
     // number the supplementary files so it's clear which is attachment #1, #2… (#2)
-    inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type }));
+    inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type, fileName: a.file_name }));
+    sheetKinds.forEach((a) => list.push({ id: a.id, label: `ตาราง: ${a.file_name}`, isLetter: false, isSheet: true, contentType: a.content_type, fileName: a.file_name }));
     return list;
   })() : [];
 
-  // Uploads that can't be shown inline (Excel, Word, zip…) — list them separately
-  // so every attached file is still downloadable (previously they were hidden).
+  // Uploads that can't be shown inline AND aren't previewable spreadsheets
+  // (Word, zip, csv…) — list them as downloads so no attachment is ever hidden.
   const otherFiles = doc ? doc.attachments.filter(
-    (a) => a.kind === 'upload' && !/^(application\/pdf|image\/)/.test(a.content_type || '')
+    (a) => a.kind === 'upload' && !/^(application\/pdf|image\/)/.test(a.content_type || '') && !isSheet(a)
   ) : [];
   const fmtSize = (b) => (b == null ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`);
 
@@ -168,15 +177,17 @@ export default function DocumentDetail() {
     : previewables[0]?.id || null;
   const activePreview = previewables.find((p) => p.id === activePreviewId) || null;
   const activeIsImage = /^image\//.test(activePreview?.contentType || '');
+  const activeIsSheet = Boolean(activePreview?.isSheet);
 
   useEffect(() => {
-    if (!activePreviewId) { setPreviewUrl(null); return; }
+    // sheets are rendered by <SheetPreview> (no blob URL needed)
+    if (!activePreviewId || activeIsSheet) { setPreviewUrl(null); return; }
     let url; let cancelled = false;
     ememoApi.attachmentBlobUrl(id, activePreviewId)
       .then((u) => { if (cancelled) { URL.revokeObjectURL(u); return; } url = u; setPreviewUrl(u); })
       .catch(() => !cancelled && setPreviewUrl(null));
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [activePreviewId, id]);
+  }, [activePreviewId, id, activeIsSheet]);
 
   const cancelDoc = async () => {
     if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
@@ -396,11 +407,15 @@ export default function DocumentDetail() {
           <div className="card !p-3">
             <div className="mb-2 flex items-center justify-between px-2 pt-1">
               <h3 className="font-bold text-slate-800">เอกสาร</h3>
-              {previewUrl && (
+              {activeIsSheet ? (
+                <button onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
+                  <Icon name="download" className="h-4 w-4" /> ดาวน์โหลดไฟล์
+                </button>
+              ) : previewUrl ? (
                 <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
                   <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
                 </button>
-              )}
+              ) : null}
             </div>
             {previewables.length > 1 && (
               <div className="mb-2 flex flex-wrap gap-1.5 px-2">
@@ -437,7 +452,9 @@ export default function DocumentDetail() {
                 ))}
               </div>
             )}
-            {previewUrl ? (
+            {activeIsSheet ? (
+              <SheetPreview docId={id} attId={activePreviewId} />
+            ) : previewUrl ? (
               activeIsImage ? (
                 // images: fit to the panel width so they don't open zoomed-in (#1)
                 <div className="h-[calc(100vh-220px)] min-h-[560px] w-full overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">

@@ -53,6 +53,9 @@ export const ememoApi = {
   // returns a blob object URL the browser can open/preview
   attachmentBlobUrl: (id, attId) =>
     apiBlobUrl(`/documents/${id}/attachments/${attId}/download`),
+  // parse an .xlsx attachment into { sheets:[{name,rows}], truncated } for a table preview
+  attachmentSheet: (id, attId) =>
+    api(`/documents/${id}/attachments/${attId}/sheet`),
   deleteAttachment: (id, attId) =>
     api(`/documents/${id}/attachments/${attId}`, { method: 'DELETE' }),
 

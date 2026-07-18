@@ -38,6 +38,14 @@ export const env = {
   // Public URL of the frontend, used to build approval links in emails.
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:5173',
 
+  // Modules turned off for the current soft launch — their APIs return 404 until
+  // enabled (defence in depth; the frontend also hides them in config/nav.js).
+  // Comma-separated; set DISABLED_MODULES='' to enable everything.
+  disabledModules: (process.env.DISABLED_MODULES ?? 'performance,credit,onboarding')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+
   // Google OAuth client id for "Sign in with Google" (public value — no secret
   // needed; the backend only verifies Google ID tokens against it). When unset,
   // the Google login route returns 501 and only email login works.

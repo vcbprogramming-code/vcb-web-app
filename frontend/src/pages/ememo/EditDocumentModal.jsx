@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
 import ReferencePicker from './ReferencePicker.jsx';
@@ -24,6 +24,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const submittingRef = useRef(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -31,7 +32,15 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
   }, []);
 
   const submit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    // The footer "บันทึก" button lives outside the <form>, so the input's
+    // `required` never fires — validate here and give a Thai field message.
+    if (!form.subject.trim()) {
+      setError('กรุณากรอกเรื่อง');
+      return;
+    }
+    if (submittingRef.current) return; // guard rapid double-submit
+    submittingRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -53,6 +62,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
       setError(err.message);
     } finally {
       setBusy(false);
+      submittingRef.current = false;
     }
   };
 

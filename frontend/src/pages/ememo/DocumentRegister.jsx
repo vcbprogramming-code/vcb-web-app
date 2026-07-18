@@ -6,6 +6,7 @@ import AddDocumentModal from './AddDocumentModal.jsx';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useHeaderSlot } from '../../components/HeaderSlot.jsx';
+import { useToast } from '../../components/Toast.jsx';
 
 // English status labels for the "All statuses" dropdown (client's mockup uses EN)
 const STATUS_OPTIONS = [
@@ -88,6 +89,7 @@ function StatusBadge({ status }) {
 export default function DocumentRegister() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const toast = useToast();
   const isAdmin = profile?.role === 'admin';
   const [projects, setProjects] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
@@ -419,9 +421,12 @@ export default function DocumentRegister() {
           projects={projects}
           docTypes={docTypes}
           onClose={() => setShowAdd(false)}
-          onCreated={() => {
+          onCreated={(newId, meta) => {
             setShowAdd(false);
             loadDocs();
+            if (meta?.emailFailed) toast.error('บันทึกเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง');
+            else toast.success('บันทึกเอกสารเรียบร้อยแล้ว');
+            if (newId) navigate(`/memos/${newId}`);
           }}
         />
       )}

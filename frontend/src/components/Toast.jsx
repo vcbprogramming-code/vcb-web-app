@@ -28,7 +28,8 @@ export function ToastProvider({ children }) {
 
   const api = {
     success: (m, ttl) => push(m, 'success', ttl),
-    error: (m, ttl) => push(m, 'error', ttl),
+    // errors linger longer so a user who glances away doesn't miss them
+    error: (m, ttl) => push(m, 'error', ttl ?? 6500),
     info: (m, ttl) => push(m, 'info', ttl),
   };
 
@@ -42,7 +43,7 @@ export function ToastProvider({ children }) {
             <div
               key={t.id}
               className={`pointer-events-auto flex items-start gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-0 shadow-lg ring-1 ${v.ring}`}
-              role="status"
+              role={t.variant === 'error' ? 'alert' : 'status'}
             >
               <span className={`h-full w-1 self-stretch ${v.bar}`} />
               <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${v.iconBg}`}>

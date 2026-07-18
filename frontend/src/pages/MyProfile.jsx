@@ -19,7 +19,10 @@ export default function MyProfile() {
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState(null);
+
+  const load = () => {
+    setLoadError(null);
     profileApi.me().then((r) => {
       setProfile(r.profile);
       setFullName(r.profile.full_name || '');
@@ -27,8 +30,10 @@ export default function MyProfile() {
       if (r.profile.signature_url) {
         profileApi.signatureBlobUrl().then(setSigUrl).catch(() => {});
       }
-    }).catch((e) => setError(e.message));
-  }, []);
+    }).catch((e) => setLoadError(e.message));
+  };
+
+  useEffect(() => { load(); }, []);
 
   // revoke the signature blob URL when it's replaced or on unmount (prevents a leak)
   useEffect(() => () => { if (sigUrl?.startsWith('blob:')) URL.revokeObjectURL(sigUrl); }, [sigUrl]);
@@ -74,7 +79,20 @@ export default function MyProfile() {
     finally { setBusy(false); }
   };
 
-  if (!profile) return <div className="text-slate-400">กำลังโหลด…</div>;
+  if (!profile) {
+    if (loadError) {
+      return (
+        <div className="max-w-2xl space-y-3">
+          <PageHeader title="โปรไฟล์ของฉัน" />
+          <div className="card space-y-3 text-center">
+            <p className="text-sm text-red-600">โหลดข้อมูลโปรไฟล์ไม่สำเร็จ: {loadError}</p>
+            <div><button onClick={load} className="btn-primary">ลองใหม่อีกครั้ง</button></div>
+          </div>
+        </div>
+      );
+    }
+    return <div className="text-slate-400">กำลังโหลด…</div>;
+  }
   const field = 'field';
 
   return (

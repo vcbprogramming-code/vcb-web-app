@@ -54,12 +54,12 @@ function UserModal({ user, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
         </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
+        <form onSubmit={submit} className="space-y-4 overflow-auto p-6">
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
@@ -156,8 +156,8 @@ export default function UsersTab() {
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      <div className="card !p-0 overflow-hidden">
-        <table className="tbl">
+      <div className="card !p-0 overflow-x-auto">
+        <table className="tbl min-w-[720px]">
           <thead>
             <tr className="tbl-head">
               <th className="tbl-th">ชื่อ</th>

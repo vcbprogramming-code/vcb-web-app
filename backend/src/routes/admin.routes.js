@@ -7,7 +7,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { hashPassword } from '../utils/auth.js';
-import { PERMISSION_CATALOG, effectivePermissions } from '../config/permissions.js';
+import { PERMISSION_CATALOG, effectivePermissions, overridesFromEffective } from '../config/permissions.js';
 import { putObject } from '../config/storage.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
@@ -92,9 +92,23 @@ router.patch(
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const f = parsed.data;
 
-    // don't let an admin disable / demote themselves out of admin
-    if (req.params.id === req.profile.id && (f.isActive === false || (f.role && f.role !== 'admin'))) {
-      throw new ApiError(400, 'ไม่สามารถปิดการใช้งานหรือลดสิทธิ์บัญชีของตนเองได้');
+    // don't let an admin lock themselves (and possibly the whole org) out.
+    if (req.params.id === req.profile.id) {
+      if (f.isActive === false || (f.role && f.role !== 'admin')) {
+        throw new ApiError(400, 'ไม่สามารถปิดการใช้งานหรือลดสิทธิ์บัญชีของตนเองได้');
+      }
+      // Changing your own login method or email can lock you out (e.g. switching
+      // to Google with a non-Google email, or a typo). Only allow it when another
+      // active admin exists to recover the account.
+      if ((f.loginMethod && f.loginMethod !== 'email') || f.email !== undefined) {
+        const other = await queryOne(
+          "select id from profiles where role = 'admin' and is_active = true and id <> $1 limit 1",
+          [req.profile.id]
+        );
+        if (!other) {
+          throw new ApiError(400, 'ต้องมีผู้ดูแลระบบ (admin) ที่ใช้งานได้อีกอย่างน้อย 1 บัญชี ก่อนเปลี่ยนอีเมลหรือวิธีเข้าสู่ระบบของบัญชีตนเอง');
+        }
+      }
     }
 
     // changing the email: make sure it isn't already used by ANOTHER account
@@ -148,6 +162,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = pwdSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    // A Google-login account never uses a password, so setting one has no effect
+    // and would silently confuse the admin — reject with a clear message.
+    const target = await queryOne('select login_method from profiles where id = $1', [req.params.id]);
+    if (!target) throw new ApiError(404, 'User not found');
+    if (target.login_method === 'google') {
+      throw new ApiError(400, 'บัญชีนี้เข้าสู่ระบบด้วย Google — ตั้งรหัสผ่านไม่ได้');
+    }
     const hash = await hashPassword(parsed.data.password);
     const row = await queryOne(
       'update profiles set password_hash = $1, password_changed_at = now() where id = $2 returning id',
@@ -200,10 +221,17 @@ router.put(
   asyncHandler(async (req, res) => {
     const parsed = permissionsSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    // The UI sends the fully-resolved map. Persist only the entries that differ
+    // from the user's role defaults, so untouched actions keep following the role
+    // (otherwise every save freezes all permissions and later role changes do
+    // nothing).
+    const target = await queryOne('select role from profiles where id = $1', [req.params.id]);
+    if (!target) throw new ApiError(404, 'User not found');
+    const overrides = overridesFromEffective(target.role, parsed.data.permissions);
     const row = await queryOne(
       `update profiles set permissions = $2::jsonb where id = $1
         returning id, role, permissions`,
-      [req.params.id, JSON.stringify(parsed.data.permissions)]
+      [req.params.id, JSON.stringify(overrides)]
     );
     if (!row) throw new ApiError(404, 'User not found');
     res.json({ data: { overrides: row.permissions, effective: effectivePermissions(row) } });
@@ -649,7 +677,7 @@ router.put(
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const row = await queryOne(
       `update doc_code_departments set department = $2, recipient_title = $3
-        where code = $1
+        where upper(code) = upper($1)
         returning code, department, recipient_title, default_approvers`,
       [req.params.code, parsed.data.department, parsed.data.recipientTitle || null]
     );
@@ -662,11 +690,11 @@ router.put(
 router.delete(
   '/doc-codes/:code',
   asyncHandler(async (req, res) => {
-    const used = await queryOne('select count(*)::int as n from documents where doc_code = $1', [req.params.code]);
+    const used = await queryOne('select count(*)::int as n from documents where upper(doc_code) = upper($1)', [req.params.code]);
     if (used && used.n > 0) {
       throw new ApiError(409, `ลบไม่ได้ — มีเอกสาร ${used.n} ฉบับใช้รหัสนี้อยู่`);
     }
-    const row = await queryOne('delete from doc_code_departments where code = $1 returning code', [req.params.code]);
+    const row = await queryOne('delete from doc_code_departments where upper(code) = upper($1) returning code', [req.params.code]);
     if (!row) throw new ApiError(404, 'Doc code not found');
     res.json({ data: { code: row.code } });
   })
@@ -688,7 +716,7 @@ router.put(
     const cleaned = parsed.data.approvers.map((a) => ({ name: a.name?.trim() || undefined, email: a.email.trim() }));
     const row = await queryOne(
       `update doc_code_departments set default_approvers = $2::jsonb
-        where code = $1
+        where upper(code) = upper($1)
         returning code, department, recipient_title, default_approvers`,
       [req.params.code, JSON.stringify(cleaned)]
     );

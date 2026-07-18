@@ -30,7 +30,8 @@ export default function DocTypesTab() {
     catch (err) { setError(err.message); }
   };
 
-  const remove = async (id) => {
+  const remove = async (id, name) => {
+    if (!window.confirm(`ลบประเภทเอกสาร "${name}"?`)) return;
     try { await adminApi.deleteDocType(id); load(); }
     catch (err) { setError(err.message); }
   };
@@ -64,7 +65,7 @@ export default function DocTypesTab() {
               ) : (
                 <>
                   <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
-                  <button onClick={() => remove(t.id)} className="text-red-500 hover:underline text-sm">ลบ</button>
+                  <button onClick={() => remove(t.id, t.name)} className="text-red-500 hover:underline text-sm">ลบ</button>
                 </>
               )}
             </div>

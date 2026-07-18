@@ -64,6 +64,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [createdDocId, setCreatedDocId] = useState(null); // resume target if a later step fails
+  const [savedDraftId, setSavedDraftId] = useState(null); // set when create succeeded but a later step failed
   const submittingRef = useRef(false);   // synchronous re-entrancy guard (state flush isn't instant)
   const uploadedRef = useRef(new Set());  // File objects already uploaded — retry-safe, no dupes
 
@@ -240,10 +241,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    // resume an already-created doc if a previous attempt failed after create —
+    // avoids creating a duplicate (and burning a running number) on retry.
+    // Declared outside the try so the catch can tell the doc was already saved.
+    let doc = createdDocId ? { id: createdDocId } : null;
     try {
-      // resume an already-created doc if a previous attempt failed after create —
-      // avoids creating a duplicate (and burning a running number) on retry
-      let doc = createdDocId ? { id: createdDocId } : null;
       if (!doc) {
         const res = await ememoApi.createDocument({
           projectId,
@@ -283,9 +285,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       const cleanedApprovers = approvers
         .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
         .filter((a) => a.email);
+      let emailSent = true;
       if (cleanedApprovers.length > 0) {
         try {
-          await ememoApi.submitForApproval(doc.id, cleanedApprovers);
+          const sub = await ememoApi.submitForApproval(doc.id, cleanedApprovers);
+          if (sub?.data?.emailSent === false) emailSent = false;
         } catch (err) {
           // a prior attempt may have created the chain server-side but lost the
           // response; a retry then 409s "already pending" — treat that as success
@@ -293,9 +297,18 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         }
       }
 
-      onCreated(doc.id);
+      // pass the email outcome up so the caller can warn if no notification went out
+      onCreated(doc.id, { emailFailed: cleanedApprovers.length > 0 && !emailSent });
     } catch (err) {
-      setError(err.message);
+      // The document may already have been created (running number burned) before
+      // a later step failed. Say it was saved as a draft so the user recovers it
+      // instead of recreating, and offer a direct link to open it.
+      if (doc?.id) {
+        setSavedDraftId(doc.id);
+        setError(`บันทึกเอกสารเป็นฉบับร่างแล้ว แต่ขั้นตอนถัดไปทำไม่สำเร็จ: ${err.message}`);
+      } else {
+        setError(err.message);
+      }
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -647,7 +660,16 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           </div>
           </>)}
 
-          {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+          {error && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+              {savedDraftId && (
+                <button type="button" onClick={() => onCreated(savedDraftId)} className="mt-2 block font-semibold text-red-800 underline">
+                  เปิดเอกสารที่บันทึกไว้เพื่อดำเนินการต่อ →
+                </button>
+              )}
+            </div>
+          )}
 
           {/* wizard nav */}
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">

@@ -17,26 +17,38 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
+  const [fetchedAt, setFetchedAt] = useState(null);
 
-  useEffect(() => {
-    ememoApi.stats().then((r) => setStats(r.data)).catch((e) => setError(e.message));
-  }, []);
+  const load = () => {
+    setError(null);
+    ememoApi.stats()
+      .then((r) => { setStats(r.data); setFetchedAt(new Date()); })
+      .catch((e) => setError(e.message));
+  };
+  useEffect(() => { load(); }, []);
 
   const s = stats;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-3">
-        <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
-          <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(new Date())}
-        </span>
+        {fetchedAt && (
+          <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
+            <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(fetchedAt)}
+          </span>
+        )}
         <span className="chip bg-brand/10 text-brand">{formatThaiLongDate(new Date())}</span>
       </div>
 
-      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {error && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>โหลดภาพรวมไม่สำเร็จ: {error}</span>
+          <button onClick={load} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">ลองใหม่</button>
+        </div>
+      )}
 
       {!s ? (
-        <div className="text-slate-400">กำลังโหลดภาพรวม…</div>
+        !error && <div className="text-slate-400">กำลังโหลดภาพรวม…</div>
       ) : (
         <>
           {/* top stat cards */}

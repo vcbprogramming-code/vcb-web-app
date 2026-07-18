@@ -38,7 +38,7 @@ const META = {
   },
 };
 
-export default function ApprovalActionModal({ action, onClose, onConfirm }) {
+export default function ApprovalActionModal({ action, onClose, onConfirm, warnNoSignature = false }) {
   const m = META[action] || META.approved;
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,6 +78,13 @@ export default function ApprovalActionModal({ action, onClose, onConfirm }) {
         </span>
         <p className="text-sm text-slate-600">{m.desc}</p>
       </div>
+
+      {warnNoSignature && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>คุณยังไม่ได้ตั้งค่าลายเซ็น หากอนุมัติตอนนี้ เอกสารจะไม่มีรูปลายเซ็นของคุณ — แนะนำให้ตั้งค่าลายเซ็นที่หน้า “โปรไฟล์ของฉัน” ก่อน</span>
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-600">

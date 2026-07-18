@@ -64,16 +64,37 @@ export default function VerifyDocument() {
 function Verified({ data }) {
   const { document: doc, approval_steps: steps = [], audit = [] } = data;
   const status = STATUS_META[doc.status] || STATUS_META.pending;
+  // The green "genuine & approved" endorsement is only truthful for an approved
+  // document. For pending/returned/rejected/cancelled show a neutral/warning
+  // banner so a scanned copy can't misrepresent its real status.
+  const isApproved = doc.status === 'approved';
+  const banner = isApproved
+    ? {
+        wrap: 'border-emerald-200 bg-emerald-50', icon: 'check', iconWrap: 'bg-emerald-500 text-white',
+        title: 'text-emerald-800', sub: 'text-emerald-700',
+        titleText: 'เอกสารนี้ได้รับการอนุมัติและมีอยู่จริงในระบบ',
+      }
+    : doc.status === 'rejected' || doc.status === 'cancelled'
+    ? {
+        wrap: 'border-rose-200 bg-rose-50', icon: 'warning', iconWrap: 'bg-rose-500 text-white',
+        title: 'text-rose-800', sub: 'text-rose-700',
+        titleText: `เอกสารนี้มีอยู่จริงในระบบ แต่สถานะปัจจุบันคือ “${status.label}”`,
+      }
+    : {
+        wrap: 'border-amber-200 bg-amber-50', icon: 'clock', iconWrap: 'bg-amber-500 text-white',
+        title: 'text-amber-800', sub: 'text-amber-700',
+        titleText: `เอกสารนี้มีอยู่จริงในระบบ · สถานะ “${status.label}” (ยังไม่อนุมัติสมบูรณ์)`,
+      };
   return (
     <div className="space-y-4">
-      {/* authenticity banner */}
-      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-          <Icon name="check" className="h-6 w-6" />
+      {/* authenticity banner — endorsement wording depends on real status */}
+      <div className={`flex items-center gap-3 rounded-2xl border px-5 py-4 ${banner.wrap}`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${banner.iconWrap}`}>
+          <Icon name={banner.icon} className="h-6 w-6" />
         </span>
         <div>
-          <div className="font-bold text-emerald-800">เอกสารนี้มีอยู่จริงในระบบ</div>
-          <div className="text-xs text-emerald-700">ออกจากระบบ VCB E-Memo · {doc.company_name || 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง'}</div>
+          <div className={`font-bold ${banner.title}`}>{banner.titleText}</div>
+          <div className={`text-xs ${banner.sub}`}>ออกจากระบบ VCB E-Memo · {doc.company_name || 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง'}</div>
         </div>
       </div>
 
@@ -105,11 +126,10 @@ function Verified({ data }) {
                   <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">{s.step_no}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-medium text-slate-700">{s.approver_name || s.approver_email}</span>
+                      <span className="font-medium text-slate-700">{s.approver_name || 'ผู้อนุมัติ'}</span>
                       <span className={`text-xs font-semibold ${color}`}>{STEP_ACTION_TH[s.action] || s.action}</span>
                       {s.acted_at && <span className="text-xs text-slate-400">{formatThaiDateTime(s.acted_at)}</span>}
                     </div>
-                    {s.comment && <div className="mt-0.5 rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{s.comment}</div>}
                   </div>
                 </li>
               );

@@ -107,6 +107,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const parsed = actionSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    // reject/return must carry a reason (backs up the client-side rule for direct
+    // API calls, so the audit/verify trail is never left blank)
+    if ((parsed.data.action === 'rejected' || parsed.data.action === 'returned') && !parsed.data.comment?.trim()) {
+      throw new ApiError(400, 'กรุณาระบุเหตุผลสำหรับการไม่อนุมัติหรือส่งกลับแก้ไข');
+    }
 
     // reject unknown tokens BEFORE writing anything to storage (avoid abuse)
     const validStep = await queryOne(

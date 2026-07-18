@@ -27,8 +27,11 @@ export async function requireAuth(req, res, next) {
          from profiles where id = $1`,
       [payload.sub]
     );
-    if (!profile) throw new ApiError(403, 'No profile found for this account');
-    if (!profile.is_active) throw new ApiError(403, 'Account is disabled');
+    // These are session-level failures (the token no longer maps to a usable
+    // account), so return 401 — the client treats 401 as "log out & re-login",
+    // whereas 403 is reserved for "authenticated but not allowed".
+    if (!profile) throw new ApiError(401, 'บัญชีนี้ไม่พบในระบบ กรุณาเข้าสู่ระบบใหม่');
+    if (!profile.is_active) throw new ApiError(401, 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
 
     // Session revocation: reject tokens issued before the last password change,
     // so an admin password reset immediately invalidates existing tokens.

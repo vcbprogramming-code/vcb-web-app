@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { api } from '../lib/api.js';
+import { api, takeRedirectAfterLogin } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
@@ -40,7 +40,12 @@ export default function Login() {
   const googleBtnRef = useRef(null);
 
   const goDest = useCallback(() => {
-    const dest = location.state?.from?.pathname || '/';
+    const dest =
+      (location.state?.from?.pathname
+        ? location.state.from.pathname + (location.state.from.search || '')
+        : null) ||
+      takeRedirectAfterLogin() ||
+      '/';
     navigate(dest, { replace: true });
   }, [location.state, navigate]);
 

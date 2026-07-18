@@ -36,7 +36,7 @@ const AUDIT_ACTION_TH = {
   consulted: 'ขอความเห็น',
   forwarded: 'ส่งต่อ',
   resent: 'ส่งอนุมัติซ้ำ',
-  email_failed: '⚠️ ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ',
+  email_failed: 'ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ',
 };
 
 /** Full system activity log for the document (always expanded). */
@@ -58,7 +58,10 @@ function AuditTrail({ entries }) {
               <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="font-medium text-slate-700">{AUDIT_ACTION_TH[a.action] || a.action}</span>
+                  <span className={`inline-flex items-center gap-1 font-medium ${a.action === 'email_failed' ? 'text-amber-600' : 'text-slate-700'}`}>
+                    {a.action === 'email_failed' && <Icon name="warning" className="h-3.5 w-3.5" />}
+                    {AUDIT_ACTION_TH[a.action] || a.action}
+                  </span>
                   {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
                   <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
                 </div>
@@ -207,12 +210,16 @@ export default function DocumentDetail() {
   };
 
   const openAttachment = async (attId) => {
+    // Open the tab synchronously inside the click gesture, THEN point it at the
+    // blob once fetched — otherwise the post-await window.open is blocked by
+    // popup blockers (Safari/Firefox) and the file silently never opens.
+    const win = window.open('', '_blank');
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
-      window.open(url, '_blank');
+      if (win) win.location = url; else window.open(url, '_blank');
       // revoke once the new tab has had time to load the blob (else it leaks for the session)
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (e) { setError(e.message); }
+    } catch (e) { if (win) win.close(); setError(e.message); toast.error(e.message); }
   };
 
   // post a message (+ optional attached file) to the conversation thread.
@@ -259,6 +266,14 @@ export default function DocumentDetail() {
           <div>
             <div className="text-sm font-bold text-slate-900">เอกสารนี้รอการอนุมัติจากคุณ</div>
             <p className="text-xs text-slate-600">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มมุมขวาบน</p>
+            {myApproval.hasSignature === false && (
+              <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                <Icon name="warning" className="h-3.5 w-3.5" />
+                คุณยังไม่ได้ตั้งค่าลายเซ็น —
+                <button onClick={() => navigate('/profile')} className="underline hover:text-amber-800">ตั้งค่าลายเซ็นที่โปรไฟล์</button>
+                เพื่อให้ลายเซ็นปรากฏบนเอกสารที่อนุมัติ
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -312,6 +327,9 @@ export default function DocumentDetail() {
               <>
                 <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
                   <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
+                </button>
+                <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
+                  <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
                 </button>
                 <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
                   <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
@@ -453,9 +471,10 @@ export default function DocumentDetail() {
           docTypes={dupData.docTypes}
           initial={dupData.initial}
           onClose={() => setDupData(null)}
-          onCreated={(newId) => {
+          onCreated={(newId, meta) => {
             setDupData(null);
-            toast.success('สร้างเอกสารจากใบเดิมแล้ว');
+            if (meta?.emailFailed) toast.error('สร้างเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง');
+            else toast.success('สร้างเอกสารจากใบเดิมแล้ว');
             if (newId) navigate(`/memos/${newId}`);
           }}
         />
@@ -482,6 +501,7 @@ export default function DocumentDetail() {
       {approvalAction && (
         <ApprovalActionModal
           action={approvalAction}
+          warnNoSignature={approvalAction === 'approved' && myApproval.hasSignature === false}
           onClose={() => setApprovalAction(null)}
           onConfirm={confirmApproval}
         />

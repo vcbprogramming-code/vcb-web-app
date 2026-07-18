@@ -85,6 +85,29 @@ export function hasPermission(profile, module, action) {
 }
 
 /**
+ * Given a role and a desired full permission map, return ONLY the entries that
+ * differ from that role's defaults — the minimal override set. Storing this
+ * (instead of the fully-resolved map the UI sends) is what keeps later role
+ * changes working: any action the admin didn't actually change stays unset and
+ * keeps falling through to the (possibly new) role default.
+ */
+export function overridesFromEffective(role, desired) {
+  const out = {};
+  for (const { module, actions } of PERMISSION_CATALOG) {
+    for (const { key } of actions) {
+      const want = desired?.[module]?.[key];
+      if (typeof want !== 'boolean') continue;
+      const def = ROLE_DEFAULTS[role]?.[module]?.[key] === true;
+      if (want !== def) {
+        if (!out[module]) out[module] = {};
+        out[module][key] = want;
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Build the full effective permission map for a profile (every catalog key
  * resolved to a boolean) — used by the admin UI to show current state.
  */

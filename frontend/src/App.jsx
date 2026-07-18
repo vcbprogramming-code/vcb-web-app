@@ -15,6 +15,7 @@ import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
 import MyProfile from './pages/MyProfile.jsx';
+import NotFound from './pages/NotFound.jsx';
 import { disabledPaths } from './config/nav.js';
 
 /** Redirect to Portal if this module is soft-disabled (see config/nav.js). */
@@ -84,7 +85,7 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

@@ -31,8 +31,11 @@ router.get(
     );
     if (!doc) throw new ApiError(404, 'ไม่พบเอกสาร — QR/ลิงก์อาจไม่ถูกต้อง');
 
+    // Public view: expose only what proves authenticity (who approved, when).
+    // Deliberately NOT approver_email (PII) or comment (internal reject reasons /
+    // opinions) — anyone with the printed QR can open this page.
     const { rows: steps } = await query(
-      `select step_no, approver_name, approver_email, action, comment, acted_at
+      `select step_no, approver_name, action, acted_at
          from approval_steps where document_id = $1 order by step_no`,
       [doc.id]
     );

@@ -38,6 +38,35 @@ function loginResponse(profile) {
   };
 }
 
+// ── lightweight in-memory brute-force throttle for login ────────────────────
+// Single-instance deployment (Render), so an in-memory map is enough; no extra
+// dependency. Keyed by IP + email, generous enough not to bother real users.
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX = 12;
+const loginHits = new Map(); // key -> { count, resetAt }
+
+function throttleKey(req) {
+  const ip = (req.headers['x-forwarded-for']?.split(',')[0] || req.ip || 'ip').trim();
+  const email = (req.body?.email || '').toString().toLowerCase();
+  return `${ip}|${email}`;
+}
+function loginThrottle(req, res, next) {
+  const now = Date.now();
+  if (loginHits.size > 5000) { // opportunistic cleanup so the map can't grow unbounded
+    for (const [k, v] of loginHits) if (v.resetAt < now) loginHits.delete(k);
+  }
+  const key = throttleKey(req);
+  let rec = loginHits.get(key);
+  if (!rec || rec.resetAt < now) { rec = { count: 0, resetAt: now + LOGIN_WINDOW_MS }; loginHits.set(key, rec); }
+  if (rec.count >= LOGIN_MAX) {
+    res.setHeader('Retry-After', String(Math.ceil((rec.resetAt - now) / 1000)));
+    return next(new ApiError(429, 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่'));
+  }
+  rec.count++;
+  next();
+}
+const clearThrottle = (req) => loginHits.delete(throttleKey(req));
+
 const loginSchema = z.object({
   email: z.string().email(),
   // email accounts log in with email + password (standard flow, 2026-07-04).
@@ -52,6 +81,7 @@ const loginSchema = z.object({
  */
 router.post(
   '/login',
+  loginThrottle,
   asyncHandler(async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -81,6 +111,7 @@ router.post(
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
     }
 
+    clearThrottle(req); // successful login — reset the attempt counter
     res.json(loginResponse(profile));
   })
 );

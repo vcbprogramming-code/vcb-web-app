@@ -238,9 +238,12 @@ router.get(
 );
 
 /** GET /api/documents/approvers — active accounts, for the approver picker.
- *  Defined BEFORE '/:id' so "approvers" isn't parsed as a document id. */
+ *  Defined BEFORE '/:id' so "approvers" isn't parsed as a document id.
+ *  Gated on ememo.submit so the full staff directory isn't exposed to every
+ *  logged-in account (admins pass automatically). */
 router.get(
   '/approvers',
+  requirePermission('ememo', 'submit'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `select full_name, email from profiles where is_active = true order by full_name`
@@ -404,7 +407,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
-              d.signer_name, d.signer_title, d.created_by, d.verify_token, pr.full_name as preparer_name,
+              d.signer_name, d.signer_title, d.created_by, d.company_id, d.verify_token, pr.full_name as preparer_name,
               lh.manager_email, lh.signatory_name as manager_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
@@ -836,7 +839,14 @@ router.get(
     );
     const canApprove = Boolean(step) && step.approver_email
       && step.approver_email.toLowerCase() === (req.profile.email || '').toLowerCase();
-    res.json({ data: { canApprove, step: canApprove ? step : null } });
+    // tell the UI whether this approver has a saved signature, so it can warn
+    // before an approval that would otherwise stamp a blank signature.
+    let hasSignature = false;
+    if (canApprove) {
+      const sig = await queryOne('select signature_url from profiles where id = $1', [req.profile.id]);
+      hasSignature = Boolean(sig?.signature_url);
+    }
+    res.json({ data: { canApprove, step: canApprove ? step : null, hasSignature } });
   })
 );
 
@@ -849,13 +859,19 @@ const approveSchema = z.object({
  * POST /api/documents/:id/approve — the logged-in user acts on the current
  * pending step, IF their email matches that step's approver. This is the
  * in-app (login-gated) replacement for the public /approve/:token flow.
+ * Authorization is being the assigned approver of the current step — NOT the
+ * "submit your own memos" permission, which is a different capability.
  */
 router.post(
   '/:id/approve',
-  requirePermission('ememo', 'submit'),
   asyncHandler(async (req, res) => {
     const parsed = approveSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    // A reject/return must carry a reason (client enforces it too; this backs it
+    // up for direct API calls so the audit/verify trail is never blank).
+    if ((parsed.data.action === 'rejected' || parsed.data.action === 'returned') && !parsed.data.comment?.trim()) {
+      throw new ApiError(400, 'กรุณาระบุเหตุผลสำหรับการไม่อนุมัติหรือส่งกลับแก้ไข');
+    }
 
     const step = await queryOne(
       `select id, approver_email from approval_steps
@@ -949,6 +965,20 @@ router.post(
     }
     const parsed = submitSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+
+    // Every approver must have an ACTIVE account: the approval email links to the
+    // login-gated in-app page, so an approver without an account gets a dead link
+    // and the document stalls. Reject early with the offending addresses.
+    const emails = [...new Set(parsed.data.approvers.map((a) => a.email.toLowerCase()))];
+    const { rows: accts } = await query(
+      `select lower(email) as email from profiles where is_active = true and lower(email) = any($1::text[])`,
+      [emails]
+    );
+    const known = new Set(accts.map((r) => r.email));
+    const missing = emails.filter((e) => !known.has(e));
+    if (missing.length) {
+      throw new ApiError(400, `ผู้อนุมัติต่อไปนี้ยังไม่มีบัญชีที่ใช้งานได้ในระบบ จึงจะอนุมัติผ่านลิงก์ไม่ได้: ${missing.join(', ')} — กรุณาสร้างบัญชีให้ก่อน หรือเลือกผู้อนุมัติที่มีบัญชี`);
+    }
 
     const client = await pool.connect();
     let firstStep;

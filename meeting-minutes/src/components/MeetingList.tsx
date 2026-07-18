@@ -1,4 +1,5 @@
 import type { Project, MeetingListItem, ProjectId } from '../types'
+import { FATHOM_INBOX_ID } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { inRange, type Range } from '../lib/ui'
@@ -10,6 +11,10 @@ interface Props {
   activeProject: ProjectId
   activeId: string | null
   query: string
+  /** ids matched by the debounced full-content server search for the current
+   *  query (see searchMeetings) — merged into the instant client-side filter
+   *  so a term buried past the excerpt still surfaces a result. */
+  searchMatchIds: Set<string> | null
   range: Range
   loaded: boolean
   onRange: (r: Range) => void
@@ -20,19 +25,27 @@ interface Props {
 const RANGE_LABELS: Record<Range, string> = { all: 'All', week: 'This week', month: 'This month' }
 
 export default function MeetingList(props: Props) {
-  const { meetings, byId, isAdmin, activeProject, activeId, query, range, loaded, onRange, onOpen, tr } = props
+  const { meetings, byId, isAdmin, activeProject, activeId, query, searchMatchIds, range, loaded, onRange, onOpen, tr } = props
   const label = activeProject === 'ALL' ? tr('allMeetings') : (byId[activeProject]?.name ?? '')
 
+  // "All meetings" is every tracked project's meetings — Fathom Inbox is a
+  // standalone review queue and never folds into the ALL aggregate, even
+  // though it happens to share the same meetings array (mirrors the
+  // FATHOM_INBOX_ID exclusion in JavaScript.html's visibleMeetings/countInRange).
+  const passesProjectFilter = (m: MeetingListItem): boolean =>
+    activeProject === 'ALL' ? m.projectId !== FATHOM_INBOX_ID : m.projectId === activeProject
+
   const countInRange = (r: Range): number =>
-    meetings.filter(m => (activeProject === 'ALL' || m.projectId === activeProject) && inRange(m, r)).length
+    meetings.filter(m => passesProjectFilter(m) && inRange(m, r)).length
 
   const q = query.trim().toLowerCase()
   const items = meetings.filter(m => {
-    if (activeProject !== 'ALL' && m.projectId !== activeProject) return false
+    if (!passesProjectFilter(m)) return false
     if (!inRange(m, range)) return false
     if (q) {
-      const hay = (m.title + ' ' + (m.dateLabel || '') + ' ' + (m.excerpt || '')).toLowerCase()
-      if (hay.indexOf(q) === -1) return false
+      const hay = (m.title + ' ' + (m.dateLabel || '') + ' ' + (m.excerpt || '') + ' ' + m.attendees.join(' ')).toLowerCase()
+      const searchMatch = searchMatchIds?.has(m.id) ?? false
+      if (hay.indexOf(q) === -1 && !searchMatch) return false
     }
     return true
   }).sort((a, b) => {

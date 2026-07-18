@@ -35,7 +35,10 @@ export interface SessionState {
   execUrl: string
 }
 
-/** listMeetings() row — the lightweight list shape. */
+/** listMeetings() row — the lightweight list shape. A Fathom recording tagged
+ *  into one or more projects appears once per projectId (FATHOM_INBOX always,
+ *  plus one entry per tagged project) — same id, taggedFromInbox marks the
+ *  duplicate copies. */
 export interface MeetingListItem {
   id: string
   projectId: ProjectId
@@ -49,7 +52,9 @@ export interface MeetingListItem {
   hasFathom: boolean
   source: MeetingSource
   attendeeCount: number
+  attendees: string[]
   excerpt: string
+  taggedFromInbox?: boolean
 }
 
 /** getMeeting() — full record incl. rendered html + content meta. */
@@ -63,6 +68,10 @@ export interface MeetingFull {
   time: string
   pinned: boolean
   visible: boolean
+  /** Fathom rows only: every project this recording is ALSO tagged into
+   *  (can be more than one). projectId stays FATHOM_INBOX permanently —
+   *  tagging never moves the row, only adds to this list. */
+  taggedProjectIds: ProjectId[]
   fathomUrl: string
   source: MeetingSource
   attendees: string[]
@@ -113,6 +122,23 @@ export interface SaveMeetingInput {
   visible?: boolean
 }
 
+/** Fathom recordings always live under this pseudo-project id (permanent
+ *  archive — never leaves it) and additionally show up under any project
+ *  they're tagged into. Mirrors FATHOM_INBOX_ID in Config.js. */
+export const FATHOM_INBOX_ID: ProjectId = 'FATHOM_INBOX'
+
+/** createProject() result. */
+export interface CreatedProject {
+  id: ProjectId
+  docId: string
+  name: string
+  nameEn: string
+  cadence: string
+  color: string
+  order: number
+  docUrl: string
+}
+
 /** The set of server functions callable through the gs() bridge. */
 export interface ServerApi {
   getSessionState(token: string): Promise<SessionState>
@@ -128,4 +154,12 @@ export interface ServerApi {
   setProjectDomain(projectId: ProjectId, allowDomain: boolean, token: string): Promise<ProjectAccess[]>
   addProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
   removeProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
+  /** Adds projectId to the recording's tag list (does not remove existing tags). Returns the full updated list. */
+  setFathomTag(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
+  /** Removes just projectId from the recording's tag list, leaving other tags intact. Returns the full updated list. */
+  untagFathomMeeting(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
+  /** Full-content search (title/dateLabel/attendees/whole body) — returns matching meeting ids. */
+  searchMeetings(query: string, token: string): Promise<string[]>
+  /** Creates a new Doc-backed project at runtime. Admin only. */
+  createProject(name: string, nameEn: string, cadence: string, token: string): Promise<CreatedProject>
 }

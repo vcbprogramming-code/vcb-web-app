@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Lang, MeetingFull, MeetingListItem, Project, ProjectId, SessionState, Theme } from './types'
+import type { CreatedProject, Lang, MeetingFull, MeetingListItem, Project, ProjectId, SessionState, Theme } from './types'
 import { api, getToken } from './api/client'
 import { makeTr } from './lib/i18n'
 import {
@@ -17,6 +17,7 @@ import SettingsModal from './components/SettingsModal'
 import AccessModal from './components/AccessModal'
 import MeetingModal from './components/MeetingModal'
 import EditorModal from './components/EditorModal'
+import NewProjectModal from './components/NewProjectModal'
 import { Busy, Toast } from './components/Overlays'
 
 const EMPTY_SESSION: SessionState = {
@@ -52,6 +53,17 @@ export default function App() {
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
   const [meetingModalTarget, setMeetingModalTarget] = useState<MeetingFull | null>(null)
   const [editorTarget, setEditorTarget] = useState<MeetingFull | null>(null)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+
+  // Debounced full-content search (see searchMeetings) — the instant
+  // client-side filter in MeetingList covers title/date/excerpt/attendees;
+  // this additionally searches the whole meeting body for a term that didn't
+  // make it into the excerpt. Cached per query so repeat keystrokes don't
+  // re-hit the server. Mirrors the search handler in JavaScript.html.
+  const [searchMatchIds, setSearchMatchIds] = useState<Set<string> | null>(null)
+  const searchCache = useRef<Map<string, Set<string>>>(new Map())
+  const searchTimer = useRef<number | undefined>(undefined)
+  const queryRef = useRef('') // always the latest query, for the debounced callback below
 
   const [busy, setBusy] = useState<string | null>(null)
   const [toastMsg, setToastMsg] = useState('')
@@ -125,13 +137,32 @@ export default function App() {
     if (isMobile()) setMobilePane('detail')
   }
   const onQuery = (q: string) => {
-    setQuery(q)
+    setQuery(q); queryRef.current = q
     if (isMobile() && q) setMobilePane('list')
+    const trimmed = q.trim()
+    window.clearTimeout(searchTimer.current)
+    if (!trimmed) { setSearchMatchIds(null); return }
+    const cached = searchCache.current.get(trimmed)
+    if (cached) { setSearchMatchIds(cached); return }
+    searchTimer.current = window.setTimeout(() => {
+      api.searchMeetings(trimmed, getToken()).then(ids => {
+        const set = new Set(ids)
+        searchCache.current.set(trimmed, set)
+        // Only apply if the query hasn't changed since this request started.
+        if (queryRef.current.trim() === trimmed) setSearchMatchIds(set)
+      }).catch(() => { /* silent — instant filter still applies */ })
+    }, 350)
   }
 
   // ---- admin flows ----
   const openNew = () => { setMeetingModalTarget(null); setMeetingModalOpen(true) }
   const openEdit = (m: MeetingFull) => setEditorTarget(m)
+  const onProjectCreated = async (p: CreatedProject) => {
+    setNewProjectOpen(false)
+    await refreshAll()
+    pickProject(p.id)
+    toast('Created ' + p.name)
+  }
 
   const manualRefresh = () => {
     setSettingsOpen(false); onBusy(tr('refreshing'))
@@ -160,7 +191,7 @@ export default function App() {
     if (activeId) {
       return (
         <MeetingDetail
-          key={activeId} id={activeId} byId={byId} isAdmin={session.isAdmin}
+          key={activeId} id={activeId} byId={byId} projects={session.projects} isAdmin={session.isAdmin}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
           onMutated={() => { refreshAll() }} execUrl={session.execUrl}
         />
@@ -184,11 +215,12 @@ export default function App() {
       <div className="body">
         <Sidebar
           projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin}
-          active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew} tr={tr}
+          active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
+          onNewProject={() => setNewProjectOpen(true)} tr={tr}
         />
         <MeetingList
           meetings={meetings} byId={byId} isAdmin={session.isAdmin}
-          activeProject={activeProject} activeId={activeId} query={query} range={range}
+          activeProject={activeProject} activeId={activeId} query={query} searchMatchIds={searchMatchIds} range={range}
           loaded={loaded} onRange={setRange} onOpen={openMeeting} tr={tr}
         />
         <main className="detail">
@@ -214,6 +246,10 @@ export default function App() {
         onBusy={onBusy} onToast={toast}
       />
       <EditorModal meeting={editorTarget} onClose={() => setEditorTarget(null)} onSaved={onEditSaved} onBusy={onBusy} onToast={toast} />
+      <NewProjectModal
+        open={newProjectOpen} onClose={() => setNewProjectOpen(false)}
+        onCreated={onProjectCreated} onBusy={onBusy} onToast={toast}
+      />
 
       <Busy msg={busy} />
       <Toast msg={toastMsg} />

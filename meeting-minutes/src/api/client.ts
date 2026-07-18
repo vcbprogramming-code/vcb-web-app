@@ -39,5 +39,9 @@ export const api: ServerApi = {
   getProjectAccess: (t) => delay(() => mockApi.getProjectAccess(t)),
   setProjectDomain: (id, a, t) => delay(() => mockApi.setProjectDomain(id, a, t)),
   addProjectViewer: (id, e, t) => delay(() => mockApi.addProjectViewer(id, e, t)),
-  removeProjectViewer: (id, e, t) => delay(() => mockApi.removeProjectViewer(id, e, t))
+  removeProjectViewer: (id, e, t) => delay(() => mockApi.removeProjectViewer(id, e, t)),
+  setFathomTag: (id, pid, t) => delay(() => mockApi.setFathomTag(id, pid, t)),
+  untagFathomMeeting: (id, pid, t) => delay(() => mockApi.untagFathomMeeting(id, pid, t)),
+  searchMeetings: (q, t) => delay(() => mockApi.searchMeetings(q, t)),
+  createProject: (n, ne, c, t) => delay(() => mockApi.createProject(n, ne, c, t))
 }

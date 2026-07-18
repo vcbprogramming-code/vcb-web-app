@@ -9,12 +9,13 @@
 // added feature — the GAS code already branches on isAdmin everywhere.
 
 import type {
-  MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditResult,
+  CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditResult,
   SaveMeetingInput, ServerApi, SessionState, SyncResult, ProjectId
 } from '../types'
+import { FATHOM_INBOX_ID } from '../types'
 import {
   ADMIN_EMAIL, APP_DISPLAY_TITLE, APP_SUBTITLE, APP_TITLE, DOMAIN,
-  SOURCE_PROJECTS, makeSeedRows, type SeedRow
+  SOURCE_PROJECTS, FATHOM_INBOX_PROJECT, makeSeedRows, type SeedRow, type SeedProject
 } from './seed'
 
 interface AccessRule { domain: boolean; emails: string[] }
@@ -32,6 +33,12 @@ function resolveIdentity(): { email: string; isAdmin: boolean } {
 // ---- in-memory store ----
 const rows: SeedRow[] = makeSeedRows()
 const accessMap: Record<ProjectId, AccessRule> = {}
+// Mirrors EXTRA_PROJECTS script property — projects created at runtime via
+// createProject(). SOURCE_PROJECTS itself is never mutated (see getAllProjects_
+// in Config.js), extras are purely additive.
+const extraProjects: SeedProject[] = []
+function allProjects(): SeedProject[] { return SOURCE_PROJECTS.concat(extraProjects) }
+function getProjectById(id: ProjectId): SeedProject | undefined { return allProjects().find(p => p.id === id) }
 
 const EMPLOYEE_VISIBLE_DEFAULT: Record<ProjectId, boolean> = { FIN: true, BD: true, BT12: true, BV: true, PN34: true }
 function docVisibleDefault(projectId: ProjectId): boolean { return !!EMPLOYEE_VISIBLE_DEFAULT[projectId] }
@@ -75,29 +82,52 @@ function uuid(): string {
 
 function buildProjects(admin: boolean): Project[] {
   const counts: Record<string, number> = {}
-  rows.filter(r => admin || isVisible(r)).forEach(r => { counts[r.projectId] = (counts[r.projectId] || 0) + 1 })
-  return SOURCE_PROJECTS.slice().sort((a, b) => a.order - b.order).map(d => ({
+  rows.filter(r => admin || isVisible(r)).forEach(r => {
+    counts[r.projectId] = (counts[r.projectId] || 0) + 1
+    ;(r.taggedProjectIds || []).forEach(pid => { counts[pid] = (counts[pid] || 0) + 1 })
+  })
+  const projects = allProjects().slice().sort((a, b) => a.order - b.order).map(d => ({
     id: d.id, name: d.name, nameEn: d.nameEn, cadence: d.cadence, color: d.color,
     count: counts[d.id] || 0, canSee: true,
     docUrl: admin ? 'https://docs.google.com/document/d/EXAMPLE_' + d.id + '/edit' : ''
   }))
+  // Fathom Inbox is admin-only — mirrors the `if (admin)` gate in
+  // getPublicBootstrap/getSessionState (Auth.js).
+  if (admin) {
+    projects.push({
+      id: FATHOM_INBOX_PROJECT.id, name: FATHOM_INBOX_PROJECT.name, nameEn: FATHOM_INBOX_PROJECT.nameEn,
+      cadence: FATHOM_INBOX_PROJECT.cadence, color: FATHOM_INBOX_PROJECT.color,
+      count: counts[FATHOM_INBOX_PROJECT.id] || 0, canSee: true, docUrl: ''
+    })
+  }
+  return projects
 }
 
 function requireAdmin(): void {
   if (!resolveIdentity().isAdmin) throw new Error('Not authorized.')
 }
 
-function toListItem(r: SeedRow): MeetingListItem {
+function toListItem(r: SeedRow, projectId: ProjectId, taggedFromInbox?: boolean): MeetingListItem {
   return {
-    id: r.id, projectId: r.projectId, title: r.title, kind: r.kind,
+    id: r.id, projectId, title: r.title, kind: r.kind,
     date: r.date, dateLabel: r.dateLabel, time: r.time,
     pinned: r.pinned, visible: r.visible, hasFathom: !!r.fathomUrl,
-    source: r.source, attendeeCount: r.attendees.length, excerpt: r.excerpt
+    source: r.source, attendeeCount: r.attendees.length, attendees: r.attendees.slice(), excerpt: r.excerpt,
+    ...(taggedFromInbox ? { taggedFromInbox: true } : {})
   }
 }
 
+// A Fathom row always stays listed under FATHOM_INBOX (the row never moves)
+// and ADDITIONALLY appears under every project it's tagged into — same id in
+// each place. Mirrors listMeetings() in Code.js.
+function toListItems(r: SeedRow): MeetingListItem[] {
+  const out = [toListItem(r, r.projectId)]
+  ;(r.taggedProjectIds || []).forEach(pid => out.push(toListItem(r, pid, true)))
+  return out
+}
+
 function accessList(): ProjectAccess[] {
-  return SOURCE_PROJECTS.slice().sort((a, b) => a.order - b.order).map(d => {
+  return allProjects().slice().sort((a, b) => a.order - b.order).map(d => {
     const r = accessMap[d.id] || { domain: docVisibleDefault(d.id), emails: [] }
     return { id: d.id, name: d.name, nameEn: d.nameEn, color: d.color, domain: !!r.domain, emails: r.emails.slice() }
   })
@@ -118,7 +148,7 @@ export const mockApi: ServerApi = {
 
   async listMeetings(): Promise<MeetingListItem[]> {
     const { isAdmin } = resolveIdentity()
-    return rows.filter(r => isAdmin || isVisible(r)).map(toListItem)
+    return rows.filter(r => isAdmin || isVisible(r)).flatMap(toListItems)
   },
 
   async getMeeting(id: string): Promise<MeetingFull | null> {
@@ -126,11 +156,11 @@ export const mockApi: ServerApi = {
     const r = rows.find(x => x.id === id)
     if (!r) return null
     if (!isAdmin && !isVisible(r)) return null
-    const proj = SOURCE_PROJECTS.find(p => p.id === r.projectId)
+    const proj = getProjectById(r.projectId)
     return {
       id: r.id, projectId: r.projectId, title: r.title, kind: r.kind,
       date: r.date, dateLabel: r.dateLabel, time: r.time,
-      pinned: r.pinned, visible: r.visible, fathomUrl: r.fathomUrl,
+      pinned: r.pinned, visible: r.visible, taggedProjectIds: (r.taggedProjectIds || []).slice(), fathomUrl: r.fathomUrl,
       source: r.source, attendees: r.attendees.slice(), html: r.content, css: '',
       docUrl: isAdmin && proj ? 'https://docs.google.com/document/d/EXAMPLE_' + proj.id + '/edit?tab=' + r.tabId : '',
       projectName: proj ? proj.name : r.projectId, updatedAt: '2026-06-21T03:00:00.000Z'
@@ -229,7 +259,87 @@ export const mockApi: ServerApi = {
     const r = accessMap[projectId]; if (!r) return accessList()
     r.emails = r.emails.filter(x => x.toLowerCase() !== String(email).toLowerCase())
     accessMap[projectId] = r; return accessList()
+  },
+
+  // Adds projectId to the recording's tag list (never removes existing tags,
+  // never moves the row out of FATHOM_INBOX). Mirrors setFathomTag in Code.js.
+  async setFathomTag(id, projectId): Promise<ProjectId[]> {
+    requireAdmin()
+    if (!getProjectById(projectId)) throw new Error('Unknown project: ' + projectId)
+    const r = rows.find(x => x.id === id)
+    if (!r) return []
+    if (r.projectId !== FATHOM_INBOX_ID) throw new Error('Only Fathom Inbox recordings can be tagged.')
+    const list = r.taggedProjectIds || []
+    if (list.indexOf(projectId) === -1) list.push(projectId)
+    r.taggedProjectIds = list
+    return list.slice()
+  },
+
+  // Removes just projectId from the tag list, leaving any other tags intact.
+  // Mirrors untagFathomMeeting in Code.js.
+  async untagFathomMeeting(id, projectId): Promise<ProjectId[]> {
+    requireAdmin()
+    const r = rows.find(x => x.id === id)
+    if (!r) return []
+    r.taggedProjectIds = (r.taggedProjectIds || []).filter(p => p !== projectId)
+    return r.taggedProjectIds.slice()
+  },
+
+  // Full-content search: listMeetings() only sends title/dateLabel/excerpt to
+  // the client, so a name/term buried deeper in the body (or an attendee not
+  // in the excerpt) never matched with the client-side filter alone. Mirrors
+  // searchMeetings in Code.js — searches title/dateLabel/attendees/full content.
+  async searchMeetings(query): Promise<string[]> {
+    const q = String(query || '').trim().toLowerCase()
+    if (!q) return []
+    const { isAdmin } = resolveIdentity()
+    const matches: string[] = []
+    rows.filter(r => isAdmin || isVisible(r)).forEach(r => {
+      let hay = (r.title + ' ' + (r.dateLabel || '') + ' ' + r.attendees.join(' ')).toLowerCase()
+      if (hay.indexOf(q) === -1) hay += ' ' + stripTags(r.content).toLowerCase()
+      if (hay.indexOf(q) !== -1) matches.push(r.id)
+    })
+    return matches
+  },
+
+  // Creates a new Doc-backed project at runtime — mirrors createProject in
+  // Code.js. In the real app this makes an actual Google Doc; here it just
+  // registers the project definition so the rest of the mock treats it
+  // identically to the hardcoded 5 (see allProjects()).
+  async createProject(name, nameEn, cadence): Promise<CreatedProject> {
+    requireAdmin()
+    const trimmedName = String(name || '').trim()
+    if (!trimmedName) throw new Error('Project name is required.')
+    const trimmedNameEn = String(nameEn || '').trim()
+    const trimmedCadence = String(cadence || 'Monthly').trim() || 'Monthly'
+
+    const id = slugifyProjectId(trimmedNameEn || trimmedName, allProjects())
+    const palette = ['#0969da', '#8250df', '#1a7f37', '#9a6700', '#cf222e', '#0b3d62', '#6639ba', '#116329']
+    const color = palette[allProjects().length % palette.length]
+    const order = allProjects().reduce((max, p) => Math.max(max, p.order || 0), 0) + 1
+    const docId = 'EXAMPLE_' + id
+
+    extraProjects.push({ id, name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order })
+    return {
+      id, docId, name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order,
+      docUrl: 'https://docs.google.com/document/d/' + docId + '/edit'
+    }
   }
+}
+
+// Mirrors slugifyProjectId_ in Code.js: derives a short id from the English
+// name (falls back to the given name if no English name), same style as the
+// hardcoded ids (FIN, BT12, ...), with a numeric-suffix fallback on collision.
+function slugifyProjectId(name: string, existingProjects: SeedProject[]): ProjectId {
+  const ascii = name.replace(/[^\x00-\x7F]/g, '')
+  const words = ascii.split(/[\s\-_]+/).filter(Boolean)
+  let base = (words.length > 1 ? words.map(w => w[0]).join('') : ascii.slice(0, 4)).toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (!base) base = 'PROJ'
+  const existingIds = new Set(existingProjects.map(p => p.id))
+  if (!existingIds.has(base)) return base
+  let n = 2
+  while (existingIds.has(base + n)) n++
+  return base + n
 }
 
 // Unused param kept for signature parity with the GAS DOMAIN-based rules.

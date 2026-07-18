@@ -82,6 +82,8 @@
   .proj .cnt { font-size: 11.5px; color: var(--ink-soft); background: var(--line-soft); border-radius: 20px; padding: 1px 8px; }
   .newbtn { width: 100%; margin-top: 12px; background: var(--brand-2); color: #fff; border: none; border-radius: 9px; padding: 10px; font-size: 13.5px; font-weight: 600; }
   .newbtn:hover { filter: brightness(1.05); }
+  .newbtn.secondary { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); margin-top: 8px; }
+  .newbtn.secondary:hover { background: var(--line-soft); filter: none; }
 
   /* ----- Meeting list ----- */
   .list { background: var(--bg); border-right: 1px solid var(--line); overflow-y: auto; }
@@ -137,6 +139,9 @@
   .badge.manual { background: #eafbf0; color: #1a7f37; }
   .badge.pin { background: #fff4d6; color: #9a6700; }
   .badge.hiddenb { background: #ffe9e9; color: #cf222e; }
+  .badge.suggest-badge { margin-left: auto; }
+  .proj.suggested { background: #fff9e0; box-shadow: inset 0 0 0 1.5px #e8c94a; }
+  .proj.suggested:hover { background: #fff4c8; }
   .card.ishidden { opacity: .62; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #fcf4f4 10px, #fcf4f4 20px); }
   .empty { padding: 30px 16px; color: var(--ink-faint); text-align: center; }
 
@@ -157,6 +162,10 @@
   .chip .cm { display: flex; flex-direction: column; line-height: 1.15; }
   .chip .cm b { font-size: 12px; font-weight: 600; text-transform: capitalize; }
   .chip .cm small { font-size: 10.5px; color: var(--ink-faint); }
+  .tagchip { padding: 3px 6px 3px 12px; border-left: 3px solid var(--c, #888); gap: 6px; }
+  .tagchip .cm b { text-transform: none; }
+  .chip-x { border: none; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; padding: 5px 6px; border-radius: 50%; }
+  .chip-x:hover { background: #ffe9e9; color: #cf222e; }
   .frame-wrap { flex: 1; overflow: auto; background: #eef1f4; padding: 22px; }
   .paper { max-width: 860px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
   iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 400px; }
@@ -169,6 +178,7 @@
   .modal { background: #fff; border-radius: 14px; width: 560px; max-width: 92vw; max-height: 88vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
   .modal h3 { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 16px; }
   .modal .form { padding: 16px 20px; display: grid; gap: 12px; }
+  .modal .subhead { margin: 0; padding: 12px 20px 0; color: var(--ink-faint); font-size: 12.5px; }
   .modal label { font-size: 12px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 4px; }
   .modal input:not([type="checkbox"]):not([type="radio"]), .modal select, .modal textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-family: inherit; }
   .modal textarea { min-height: 160px; resize: vertical; }
@@ -358,6 +368,7 @@
   html.theme-dark .range button:not(.active):hover { background: var(--line-soft); }
   html.theme-dark .attendees { background: #1c2128; border-bottom-color: var(--line); }
   html.theme-dark .chip { background: var(--panel); border-color: var(--line); color: var(--ink); }
+  html.theme-dark .chip-x:hover { background: #3a1d23; color: #ff7a85; }
   html.theme-dark .frame-wrap { background: #1a1f26; }
   html.theme-dark .mobile-backbar { background: var(--panel); border-bottom-color: var(--line); }
   html.theme-dark .mobile-back-btn { background: transparent; border-color: var(--line); color: var(--brand-2); }
@@ -373,6 +384,9 @@
   html.theme-dark .badge.manual { background: #1c2e23; color: #6dcf7e; }
   html.theme-dark .badge.pin { background: #3a2e16; color: #ffce62; }
   html.theme-dark .badge.hiddenb { background: #3a1d23; color: #ff7a85; }
+  html.theme-dark .badge.suggest-badge { background: #3a2e16; color: #ffce62; }
+  html.theme-dark .proj.suggested { background: #2e2712; box-shadow: inset 0 0 0 1.5px #a4822c; }
+  html.theme-dark .proj.suggested:hover { background: #3a3018; }
   html.theme-dark .card.ishidden { background: repeating-linear-gradient(45deg, #161b22, #161b22 10px, #1f1719 10px, #1f1719 20px); }
   html.theme-dark .ac-status { background: #1e2a40; color: #7aa2f7; }
   html.theme-dark .ac-status.restricted { background: #3a2e16; color: #ffce62; }
@@ -382,6 +396,13 @@
 
   html.is-mobile {
     -webkit-tap-highlight-color: rgba(31, 111, 235, 0.18);
+  }
+  /* Fathom tagging (File into project / tag chips) is an admin desktop-review
+     workflow — nobody triages recordings from a phone, and the button/chips
+     just eat space in the already-tight mobile detail bar. */
+  html.is-mobile #d_file,
+  html.is-mobile .tag-chips {
+    display: none;
   }
   html.is-mobile body {
     overscroll-behavior-y: contain;

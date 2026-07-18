@@ -1,4 +1,5 @@
 import type { Project, MeetingListItem } from '../types'
+import { FATHOM_INBOX_ID } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { cssVar } from '../lib/ui'
@@ -11,6 +12,9 @@ interface Props {
 }
 
 // ALL-projects dashboard: the latest meeting per project. Mirrors renderDashboard().
+// Fathom Inbox never gets a card here — it's a standalone review queue, not
+// one of the tracked projects (mirrors the S.projects.filter exclusion in
+// JavaScript.html's renderDashboard()).
 export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
   const by: Record<string, MeetingListItem> = {}
   meetings.forEach(m => {
@@ -18,7 +22,8 @@ export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
     const cur = by[m.projectId]
     if (!cur || (m.date || '') > (cur.date || '')) by[m.projectId] = m
   })
-  const cards = projects.map(p => ({ p, m: by[p.id] })).filter((x): x is { p: Project; m: MeetingListItem } => !!x.m)
+  const cards = projects.filter(p => p.id !== FATHOM_INBOX_ID)
+    .map(p => ({ p, m: by[p.id] })).filter((x): x is { p: Project; m: MeetingListItem } => !!x.m)
 
   return (
     <div className="dash-wrap">

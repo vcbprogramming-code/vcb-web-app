@@ -13,9 +13,17 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-06-29
-- **Live deployment referenced:** `@28` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-07-18
+- **Live deployment referenced:** `@53` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed this sync:** Fathom Inbox (webhook/backfill intake, permanent
+  archive, never in "All meetings"), multi-project tagging (a recording can be
+  tagged into more than one project, each independently removable — never a
+  single ambiguous untag action), a keyword-based project suggestion in the tag
+  picker (weighted so a project's own id/name beats generic English words —
+  fixes an ERP-meeting-suggests-FIN false positive), full-content search
+  (title/date/attendees instant + debounced whole-body search), and self-serve
+  "+ New project" (creates a project at runtime, no code change needed).
 
 ## CSS
 `src/styles.css` is the **verbatim** contents of the `<style>…</style>` block in
@@ -57,6 +65,16 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `setProjectDomain` | `mockApi.setProjectDomain` | `ProjectAccess[]` |
 | `addProjectViewer` | `mockApi.addProjectViewer` | `ProjectAccess[]` |
 | `removeProjectViewer` | `mockApi.removeProjectViewer` | `ProjectAccess[]` |
+| `setFathomTag` | `mockApi.setFathomTag` | `ProjectId[]` (full tag list) |
+| `untagFathomMeeting` | `mockApi.untagFathomMeeting` | `ProjectId[]` (full tag list) |
+| `searchMeetings` | `mockApi.searchMeetings` | `string[]` (matching ids) |
+| `createProject` | `mockApi.createProject` | `CreatedProject` |
+
+Not ported (server-only, no client-facing equivalent needed): `doPost` webhook
+intake, `ingestFathomPayload_`, `backfillFathomMeetings`/`refreshFathomMeetings`,
+`registerFathomWebhook`, `diagFathomRaw_` — these populate the row store that
+`listMeetings`/`getMeeting` read from; the mock's Fathom seed rows in `seed.ts`
+stand in for what a real backfill/webhook delivery would have produced.
 
 ## Component mapping (GAS → React)
 | GAS (Index.html / JavaScript.html) | React component |
@@ -77,6 +95,30 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `OVERRIDE_CSS`, section extraction, bullets | `lib/docRender.ts` |
 | mobile panes, range math, theme/lang apply, `applyMobileScale` | `lib/ui.ts` |
 | `S.contentCache`, `prefetchLatest()` | `api/contentCache.ts` |
+| tag picker `openTagPicker()` / `suggestProjectFor_()` | `components/TagPickerModal.tsx` |
+| per-chip untag ✕ in `renderDetail()` | inline in `components/MeetingDetail.tsx` |
+| "New project" modal + `createProject` | `components/NewProjectModal.tsx` |
+
+## Fathom Inbox (added 2026-07-18)
+Fathom recordings (via webhook or backfill) land in a permanent, admin-only
+pseudo-project — `FATHOM_INBOX_ID` in `types.ts`. Key rules, mirrored exactly
+from the GAS source:
+- **The row never moves.** `projectId` stays `FATHOM_INBOX` forever;
+  `taggedProjectIds` is a separate list of projects it ALSO shows under.
+  `listMeetings`/`mockApi.listMeetings` emit one list entry per tag PLUS the
+  permanent inbox entry — same `id` each time (see `toListItems` in `mock.ts`).
+- **Tagging is additive and reversible per-project.** `setFathomTag` adds one
+  project to the list; `untagFathomMeeting` removes just one — never a single
+  action that clears everything. This was a deliberate fix after tagging was
+  first built as a single-value field that a status button could accidentally
+  clear on click.
+- **Fathom Inbox is excluded from "All meetings"** everywhere it's aggregated:
+  `Sidebar.tsx` (ALL count), `MeetingList.tsx` (ALL list + range counts),
+  `Dashboard.tsx` (latest-per-project cards), `MobileLatest.tsx` (latest strip).
+- **The tag-picker suggestion is a hint, never an auto-pick** — admin always
+  clicks explicitly, because auto-assigning by keyword match risks leaking a
+  confidential meeting's content into the wrong project's visibility scope
+  (this was an explicit product decision, not a technical shortcut).
 
 ## Admin simulation
 The live web app is `ANYONE_ANONYMOUS`, so `isAdmin` is only ever true when an admin

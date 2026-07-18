@@ -5,10 +5,12 @@ import { buildMeetingSrcdoc } from '../lib/docRender'
 import { fetchMeeting, getCached, setCached } from '../api/contentCache'
 import { api, getToken } from '../api/client'
 import { applyMobileScale, isMobile } from '../lib/ui'
+import TagPickerModal from './TagPickerModal'
 
 interface Props {
   id: string
   byId: Record<string, Project>
+  projects: Project[]
   isAdmin: boolean
   onToast: (msg: string) => void
   onBusy: (msg: string | null) => void
@@ -18,10 +20,11 @@ interface Props {
 }
 
 // Mirrors openMeeting() + renderDetail().
-export default function MeetingDetail({ id, byId, isAdmin, onToast, onBusy, onEdit, onMutated, execUrl }: Props) {
+export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, onBusy, onEdit, onMutated, execUrl }: Props) {
   const [m, setM] = useState<MeetingFull | null>(getCached(id) ?? null)
   const [loading, setLoading] = useState(!getCached(id))
   const [err, setErr] = useState('')
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
@@ -77,6 +80,24 @@ export default function MeetingDetail({ id, byId, isAdmin, onToast, onBusy, onEd
       navigator.clipboard.writeText(link).then(() => onToast('Share link copied to clipboard'), () => window.prompt('Copy this link to share:', link))
     } else window.prompt('Copy this link to share:', link)
   }
+  // Removes just ONE project's tag, leaving any other tags on the recording
+  // intact — never a single ambiguous "untag everything" action. Mirrors the
+  // per-chip ✕ button in JavaScript.html's renderDetail().
+  async function untagOne(projectId: string): Promise<void> {
+    if (!m) return
+    const target = byId[projectId]
+    onBusy('Removing from ' + (target?.name || projectId) + '…')
+    try {
+      const list = await api.untagFathomMeeting(m.id, projectId, getToken())
+      const next = { ...m, taggedProjectIds: list }; setCached(m.id, next); setM(next); onMutated()
+      onToast('Removed from ' + (target?.name || projectId) + ' — still in Fathom Inbox')
+    } catch (e) { onToast('Failed: ' + (e instanceof Error ? e.message : String(e))) } finally { onBusy(null) }
+  }
+  function onTagged(projectName: string): void {
+    // Re-fetch so taggedProjectIds reflects the server's authoritative list.
+    fetchMeeting(id).then(full => { setM(full); onMutated() })
+    onToast('Now also showing in ' + projectName)
+  }
   function print(): void {
     const f = frameRef.current
     try { f!.contentWindow!.focus(); f!.contentWindow!.print() } catch { window.print() }
@@ -96,6 +117,9 @@ export default function MeetingDetail({ id, byId, isAdmin, onToast, onBusy, onEd
         <h2>{m.title}</h2>
         {isAdmin && <button className={'dbtn' + (m.visible ? '' : ' danger')} id="d_vis" onClick={toggleVisibility}>{m.visible ? '👁 Visible to staff' : '🚫 Hidden'}</button>}
         {isAdmin && <button className="dbtn" id="d_pin" title="Pin" onClick={togglePin}>{m.pinned ? <>★ <span className="blbl">Pinned</span></> : <>☆ <span className="blbl">Pin</span></>}</button>}
+        {isAdmin && m.source === 'fathom' && (
+          <button className="dbtn primary" id="d_file" title="Also show this in a project" onClick={() => setTagPickerOpen(true)}>📂 File into project…</button>
+        )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
         {editable && <button className="dbtn primary" id="d_editapp" onClick={() => onEdit(m)}>✎ Edit here</button>}
         {isAdmin && m.docUrl && <a className="dbtn" id="d_docedit" href={m.docUrl} target="_blank" rel="noreferrer">Open in Google Docs</a>}
@@ -119,11 +143,31 @@ export default function MeetingDetail({ id, byId, isAdmin, onToast, onBusy, onEd
         </div>
       )}
 
+      {isAdmin && m.source === 'fathom' && m.taggedProjectIds.length > 0 && (
+        <div className="attendees tag-chips">
+          <span className="atl">Also tagged into</span>
+          {m.taggedProjectIds.map(pid => {
+            const tp = byId[pid] || ({ name: pid, color: '#888' } as Project)
+            return (
+              <span key={pid} className="chip tagchip" style={{ ['--c' as string]: tp.color }}>
+                <span className="cm"><b>{tp.name}</b></span>
+                <button type="button" className="chip-x" title={'Remove from ' + tp.name} onClick={() => untagOne(pid)}>✕</button>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
       <div className="frame-wrap">
         <div className="paper">
           <iframe className="render" id="renderFrame" ref={frameRef} srcDoc={srcdoc} onLoad={onFrameLoad} title="meeting" />
         </div>
       </div>
+
+      <TagPickerModal
+        open={tagPickerOpen} meeting={m} projects={projects}
+        onClose={() => setTagPickerOpen(false)} onTagged={onTagged} onBusy={onBusy} onToast={onToast}
+      />
     </>
   )
 }

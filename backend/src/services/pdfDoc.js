@@ -123,9 +123,8 @@ async function clearVersion(documentId, version, keepKey = null) {
  */
 export async function regenerateOriginalWithAudit(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
-  const sigKey = doc.author_signature_url || doc.author_profile_signature;
-  let authorSignature = null;
-  if (sigKey) authorSignature = await getObjectBuffer(sigKey).catch(() => null);
+  // returned/rejected → back to an unsigned letter; the decision trail is appended.
+  const authorSignature = null;
   const { rows: auditSteps } = await query(
     `select approver_name, approver_email, action, comment, acted_at
        from approval_steps where document_id = $1 order by step_no`,
@@ -149,16 +148,11 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
 
 export async function generateOriginalPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
-  // signature image: the one chosen for this doc, else the author's saved
-  // profile signature
-  const sigKey = doc.author_signature_url || doc.author_profile_signature;
-  let authorSignature = null;
-  if (sigKey) {
-    authorSignature = await getObjectBuffer(sigKey).catch(() => null);
-  }
-  // original = the clean letter, no ความเห็น/การพิจารณา box yet
+  // No signature on the ORIGINAL: the ผู้ลงนาม (project manager) signs only when
+  // they APPROVE (first step). Until then the "ขอแสดงความนับถือ" block shows the
+  // name with a blank signature line.
   const qr = await buildVerifyQr(doc);
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature, commentBox: false, qr });
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature: null, commentBox: false, qr });
   const key = `documents/${doc.id}/original-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'original', key);
@@ -181,7 +175,7 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
 
   const { rows: steps } = await query(
-    `select s.approver_name, s.signature_url, pr.job_title as approver_title,
+    `select s.approver_name, s.signature_url, s.is_signer, pr.job_title as approver_title,
             pr.signature_url as profile_signature
        from approval_steps s
        left join profiles pr on pr.id = s.approver_id
@@ -190,13 +184,12 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
 
-  // Signature image: the one captured when they approved, else the one saved on
-  // their profile. The step's copy is empty for anyone who approved before adding a
-  // signature to their profile — falling back here means their signature still shows
-  // (this is the same profile signature the approve flow would have used).
-  // Title: each approver's OWN job title. If they haven't set one, print no title —
-  // borrowing the letterhead's signatory title (the project manager's) would stamp a
-  // role under their name that isn't theirs.
+  // Split the SIGNER (ผู้จัดการโครงการ/ผู้ลงนาม) from the ผู้อนุมัติ: the signer's
+  // signature goes under "ขอแสดงความนับถือ" (as authorSignature), the rest fill the
+  // ผู้อนุมัติ row — so a signer who also approved never appears twice.
+  // Signature image: the one captured when they approved, else their profile one.
+  // Title: each approver's OWN job title (no borrowing the letterhead's).
+  let signerSignature = null;
   const signatures = [];
   for (const s of steps) {
     let image = null;
@@ -204,7 +197,8 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     if (sigKey) {
       try { image = await getObjectBuffer(sigKey); } catch { image = null; }
     }
-    signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
+    if (s.is_signer) signerSignature = image;
+    else signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
   }
 
   // full decision trail for the "บันทึกการพิจารณา" page
@@ -215,7 +209,7 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   );
 
   const qr = await buildVerifyQr(doc);
-  const pdf = await generateLetterPdf(doc, letter, { signatures, auditSteps, qr });
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature: signerSignature, signatures, auditSteps, qr });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'approved', key);

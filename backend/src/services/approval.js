@@ -26,7 +26,6 @@ export async function createApprovalChain(client, { documentId, approvers, actor
   const created = [];
   for (let i = 0; i < approvers.length; i++) {
     const a = approvers[i];
-    const isFirst = i === 0;
     // Link the step to the approver's account (matched by email) so the approved
     // PDF prints THEIR job title under the signature (not the letterhead default)
     // and their saved profile signature can be used. Null for external emails.
@@ -35,26 +34,51 @@ export async function createApprovalChain(client, { documentId, approvers, actor
       .then((r) => r.rows[0]);
     const { rows } = await client.query(
       `insert into approval_steps
-         (document_id, step_no, approver_name, approver_email, approver_id, action,
+         (document_id, step_no, approver_name, approver_email, approver_id, action, is_signer,
           action_token, token_expires_at)
-       values ($1,$2,$3,$4,$5,'pending',$6,$7)
-       returning id, step_no, approver_name, approver_email, action_token`,
-      [
-        documentId,
-        i + 1,
-        a.name || null,
-        a.email,
-        acct?.id || null,
-        // only the active (first) step gets a live token; later steps get theirs
-        // when the chain advances to them
-        isFirst ? makeToken() : null,
-        isFirst ? tokenExpiry() : null,
-      ]
+       values ($1,$2,$3,$4,$5,'pending',$6,null,null)
+       returning id, step_no, approver_name, approver_email, approver_id, is_signer`,
+      [documentId, i + 1, a.name || null, a.email, acct?.id || null, Boolean(a.isSigner)]
     );
     created.push(rows[0]);
   }
 
-  await client.query(`update documents set status = 'pending' where id = $1`, [documentId]);
+  // If the signer (step 1 = ผู้จัดการโครงการ/ผู้ลงนาม) IS the person submitting,
+  // they can't/needn't approve their own document — auto-approve that step and
+  // stamp their profile signature, so the chain advances straight to the execs.
+  let activateIdx = 0;
+  const signer = created[0];
+  if (signer?.is_signer && actorId && signer.approver_id === actorId) {
+    const { rows: pr } = await client.query('select signature_url from profiles where id = $1', [actorId]);
+    await client.query(
+      `update approval_steps set action = 'approved', acted_at = now(), signature_url = $2,
+              comment = 'ผู้จัดทำเป็นผู้จัดการโครงการ/ผู้ลงนาม (อนุมัติอัตโนมัติ)'
+        where id = $1`,
+      [signer.id, pr[0]?.signature_url || null]
+    );
+    await client.query(
+      `insert into audit_log (document_id, actor_id, actor_label, action, detail)
+       values ($1,$2,$3,'approved',$4)`,
+      [documentId, actorId, actorLabel || null, JSON.stringify({ step_no: 1, auto: true })]
+    );
+    activateIdx = 1;
+  }
+
+  // Activate the next open step (issue its token) — the one to email.
+  let firstToEmail = null;
+  if (created[activateIdx]) {
+    const { rows: act } = await client.query(
+      `update approval_steps set action_token = $1, token_expires_at = $2 where id = $3
+       returning id, step_no, approver_name, approver_email, action_token`,
+      [makeToken(), tokenExpiry(), created[activateIdx].id]
+    );
+    firstToEmail = act[0];
+  }
+
+  // If the signer was auto-approved and there are no further steps, the doc is
+  // fully approved already; otherwise it's pending.
+  const finalized = activateIdx >= created.length;
+  await client.query(`update documents set status = $1 where id = $2`, [finalized ? 'approved' : 'pending', documentId]);
 
   await client.query(
     `insert into audit_log (document_id, actor_id, actor_label, action, detail)
@@ -62,7 +86,7 @@ export async function createApprovalChain(client, { documentId, approvers, actor
     [documentId, actorId || null, actorLabel || null, JSON.stringify({ steps: approvers.length })]
   );
 
-  return created[0];
+  return { firstStep: firstToEmail, finalized };
 }
 
 /**

@@ -258,12 +258,11 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
       }
     };
 
-    // The SIGNER (ผู้ลงนาม) ALWAYS signs under "ขอแสดงความนับถือ" — they are the person
-    // issuing the memo, so their block appears on every version. The project
-    // signatory's configured signature is stamped automatically; the author's own
-    // uploaded signature takes precedence. pdfDoc.js resolves doc.signer_name/title.
-    const sigImage = opts.authorSignature
-      || (Buffer.isBuffer(letter.signatureBuffer) ? letter.signatureBuffer : null);
+    // The SIGNER (ผู้ลงนาม = ผู้จัดการโครงการ) signs under "ขอแสดงความนับถือ". Their
+    // signature is stamped only when they APPROVE the document (passed here as
+    // authorSignature) — no auto-stamp — so the block shows a blank line until then.
+    // pdfDoc.js resolves doc.signer_name/title.
+    const sigImage = opts.authorSignature || null;
     drawSignature({
       image: sigImage,
       name: doc.signer_name || letter.signatoryName,

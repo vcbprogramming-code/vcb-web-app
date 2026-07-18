@@ -40,6 +40,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // = the preparer signs; typing a name here makes someone else the signer.
   const [signerName, setSignerName] = useState(initial?.signer_name || '');
   const [signerTitle, setSignerTitle] = useState(initial?.signer_title || '');
+  // ผู้จัดการโครงการ / ผู้ลงนาม = ผู้อนุมัติลำดับแรก (เซ็นใต้ "ขอแสดงความนับถือ").
+  // จากโครงการถ้าตั้งไว้ (ล็อก) ไม่งั้นผู้สร้างเลือกเอง.
+  const [pmEmail, setPmEmail] = useState('');
+  const [pmConfigured, setPmConfigured] = useState(false);
   const [dateReceived, setDateReceived] = useState(() => {
     // local date, not UTC — toISOString() would show yesterday late at night in Thailand
     const d = new Date();
@@ -143,8 +147,18 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         if (cancelled) return;
         const lh = r.data || {};
         setLetter(lh);
-        setSignerName(lh.signatory_name || '');
         setSignerTitle(lh.signatory_title || '');
+        // resolve the PM (ผู้ลงนาม + ผู้อนุมัติลำดับแรก): bound to the project, or the
+        // creator picks one below when the project has none.
+        if (lh.manager_email) {
+          setPmConfigured(true);
+          setPmEmail(lh.manager_email);
+          setSignerName(lh.signatory_name || '');
+        } else {
+          setPmConfigured(false);
+          setPmEmail('');
+          setSignerName('');
+        }
         // the project's bound company is a DEFAULT (#6): pre-select it so the
         // header matches the project, but the clerk can still switch it — the
         // client asked to stop the hard Auto-lock (some projects don't want it).
@@ -155,16 +169,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         } else if (lh.company_id) {
           setCompanyId(lh.company_id);
         }
-        // auto-route approval to the project manager (#3): the approver follows the
-        // selected project — set it to the new project's manager, or clear it when
-        // the project has none, so it never disagrees with the (project-driven)
-        // signer. Skip only when a doc-code chain is locked in (that takes
-        // precedence and isn't project-scoped).
-        if (!approversLockedRef.current) {
-          setApprovers(lh.manager_email
-            ? [{ name: lh.signatory_name || '', email: lh.manager_email }]
-            : [{ name: '', email: '' }]);
-        }
+        // the ผู้อนุมัติ list holds only the HIGHER approvers (steps after the PM);
+        // the PM is handled separately as the signer/first step.
+        if (!approversLockedRef.current) setApprovers([{ name: '', email: '' }]);
       })
       .catch(() => !cancelled && setLetter({}));
     return () => { cancelled = true; };
@@ -259,6 +266,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       setStep(1);
       return;
     }
+    // to SEND for approval a ผู้จัดการโครงการ/ผู้ลงนาม is required (they approve first).
+    // If higher approvers were chosen but no PM, block; if nothing chosen → draft.
+    if (!pmEmail.trim() && approvers.some((a) => a.email.trim())) {
+      setError('กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) ในขั้นที่ 2 ก่อน — เอกสารต้องผ่าน ผจก. ก่อนส่งผู้อนุมัติที่สูงกว่า');
+      setStep(2);
+      return;
+    }
     // synchronous guard: a fast double-click / Enter+click can fire submit twice
     // before setSubmitting(true) commits, which would create two documents.
     if (submittingRef.current) return;
@@ -307,14 +321,19 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       // to view/print without a manual step (it can be regenerated after edits)
       await ememoApi.generatePdf(doc.id).catch(() => {});
 
-      // if approvers were given, send for approval right away
-      const cleanedApprovers = approvers
+      // Build the chain: PM (ผู้ลงนาม, isSigner) FIRST, then the higher approvers.
+      // The PM is auto (project) or picked; execs come from the picker/doc-code.
+      const pmKey = pmEmail.trim().toLowerCase();
+      const cleanedExecs = approvers
         .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
-        .filter((a) => a.email);
+        .filter((a) => a.email && a.email.toLowerCase() !== pmKey);
+      const finalApprovers = pmEmail.trim()
+        ? [{ name: signerName.trim() || undefined, email: pmEmail.trim(), isSigner: true }, ...cleanedExecs]
+        : [];
       let emailSent = true;
-      if (cleanedApprovers.length > 0) {
+      if (finalApprovers.length > 0) {
         try {
-          const sub = await ememoApi.submitForApproval(doc.id, cleanedApprovers);
+          const sub = await ememoApi.submitForApproval(doc.id, finalApprovers);
           if (sub?.data?.emailSent === false) emailSent = false;
         } catch (err) {
           // a prior attempt may have created the chain server-side but lost the
@@ -324,7 +343,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       }
 
       // pass the email outcome up so the caller can warn if no notification went out
-      onCreated(doc.id, { emailFailed: cleanedApprovers.length > 0 && !emailSent });
+      onCreated(doc.id, { emailFailed: finalApprovers.length > 0 && !emailSent });
     } catch (err) {
       // The document may already have been created (running number burned) before
       // a later step failed. Say it was saved as a draft so the user recovers it
@@ -453,19 +472,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   const c = docCodes.find((x) => x.code === code);
                   // auto-fill เรียน from the code's recipient title (if not edited)
                   if (c?.recipient_title && !recipient.trim()) setRecipient(c.recipient_title);
-                  // auto-fill + lock approvers from the code's configured chain
+                  // auto-fill + lock the HIGHER approvers from the code's configured
+                  // chain. The PM (signer/first step) is separate — not prepended here.
                   const cfg = Array.isArray(c?.default_approvers) ? c.default_approvers : [];
                   if (cfg.length) {
-                    let chain = cfg.map((a) => ({ name: a.name || '', email: a.email || '' }));
-                    // route to the project manager FIRST, then the code's chain, so the
-                    // PM is never skipped (client). Dedupe by email; if the PM is already
-                    // in the chain, move them to the front.
-                    if (letter.manager_email) {
-                      const pmEmail = letter.manager_email.toLowerCase();
-                      chain = [{ name: letter.signatory_name || '', email: letter.manager_email },
-                               ...chain.filter((a) => (a.email || '').toLowerCase() !== pmEmail)];
-                    }
-                    setApprovers(chain);
+                    setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
                     setApproversLocked(true);
                   } else {
                     // switching to a code with no config: clear any previously-locked rows
@@ -614,31 +625,43 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             </label>
           </div>
 
-          {/* signer (ผู้ลงนาม) = the PROJECT MANAGER, auto-filled from the project's
-              letterhead (#5). Read-only: the clerk (preparer) can't pick someone
-              else — they only draft; the manager signs under "ขอแสดงความนับถือ". */}
+          {/* ผู้จัดการโครงการ / ผู้ลงนาม = ผู้อนุมัติลำดับแรก. From the project if bound,
+              else the creator must pick one. Signs under "ขอแสดงความนับถือ". */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้ลงนาม (ใต้ขอแสดงความนับถือ)</label>
-            {signerName ? (
+            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
+            <p className="mb-2 text-xs text-slate-400">
+              เซ็นใต้ "ขอแสดงความนับถือ" และ<b className="text-slate-600">อนุมัติเป็นลำดับแรก</b>ก่อนส่งต่อผู้อนุมัติที่สูงกว่า · ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นผู้ร่าง
+            </p>
+            {pmConfigured ? (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="text-sm font-medium text-slate-800">{signerName || pmEmail}</span>
+                {signerTitle && <span className="text-sm text-slate-500">· {signerTitle}</span>}
+                <span className="ml-auto text-[11px] text-slate-400">กำหนดจากโครงการ</span>
+              </div>
+            ) : projectId ? (
               <>
-                <p className="mb-2 text-xs text-slate-400">
-                  ผู้ลงนามคือ <b className="text-slate-600">ผู้จัดการโครงการ</b> ของโครงการที่เลือก (กำหนดอัตโนมัติ) ·
-                  ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นเพียงผู้ร่างเอกสาร
-                </p>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-800">{signerName}</span>
-                  {signerTitle && <span className="text-sm text-slate-500">· {signerTitle}</span>}
-                </div>
+                <select
+                  value={pmEmail}
+                  onChange={(e) => {
+                    const email = e.target.value;
+                    const u = approverUsers.find((x) => x.email === email);
+                    setPmEmail(email);
+                    setSignerName(u?.full_name || '');
+                  }}
+                  className={field}
+                >
+                  <option value="">— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —</option>
+                  {approverUsers.map((u) => (
+                    <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-slate-400">โครงการนี้ยังไม่ได้ตั้งผู้จัดการโครงการถาวร — เลือกผู้ลงนามสำหรับเอกสารนี้ (ตั้งถาวรได้ที่ ตั้งค่า E-Memo → โครงการ)</p>
               </>
             ) : (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
                 <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>
-                  {projectId
-                    ? 'โครงการนี้ยังไม่ได้ตั้งชื่อผู้จัดการโครงการ (ผู้ลงนาม) — ตั้งได้ที่ ตั้งค่า E-Memo → โครงการ → ผู้ลงนาม'
-                    : 'เลือกโครงการก่อน ระบบจะกำหนดผู้ลงนาม (ผู้จัดการโครงการ) ให้อัตโนมัติ'}
-                </span>
+                <span>เลือกโครงการก่อน</span>
               </div>
             )}
           </div>
@@ -652,7 +675,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {/* approvers — optional, OR auto-filled+locked from the doc-code config */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติ {approversLocked ? '' : '(ไม่บังคับ)'}</label>
+              <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติที่สูงกว่า (ลำดับถัดจากผู้จัดการโครงการ) {approversLocked ? '' : '(ไม่บังคับ)'}</label>
               {approversLocked && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-medium text-brand">
                   <Icon name="check" className="h-3 w-3" /> กำหนดจากรหัสเอกสาร
@@ -729,7 +752,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <button key="submit" type="submit" disabled={submitting} className="btn-primary">
                 {submitting
                   ? (uploadingIdx >= 0 ? `กำลังอัปโหลดไฟล์ (${uploadingIdx + 1}/${files.length})…` : 'กำลังบันทึก…')
-                  : approvers.some((a) => a.email.trim())
+                  : pmEmail.trim()
                     ? 'บันทึกและส่งอนุมัติ'
                     : 'บันทึกเอกสาร'}
               </button>

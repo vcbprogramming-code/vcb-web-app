@@ -3,46 +3,33 @@ import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 
 export default function SubmitApprovalModal({ documentId, docCode, projectManager, onClose, onSubmitted }) {
-  const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
+  const [approvers, setApprovers] = useState([{ name: '', email: '' }]); // higher approvers only
   const [locked, setLocked] = useState(false);
   const [users, setUsers] = useState([]); // system accounts, for the picker
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // ผู้จัดการโครงการ / ผู้ลงนาม = first approver (signs under ขอแสดงความนับถือ)
+  const [pmEmail, setPmEmail] = useState(projectManager?.email || '');
+  const [pmName, setPmName] = useState(projectManager?.name || '');
+  const pmConfigured = Boolean(projectManager?.email);
 
-  // load the accounts that can be picked as approvers (must have a system account)
+  // load the accounts that can be picked (must have a system account)
   useEffect(() => {
     ememoApi.listApprovers().then((r) => setUsers(r.data)).catch(() => setUsers([]));
   }, []);
+  useEffect(() => { setPmEmail(projectManager?.email || ''); setPmName(projectManager?.name || ''); }, [projectManager?.email, projectManager?.name]);
 
-  // prefill + lock the approver chain from the doc-code config (same as create).
-  // When the code has no configured chain, fall back to the project manager (#3)
-  // so approval auto-routes to them without hand-picking every time.
+  // prefill + lock the HIGHER approvers from the doc-code config (PM is separate).
   useEffect(() => {
-    const prefillManager = () => {
-      if (projectManager?.email) setApprovers([{ name: projectManager.name || '', email: projectManager.email }]);
-    };
-    if (!docCode) { prefillManager(); return; }
+    if (!docCode) return;
     ememoApi.listDocCodes().then((r) => {
       const cfg = r.data.find((c) => c.code === docCode)?.default_approvers;
       if (Array.isArray(cfg) && cfg.length) {
-        let chain = cfg.map((a) => ({ name: a.name || '', email: a.email || '' }));
-        // route to the project manager FIRST, then the code's chain (client: PM must
-        // not be skipped). Dedupe by email; move an in-chain PM to the front.
-        if (projectManager?.email) {
-          const pmEmail = projectManager.email.toLowerCase();
-          chain = [{ name: projectManager.name || '', email: projectManager.email },
-                   ...chain.filter((a) => (a.email || '').toLowerCase() !== pmEmail)];
-        }
-        setApprovers(chain);
+        setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
         setLocked(true);
-      } else {
-        prefillManager();
       }
-    }).catch(() => prefillManager());
-    // depend on primitives, not the projectManager object (DocumentDetail builds a
-    // fresh object each render — depending on it would re-run this effect on every
-    // parent re-render and reset the user's approver edits).
-  }, [docCode, projectManager?.email, projectManager?.name]);
+    }).catch(() => {});
+  }, [docCode]);
 
   // pick a user by email → fill name+email for that row
   const pick = (i, email) => {
@@ -55,16 +42,18 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
-    const cleaned = approvers
-      .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
-      .filter((a) => a.email);
-    if (cleaned.length === 0) {
-      setError('กรุณาเลือกผู้อนุมัติอย่างน้อย 1 คน');
+    if (!pmEmail.trim()) {
+      setError('กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) — เอกสารต้องผ่าน ผจก. อนุมัติก่อน');
       return;
     }
+    const pmKey = pmEmail.trim().toLowerCase();
+    const execs = approvers
+      .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
+      .filter((a) => a.email && a.email.toLowerCase() !== pmKey);
+    const finalApprovers = [{ name: pmName.trim() || undefined, email: pmEmail.trim(), isSigner: true }, ...execs];
     setSubmitting(true);
     try {
-      const res = await ememoApi.submitForApproval(documentId, cleaned);
+      const res = await ememoApi.submitForApproval(documentId, finalApprovers);
       onSubmitted(res?.data?.emailSent === false);
     } catch (err) {
       setError(err.message);
@@ -84,11 +73,27 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           <p className="text-sm text-slate-500">
-            {locked
-              ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่า E-Memo → ผู้อนุมัติตามรหัส)'
-              : 'เลือกผู้อนุมัติตามลำดับขั้น — ระบบจะส่งอีเมลให้เข้ามาอนุมัติในเว็บทีละคน (ผู้อนุมัติต้องมีบัญชีในระบบ)'}
+            ผู้จัดการโครงการ (ผู้ลงนาม) อนุมัติเป็นลำดับแรก แล้วส่งต่อผู้อนุมัติที่สูงกว่าทีละคน — ระบบส่งอีเมลให้เข้ามาอนุมัติในเว็บ (ทุกคนต้องมีบัญชีในระบบ)
           </p>
 
+          {/* PM = signer / first approver */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+            <label className="mb-1 block text-sm font-medium text-slate-600">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
+            {pmConfigured ? (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="font-medium text-slate-800">{pmName || pmEmail}</span>
+                <span className="ml-auto text-[11px] text-slate-400">กำหนดจากโครงการ</span>
+              </div>
+            ) : (
+              <select value={pmEmail} onChange={(e) => { const u = users.find((x) => x.email === e.target.value); setPmEmail(e.target.value); setPmName(u?.full_name || ''); }} className={field}>
+                <option value="">— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —</option>
+                {users.map((u) => (<option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>))}
+              </select>
+            )}
+          </div>
+
+          <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติที่สูงกว่า (ลำดับถัดจากผู้จัดการโครงการ){locked ? '' : ' — ไม่บังคับ'}</label>
           <div className="space-y-2">
             {approvers.map((a, i) => (
               <div key={i} className="flex items-center gap-2">

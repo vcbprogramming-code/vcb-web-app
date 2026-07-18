@@ -987,7 +987,13 @@ router.post(
 );
 
 const submitSchema = z.object({
-  approvers: z.array(z.object({ name: z.string().optional(), email: z.string().email() })).min(1),
+  // approvers[0] with isSigner:true = the ผู้จัดการโครงการ/ผู้ลงนาม (first to approve;
+  // signature stamped under "ขอแสดงความนับถือ"). The rest are the higher approvers.
+  approvers: z.array(z.object({
+    name: z.string().optional(),
+    email: z.string().email(),
+    isSigner: z.boolean().optional(),
+  })).min(1),
 });
 
 router.post(
@@ -1028,10 +1034,10 @@ router.post(
     }
 
     const client = await pool.connect();
-    let firstStep;
+    let chain;
     try {
       await client.query('begin');
-      firstStep = await createApprovalChain(client, {
+      chain = await createApprovalChain(client, {
         documentId: doc.id,
         approvers: parsed.data.approvers,
         actorLabel: req.profile.full_name || req.profile.email,
@@ -1044,16 +1050,27 @@ router.post(
     } finally {
       client.release();
     }
+    const firstStep = chain.firstStep;
+
+    // Chain fully approved on submit (creator IS the signer and no higher approvers)
+    // → produce the signed PDF now, like the finalize path in /approve.
+    if (chain.finalized) {
+      await generateApprovedPdf(doc.id).catch((e) => console.error('approved-pdf failed:', e.message));
+      await autoCombine(doc.id);
+    }
+
     // Track whether the approver was actually notified. On failure, record it in
     // the document's history (visible in the detail timeline) and tell the caller,
     // so "submitted" doesn't silently hide that no email went out.
     let emailSent = true;
-    await sendApprovalRequest({ step: firstStep, doc }).catch((e) => { emailSent = false; console.error('approval email failed:', e.message); });
-    if (!emailSent) {
-      await query(
-        `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'email_failed',$4)`,
-        [doc.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ to: firstStep.approver_email })]
-      ).catch(() => {});
+    if (firstStep) {
+      await sendApprovalRequest({ step: firstStep, doc }).catch((e) => { emailSent = false; console.error('approval email failed:', e.message); });
+      if (!emailSent) {
+        await query(
+          `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'email_failed',$4)`,
+          [doc.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ to: firstStep.approver_email })]
+        ).catch(() => {});
+      }
     }
 
     // CC "for your information / please advise" — send a copy to any email in the
@@ -1067,7 +1084,7 @@ router.post(
       }).catch((e) => console.error('cc notification failed:', e.message));
     }
 
-    res.json({ data: { status: 'pending', firstApprover: firstStep.approver_email, ccNotified: ccEmails.length, emailSent } });
+    res.json({ data: { status: chain.finalized ? 'approved' : 'pending', firstApprover: firstStep?.approver_email || null, ccNotified: ccEmails.length, emailSent, finalized: chain.finalized } });
   })
 );
 

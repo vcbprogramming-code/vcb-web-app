@@ -38,8 +38,14 @@ const META = {
   },
 };
 
-export default function ApprovalActionModal({ action, onClose, onConfirm, warnNoSignature = false }) {
-  const m = META[action] || META.approved;
+export default function ApprovalActionModal({ action, onClose, onConfirm, warnNoSignature = false, nextApproverName = null, isFinalStep = false }) {
+  const base = META[action] || META.approved;
+  // state-aware description for approve: forward to next, or finalize
+  const m = action === 'approved'
+    ? { ...base, desc: isFinalStep
+        ? 'เมื่ออนุมัติ เอกสารจะได้รับการอนุมัติสมบูรณ์'
+        : (nextApproverName ? `เมื่ออนุมัติ เอกสารจะถูกส่งต่อให้ “${nextApproverName}” พิจารณาต่อ` : base.desc) }
+    : base;
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);

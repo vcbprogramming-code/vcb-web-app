@@ -281,10 +281,10 @@ export async function sendConsultRequest({ toEmail, toName, doc, askerName, ques
 export async function sendAuthorNotification({ toEmail, authorName, doc, outcome, actorName, comment }) {
   if (!toEmail) return { skipped: true };
   const meta = {
-    approved: { label: 'ได้รับการอนุมัติแล้ว', color: '#16a34a' },
-    returned: { label: 'ถูกส่งกลับให้แก้ไข', color: '#ea580c' },
-    rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626' },
-  }[outcome] || { label: outcome, color: '#334155' };
+    approved: { label: 'ได้รับการอนุมัติแล้ว', color: '#16a34a', cta: 'เปิดดูเอกสารที่อนุมัติแล้ว' },
+    returned: { label: 'ถูกส่งกลับให้แก้ไข', color: '#ea580c', cta: 'แก้ไขและส่งอนุมัติอีกครั้ง' },
+    rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626', cta: 'เปิดดูเอกสาร' },
+  }[outcome] || { label: outcome, color: '#334155', cta: 'เปิดดูเอกสาร' };
   // open THIS document directly so the author lands on the decided document
   const url = `${env.appBaseUrl}/memos/${doc.id}`;
   const html = `
@@ -299,7 +299,7 @@ export async function sendAuthorNotification({ toEmail, authorName, doc, outcome
         <p style="margin:0 0 16px">เอกสารเลขที่ <b>${esc(doc.doc_number)}</b> เรื่อง “${esc(doc.subject)}” <b style="color:${meta.color}">${meta.label}</b>${actorName ? ` โดย ${esc(actorName)}` : ''}</p>
         ${comment ? `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:16px"><div style="color:#64748b;font-size:13px;margin-bottom:2px">เหตุผล/ความเห็น</div>${esc(comment)}</div>` : ''}
         <div style="text-align:center;margin-top:8px">
-          <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;padding:12px 28px;border-radius:10px;text-decoration:none">เปิดดูเอกสาร</a>
+          <a href="${url}" style="display:inline-block;background:#2563eb;color:#fff;font-weight:600;padding:12px 28px;border-radius:10px;text-decoration:none">${meta.cta}</a>
         </div>
       </div>
     </div>

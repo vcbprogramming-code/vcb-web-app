@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import SubmitApprovalModal from './SubmitApprovalModal.jsx';
 import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
@@ -97,6 +98,8 @@ export default function DocumentDetail() {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
+  const composerRef = useRef(null);
   const [doc, setDoc] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -118,6 +121,9 @@ export default function DocumentDetail() {
   const [myApproval, setMyApproval] = useState({ canApprove: false });
   const [approvalAction, setApprovalAction] = useState(null); // 'approved'|'returned'|'rejected' → opens the modal
   const [showConsult, setShowConsult] = useState(false);
+  // after acting, a persistent "what happened + next" state so the approver gets
+  // closure and a path to their next pending item (not just a fleeting toast).
+  const [postAction, setPostAction] = useState(null); // { action, next: {id,doc_number}|null, count }
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
@@ -149,9 +155,16 @@ export default function DocumentDetail() {
   // confirmed from ApprovalActionModal (comment already validated there)
   const confirmApproval = async (comment) => {
     const done = { approved: 'อนุมัติเอกสารเรียบร้อย', returned: 'ส่งกลับให้แก้ไขแล้ว', rejected: 'ไม่อนุมัติเอกสารแล้ว' };
-    await ememoApi.approveDocument(id, approvalAction, comment);
+    const acted = approvalAction;
+    const res = await ememoApi.approveDocument(id, acted, comment);
     setApprovalAction(null);
-    toast.success(done[approvalAction] || 'ดำเนินการเรียบร้อย');
+    toast.success(done[acted] || 'ดำเนินการเรียบร้อย');
+    // closure + next step: pull the caller's remaining awaiting-me queue
+    try {
+      const r = await ememoApi.awaitingMe();
+      const next = (r.data?.items || []).find((x) => x.id !== id) || null;
+      setPostAction({ action: acted, finalized: res?.data?.finalized, advanced: res?.data?.advanced, next, count: r.data?.count || 0 });
+    } catch { setPostAction({ action: acted, next: null, count: 0 }); }
     load();
   };
 
@@ -210,7 +223,8 @@ export default function DocumentDetail() {
   }, [activePreviewId, id, activeIsSheet]);
 
   const cancelDoc = async () => {
-    if (!window.confirm('ยกเลิกเอกสารนี้? (กลับคืนไม่ได้)')) return;
+    const ok = await confirm({ title: 'ยกเลิกเอกสาร', message: 'ยกเลิกเอกสารนี้?\nเอกสารจะไม่เดินในสายอนุมัติต่อ และกลับคืนไม่ได้', confirmLabel: 'ยกเลิกเอกสาร' });
+    if (!ok) return;
     setBusy(true);
     try { await ememoApi.cancelDocument(id); toast.success('ยกเลิกเอกสารแล้ว'); load(); }
     catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
@@ -299,22 +313,96 @@ export default function DocumentDetail() {
   const isPending = doc.status === 'pending';
   const me = profile?.full_name || user?.email || 'ฉัน';
 
+  // consulted-user cue: is there an open "ขอความเห็น" addressed to me?
+  const myEmail = (profile?.email || '').toLowerCase();
+  const consultForMe = !myApproval.canApprove && (doc.messages || []).some(
+    (m) => m.kind === 'consult' && (m.consult_email || '').toLowerCase() === myEmail
+  );
+  // owner-facing "why it came back" banner + reason
+  const steps = doc.approval_steps || [];
+  const lastDecision = [...steps].reverse().find((s) => s.action === 'returned' || s.action === 'rejected');
+  const showOwnerReturnBanner = canManage && (doc.status === 'returned' || doc.status === 'rejected');
+  // for the approve modal: who's next / is this the final step?
+  const curIdx = steps.findIndex((s) => s.action === 'pending');
+  const nextApproverName = curIdx >= 0 && steps[curIdx + 1] ? (steps[curIdx + 1].approver_name || steps[curIdx + 1].approver_email) : null;
+  const isFinalStep = curIdx >= 0 && !steps[curIdx + 1];
+  const scrollToComposer = () => { composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); composerRef.current?.querySelector('textarea')?.focus(); };
+
   return (
     <div className="space-y-5">
       <button onClick={() => navigate('/memos')} className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-slate-800">
         <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
       </button>
 
+      {/* After acting: a persistent closure card + a path to the next pending doc */}
+      {postAction && (
+        <div className={`flex flex-wrap items-center gap-3 rounded-2xl border px-5 py-4 ${postAction.action === 'approved' ? 'border-emerald-200 bg-emerald-50' : postAction.action === 'rejected' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'}`}>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${postAction.action === 'approved' ? 'bg-emerald-500' : postAction.action === 'rejected' ? 'bg-rose-500' : 'bg-amber-500'}`}>
+            <Icon name={postAction.action === 'approved' ? 'check' : postAction.action === 'rejected' ? 'x' : 'undo'} className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-slate-900">
+              {postAction.action === 'approved' ? (postAction.finalized ? 'อนุมัติสมบูรณ์แล้ว' : 'อนุมัติแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป') : postAction.action === 'rejected' ? 'ไม่อนุมัติเอกสารแล้ว' : 'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว'}
+            </div>
+            <p className="text-xs text-slate-600">{postAction.count > 0 ? `ยังมีอีก ${postAction.count} ฉบับที่รออนุมัติจากคุณ` : 'ไม่มีเอกสารอื่นที่รออนุมัติจากคุณแล้ว'}</p>
+          </div>
+          {postAction.next ? (
+            <button onClick={() => { setPostAction(null); navigate(`/memos/${postAction.next.id}`); }} className="btn-primary shrink-0">
+              เอกสารที่รออนุมัติถัดไป <Icon name="arrowRight" className="h-4 w-4" />
+            </button>
+          ) : (
+            <button onClick={() => navigate('/memos')} className="btn-outline shrink-0">กลับทะเบียนเอกสาร</button>
+          )}
+        </div>
+      )}
+
+      {/* Owner cue when the document came back — surfaces the reason + edit path */}
+      {showOwnerReturnBanner && !postAction && (
+        <div className={`rounded-2xl border px-5 py-4 ${doc.status === 'returned' ? 'border-amber-200 bg-amber-50' : 'border-rose-200 bg-rose-50'}`}>
+          <div className="flex items-start gap-3">
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${doc.status === 'returned' ? 'bg-amber-500' : 'bg-rose-500'}`}>
+              <Icon name={doc.status === 'returned' ? 'undo' : 'x'} className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-slate-900">{doc.status === 'returned' ? 'เอกสารนี้ถูกส่งกลับให้แก้ไข' : 'เอกสารนี้ไม่ได้รับการอนุมัติ'}</div>
+              {lastDecision?.comment
+                ? <p className="mt-0.5 text-sm text-slate-700"><span className="text-slate-500">เหตุผล:</span> {lastDecision.comment}</p>
+                : <p className="mt-0.5 text-xs text-slate-500">ไม่ได้ระบุเหตุผล</p>}
+              {doc.status === 'returned' && notSubmitted && canManage && (
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => setShowEdit(true)} className="btn-outline !py-1.5 !text-sm"><Icon name="edit" className="h-4 w-4" /> แก้ไข</button>
+                  <button onClick={() => setShowSubmit(true)} className="btn-primary !py-1.5 !text-sm"><Icon name="check" className="h-4 w-4" /> ส่งอนุมัติอีกครั้ง</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consulted-user cue: you were asked for an opinion — reply below */}
+      {consultForMe && !postAction && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand/30 bg-brand-tint px-5 py-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
+            <Icon name="chat" className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold text-slate-900">คุณถูกขอความเห็นในเอกสารนี้</div>
+            <p className="text-xs text-slate-600">ท่านไม่จำเป็นต้องอนุมัติ — เพียงอ่านเอกสารแล้วให้ความเห็นในช่องด้านล่าง</p>
+          </div>
+          <button onClick={scrollToComposer} className="btn-primary shrink-0"><Icon name="chat" className="h-4 w-4" /> ให้ความเห็น</button>
+        </div>
+      )}
+
       {/* Status banner for the current approver — informs, doesn't act. The
           actual action buttons live in the header card below (one place). */}
-      {myApproval.canApprove && (
+      {myApproval.canApprove && !postAction && (
         <div className="flex items-center gap-3 rounded-2xl border border-brand/30 bg-brand-tint px-5 py-3.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
             <Icon name="check" className="h-5 w-5" />
           </span>
           <div>
             <div className="text-sm font-bold text-slate-900">เอกสารนี้รอการอนุมัติจากคุณ</div>
-            <p className="text-xs text-slate-600">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มมุมขวาบน</p>
+            <p className="text-xs text-slate-600">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มด้านบน</p>
             {myApproval.hasSignature === false && (
               <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
                 <Icon name="warning" className="h-3.5 w-3.5" />
@@ -374,7 +462,7 @@ export default function DocumentDetail() {
             {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
             {myApproval.canApprove && (
               <>
-                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-light">
+                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl border border-brand/40 px-4 py-2.5 text-sm font-medium text-brand transition hover:bg-brand-tint">
                   <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
                 </button>
                 <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
@@ -515,12 +603,13 @@ export default function DocumentDetail() {
             <Timeline doc={doc} openAttachment={openAttachment} />
 
             {/* composer */}
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div ref={composerRef} className={`mt-4 rounded-xl border bg-slate-50 p-3 ${consultForMe ? 'border-brand/40 ring-2 ring-brand/15' : 'border-slate-200'}`}>
+              {consultForMe && <div className="mb-1.5 text-xs font-semibold text-brand">ให้ความเห็นของคุณที่นี่</div>}
               <textarea
                 value={msgText}
                 onChange={(e) => setMsgText(e.target.value)}
                 rows={2}
-                placeholder="เขียนข้อความ / บันทึก / สอบถาม…"
+                placeholder={consultForMe ? 'พิมพ์ความเห็นของคุณ…' : 'เขียนข้อความ / บันทึก / สอบถาม…'}
                 className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               />
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -532,7 +621,7 @@ export default function DocumentDetail() {
                 <div className="flex items-center gap-2">
                   {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">ลบไฟล์</button>}
                   <button onClick={postMessage} disabled={posting || (!msgText.trim() && !msgFile)} className="btn-primary px-3 py-1.5 text-xs">
-                    {posting ? 'กำลังส่ง…' : 'ส่งข้อความ'}
+                    {posting ? 'กำลังส่ง…' : consultForMe ? 'ส่งความเห็น' : 'ส่งข้อความ'}
                   </button>
                 </div>
               </div>
@@ -581,6 +670,8 @@ export default function DocumentDetail() {
         <ApprovalActionModal
           action={approvalAction}
           warnNoSignature={approvalAction === 'approved' && myApproval.hasSignature === false}
+          nextApproverName={nextApproverName}
+          isFinalStep={isFinalStep}
           onClose={() => setApprovalAction(null)}
           onConfirm={confirmApproval}
         />

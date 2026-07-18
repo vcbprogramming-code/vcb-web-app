@@ -141,6 +141,13 @@ export default function Login() {
           <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</p>
         </div>
 
+        {/* context strip — reassures a user who arrived from an email link */}
+        {(location.state?.from?.pathname || '').startsWith('/memos/') && (
+          <div className="mb-4 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2.5 text-center text-sm text-cyan-100">
+            เข้าสู่ระบบด้วยบัญชีของท่าน เพื่อเปิดดูเอกสารที่ส่งถึงท่าน
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {error}
@@ -192,6 +199,7 @@ export default function Login() {
           <button type="submit" className="cyber-btn w-full" disabled={submitting}>
             {submitting ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบด้วยอีเมล'}
           </button>
+          <p className="text-center text-xs text-slate-500">ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบเพื่อขอรหัสผ่านใหม่</p>
         </form>
         </div>
       </div>

@@ -1,19 +1,29 @@
 name: keep-warm
 
-# Keeps the Render free-tier API awake. Render spins the service down after ~15 min
-# of no traffic, and the cold start (~30-50s) makes the first E-Memo page load slow.
-# This public repo gets unlimited free Actions minutes, so a periodic health ping is
-# a free way to keep it warm. (For DOWN alerts, add UptimeRobot on top — this only
-# pings, it doesn't notify.) See the project-production-deploy memory.
+# Keeps the Render free-tier API awake. Render sleeps after ~15 min idle and the
+# cold start (~30-50s) makes the first E-Memo page load slow.
+#
+# WHY THIS IS A SELF-LOOP: GitHub heavily THROTTLES frequent `schedule:` crons —
+# our old `*/5` actually fired only every ~1.5-3 hours (observed), so a plain
+# periodic ping left long gaps and the service still cold-started. Instead, each
+# (throttled) trigger now runs a long-lived job that pings every 10 min for ~5.7h.
+# One trigger covers a big window, and a newer trigger just restarts the loop
+# (concurrency cancels the old run). This public repo has unlimited Actions
+# minutes, so cost isn't a concern.
+#
+# For GUARANTEED timing, a dedicated external pinger (UptimeRobot / cron-job.org,
+# both free, fire on time) or a paid Render instance ($7/mo, never sleeps) is more
+# robust than GitHub's throttled scheduler.
 
 on:
   schedule:
-    # every 5 minutes — GitHub's tightest allowed interval (runs may be delayed a few
-    # minutes under load, which is fine: Render only sleeps after 15 min idle).
+    # GitHub will throttle this to roughly hourly+; the in-job loop covers the gaps.
     - cron: '*/5 * * * *'
   workflow_dispatch: {} # allow a manual run from the Actions tab
+  push:
+    branches: [main] # re-arm the loop right after a deploy
 
-# never run two pings at once, and let a new one cancel a stuck older one
+# only one warmer at a time; a fresh trigger restarts the loop for a new window
 concurrency:
   group: keep-warm
   cancel-in-progress: true
@@ -21,17 +31,16 @@ concurrency:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 350 # stay under the 6h hard limit
     steps:
-      - name: Ping API health (wake + keep warm)
+      - name: Keep API warm (self-looping ping every 10 min)
         run: |
           URL="https://vcb-hr-api.onrender.com/api/health"
-          for i in 1 2 3 4; do
+          END=$(( $(date +%s) + 340*60 ))  # run ~5h40m, then let the next trigger continue
+          while [ "$(date +%s)" -lt "$END" ]; do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || echo 000)
-            if [ "$code" = "200" ]; then
-              echo "healthy ($code) on attempt $i"
-              exit 0
-            fi
-            echo "attempt $i -> $code (server may be waking); retrying in 20s"
-            sleep 20
+            echo "$(date -u +%H:%M:%S)Z  ping -> $code"
+            [ "$code" = "200" ] || echo "::warning::health ping returned $code (server may be waking)"
+            sleep 600  # 10 minutes — comfortably under Render's ~15 min sleep timer
           done
-          echo "::warning::health ping did not return 200 after 4 attempts"
+          echo "loop window elapsed; the next scheduled trigger will take over"

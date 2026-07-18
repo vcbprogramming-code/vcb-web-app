@@ -3,7 +3,6 @@ import authRoutes from './auth.routes.js';
 import orgRoutes from './org.routes.js';
 import projectRoutes from './projects.routes.js';
 import documentRoutes from './documents.routes.js';
-import approvalRoutes from './approvals.routes.js';
 import verifyRoutes from './verify.routes.js';
 import adminRoutes from './admin.routes.js';
 import performanceRoutes from './performance.routes.js';
@@ -30,7 +29,10 @@ router.use('/org', orgRoutes);
 // Module 1: E-Memo & E-Signature
 router.use('/projects', projectRoutes);
 router.use('/documents', documentRoutes);
-router.use('/approvals', approvalRoutes); // public (token-based) approval actions
+// NOTE: the public token-based /approvals routes were retired — approval is now
+// login-gated in-app (email links go to /memos/:id). Removing the mount closes an
+// unauthenticated mutation/download surface. Any pending step is still actionable
+// via the in-app POST /documents/:id/approve. (approvals.routes.js kept for history.)
 router.use('/verify', verifyRoutes); // public (token-based) document authenticity check
 router.use('/admin', adminRoutes); // admin-only: users + config
 

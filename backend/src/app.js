@@ -13,11 +13,12 @@ export function createApp() {
   const allowedOrigins = env.clientOrigin.split(',').map((s) => s.trim()).filter(Boolean);
   const corsOrigin = (origin, cb) => {
     // allow same-origin / curl (no Origin header), any whitelisted origin, and
-    // any Vercel deployment of this app (preview + production *.vercel.app URLs)
+    // THIS app's Vercel deployments only (production + its preview URLs, which
+    // all start with the project name) — not every random *.vercel.app site.
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
-      /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)
+      /^https:\/\/project-bhq0j[a-z0-9-]*\.vercel\.app$/i.test(origin)
     ) {
       return cb(null, true);
     }

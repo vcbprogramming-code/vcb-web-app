@@ -7,7 +7,6 @@ import Portal from './pages/Portal.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
-import ApprovalAction from './pages/ememo/ApprovalAction.jsx';
 import VerifyDocument from './pages/ememo/VerifyDocument.jsx';
 import EmemoSettings from './pages/ememo/EmemoSettings.jsx';
 import Settings from './pages/admin/Settings.jsx';
@@ -28,8 +27,10 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      {/* public approval page — reached from the email link, no login */}
-      <Route path="/approve/:token" element={<ApprovalAction />} />
+      {/* the old public token approval page is retired — approval is now login-gated
+          in-app. Funnel any stale email link to login (then the register shows the
+          approver's awaiting-me docs at the top). */}
+      <Route path="/approve/:token" element={<Navigate to="/login" replace />} />
       {/* public document verification — reached by scanning the QR, no login */}
       <Route path="/verify/:token" element={<VerifyDocument />} />
 

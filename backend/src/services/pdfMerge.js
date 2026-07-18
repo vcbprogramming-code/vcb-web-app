@@ -1,11 +1,15 @@
 import { PDFDocument } from 'pdf-lib';
 import { query, queryOne } from '../config/db.js';
 import { putObject, deleteObject, getObjectBuffer } from '../config/storage.js';
+import { parseXlsxToSheets, renderSheetTablePdf } from './sheetPdf.js';
 
 // Attachment content types we can fold into the single combined PDF.
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
 const isPdf = (ct) => (ct || '').toLowerCase().includes('pdf');
 const isImage = (ct) => IMAGE_TYPES.has((ct || '').toLowerCase());
+// .xlsx → rendered to table page(s) and appended (not embeddable as-is)
+const isXlsx = (ct, name) =>
+  /spreadsheetml|officedocument\.spreadsheet/i.test(ct || '') || /\.xlsx$/i.test(name || '');
 
 /**
  * Append an image (jpg/png) as one full A4 page, scaled to fit with a margin.
@@ -88,6 +92,14 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
       } else if (isImage(att.content_type)) {
         const bytes = await getObjectBuffer(att.storage_key);
         await addImagePage(outPdf, bytes, att.content_type);
+      } else if (isXlsx(att.content_type, att.file_name)) {
+        // render the spreadsheet as table page(s), then append like a PDF
+        const bytes = await getObjectBuffer(att.storage_key);
+        const { sheets, truncated } = await parseXlsxToSheets(bytes);
+        const sheetBytes = await renderSheetTablePdf(sheets, { title: att.file_name, truncated });
+        const src = await PDFDocument.load(sheetBytes);
+        const pages = await outPdf.copyPages(src, src.getPageIndices());
+        pages.forEach((p) => outPdf.addPage(p));
       } else {
         skipped.push(att.file_name);
       }
@@ -135,7 +147,8 @@ export async function autoCombine(documentId, uploadedBy = null) {
     const hasInline = await queryOne(
       `select 1 from document_attachments
         where document_id = $1 and kind = 'upload'
-          and (content_type ilike 'application/pdf%' or content_type ilike 'image/%')
+          and (content_type ilike 'application/pdf%' or content_type ilike 'image/%'
+               or content_type ilike '%spreadsheetml%' or file_name ilike '%.xlsx')
         limit 1`,
       [documentId]
     );

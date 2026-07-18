@@ -18,6 +18,7 @@ import {
 import { putObject, deleteObject, openDownloadStream, getObjectBuffer } from '../config/storage.js';
 import { generateOriginalPdf, generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 import { generateCombinedPdf, autoCombine } from '../services/pdfMerge.js';
+import { parseXlsxToSheets } from '../services/sheetPdf.js';
 import { createApprovalChain, sendApprovalRequest, applyApprovalAction } from '../services/approval.js';
 import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsultRequest } from '../services/email.js';
 
@@ -816,38 +817,13 @@ router.get(
     if (!isXlsx) throw new ApiError(400, 'ไฟล์นี้แสดงเป็นตารางไม่ได้ (รองรับเฉพาะ .xlsx)');
 
     const buf = await getObjectBuffer(att.storage_key);
-    const MAX_ROWS = 300, MAX_COLS = 60;
-    const wb = new ExcelJS.Workbook();
+    let parsed;
     try {
-      await wb.xlsx.load(buf);
+      parsed = await parseXlsxToSheets(buf);
     } catch {
       throw new ApiError(422, 'เปิดไฟล์ Excel นี้ไม่สำเร็จ — ไฟล์อาจเสียหาย กรุณาดาวน์โหลดเพื่อเปิดด้วยโปรแกรม');
     }
-    let truncated = false;
-    const sheets = [];
-    wb.eachSheet((ws) => {
-      const rows = [];
-      let r = 0;
-      ws.eachRow({ includeEmpty: true }, (row) => {
-        if (r >= MAX_ROWS) { truncated = true; return; }
-        const cells = [];
-        let c = 0;
-        row.eachCell({ includeEmpty: true }, (cell) => {
-          if (c >= MAX_COLS) { truncated = true; return; }
-          let v = cell.text;
-          if (v == null) {
-            const raw = cell.value;
-            v = raw == null ? '' : (typeof raw === 'object' ? (raw.result ?? raw.text ?? '') : raw);
-          }
-          cells.push(String(v));
-          c += 1;
-        });
-        rows.push(cells);
-        r += 1;
-      });
-      sheets.push({ name: ws.name, rows });
-    });
-    res.json({ data: { sheets, truncated } });
+    res.json({ data: parsed });
   })
 );
 

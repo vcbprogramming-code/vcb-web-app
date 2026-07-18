@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
@@ -125,6 +125,26 @@ export default function DocumentDetail() {
   }, [id]);
 
   useEffect(load, [load]);
+
+  // The combined "one file" PDF is built in the background (a few seconds after
+  // create/edit), so a freshly-opened document may still show only the letter.
+  // Auto-refetch until the combined file appears, so the user doesn't have to
+  // refresh manually. `combinePending` = there are mergeable uploads but no
+  // combined file yet.
+  const combinePollRef = useRef(0);
+  const combinePending = doc
+    ? (doc.attachments || []).some((a) => a.kind === 'upload'
+        && (/^(application\/pdf|image\/)/.test(a.content_type || '') || isSheet(a)))
+      && !(doc.attachments || []).some((a) => a.kind === 'combined_pdf')
+    : false;
+  useEffect(() => {
+    if (!doc) return undefined;
+    if (!combinePending) { combinePollRef.current = 0; return undefined; }
+    if (combinePollRef.current >= 6) return undefined; // give up after ~21s
+    combinePollRef.current += 1;
+    const t = setTimeout(load, 3500);
+    return () => clearTimeout(t);
+  }, [doc, combinePending, load]);
 
   // confirmed from ApprovalActionModal (comment already validated there)
   const confirmApproval = async (comment) => {
@@ -417,6 +437,12 @@ export default function DocumentDetail() {
                 </button>
               ) : null}
             </div>
+            {combinePending && (
+              <div className="mb-2 flex items-center gap-1.5 px-2 text-xs text-slate-400">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand" />
+                กำลังรวมไฟล์แนบเข้าเอกสาร… (จะแสดงอัตโนมัติเมื่อเสร็จ)
+              </div>
+            )}
             {previewables.length > 1 && (
               <div className="mb-2 flex flex-wrap gap-1.5 px-2">
                 {previewables.map((p) => (

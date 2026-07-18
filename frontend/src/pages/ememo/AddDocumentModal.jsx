@@ -24,16 +24,16 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
   const [enclosures, setEnclosures] = useState(
     Array.isArray(initial?.enclosures) && initial.enclosures.length
-      ? initial.enclosures.map((e) => ({ name: e.name || '', qty: e.qty != null ? String(e.qty) : '' }))
-      : [{ name: '', qty: '' }]
+      ? initial.enclosures.map((e) => ({ name: e.name || '', qty: e.qty != null ? String(e.qty) : '', unit: e.unit || 'ชุด' }))
+      : [{ name: '', qty: '', unit: 'ชุด' }]
   );
   const setEncl = (i, key, val) => setEnclosures((prev) => prev.map((e, idx) => (idx === i ? { ...e, [key]: val } : e)));
-  const addEncl = () => setEnclosures((prev) => [...prev, { name: '', qty: '' }]);
+  const addEncl = () => setEnclosures((prev) => [...prev, { name: '', qty: '', unit: 'ชุด' }]);
   const removeEncl = (i) => setEnclosures((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   // rows with a name → the payload shape the API/preview expect
   const enclList = enclosures
     .filter((e) => e.name.trim())
-    .map((e) => ({ name: e.name.trim(), qty: e.qty ? Number(e.qty) : undefined, unit: 'ชุด' }));
+    .map((e) => ({ name: e.name.trim(), qty: e.qty ? Number(e.qty) : undefined, unit: (e.unit || 'ชุด').trim() || 'ชุด' }));
   const [body, setBody] = useState(initial?.body || '');
   const [remarks, setRemarks] = useState(initial?.remarks || '');
   // signer (ผู้เซ็น) — may differ from the preparer (the logged-in author). Blank
@@ -63,6 +63,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [preview, setPreview] = useState(null); // { docNumber, department, runNo }
   const [previewLoading, setPreviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingIdx, setUploadingIdx] = useState(-1); // index of the file currently uploading (for progress)
   const [error, setError] = useState(null);
   const [createdDocId, setCreatedDocId] = useState(null); // resume target if a later step fails
   const [savedDraftId, setSavedDraftId] = useState(null); // set when create succeeded but a later step failed
@@ -207,6 +208,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
   const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
   const removeApprover = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
+  const moveApprover = (i, dir) => setApprovers((prev) => {
+    const j = i + dir;
+    if (j < 0 || j >= prev.length) return prev;
+    const next = [...prev];
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
 
   const STEPS = ['ข้อมูลเอกสาร', 'เนื้อหา & ไฟล์แนบ', 'ผู้อนุมัติ & ยืนยัน'];
 
@@ -285,9 +293,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
       // upload each supplementary file (streamed into storage via the API).
       // skip files already uploaded on a previous attempt so a retry after a
-      // mid-loop failure doesn't create duplicate attachments.
-      for (const f of files) {
+      // mid-loop failure doesn't create duplicate attachments. Track the index so
+      // the UI shows real per-file progress instead of one frozen "saving".
+      for (let fi = 0; fi < files.length; fi += 1) {
+        const f = files[fi];
         if (uploadedRef.current.has(f)) continue;
+        setUploadingIdx(fi);
         await ememoApi.uploadAttachment(doc.id, f);
         uploadedRef.current.add(f);
       }
@@ -327,6 +338,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
+      setUploadingIdx(-1);
     }
   };
 
@@ -535,8 +547,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 <div key={i} className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-center text-sm text-slate-400">{i + 1}.</span>
                   <input value={e.name} onChange={(ev) => setEncl(i, 'name', ev.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
-                  <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-24`} />
-                  <span className="self-center text-sm text-slate-500">ชุด</span>
+                  <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-20`} />
+                  <input value={e.unit} onChange={(ev) => setEncl(i, 'unit', ev.target.value)} placeholder="หน่วย" className={`${field} w-20`} title="หน่วย เช่น ชุด/แผ่น/เล่ม/ฉบับ" />
                   {enclosures.length > 1 && (
                     <button type="button" onClick={() => removeEncl(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
                   )}
@@ -568,16 +580,22 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
             {files.length > 0 && (
               <ul className="mb-2 space-y-2">
-                {files.map((f, i) => (
+                {files.map((f, i) => {
+                  const done = submitting && uploadingIdx >= 0 && i < uploadingIdx;
+                  const uploading = submitting && i === uploadingIdx;
+                  return (
                   <li key={`${f.name}-${i}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-2.5 text-sm">
                     <span className="flex min-w-0 items-center gap-2">
                       <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
                       <span className="truncate text-slate-700">{f.name}</span>
                       <span className="shrink-0 text-xs text-slate-400">({(f.size / 1024).toFixed(0)} KB)</span>
+                      {uploading && <span className="shrink-0 text-xs font-medium text-brand">กำลังอัปโหลด…</span>}
+                      {done && <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> เสร็จ</span>}
                     </span>
-                    <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-sm text-red-500 hover:underline">ลบ</button>
+                    {!submitting && <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-sm text-red-500 hover:underline">ลบ</button>}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
 
@@ -666,12 +684,19 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                         <option value={a.email}>{a.name ? `${a.name} (${a.email})` : a.email}</option>
                       )}
                       {approverUsers.map((u) => (
-                        <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
+                        // disable a person already chosen in another row (no duplicate approvers)
+                        <option key={u.email} value={u.email} disabled={approvers.some((x, xi) => xi !== i && x.email === u.email)}>
+                          {u.full_name} ({u.email}){approvers.some((x, xi) => xi !== i && x.email === u.email) ? ' — เลือกแล้ว' : ''}
+                        </option>
                       ))}
                     </select>
                   )}
                   {!approversLocked && approvers.length > 1 && (
-                    <button type="button" onClick={() => removeApprover(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
+                    <>
+                      <button type="button" onClick={() => moveApprover(i, -1)} disabled={i === 0} title="เลื่อนขึ้น" className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowLeft" className="h-4 w-4 rotate-90" /></button>
+                      <button type="button" onClick={() => moveApprover(i, 1)} disabled={i === approvers.length - 1} title="เลื่อนลง" className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowRight" className="h-4 w-4 rotate-90" /></button>
+                      <button type="button" onClick={() => removeApprover(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
+                    </>
                   )}
                 </div>
               ))}
@@ -703,7 +728,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             ) : (
               <button key="submit" type="submit" disabled={submitting} className="btn-primary">
                 {submitting
-                  ? 'กำลังบันทึก…'
+                  ? (uploadingIdx >= 0 ? `กำลังอัปโหลดไฟล์ (${uploadingIdx + 1}/${files.length})…` : 'กำลังบันทึก…')
                   : approvers.some((a) => a.email.trim())
                     ? 'บันทึกและส่งอนุมัติ'
                     : 'บันทึกเอกสาร'}

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adminApi, ROLE_LABELS } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
+import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 
 const ROLE_CHIP = {
@@ -20,31 +21,36 @@ function UserModal({ user, onClose, onSaved }) {
   const [loginMethod, setLoginMethod] = useState(user?.login_method || 'email');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [created, setCreated] = useState(null); // { email, password } → credential hand-off panel
+  const errRef = useRef(null);
 
   const isGoogle = loginMethod === 'google';
+
+  useEffect(() => { if (error) errRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, [error]);
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
+    // client-side validation with clear Thai messages (no server round-trip)
+    if (!fullName.trim()) { setError('กรุณากรอกชื่อ-นามสกุล'); return; }
+    if (!email.trim()) { setError('กรุณากรอกอีเมล'); return; }
+    if (!isGoogle && !editing && password.trim().length < 6) { setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
+    if (!isGoogle && editing && password && password.trim().length < 6) { setError('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
     setBusy(true);
     try {
       if (editing) {
         await adminApi.updateUser(user.id, { fullName, email, role, loginMethod });
-        // password only applies to email accounts
         if (!isGoogle && password) await adminApi.resetPassword(user.id, password);
+        onSaved();
       } else {
-        // email accounts require a password (standard email+password login)
-        if (!isGoogle && !password) {
-          setError('บัญชีแบบอีเมลต้องตั้งรหัสผ่าน');
-          setBusy(false);
-          return;
-        }
         await adminApi.createUser({
           fullName, email, role, loginMethod,
           password: isGoogle ? undefined : password,
         });
+        // hand off the credentials for a NEW email account (admin must relay them)
+        if (!isGoogle) setCreated({ email: email.trim(), password });
+        else onSaved();
       }
-      onSaved();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -54,14 +60,35 @@ function UserModal({ user, onClose, onSaved }) {
 
   const field = 'field';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
+  // credential hand-off after creating a new email account
+  if (created) {
+    const copy = () => navigator.clipboard?.writeText(`อีเมล: ${created.email}\nรหัสผ่าน: ${created.password}`).catch(() => {});
+    return (
+      <Modal title="สร้างบัญชีเรียบร้อย" onClose={onSaved} size="md"
+        footer={<button onClick={onSaved} className="btn-primary">เสร็จสิ้น</button>}>
+        <p className="text-sm text-slate-600">ส่งข้อมูลเข้าสู่ระบบให้ผู้ใช้ (รหัสผ่านนี้แสดงครั้งเดียว):</p>
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+          <div><span className="text-slate-500">อีเมล:</span> <span className="font-medium text-slate-800">{created.email}</span></div>
+          <div><span className="text-slate-500">รหัสผ่านชั่วคราว:</span> <span className="font-mono font-medium text-slate-800">{created.password}</span></div>
         </div>
-        <form onSubmit={submit} className="space-y-4 overflow-auto p-6">
+        <button onClick={copy} className="btn-outline w-full"><Icon name="document" className="h-4 w-4" /> คัดลอกอีเมล + รหัสผ่าน</button>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal
+      title={editing ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'}
+      onClose={busy ? undefined : onClose}
+      size="md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button type="submit" form="user-form" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+        </>
+      }
+    >
+        <form id="user-form" onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
@@ -109,17 +136,9 @@ function UserModal({ user, onClose, onSaved }) {
             </select>
           </div>
 
-          {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
-            <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? 'กำลังบันทึก…' : 'บันทึก'}
-            </button>
-          </div>
+          {error && <div ref={errRef} className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

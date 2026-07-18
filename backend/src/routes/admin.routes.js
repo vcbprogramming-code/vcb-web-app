@@ -205,6 +205,9 @@ router.get(
         role: row.role,
         overrides: row.permissions || {},
         effective: effectivePermissions(row),
+        // the role's baseline (no overrides) so the UI can flag which toggles were
+        // changed for this user and offer "reset to role default"
+        defaults: effectivePermissions({ role: row.role, permissions: {} }),
       },
     });
   })

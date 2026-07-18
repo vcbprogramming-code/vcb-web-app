@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adminApi, ememoApi } from '../../lib/ememo.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
+import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 
 const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#0d9488'];
@@ -24,6 +25,8 @@ function ProjectModal({ project, onClose, onSaved }) {
   const setL = (k, v) => setLetter((f) => ({ ...f, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const errRef = useRef(null);
+  useEffect(() => { if (error) errRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, [error]);
   const [companies, setCompanies] = useState([]);
   const [users, setUsers] = useState([]); // system accounts, for the manager picker (#3)
   const [sigUploading, setSigUploading] = useState(false);
@@ -94,13 +97,18 @@ function ProjectModal({ project, onClose, onSaved }) {
   const field = 'field';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="text-lg font-bold text-slate-800">{editing ? 'แก้ไขโครงการ' : 'เพิ่มโครงการ'}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
-        </div>
-        <form onSubmit={submit} className="p-6 space-y-4 overflow-auto">
+    <Modal
+      title={editing ? 'แก้ไขโครงการ' : 'เพิ่มโครงการ'}
+      onClose={busy ? undefined : onClose}
+      size="xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button type="submit" form="project-form" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+        </>
+      }
+    >
+        <form id="project-form" onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">รหัสโครงการ <span className="text-red-500">*</span></label>
@@ -248,15 +256,9 @@ function ProjectModal({ project, onClose, onSaved }) {
             </div>
           </div>
 
-          {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
-            <button type="submit" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
-          </div>
+          {error && <div ref={errRef} className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

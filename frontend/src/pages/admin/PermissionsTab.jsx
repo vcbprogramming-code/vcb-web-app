@@ -17,6 +17,7 @@ export default function PermissionsTab() {
   const [catalog, setCatalog] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [effective, setEffective] = useState({}); // { module: { action: bool } }
+  const [defaults, setDefaults] = useState({});   // role baseline, to flag overrides
   const [role, setRole] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -46,9 +47,9 @@ export default function PermissionsTab() {
     setVisSaved(false);
     setDirty(false);
     setError(null);
-    if (!id) { setEffective({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
+    if (!id) { setEffective({}); setDefaults({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
     adminApi.getUserPermissions(id)
-      .then((r) => { setEffective(r.data.effective || {}); setRole(r.data.role); })
+      .then((r) => { setEffective(r.data.effective || {}); setDefaults(r.data.defaults || {}); setRole(r.data.role); })
       .catch((e) => setError(e.message));
     adminApi.getUserVisibility(id)
       .then((r) => { setVisProjects(r.data.projectIds || []); setVisCodes(r.data.docCodes || []); })
@@ -70,6 +71,16 @@ export default function PermissionsTab() {
     setEffective((prev) => ({
       ...prev,
       [module]: { ...(prev[module] || {}), [action]: !(prev[module]?.[action]) },
+    }));
+  };
+
+  // reset one action back to the role default (removes the per-user override)
+  const resetOne = (module, action) => {
+    setSaved(false);
+    setDirty(true);
+    setEffective((prev) => ({
+      ...prev,
+      [module]: { ...(prev[module] || {}), [action]: Boolean(defaults[module]?.[action]) },
     }));
   };
 
@@ -111,7 +122,7 @@ export default function PermissionsTab() {
       {selectedId && !isAdmin && (
         <>
           <p className="text-xs text-slate-400">
-            ติ๊กเพื่อให้สิทธิ์ · เอาติ๊กออกเพื่อห้าม (ค่าเริ่มต้นมาจากบทบาทของผู้ใช้ กดเพื่อปรับเฉพาะคนนี้)
+            ติ๊กเพื่อให้สิทธิ์ · เอาติ๊กออกเพื่อห้าม · ค่าเริ่มต้นมาจาก<b>บทบาท</b>ของผู้ใช้ — รายการที่ปรับต่างจากบทบาทจะมีป้าย <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-700">แก้เฉพาะคนนี้</span>
           </p>
           <div className="space-y-4">
             {catalog.map((mod) => (
@@ -120,18 +131,28 @@ export default function PermissionsTab() {
                 <div className="divide-y divide-slate-100">
                   {mod.actions.map((a) => {
                     const on = Boolean(effective[mod.module]?.[a.key]);
+                    const def = Boolean(defaults[mod.module]?.[a.key]);
+                    const overridden = on !== def;
                     return (
-                      <label key={a.key} className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-50">
-                        <span className="text-sm text-slate-700">{a.label}</span>
+                      <div key={a.key} className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50">
+                        <span className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                          {a.label}
+                          {overridden && (
+                            <>
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">แก้เฉพาะคนนี้</span>
+                              <button type="button" onClick={() => resetOne(mod.module, a.key)} className="text-[11px] text-slate-400 hover:text-brand hover:underline">คืนค่าเริ่มต้น ({def ? 'อนุญาต' : 'ห้าม'})</button>
+                            </>
+                          )}
+                        </span>
                         <button
                           type="button"
                           onClick={() => toggle(mod.module, a.key)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${on ? 'bg-brand' : 'bg-slate-300'}`}
+                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${on ? 'bg-brand' : 'bg-slate-300'}`}
                           aria-pressed={on}
                         >
                           <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
                         </button>
-                      </label>
+                      </div>
                     );
                   })}
                 </div>

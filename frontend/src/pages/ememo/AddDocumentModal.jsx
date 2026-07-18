@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 import ReferencePicker from './ReferencePicker.jsx';
@@ -213,14 +214,28 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     if (e) { e.preventDefault(); e.stopPropagation(); }
     setError(null);
     if (step === 1) {
-      if (!projectId || !docCode || !subject.trim()) {
-        setError('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง');
-        return;
-      }
+      const miss = [];
+      if (!projectId) miss.push('โครงการ');
+      if (!docCode) miss.push('รหัสเอกสาร');
+      if (!subject.trim()) miss.push('เรื่อง');
+      if (miss.length) { setError(`กรุณากรอก: ${miss.join(' · ')}`); return; }
     }
     setStep((s) => Math.min(3, s + 1));
   };
   const goBack = () => { setError(null); setStep((s) => Math.max(1, s - 1)); };
+
+  // guard against discarding a half-filled form by accident (X / cancel / Esc)
+  const confirm = useConfirm();
+  const requestClose = async () => {
+    const dirty = !createdDocId && Boolean(
+      subject.trim() || body.trim() || recipient.trim() || files.length || enclList.length || approvers.some((a) => a.email.trim())
+    );
+    if (dirty) {
+      const ok = await confirm({ title: 'ออกโดยไม่บันทึก?', message: 'ข้อมูลที่กรอกไว้จะหายไป ต้องการออกจากหน้านี้หรือไม่?', confirmLabel: 'ออกโดยไม่บันทึก' });
+      if (!ok) return;
+    }
+    onClose();
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -355,6 +370,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-bold text-slate-800">{initial ? 'สร้างเอกสารจากใบเดิม' : 'เพิ่มเอกสารใหม่'}</h3>
+            {/* compact step label on mobile (the full stepper is desktop-only) */}
+            <span className="text-sm font-medium text-slate-500 sm:hidden">ขั้นที่ {step}/3 · {STEPS[step - 1]}</span>
             {/* stepper */}
             <div className="hidden items-center gap-1.5 sm:flex">
               {STEPS.map((label, i) => {
@@ -375,7 +392,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               })}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
+          <button type="button" onClick={requestClose} className="text-slate-400 hover:text-slate-700"><Icon name="x" className="h-5 w-5" /></button>
         </div>
 
         {/* split view: form (left) · live A4 preview (right) */}
@@ -574,8 +591,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             >
               <Icon name="download" className="h-6 w-6 text-slate-400" />
               <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
-              <span className="text-xs text-slate-400">PDF, Word, Excel, รูปภาพ · เลือกได้หลายไฟล์ · สูงสุด 25 MB/ไฟล์</span>
-              <input type="file" multiple className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
+              <span className="text-xs text-slate-400">PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 25 MB/ไฟล์</span>
+              <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
             </label>
           </div>
 
@@ -629,6 +646,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่าระบบ → รหัสเอกสาร)'
                 : 'เลือกผู้อนุมัติตามลำดับขั้น (ต้องมีบัญชีในระบบ) — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ หากเว้นว่างไว้ เอกสารจะถูกบันทึกเป็นฉบับร่าง'}
             </p>
+            {!approversLocked && approverUsers.length === 0 && (
+              <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                ยังไม่มีบัญชีผู้อนุมัติในระบบ — ติดต่อผู้ดูแลระบบให้เพิ่มผู้ใช้ก่อน หรือเว้นว่างไว้เพื่อบันทึกเป็น <b>ฉบับร่าง</b> แล้วส่งอนุมัติภายหลังได้
+              </div>
+            )}
             <div className="space-y-2">
               {approvers.map((a, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -673,7 +695,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
           {/* wizard nav */}
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <button type="button" onClick={step === 1 ? onClose : goBack} className="btn-outline">
+            <button type="button" onClick={step === 1 ? requestClose : goBack} className="btn-outline">
               {step === 1 ? 'ยกเลิก' : '← ก่อนหน้า'}
             </button>
             {step < 3 ? (

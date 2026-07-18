@@ -525,6 +525,12 @@ export default function DocumentDetail() {
                 </button>
               ) : null}
             </div>
+            {/* mobile: the inline A4 preview is small — offer a prominent full-screen read */}
+            {previewUrl && !activeIsSheet && (
+              <button onClick={() => window.open(previewUrl, '_blank')} className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white md:hidden">
+                <Icon name="eye" className="h-4 w-4" /> เปิดเอกสารเต็มจอเพื่ออ่าน
+              </button>
+            )}
             {combinePending && (
               <div className="mb-2 flex items-center gap-1.5 px-2 text-xs text-slate-400">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand" />

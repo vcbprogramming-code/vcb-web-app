@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi, ROLE_LABELS } from '../../lib/ememo.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 
 /**
@@ -9,6 +11,8 @@ import Icon from '../../components/Icon.jsx';
  * and can't be edited.
  */
 export default function PermissionsTab() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [selectedId, setSelectedId] = useState('');
@@ -16,6 +20,7 @@ export default function PermissionsTab() {
   const [role, setRole] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false); // unsaved permission/visibility edits
   const [error, setError] = useState(null);
   // per-user document visibility (#8)
   const [projects, setProjects] = useState([]);
@@ -31,10 +36,15 @@ export default function PermissionsTab() {
       .catch((e) => setError(e.message));
   }, []);
 
-  const selectUser = (id) => {
+  const selectUser = async (id) => {
+    if (dirty && id !== selectedId) {
+      const ok = await confirm({ title: 'มีการแก้ไขที่ยังไม่บันทึก', message: 'สลับผู้ใช้โดยไม่บันทึก? การเปลี่ยนแปลงสิทธิ์/การมองเห็นที่ยังไม่ได้บันทึกจะหายไป', confirmLabel: 'สลับโดยไม่บันทึก', danger: false });
+      if (!ok) return;
+    }
     setSelectedId(id);
     setSaved(false);
     setVisSaved(false);
+    setDirty(false);
     setError(null);
     if (!id) { setEffective({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
     adminApi.getUserPermissions(id)
@@ -45,17 +55,18 @@ export default function PermissionsTab() {
       .catch(() => { setVisProjects([]); setVisCodes([]); });
   };
 
-  const toggleVisProject = (pid) => { setVisSaved(false); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
-  const toggleVisCode = (code) => { setVisSaved(false); setVisCodes((prev) => prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]); };
+  const toggleVisProject = (pid) => { setVisSaved(false); setDirty(true); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
+  const toggleVisCode = (code) => { setVisSaved(false); setDirty(true); setVisCodes((prev) => prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]); };
   const saveVisibility = async () => {
     setVisBusy(true); setError(null);
-    try { await adminApi.saveUserVisibility(selectedId, visProjects, visCodes); setVisSaved(true); }
-    catch (e) { setError(e.message); }
+    try { await adminApi.saveUserVisibility(selectedId, visProjects, visCodes); setVisSaved(true); setDirty(false); toast.success('บันทึกการมองเห็นแล้ว'); }
+    catch (e) { setError(e.message); toast.error(e.message); }
     finally { setVisBusy(false); }
   };
 
   const toggle = (module, action) => {
     setSaved(false);
+    setDirty(true);
     setEffective((prev) => ({
       ...prev,
       [module]: { ...(prev[module] || {}), [action]: !(prev[module]?.[action]) },
@@ -66,10 +77,12 @@ export default function PermissionsTab() {
     setBusy(true);
     setError(null);
     try {
-      // send the whole effective map as the override set (explicit + resolved)
+      // send the whole effective map (backend stores only the diff vs role default)
       await adminApi.saveUserPermissions(selectedId, effective);
       setSaved(true);
-    } catch (e) { setError(e.message); }
+      setDirty(false);
+      toast.success('บันทึกสิทธิ์แล้ว');
+    } catch (e) { setError(e.message); toast.error(e.message); }
     finally { setBusy(false); }
   };
 

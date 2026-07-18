@@ -171,7 +171,9 @@ export function extractCcEmails(ccText) {
 export async function sendCcNotification({ toEmails, doc, actorName }) {
   const emails = Array.isArray(toEmails) ? toEmails.filter(Boolean) : [];
   if (!emails.length) return { skipped: true };
-  const url = `${env.appBaseUrl}/memos`;
+  // open THIS document directly (not the register), so the CC recipient sees
+  // exactly which document was copied to them
+  const url = `${env.appBaseUrl}/memos/${doc.id}`;
   const row = (label, value) =>
     `<tr>
        <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
@@ -279,17 +281,18 @@ export async function sendConsultRequest({ toEmail, toName, doc, askerName, ques
 export async function sendAuthorNotification({ toEmail, authorName, doc, outcome, actorName, comment }) {
   if (!toEmail) return { skipped: true };
   const meta = {
-    approved: { label: 'ได้รับการอนุมัติแล้ว', color: '#16a34a', emoji: '✅' },
-    returned: { label: 'ถูกส่งกลับให้แก้ไข', color: '#ea580c', emoji: '↩️' },
-    rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626', emoji: '✕' },
-  }[outcome] || { label: outcome, color: '#334155', emoji: '' };
-  const url = `${env.appBaseUrl}/memos`;
+    approved: { label: 'ได้รับการอนุมัติแล้ว', color: '#16a34a' },
+    returned: { label: 'ถูกส่งกลับให้แก้ไข', color: '#ea580c' },
+    rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626' },
+  }[outcome] || { label: outcome, color: '#334155' };
+  // open THIS document directly so the author lands on the decided document
+  const url = `${env.appBaseUrl}/memos/${doc.id}`;
   const html = `
   <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
       <div style="background:${meta.color};padding:22px 28px;color:#fff">
         <div style="font-size:13px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
-        <div style="font-size:19px;font-weight:700;margin-top:4px">${meta.emoji} เอกสารของท่าน${meta.label}</div>
+        <div style="font-size:19px;font-weight:700;margin-top:4px">เอกสารของท่าน${meta.label}</div>
       </div>
       <div style="padding:28px;font-size:15px;color:#334155">
         <p style="margin:0 0 6px">เรียน <b>${esc(authorName || 'ผู้จัดทำ')}</b></p>

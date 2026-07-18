@@ -156,6 +156,13 @@ export default function DocumentDetail() {
     return list;
   })() : [];
 
+  // Uploads that can't be shown inline (Excel, Word, zip…) — list them separately
+  // so every attached file is still downloadable (previously they were hidden).
+  const otherFiles = doc ? doc.attachments.filter(
+    (a) => a.kind === 'upload' && !/^(application\/pdf|image\/)/.test(a.content_type || '')
+  ) : [];
+  const fmtSize = (b) => (b == null ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`);
+
   const activePreviewId = (previewAttId && previewables.some((p) => p.id === previewAttId))
     ? previewAttId
     : previewables[0]?.id || null;
@@ -220,6 +227,17 @@ export default function DocumentDetail() {
       // revoke once the new tab has had time to load the blob (else it leaks for the session)
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) { if (win) win.close(); setError(e.message); toast.error(e.message); }
+  };
+
+  // Download a non-previewable file (Excel/Word/…) keeping its real filename.
+  const downloadAttachment = async (attId, fileName) => {
+    try {
+      const url = await ememoApi.attachmentBlobUrl(id, attId);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName || 'download';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) { setError(e.message); toast.error(e.message); }
   };
 
   // post a message (+ optional attached file) to the conversation thread.
@@ -397,6 +415,24 @@ export default function DocumentDetail() {
                   >
                     <Icon name={p.isLetter ? 'file' : 'paperclip'} className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {otherFiles.length > 0 && (
+              <div className="mb-2 space-y-1 px-2">
+                <div className="text-xs font-semibold text-slate-500">ไฟล์แนบอื่น ๆ (เปิด/ดาวน์โหลด)</div>
+                {otherFiles.map((a) => (
+                  <button
+                    key={a.id}
+                    onClick={() => downloadAttachment(a.id, a.file_name)}
+                    className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-brand hover:bg-brand-tint"
+                    title={`ดาวน์โหลด ${a.file_name}`}
+                  >
+                    <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="min-w-0 flex-1 truncate">{a.file_name}</span>
+                    {a.size_bytes != null && <span className="shrink-0 text-xs text-slate-400">{fmtSize(a.size_bytes)}</span>}
+                    <Icon name="download" className="h-4 w-4 shrink-0 text-brand" />
                   </button>
                 ))}
               </div>

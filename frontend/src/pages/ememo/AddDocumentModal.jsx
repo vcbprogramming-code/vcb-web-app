@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
+import { compressImages, fmtBytes } from '../../lib/imageCompress.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
@@ -52,6 +53,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   });
   const [files, setFiles] = useState([]); // supplementary attachments (multiple)
   const [dragOver, setDragOver] = useState(false);
+  const [compressing, setCompressing] = useState(false); // shrinking picked images
+  const [compressNote, setCompressNote] = useState(null); // "บีบรูป N ไฟล์ ประหยัด X"
   const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
   const [approverUsers, setApproverUsers] = useState([]); // system accounts, for the picker
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
@@ -199,13 +202,28 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   }, [projectId, docCode]);
 
   const MAX_BYTES = 200 * 1024 * 1024; // must match backend MAX_UPLOAD_BYTES (env.js)
-  // add one or more files (from picker or drop); reject oversized ones + dedupe
-  const pickFiles = (fileList) => {
+  // add one or more files (from picker or drop). Images are compressed in the
+  // browser first (photos/scans shrink a lot); the size check runs on the
+  // resulting file. Non-images pass through untouched.
+  const pickFiles = async (fileList) => {
     const incoming = Array.from(fileList || []);
     if (!incoming.length) return;
-    const tooBig = incoming.filter((f) => f.size > MAX_BYTES);
-    const ok = incoming.filter((f) => f.size <= MAX_BYTES);
-    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 200 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
+    setCompressing(true);
+    setCompressNote(null);
+    let processed = incoming;
+    try {
+      const results = await compressImages(incoming);
+      processed = results.map((r) => r.file);
+      const shrunk = results.filter((r) => r.compressed);
+      if (shrunk.length) {
+        const saved = shrunk.reduce((s, r) => s + (r.from - r.to), 0);
+        setCompressNote(`บีบรูปแล้ว ${shrunk.length} ไฟล์ · ประหยัด ${fmtBytes(saved)}`);
+      }
+    } catch { /* fall back to the originals on any failure */ }
+    setCompressing(false);
+    const tooBig = processed.filter((f) => f.size > MAX_BYTES);
+    const ok = processed.filter((f) => f.size <= MAX_BYTES);
+    if (tooBig.length) setError(`ไฟล์ใหญ่เกิน 200 MB: ${tooBig.map((f) => f.name).join(', ')}`);
     setFiles((prev) => {
       const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
       return [...prev, ...ok.filter((f) => !seen.has(`${f.name}:${f.size}`))];
@@ -618,11 +636,25 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 dragOver ? 'border-brand bg-brand/5' : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <Icon name="download" className="h-6 w-6 text-slate-400" />
-              <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
-              <span className="text-xs text-slate-400">PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์</span>
+              {compressing ? (
+                <span className="inline-flex items-center gap-2 text-sm font-medium text-brand">
+                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>
+                  กำลังบีบรูปเพื่อลดขนาด…
+                </span>
+              ) : (
+                <>
+                  <Icon name="download" className="h-6 w-6 text-slate-400" />
+                  <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
+                  <span className="text-xs text-slate-400">รูปภาพจะถูกบีบอัตโนมัติ · PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์</span>
+                </>
+              )}
               <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
             </label>
+            {compressNote && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+                <Icon name="check" className="h-3.5 w-3.5" /> {compressNote}
+              </div>
+            )}
           </div>
 
           {/* ผู้จัดการโครงการ / ผู้ลงนาม = ผู้อนุมัติลำดับแรก. From the project if bound,

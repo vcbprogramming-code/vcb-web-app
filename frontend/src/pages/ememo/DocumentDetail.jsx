@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
+import { compressImage } from '../../lib/imageCompress.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
@@ -565,7 +566,13 @@ export default function DocumentDetail() {
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-slate-500 hover:text-brand">
                   <Icon name="paperclip" className="h-4 w-4" />
                   {msgFile ? <span className="max-w-[160px] truncate">{msgFile.name}</span> : 'แนบไฟล์'}
-                  <input type="file" className="hidden" onChange={(e) => setMsgFile(e.target.files?.[0] || null)} />
+                  <input type="file" className="hidden" onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!f) { setMsgFile(null); return; }
+                    const { file } = await compressImage(f); // shrink images; other files untouched
+                    setMsgFile(file);
+                  }} />
                 </label>
                 <div className="flex items-center gap-2">
                   {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">ลบไฟล์</button>}

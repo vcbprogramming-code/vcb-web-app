@@ -37,7 +37,15 @@ const accessMap: Record<ProjectId, AccessRule> = {}
 // createProject(). SOURCE_PROJECTS itself is never mutated (see getAllProjects_
 // in Config.js), extras are purely additive.
 const extraProjects: SeedProject[] = []
-function allProjects(): SeedProject[] { return SOURCE_PROJECTS.concat(extraProjects) }
+// Mirrors PROJECT_OVERRIDES — renames/edits applied to ANY project (including
+// the original 5) without mutating SOURCE_PROJECTS. See renameProject below.
+const projectOverrides = new Map<ProjectId, Partial<SeedProject>>()
+function allProjects(): SeedProject[] {
+  return SOURCE_PROJECTS.concat(extraProjects).map(p => {
+    const o = projectOverrides.get(p.id)
+    return o ? { ...p, ...o } : p
+  })
+}
 function getProjectById(id: ProjectId): SeedProject | undefined { return allProjects().find(p => p.id === id) }
 
 const EMPLOYEE_VISIBLE_DEFAULT: Record<ProjectId, boolean> = { FIN: true, BD: true, BT12: true, BV: true, PN34: true }
@@ -302,10 +310,13 @@ export const mockApi: ServerApi = {
     return matches
   },
 
-  // Creates a new Doc-backed project at runtime — mirrors createProject in
-  // Code.js. In the real app this makes an actual Google Doc; here it just
-  // registers the project definition so the rest of the mock treats it
-  // identically to the hardcoded 5 (see allProjects()).
+  // Creates a new project as a lightweight TAG-ONLY bucket — no Google Doc.
+  // Mirrors createProject in Code.js. An earlier version of both the mock and
+  // the real GAS function always created a Doc (matching how the original 5
+  // projects work); that was wrong for this use case — an admin using "+ New
+  // project" purely as a Fathom tag bucket got a surprise Doc they never
+  // wanted (found 2026-07-19). Do not reintroduce Doc creation without a
+  // deliberate opt-in.
   async createProject(name, nameEn, cadence): Promise<CreatedProject> {
     requireAdmin()
     const trimmedName = String(name || '').trim()
@@ -317,13 +328,26 @@ export const mockApi: ServerApi = {
     const palette = ['#0969da', '#8250df', '#1a7f37', '#9a6700', '#cf222e', '#0b3d62', '#6639ba', '#116329']
     const color = palette[allProjects().length % palette.length]
     const order = allProjects().reduce((max, p) => Math.max(max, p.order || 0), 0) + 1
-    const docId = 'EXAMPLE_' + id
 
     extraProjects.push({ id, name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order })
-    return {
-      id, docId, name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order,
-      docUrl: 'https://docs.google.com/document/d/' + docId + '/edit'
-    }
+    return { id, docId: '', name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order, docUrl: '' }
+  },
+
+  // Renames/edits a project — works for ANY project, including the original
+  // hardcoded 5, via a PROJECT_OVERRIDES-style patch layered over the base
+  // definition. Mirrors renameProject in Code.js.
+  async renameProject(projectId, patch): Promise<Project> {
+    requireAdmin()
+    if (!getProjectById(projectId)) throw new Error('Unknown project: ' + projectId)
+    const clean: Partial<SeedProject> = {}
+    if (patch && typeof patch.name === 'string' && patch.name.trim()) clean.name = patch.name.trim()
+    if (patch && typeof patch.nameEn === 'string') clean.nameEn = patch.nameEn.trim()
+    if (patch && typeof patch.cadence === 'string' && patch.cadence.trim()) clean.cadence = patch.cadence.trim()
+    if (patch && typeof patch.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(patch.color)) clean.color = patch.color
+    const overrides = projectOverrides.get(projectId) || {}
+    projectOverrides.set(projectId, { ...overrides, ...clean })
+    const updated = getProjectById(projectId)!
+    return { id: updated.id, name: updated.name, nameEn: updated.nameEn, cadence: updated.cadence, color: updated.color, count: 0, canSee: true }
   }
 }
 

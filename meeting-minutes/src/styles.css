@@ -80,6 +80,9 @@
   .proj .pn b { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .proj .pn small { color: var(--ink-faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   .proj .cnt { font-size: 11.5px; color: var(--ink-soft); background: var(--line-soft); border-radius: 20px; padding: 1px 8px; }
+  .proj-rename { border: none; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; padding: 5px 6px; border-radius: 6px; opacity: 0; flex: none; }
+  .proj:hover .proj-rename { opacity: 1; }
+  .proj-rename:hover { background: var(--line-soft); color: var(--ink); }
   .newbtn { width: 100%; margin-top: 12px; background: var(--brand-2); color: #fff; border: none; border-radius: 9px; padding: 10px; font-size: 13.5px; font-weight: 600; }
   .newbtn:hover { filter: brightness(1.05); }
   .newbtn.secondary { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); margin-top: 8px; }

@@ -13,10 +13,10 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-07-18
-- **Live deployment referenced:** `@53` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-07-19
+- **Live deployment referenced:** `@60` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
-- **What changed this sync:** Fathom Inbox (webhook/backfill intake, permanent
+- **What changed 2026-07-18 sync:** Fathom Inbox (webhook/backfill intake, permanent
   archive, never in "All meetings"), multi-project tagging (a recording can be
   tagged into more than one project, each independently removable — never a
   single ambiguous untag action), a keyword-based project suggestion in the tag
@@ -24,6 +24,21 @@ change to the GAS source, diff it against this folder and update only what chang
   fixes an ERP-meeting-suggests-FIN false positive), full-content search
   (title/date/attendees instant + debounced whole-body search), and self-serve
   "+ New project" (creates a project at runtime, no code change needed).
+- **What changed 2026-07-19 sync:**
+  - **"+ New project" no longer creates a Google Doc.** It's a tag-only
+    bucket (docId/docUrl are always `''`) — an earlier version always made a
+    Doc, matching the original 5 projects, which produced an unwanted Doc +
+    a stale placeholder "Tab 1" row when an admin used it purely as a Fathom
+    tag bucket. Do not reintroduce Doc creation without a deliberate opt-in.
+  - **Project rename** (`renameProject` / `RenameProjectModal.tsx`) — works
+    for any project, including the original 5, via an overrides layer
+    (`projectOverrides` map in `mock.ts`) rather than mutating the base
+    definitions. Pencil icon on hover, admin-only, on every sidebar tile
+    except ALL and Fathom Inbox.
+  - Fathom webhook duplicate-row bug (multiple deliveries for one recording
+    each inserting a new row) — GAS-only fix (`doPost`/`ingestFathomPayload_`
+    dedup by `recording_id`), no React-side equivalent since the mock has no
+    webhook endpoint.
 
 ## CSS
 `src/styles.css` is the **verbatim** contents of the `<style>…</style>` block in
@@ -68,13 +83,15 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `setFathomTag` | `mockApi.setFathomTag` | `ProjectId[]` (full tag list) |
 | `untagFathomMeeting` | `mockApi.untagFathomMeeting` | `ProjectId[]` (full tag list) |
 | `searchMeetings` | `mockApi.searchMeetings` | `string[]` (matching ids) |
-| `createProject` | `mockApi.createProject` | `CreatedProject` |
+| `createProject` | `mockApi.createProject` | `CreatedProject` (docId/docUrl always `''` — tag-only) |
+| `renameProject` | `mockApi.renameProject` | `Project` |
 
 Not ported (server-only, no client-facing equivalent needed): `doPost` webhook
 intake, `ingestFathomPayload_`, `backfillFathomMeetings`/`refreshFathomMeetings`,
-`registerFathomWebhook`, `diagFathomRaw_` — these populate the row store that
-`listMeetings`/`getMeeting` read from; the mock's Fathom seed rows in `seed.ts`
-stand in for what a real backfill/webhook delivery would have produced.
+`registerFathomWebhook`, `diagFathomRaw_`/`diagFathomDupes_`/`diagExtraProjects_`,
+`detachProjectDoc`, `autoCleanupErpDoc_` — these populate/repair the row store
+that `listMeetings`/`getMeeting` read from; the mock's Fathom seed rows in
+`seed.ts` stand in for what a real backfill/webhook delivery would have produced.
 
 ## Component mapping (GAS → React)
 | GAS (Index.html / JavaScript.html) | React component |
@@ -98,6 +115,7 @@ stand in for what a real backfill/webhook delivery would have produced.
 | tag picker `openTagPicker()` / `suggestProjectFor_()` | `components/TagPickerModal.tsx` |
 | per-chip untag ✕ in `renderDetail()` | inline in `components/MeetingDetail.tsx` |
 | "New project" modal + `createProject` | `components/NewProjectModal.tsx` |
+| rename project (pencil icon) + `renameProject` | `components/RenameProjectModal.tsx` |
 
 ## Fathom Inbox (added 2026-07-18)
 Fathom recordings (via webhook or backfill) land in a permanent, admin-only

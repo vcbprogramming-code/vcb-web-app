@@ -43,5 +43,6 @@ export const api: ServerApi = {
   setFathomTag: (id, pid, t) => delay(() => mockApi.setFathomTag(id, pid, t)),
   untagFathomMeeting: (id, pid, t) => delay(() => mockApi.untagFathomMeeting(id, pid, t)),
   searchMeetings: (q, t) => delay(() => mockApi.searchMeetings(q, t)),
-  createProject: (n, ne, c, t) => delay(() => mockApi.createProject(n, ne, c, t))
+  createProject: (n, ne, c, t) => delay(() => mockApi.createProject(n, ne, c, t)),
+  renameProject: (id, patch, t) => delay(() => mockApi.renameProject(id, patch, t))
 }

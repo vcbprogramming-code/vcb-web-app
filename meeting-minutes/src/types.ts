@@ -127,7 +127,8 @@ export interface SaveMeetingInput {
  *  they're tagged into. Mirrors FATHOM_INBOX_ID in Config.js. */
 export const FATHOM_INBOX_ID: ProjectId = 'FATHOM_INBOX'
 
-/** createProject() result. */
+/** createProject() result. docId/docUrl are '' — projects created at runtime
+ *  are tag-only buckets, never Doc-backed (see PORT_NOTES.md 2026-07-19). */
 export interface CreatedProject {
   id: ProjectId
   docId: string
@@ -137,6 +138,14 @@ export interface CreatedProject {
   color: string
   order: number
   docUrl: string
+}
+
+/** Partial edit accepted by renameProject() — omit a field to leave it unchanged. */
+export interface ProjectRenamePatch {
+  name?: string
+  nameEn?: string
+  cadence?: string
+  color?: string
 }
 
 /** The set of server functions callable through the gs() bridge. */
@@ -160,6 +169,8 @@ export interface ServerApi {
   untagFathomMeeting(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
   /** Full-content search (title/dateLabel/attendees/whole body) — returns matching meeting ids. */
   searchMeetings(query: string, token: string): Promise<string[]>
-  /** Creates a new Doc-backed project at runtime. Admin only. */
+  /** Creates a new tag-only project bucket at runtime (no Google Doc). Admin only. */
   createProject(name: string, nameEn: string, cadence: string, token: string): Promise<CreatedProject>
+  /** Renames/edits any project, including the original 5. Admin only. */
+  renameProject(projectId: ProjectId, patch: ProjectRenamePatch, token: string): Promise<Project>
 }

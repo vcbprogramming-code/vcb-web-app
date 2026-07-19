@@ -18,6 +18,7 @@ import AccessModal from './components/AccessModal'
 import MeetingModal from './components/MeetingModal'
 import EditorModal from './components/EditorModal'
 import NewProjectModal from './components/NewProjectModal'
+import RenameProjectModal from './components/RenameProjectModal'
 import { Busy, Toast } from './components/Overlays'
 
 const EMPTY_SESSION: SessionState = {
@@ -54,6 +55,7 @@ export default function App() {
   const [meetingModalTarget, setMeetingModalTarget] = useState<MeetingFull | null>(null)
   const [editorTarget, setEditorTarget] = useState<MeetingFull | null>(null)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [renameProjectId, setRenameProjectId] = useState<ProjectId | null>(null)
 
   // Debounced full-content search (see searchMeetings) — the instant
   // client-side filter in MeetingList covers title/date/excerpt/attendees;
@@ -216,7 +218,7 @@ export default function App() {
         <Sidebar
           projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin}
           active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
-          onNewProject={() => setNewProjectOpen(true)} tr={tr}
+          onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId} tr={tr}
         />
         <MeetingList
           meetings={meetings} byId={byId} isAdmin={session.isAdmin}
@@ -249,6 +251,12 @@ export default function App() {
       <NewProjectModal
         open={newProjectOpen} onClose={() => setNewProjectOpen(false)}
         onCreated={onProjectCreated} onBusy={onBusy} onToast={toast}
+      />
+      <RenameProjectModal
+        open={!!renameProjectId} project={renameProjectId ? byId[renameProjectId] ?? null : null}
+        onClose={() => setRenameProjectId(null)}
+        onRenamed={() => { setRenameProjectId(null); refreshAll() }}
+        onBusy={onBusy} onToast={toast}
       />
 
       <Busy msg={busy} />

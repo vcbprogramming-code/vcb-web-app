@@ -9,7 +9,7 @@ import EditDocumentModal from './EditDocumentModal.jsx';
 import ApprovalActionModal from './ApprovalActionModal.jsx';
 import ConsultModal from './ConsultModal.jsx';
 import AddDocumentModal from './AddDocumentModal.jsx';
-import SheetPreview from './SheetPreview.jsx';
+import ReferenceModal from './ReferenceModal.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 
@@ -46,53 +46,6 @@ const AUDIT_ACTION_TH = {
   email_failed: 'ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ',
 };
 
-/** Full system activity log for the document (always expanded). */
-function AuditTrail({ entries }) {
-  const list = Array.isArray(entries) ? entries : [];
-  if (list.length === 0) return null;
-  return (
-    <div className="mt-5 border-t border-slate-100 pt-4">
-      <h4 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-500">
-        <Icon name="clock" className="h-4 w-4" /> ประวัติการดำเนินการ (Audit Trail)
-      </h4>
-      <ol className="space-y-2">
-        {list.map((a, i) => {
-          // `edited` entries carry a before→after change list in detail.changes
-          const changes = a.action === 'edited' && Array.isArray(a.detail?.changes) ? a.detail.changes : [];
-          const truncate = (s) => (s && s.length > 40 ? `${s.slice(0, 40)}…` : s);
-          return (
-            <li key={i} className="flex items-start gap-2.5 text-xs">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className={`inline-flex items-center gap-1 font-medium ${a.action === 'email_failed' ? 'text-amber-600' : 'text-slate-700'}`}>
-                    {a.action === 'email_failed' && <Icon name="warning" className="h-3.5 w-3.5" />}
-                    {AUDIT_ACTION_TH[a.action] || a.action}
-                  </span>
-                  {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
-                  <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
-                </div>
-                {changes.length > 0 && (
-                  <ul className="mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2.5">
-                    {changes.map((c, j) => (
-                      <li key={j} className="text-slate-500">
-                        <span className="font-medium text-slate-600">{c.label}:</span>{' '}
-                        {c.from
-                          ? <><span className="text-rose-500 line-through">{truncate(c.from)}</span> <span className="text-slate-400">→</span> <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span></>
-                          : <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -116,6 +69,9 @@ export default function DocumentDetail() {
   const [msgText, setMsgText] = useState('');
   const [msgFile, setMsgFile] = useState(null);
   const [posting, setPosting] = useState(false);
+  const [canceling, setCanceling] = useState(false); // ยกเลิกเอกสาร in flight
+  const [attBusy, setAttBusy] = useState(null); // attachment id whose blob is being fetched (open/download)
+  const [refPreviewId, setRefPreviewId] = useState(null); // อ้างถึง preview modal (#6)
 
   // is the logged-in user the current pending approver?
   const [myApproval, setMyApproval] = useState({ canApprove: false });
@@ -176,32 +132,29 @@ export default function DocumentDetail() {
     load();
   };
 
-  // ONE document to show (B2): the combined file if attachments were merged in,
-  // else the letter itself (the approved/signed version once approved). Extra
-  // uploaded files appear as their own labelled tabs (B3).
+  // The "เอกสาร" section shows ONLY the memo/letter itself (the approved/signed
+  // version once approved, else the original) — NOT the combined file (client #8:
+  // "แสดงแค่บันทึกข้อความก็พอ"). Extra uploaded PDFs/images appear as their own
+  // labelled tabs (B3). Excel is download-only (client #7).
   const previewables = doc ? (() => {
-    const combined = doc.attachments.find((a) => a.kind === 'combined_pdf');
     const letter =
       doc.attachments.find((a) => a.version === 'approved') ||
       doc.attachments.find((a) => a.version === 'original');
-    const primary = combined || letter;
     const inlineKinds = doc.attachments.filter(
       (a) => (a.kind === 'upload') && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
-    // .xlsx spreadsheets: previewable as a table (parsed server-side)
-    const sheetKinds = doc.attachments.filter((a) => a.kind === 'upload' && isSheet(a));
     const list = [];
-    if (primary) list.push({ id: primary.id, label: 'เอกสาร', isLetter: true, contentType: primary.content_type });
+    if (letter) list.push({ id: letter.id, label: 'เอกสาร', isLetter: true, contentType: letter.content_type });
     // number the supplementary files so it's clear which is attachment #1, #2… (#2)
     inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type, fileName: a.file_name }));
-    sheetKinds.forEach((a) => list.push({ id: a.id, label: `ตาราง: ${a.file_name}`, isLetter: false, isSheet: true, contentType: a.content_type, fileName: a.file_name }));
     return list;
   })() : [];
 
-  // Uploads that can't be shown inline AND aren't previewable spreadsheets
-  // (Word, zip, csv…) — list them as downloads so no attachment is ever hidden.
+  // Uploads that can't be shown inline (Word, zip, csv…) AND all spreadsheets
+  // (Excel is download-only per client #7 — rendering the table inline is
+  // redundant with the attached file) — listed as downloads so nothing is hidden.
   const otherFiles = doc ? doc.attachments.filter(
-    (a) => a.kind === 'upload' && !/^(application\/pdf|image\/)/.test(a.content_type || '') && !isSheet(a)
+    (a) => a.kind === 'upload' && (isSheet(a) || !/^(application\/pdf|image\/)/.test(a.content_type || ''))
   ) : [];
   const fmtSize = (b) => (b == null ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`);
 
@@ -210,24 +163,22 @@ export default function DocumentDetail() {
     : previewables[0]?.id || null;
   const activePreview = previewables.find((p) => p.id === activePreviewId) || null;
   const activeIsImage = /^image\//.test(activePreview?.contentType || '');
-  const activeIsSheet = Boolean(activePreview?.isSheet);
 
   useEffect(() => {
-    // sheets are rendered by <SheetPreview> (no blob URL needed)
-    if (!activePreviewId || activeIsSheet) { setPreviewUrl(null); return; }
+    if (!activePreviewId) { setPreviewUrl(null); return; }
     let url; let cancelled = false;
     ememoApi.attachmentBlobUrl(id, activePreviewId)
       .then((u) => { if (cancelled) { URL.revokeObjectURL(u); return; } url = u; setPreviewUrl(u); })
       .catch(() => !cancelled && setPreviewUrl(null));
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [activePreviewId, id, activeIsSheet]);
+  }, [activePreviewId, id]);
 
   const cancelDoc = async () => {
     const ok = await confirm({ title: 'ยกเลิกเอกสาร', message: 'ยกเลิกเอกสารนี้?\nเอกสารจะไม่เดินในสายอนุมัติต่อ และกลับคืนไม่ได้', confirmLabel: 'ยกเลิกเอกสาร' });
     if (!ok) return;
-    setBusy(true);
+    setCanceling(true);
     try { await ememoApi.cancelDocument(id); toast.success('ยกเลิกเอกสารแล้ว'); load(); }
-    catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
+    catch (e) { setError(e.message); toast.error(e.message); } finally { setCanceling(false); }
   };
 
   // "สร้างจากใบนี้" — copy all fields + uploaded attachments into a new draft.
@@ -266,16 +217,19 @@ export default function DocumentDetail() {
     // blob once fetched — otherwise the post-await window.open is blocked by
     // popup blockers (Safari/Firefox) and the file silently never opens.
     const win = window.open('', '_blank');
+    setAttBusy(attId);
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
       if (win) win.location = url; else window.open(url, '_blank');
       // revoke once the new tab has had time to load the blob (else it leaks for the session)
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) { if (win) win.close(); setError(e.message); toast.error(e.message); }
+    finally { setAttBusy(null); }
   };
 
   // Download a non-previewable file (Excel/Word/…) keeping its real filename.
   const downloadAttachment = async (attId, fileName) => {
+    setAttBusy(attId);
     try {
       const url = await ememoApi.attachmentBlobUrl(id, attId);
       const a = document.createElement('a');
@@ -283,6 +237,7 @@ export default function DocumentDetail() {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) { setError(e.message); toast.error(e.message); }
+    finally { setAttBusy(null); }
   };
 
   // post a message (+ optional attached file) to the conversation thread.
@@ -309,7 +264,9 @@ export default function DocumentDetail() {
   const isOwner = doc.created_by && doc.created_by === profile?.id;
   const isAdmin = profile?.role === 'admin';
   const canManage = isOwner || isAdmin;
-  const notSubmitted = ['draft', 'returned'].includes(doc.status); // owner can still edit + send
+  // owner can still edit + (re)send: a rejected doc may be corrected & resubmitted (#11)
+  const notSubmitted = ['draft', 'returned', 'rejected'].includes(doc.status);
+  const isResubmit = ['returned', 'rejected'].includes(doc.status); // resubmission needs a reason
   const isPending = doc.status === 'pending';
   const me = profile?.full_name || user?.email || 'ฉัน';
 
@@ -334,7 +291,7 @@ export default function DocumentDetail() {
         <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
       </button>
 
-      {/* After acting: a persistent closure card + a path to the next pending doc */}
+      {/* After acting: a concise closure card confirming the outcome (#12). */}
       {postAction && (
         <div className={`flex flex-wrap items-center gap-3 rounded-2xl border px-5 py-4 ${postAction.action === 'approved' ? 'border-emerald-200 bg-emerald-50' : postAction.action === 'rejected' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'}`}>
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${postAction.action === 'approved' ? 'bg-emerald-500' : postAction.action === 'rejected' ? 'bg-rose-500' : 'bg-amber-500'}`}>
@@ -342,17 +299,14 @@ export default function DocumentDetail() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-bold text-slate-900">
-              {postAction.action === 'approved' ? (postAction.finalized ? 'อนุมัติสมบูรณ์แล้ว' : 'อนุมัติแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป') : postAction.action === 'rejected' ? 'ไม่อนุมัติเอกสารแล้ว' : 'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว'}
+              {postAction.action === 'approved'
+                ? (postAction.finalized ? 'อนุมัติเอกสารเรียบร้อยแล้ว' : 'บันทึกการอนุมัติของคุณแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป')
+                : postAction.action === 'rejected' ? 'บันทึกการไม่อนุมัติเรียบร้อยแล้ว'
+                : 'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว'}
             </div>
-            <p className="text-xs text-slate-600">{postAction.count > 0 ? `ยังมีอีก ${postAction.count} ฉบับที่รออนุมัติจากคุณ` : 'ไม่มีเอกสารอื่นที่รออนุมัติจากคุณแล้ว'}</p>
+            <p className="text-xs text-slate-600">ระบบบันทึกผลการพิจารณาของคุณเรียบร้อยแล้ว</p>
           </div>
-          {postAction.next ? (
-            <button onClick={() => { setPostAction(null); navigate(`/memos/${postAction.next.id}`); }} className="btn-primary shrink-0">
-              เอกสารที่รออนุมัติถัดไป <Icon name="arrowRight" className="h-4 w-4" />
-            </button>
-          ) : (
-            <button onClick={() => navigate('/memos')} className="btn-outline shrink-0">กลับทะเบียนเอกสาร</button>
-          )}
+          <button onClick={() => navigate('/memos')} className="btn-outline shrink-0">กลับทะเบียนเอกสาร</button>
         </div>
       )}
 
@@ -368,10 +322,12 @@ export default function DocumentDetail() {
               {lastDecision?.comment
                 ? <p className="mt-0.5 text-sm text-slate-700"><span className="text-slate-500">เหตุผล:</span> {lastDecision.comment}</p>
                 : <p className="mt-0.5 text-xs text-slate-500">ไม่ได้ระบุเหตุผล</p>}
-              {doc.status === 'returned' && notSubmitted && canManage && (
-                <div className="mt-2 flex gap-2">
-                  <button onClick={() => setShowEdit(true)} className="btn-outline !py-1.5 !text-sm"><Icon name="edit" className="h-4 w-4" /> แก้ไข</button>
-                  <button onClick={() => setShowSubmit(true)} className="btn-primary !py-1.5 !text-sm"><Icon name="check" className="h-4 w-4" /> ส่งอนุมัติอีกครั้ง</button>
+              {/* #11: a returned OR rejected doc can be corrected and re-submitted */}
+              {notSubmitted && canManage && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button onClick={() => setShowEdit(true)} className="btn-outline !py-1.5 !text-sm"><Icon name="edit" className="h-4 w-4" /> แก้ไขเอกสาร</button>
+                  <button onClick={() => setShowSubmit(true)} className="btn-primary !py-1.5 !text-sm"><Icon name="check" className="h-4 w-4" /> แก้ไขแล้วส่งพิจารณาอีกครั้ง</button>
+                  <span className="text-xs text-slate-500">— ต้องระบุเหตุผลที่ส่งพิจารณาใหม่</span>
                 </div>
               )}
             </div>
@@ -438,12 +394,12 @@ export default function DocumentDetail() {
               <MetaItem icon="file" label="อ้างถึง">
                 {doc.reference_doc ? (
                   <button
-                    onClick={() => navigate(`/memos/${doc.reference_doc.id}`)}
+                    onClick={() => setRefPreviewId(doc.reference_doc.id)}
                     className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
-                    title="เปิดเอกสารที่อ้างถึง"
+                    title="ดูตัวอย่างเอกสารที่อ้างถึง"
                   >
                     {doc.reference}
-                    <Icon name="arrowRight" className="h-3.5 w-3.5" />
+                    <Icon name="eye" className="h-3.5 w-3.5" />
                   </button>
                 ) : doc.reference}
               </MetaItem>
@@ -459,45 +415,33 @@ export default function DocumentDetail() {
 
           {/* RIGHT: actions (only when there are any, so the row doesn't get skewed) */}
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* APPROVER actions — solid, semantic colors; click opens a confirm/reason modal */}
+            {/* APPROVER actions (#13 — ส่งกลับแก้ไข removed; ไม่อนุมัติ now covers
+                "send back for edit"). Tooltips clarify each action's meaning. */}
             {myApproval.canApprove && (
               <>
-                <button onClick={() => setShowConsult(true)} className="inline-flex items-center gap-2 rounded-xl border border-brand/40 px-4 py-2.5 text-sm font-medium text-brand transition hover:bg-brand-tint">
+                <button onClick={() => setShowConsult(true)} title="สอบถาม/ขอความเห็นจากผู้อื่นก่อนตัดสินใจ — ยังไม่ใช่การอนุมัติ" className="inline-flex items-center gap-2 rounded-xl border border-brand/40 px-4 py-2.5 text-sm font-medium text-brand transition hover:bg-brand-tint">
                   <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
                 </button>
-                <button onClick={() => setApprovalAction('returned')} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600">
-                  <Icon name="undo" className="h-4 w-4" /> ส่งกลับแก้ไข
-                </button>
-                <button onClick={() => setApprovalAction('rejected')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+                <button onClick={() => setApprovalAction('rejected')} title="ไม่อนุมัติเอกสาร และส่งกลับให้ผู้จัดทำแก้ไขเพื่อยื่นใหม่ (ต้องระบุเหตุผล)" className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
                   <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
                 </button>
-                <button onClick={() => setApprovalAction('approved')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                <button onClick={() => setApprovalAction('approved')} title="อนุมัติเอกสาร และส่งต่อผู้อนุมัติลำดับถัดไป (ถ้ามี)" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
                   <Icon name="check" className="h-5 w-5" /> อนุมัติ
                 </button>
               </>
             )}
 
-            {/* OWNER/ADMIN actions — scoped to status */}
+            {/* OWNER/ADMIN actions — scoped to status (#13 — ยกเลิก + สร้างจากใบนี้ removed) */}
             {canManage && notSubmitted && (
-              <button onClick={() => setShowEdit(true)} disabled={busy} className="btn-outline">
+              <button onClick={() => setShowEdit(true)} disabled={busy} title="แก้ไขเนื้อหาเอกสารก่อนส่งอนุมัติ" className="btn-outline">
                 <Icon name="edit" className="h-4 w-4" /> แก้ไข
               </button>
             )}
-            {canManage && (notSubmitted || isPending) && (
-              <button onClick={cancelDoc} disabled={busy} className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50">
-                <Icon name="x" className="h-4 w-4" /> ยกเลิก
-              </button>
-            )}
             {canManage && notSubmitted && (
-              <button onClick={() => setShowSubmit(true)} className="btn-primary">
+              <button onClick={() => setShowSubmit(true)} title="ส่งเอกสารเข้าสายอนุมัติ (ผู้จัดการโครงการอนุมัติเป็นลำดับแรก)" className="btn-primary">
                 <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
               </button>
             )}
-
-            {/* create a new document from this one (copy fields + attachments) */}
-            <button onClick={duplicateDoc} disabled={dupLoading} className="btn-outline">
-              <Icon name="layers" className="h-4 w-4" /> {dupLoading ? 'กำลังเตรียม…' : 'สร้างจากใบนี้'}
-            </button>
 
             {/* public verification page (same as scanning the PDF's QR) */}
             {doc.verify_token && (
@@ -515,18 +459,14 @@ export default function DocumentDetail() {
           <div className="card !p-3">
             <div className="mb-2 flex items-center justify-between px-2 pt-1">
               <h3 className="font-bold text-slate-800">เอกสาร</h3>
-              {activeIsSheet ? (
-                <button onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
-                  <Icon name="download" className="h-4 w-4" /> ดาวน์โหลดไฟล์
-                </button>
-              ) : previewUrl ? (
+              {previewUrl ? (
                 <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
                   <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
                 </button>
               ) : null}
             </div>
             {/* mobile: the inline A4 preview is small — offer a prominent full-screen read */}
-            {previewUrl && !activeIsSheet && (
+            {previewUrl && (
               <button onClick={() => window.open(previewUrl, '_blank')} className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white md:hidden">
                 <Icon name="eye" className="h-4 w-4" /> เปิดเอกสารเต็มจอเพื่ออ่าน
               </button>
@@ -561,20 +501,23 @@ export default function DocumentDetail() {
                   <button
                     key={a.id}
                     onClick={() => downloadAttachment(a.id, a.file_name)}
-                    className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-brand hover:bg-brand-tint"
+                    disabled={attBusy === a.id}
+                    className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-brand hover:bg-brand-tint disabled:opacity-60"
                     title={`ดาวน์โหลด ${a.file_name}`}
                   >
                     <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
                     <span className="min-w-0 flex-1 truncate">{a.file_name}</span>
-                    {a.size_bytes != null && <span className="shrink-0 text-xs text-slate-400">{fmtSize(a.size_bytes)}</span>}
-                    <Icon name="download" className="h-4 w-4 shrink-0 text-brand" />
+                    {attBusy === a.id
+                      ? <Spinner className="h-4 w-4 shrink-0" tone="inherit" label="กำลังเตรียม…" />
+                      : <>
+                          {a.size_bytes != null && <span className="shrink-0 text-xs text-slate-400">{fmtSize(a.size_bytes)}</span>}
+                          <Icon name="download" className="h-4 w-4 shrink-0 text-brand" />
+                        </>}
                   </button>
                 ))}
               </div>
             )}
-            {activeIsSheet ? (
-              <SheetPreview docId={id} attId={activePreviewId} />
-            ) : previewUrl ? (
+            {previewUrl ? (
               activeIsImage ? (
                 // images: fit to the panel width so they don't open zoomed-in (#1)
                 <div className="h-[calc(100vh-220px)] min-h-[560px] w-full overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -600,11 +543,11 @@ export default function DocumentDetail() {
           </div>
         </div>
 
-        {/* RIGHT: conversation + audit trail (info moved into the header card) */}
+        {/* RIGHT: ONE unified timeline — lifecycle events + approval steps +
+            messages, all in a single chronological thread (#4/#5). */}
         <div className="space-y-5 lg:col-span-2">
-          {/* ── บันทึก: approval chain + messages merged as a timeline ── */}
           <div className="card">
-            <h3 className="mb-4 font-bold text-slate-800">บันทึก</h3>
+            <h3 className="mb-4 font-bold text-slate-800">บันทึกและการพิจารณา</h3>
 
             <Timeline doc={doc} openAttachment={openAttachment} />
 
@@ -632,9 +575,6 @@ export default function DocumentDetail() {
                 </div>
               </div>
             </div>
-
-            {/* Audit Trail — full system activity log, always expanded */}
-            <AuditTrail entries={doc.audit} />
           </div>
         </div>
       </div>
@@ -659,6 +599,7 @@ export default function DocumentDetail() {
           documentId={id}
           docCode={doc.doc_code}
           projectManager={doc.manager_email ? { name: doc.manager_name, email: doc.manager_email } : null}
+          resubmit={isResubmit}
           onClose={() => setShowSubmit(false)}
           onSubmitted={(emailFailed) => { setShowSubmit(false); if (emailFailed) toast.error('ส่งเข้าสายอนุมัติแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'); else toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
         />
@@ -686,22 +627,41 @@ export default function DocumentDetail() {
       {showConsult && (
         <ConsultModal onClose={() => setShowConsult(false)} onConfirm={confirmConsult} />
       )}
+
+      {refPreviewId && (
+        <ReferenceModal
+          refId={refPreviewId}
+          onClose={() => setRefPreviewId(null)}
+          onOpenFull={(rid) => { setRefPreviewId(null); navigate(`/memos/${rid}`); }}
+        />
+      )}
     </div>
   );
 }
 
+// lifecycle audit actions shown inline in the timeline. approve/reject/return/
+// consult are represented by their step/message rows, so they're excluded here to
+// avoid duplicate entries.
+const TIMELINE_LIFECYCLE = new Set(['created', 'submitted', 'edited', 'cancelled', 'resent', 'email_failed', 'forwarded']);
+
 /**
- * Merged timeline: approval-chain steps + conversation messages, ordered by time.
- * Approval steps that are still pending anchor at their queue position; acted
- * steps and messages sort by their timestamp.
+ * ONE unified timeline (#4/#5): document-lifecycle audit events + approval-chain
+ * steps + conversation messages, all in a single chronological thread joined by a
+ * continuous connector line. Pending steps anchor at their queue position; acted
+ * steps, audit events and messages sort by their timestamp.
  */
 function Timeline({ doc, openAttachment }) {
   const steps = doc.approval_steps || [];
   const messages = doc.messages || [];
+  const audit = doc.audit || [];
   const currentIdx = steps.findIndex((s) => s.action === 'pending');
 
   // build a unified, time-sorted event list
   const events = [];
+  audit.forEach((a, i) => {
+    if (!TIMELINE_LIFECYCLE.has(a.action)) return;
+    events.push({ kind: 'audit', id: `a-${i}`, audit: a, at: a.created_at ? new Date(a.created_at).getTime() : 0 });
+  });
   steps.forEach((s, i) => {
     events.push({
       kind: 'step', id: `s-${s.id}`, step: s, i,
@@ -718,9 +678,48 @@ function Timeline({ doc, openAttachment }) {
     return <p className="text-sm text-slate-500">ยังไม่มีการพิจารณาหรือข้อความ — เริ่มการสนทนาด้านล่างได้เลย</p>;
   }
 
+  const truncate = (s) => (s && s.length > 40 ? `${s.slice(0, 40)}…` : s);
+
   return (
-    <ol className="relative space-y-4">
-      {events.map((ev) => {
+    <ol className="relative">
+      {events.map((ev, idx) => {
+        const last = idx === events.length - 1;
+        // continuous connector line joining this node's dot to the next (#5)
+        const connector = !last && <span className="absolute left-[13.5px] top-7 h-full w-px bg-slate-200" aria-hidden="true" />;
+
+        if (ev.kind === 'audit') {
+          const a = ev.audit;
+          const changes = a.action === 'edited' && Array.isArray(a.detail?.changes) ? a.detail.changes : [];
+          const warn = a.action === 'email_failed';
+          return (
+            <li key={ev.id} className="relative flex gap-3 pb-5 text-sm last:pb-0">
+              {connector}
+              <span className={`relative z-10 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${warn ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
+                <Icon name={warn ? 'warning' : 'clock'} className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                  <span className={`font-medium ${warn ? 'text-amber-600' : 'text-slate-600'}`}>{AUDIT_ACTION_TH[a.action] || a.action}</span>
+                  {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
+                  <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
+                </div>
+                {changes.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2.5 text-xs">
+                    {changes.map((c, j) => (
+                      <li key={j} className="text-slate-500">
+                        <span className="font-medium text-slate-600">{c.label}:</span>{' '}
+                        {c.from
+                          ? <><span className="text-rose-500 line-through">{truncate(c.from)}</span> <span className="text-slate-400">→</span> <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span></>
+                          : <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          );
+        }
+
         if (ev.kind === 'step') {
           const s = ev.step;
           const m = APPROVAL_META[s.action] || APPROVAL_META.pending;
@@ -729,30 +728,41 @@ function Timeline({ doc, openAttachment }) {
           const circle = isDone
             ? (s.action === 'approved' ? 'bg-emerald-500 text-white' : s.action === 'rejected' ? 'bg-rose-500 text-white' : 'bg-orange-500 text-white')
             : ev.isCurrent ? 'bg-brand text-white ring-4 ring-brand/15'
-            : 'bg-white/10 text-slate-500';
+            : 'bg-slate-200 text-slate-500';
           const icon = s.action === 'approved' ? 'check' : s.action === 'rejected' ? 'x' : s.action === 'returned' ? 'undo' : null;
           return (
-            <li key={ev.id} className="relative flex gap-3 text-sm">
+            <li key={ev.id} className="relative flex gap-3 pb-5 text-sm last:pb-0">
+              {connector}
               <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${circle}`}>
                 {icon ? <Icon name={icon} className="h-4 w-4" strokeWidth={2.4} /> : s.step_no}
               </span>
               <div className="min-w-0 flex-1">
                 <div className={`flex flex-wrap items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
                   <span className="truncate">{s.approver_name || s.approver_email}</span>
+                  {/* #10: mark the signer clearly as the project manager */}
+                  {s.is_signer && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ผู้จัดการโครงการ</span>}
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : ev.isCurrent ? 'กำลังพิจารณา' : m.label}</span>
                   {s.acted_at && <span className="text-[11px] text-slate-500">{formatThaiDateTime(s.acted_at)}</span>}
                 </div>
                 <div className="truncate text-xs text-slate-500">{s.approver_email}</div>
+                {/* #9: once approved, show that their signature is now on the letter */}
+                {s.action === 'approved' && s.has_signature && (
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                    <Icon name="check" className="h-3.5 w-3.5" /> ลงลายเซ็นบนเอกสารแล้ว
+                  </div>
+                )}
                 {s.comment && <div className="mt-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">{s.comment}</div>}
               </div>
             </li>
           );
         }
+
         // message — 'consult' rows (ขอความเห็น) get a distinct blue accent
         const m = ev.msg;
         const isConsult = m.kind === 'consult';
         return (
-          <li key={ev.id} className="relative flex gap-3 text-sm">
+          <li key={ev.id} className="relative flex gap-3 pb-5 text-sm last:pb-0">
+            {connector}
             <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isConsult ? 'bg-brand-tint text-brand' : 'bg-slate-100 text-slate-500'}`}>
               <Icon name="chat" className="h-4 w-4" />
             </span>

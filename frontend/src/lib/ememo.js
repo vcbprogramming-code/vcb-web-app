@@ -60,8 +60,8 @@ export const ememoApi = {
     api(`/documents/${id}/attachments/${attId}`, { method: 'DELETE' }),
 
   // approval
-  submitForApproval: (id, approvers) =>
-    api(`/documents/${id}/submit`, { method: 'POST', body: { approvers } }),
+  submitForApproval: (id, approvers, resubmitNote) =>
+    api(`/documents/${id}/submit`, { method: 'POST', body: { approvers, ...(resubmitNote ? { resubmitNote } : {}) } }),
 
   // public document verification (no auth — QR/token from a printed copy)
   verifyDocument: (token) => api(`/verify/${token}`, { auth: false }),

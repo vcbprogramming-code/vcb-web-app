@@ -3,6 +3,7 @@ import { adminApi, ROLE_LABELS } from '../../lib/ememo.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
+import Spinner from '../../components/Spinner.jsx';
 
 /**
  * Action-level permissions editor (backlog round 2 #3). Pick a user, then toggle
@@ -30,11 +31,15 @@ export default function PermissionsTab() {
   const [visCodes, setVisCodes] = useState([]);        // allowed doc codes ([] = all)
   const [visBusy, setVisBusy] = useState(false);
   const [visSaved, setVisSaved] = useState(false);
+  const [loading, setLoading] = useState(true);       // initial reference-data load
+  const [userLoading, setUserLoading] = useState(false); // loading the picked user's perms/visibility
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([adminApi.listUsers(), adminApi.permissionCatalog(), adminApi.listProjects(), adminApi.listDocCodeApprovers()])
       .then(([u, c, p, dc]) => { setUsers(u.data); setCatalog(c.data); setProjects(p.data); setDocCodes(dc.data); })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const selectUser = async (id) => {
@@ -48,12 +53,16 @@ export default function PermissionsTab() {
     setDirty(false);
     setError(null);
     if (!id) { setEffective({}); setDefaults({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
-    adminApi.getUserPermissions(id)
-      .then((r) => { setEffective(r.data.effective || {}); setDefaults(r.data.defaults || {}); setRole(r.data.role); })
-      .catch((e) => setError(e.message));
-    adminApi.getUserVisibility(id)
-      .then((r) => { setVisProjects(r.data.projectIds || []); setVisCodes(r.data.docCodes || []); })
-      .catch(() => { setVisProjects([]); setVisCodes([]); });
+    setUserLoading(true);
+    try {
+      const [perm, vis] = await Promise.all([
+        adminApi.getUserPermissions(id),
+        adminApi.getUserVisibility(id).catch(() => ({ data: {} })),
+      ]);
+      setEffective(perm.data.effective || {}); setDefaults(perm.data.defaults || {}); setRole(perm.data.role);
+      setVisProjects(vis.data.projectIds || []); setVisCodes(vis.data.docCodes || []);
+    } catch (e) { setError(e.message); }
+    finally { setUserLoading(false); }
   };
 
   const toggleVisProject = (pid) => { setVisSaved(false); setDirty(true); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
@@ -102,9 +111,12 @@ export default function PermissionsTab() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div>
-        <label className="block text-sm font-medium text-slate-600 mb-1">เลือกผู้ใช้</label>
-        <select value={selectedId} onChange={(e) => selectUser(e.target.value)} className="field">
-          <option value="">— เลือกผู้ใช้ —</option>
+        <label className="mb-1 flex items-center gap-2 text-sm font-medium text-slate-600">
+          เลือกผู้ใช้
+          {loading && <Spinner className="h-4 w-4" label="กำลังโหลดรายชื่อ…" />}
+        </label>
+        <select value={selectedId} onChange={(e) => selectUser(e.target.value)} disabled={loading} className="field disabled:opacity-60">
+          <option value="">{loading ? 'กำลังโหลด…' : '— เลือกผู้ใช้ —'}</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>{u.full_name} ({u.email}) · {ROLE_LABELS[u.role] || u.role}</option>
           ))}
@@ -113,13 +125,17 @@ export default function PermissionsTab() {
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      {selectedId && isAdmin && (
+      {selectedId && userLoading && (
+        <div className="flex justify-center py-12"><Spinner className="h-6 w-6" label="กำลังโหลดสิทธิ์ของผู้ใช้…" /></div>
+      )}
+
+      {selectedId && !userLoading && isAdmin && (
         <div className="rounded-xl bg-amber-50 text-amber-800 text-sm px-4 py-3">
           ผู้ดูแลระบบมีสิทธิ์ทุกอย่างโดยอัตโนมัติ — ไม่ต้องตั้งค่าสิทธิ์
         </div>
       )}
 
-      {selectedId && !isAdmin && (
+      {selectedId && !userLoading && !isAdmin && (
         <>
           <p className="text-xs text-slate-400">
             ติ๊กเพื่อให้สิทธิ์ · เอาติ๊กออกเพื่อห้าม · ค่าเริ่มต้นมาจาก<b>บทบาท</b>ของผู้ใช้ — รายการที่ปรับต่างจากบทบาทจะมีป้าย <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-700">แก้เฉพาะคนนี้</span>

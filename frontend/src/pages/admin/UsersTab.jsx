@@ -5,6 +5,7 @@ import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { BusyLabel } from '../../components/Spinner.jsx';
 
 const ROLE_CHIP = {
   admin: 'bg-purple-50 text-purple-700',
@@ -150,6 +151,8 @@ export default function UsersTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editUser, setEditUser] = useState(undefined); // undefined=closed, null=new, obj=edit
+  const [busyKey, setBusyKey] = useState(null); // `${action}:${id}` of the row action in flight
+  const rowBusy = (u) => Boolean(busyKey && busyKey.endsWith(`:${u.id}`));
 
   const load = () => { setLoading(true); return adminApi.listUsers().then((r) => setUsers(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
@@ -159,21 +162,24 @@ export default function UsersTab() {
       const ok = await confirm({ title: 'ปิดใช้งานผู้ใช้', message: `ปิดใช้งาน "${u.full_name}"?\nผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`, confirmLabel: 'ปิดใช้งาน' });
       if (!ok) return;
     }
+    setBusyKey(`toggle:${u.id}`);
     try {
       await adminApi.updateUser(u.id, { isActive: !u.is_active });
       toast.success(u.is_active ? 'ปิดใช้งานผู้ใช้แล้ว' : 'เปิดใช้งานผู้ใช้แล้ว');
-      load();
+      await load();
     } catch (e) { toast.error(e.message); }
+    finally { setBusyKey(null); }
   };
 
   const removeUser = async (u) => {
     const ok = await confirm({ title: 'ลบผู้ใช้', message: `ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`, confirmLabel: 'ลบผู้ใช้' });
     if (!ok) return;
+    setBusyKey(`del:${u.id}`);
     try {
       await adminApi.deleteUser(u.id);
       toast.success('ลบผู้ใช้แล้ว');
-      load();
-    } catch (e) { toast.error(e.message); }
+      await load();
+    } catch (e) { toast.error(e.message); setBusyKey(null); }
   };
 
   return (
@@ -218,13 +224,17 @@ export default function UsersTab() {
                   </span>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setEditUser(u)} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
-                  <button onClick={() => toggleActive(u)} className="text-slate-500 hover:underline text-sm mr-3">
-                    {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                  <button onClick={() => setEditUser(u)} disabled={rowBusy(u)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>
+                  <button onClick={() => toggleActive(u)} disabled={rowBusy(u)} className="text-slate-500 hover:underline text-sm mr-3 disabled:opacity-50">
+                    <BusyLabel busy={busyKey === `toggle:${u.id}`} busyText="กำลังบันทึก…">
+                      {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                    </BusyLabel>
                   </button>
                   {/* can't delete your own account */}
                   {u.id !== profile?.id && (
-                    <button onClick={() => removeUser(u)} className="text-sm text-red-500 hover:underline">ลบ</button>
+                    <button onClick={() => removeUser(u)} disabled={rowBusy(u)} className="text-sm text-red-500 hover:underline disabled:opacity-50">
+                      <BusyLabel busy={busyKey === `del:${u.id}`} busyText="กำลังลบ…">ลบ</BusyLabel>
+                    </button>
                   )}
                 </td>
               </tr>

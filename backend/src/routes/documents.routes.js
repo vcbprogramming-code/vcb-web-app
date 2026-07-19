@@ -440,7 +440,8 @@ router.get(
       `select id, kind, version, file_name, content_type, size_bytes, created_at
          from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
     const { rows: steps } = await query(
-      `select id, step_no, approver_name, approver_email, action, comment, acted_at
+      `select id, step_no, approver_name, approver_email, action, comment, acted_at,
+              is_signer, (signature_url is not null) as has_signature
          from approval_steps where document_id = $1 order by step_no`, [req.params.id]);
     const { rows: audit } = await query(
       `select action, actor_label, detail, created_at
@@ -647,14 +648,15 @@ const editSchema = z.object({
   enclosures: z.array(z.object({ name: z.string(), qty: z.number().optional(), unit: z.string().optional() })).optional(),
 });
 
-/** PATCH /api/documents/:id — edit content while draft/pending/returned. */
+/** PATCH /api/documents/:id — edit content while draft/pending/returned/rejected.
+ *  A rejected doc can be corrected and re-submitted for review (#11). */
 router.patch(
   '/:id',
   asyncHandler(async (req, res) => {
     const parsed = editSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const doc = await loadDocForMutation(req);
-    if (!['draft', 'pending', 'returned'].includes(doc.status)) {
+    if (!['draft', 'pending', 'returned', 'rejected'].includes(doc.status)) {
       throw new ApiError(409, 'แก้ไขได้เฉพาะเอกสารที่ยังไม่อนุมัติ/ปิดเรื่อง');
     }
     const f = parsed.data;
@@ -960,7 +962,11 @@ router.post(
     if (result.nextStep) {
       await sendApprovalRequest({ step: result.nextStep, doc: result.document }).catch((e) => console.error('next-approver email failed:', e.message));
     }
-    if (result.finalized) {
+    // Regenerate the SIGNED letter after EVERY approval (not just the final one)
+    // so each approver's signature shows immediately — the next approver then sees
+    // that the previous person already signed (#9). generateApprovedPdf only stamps
+    // the steps approved so far, so mid-chain it's a partially-signed letter.
+    if (result.finalized || parsed.data.action === 'approved') {
       await generateApprovedPdf(result.document.id).catch((e) => console.error('approved-pdf failed:', e.message));
       // rebuild the combined "one file" so it merges the SIGNED letter, not the original
       await autoCombine(result.document.id);
@@ -994,6 +1000,9 @@ const submitSchema = z.object({
     email: z.string().email(),
     isSigner: z.boolean().optional(),
   })).min(1),
+  // reason the creator is re-submitting a rejected/returned doc for review (#11) —
+  // logged to the thread + audit so reviewers see what changed since last time.
+  resubmitNote: z.string().optional(),
 });
 
 router.post(
@@ -1001,8 +1010,9 @@ router.post(
   requirePermission('ememo', 'submit'),
   asyncHandler(async (req, res) => {
     const doc = await loadDocForMutation(req);
-    // approved/rejected/cancelled documents are done — never re-submittable
-    if (!['draft', 'returned', 'pending'].includes(doc.status)) {
+    // approved/cancelled documents are done. A REJECTED doc may be corrected and
+    // re-submitted for review (#11) — it re-enters the chain like a returned one.
+    if (!['draft', 'returned', 'rejected', 'pending'].includes(doc.status)) {
       throw new ApiError(409, 'ส่งอนุมัติได้เฉพาะเอกสารที่ยังไม่อนุมัติเท่านั้น');
     }
     // a pending doc that already has a live approval chain must not be re-submitted
@@ -1018,6 +1028,13 @@ router.post(
     }
     const parsed = submitSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+
+    // Re-submitting a rejected/returned doc requires a reason (#11) so reviewers
+    // know what changed — enforced here so a direct API call can't skip it either.
+    const isResubmit = doc.status === 'returned' || doc.status === 'rejected';
+    if (isResubmit && !parsed.data.resubmitNote?.trim()) {
+      throw new ApiError(400, 'กรุณาระบุเหตุผลที่ส่งเอกสารกลับเข้าพิจารณาอีกครั้ง');
+    }
 
     // Every approver must have an ACTIVE account: the approval email links to the
     // login-gated in-app page, so an approver without an account gets a dead link
@@ -1051,6 +1068,20 @@ router.post(
       client.release();
     }
     const firstStep = chain.firstStep;
+
+    // Log the resubmission reason to the thread + audit so reviewers see what changed (#11).
+    if (isResubmit && parsed.data.resubmitNote?.trim()) {
+      const note = parsed.data.resubmitNote.trim();
+      await query(
+        `insert into document_messages (document_id, author_id, author_label, body, kind)
+         values ($1,$2,$3,$4,'note')`,
+        [doc.id, req.profile.id, req.profile.full_name || req.profile.email, `ส่งพิจารณาอีกครั้ง: ${note}`]
+      ).catch((e) => console.error('resubmit note message failed:', e.message));
+      await query(
+        `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'resent',$4)`,
+        [doc.id, req.profile.id, req.profile.full_name || req.profile.email, { note }]
+      ).catch((e) => console.error('resubmit audit failed:', e.message));
+    }
 
     // Chain fully approved on submit (creator IS the signer and no higher approvers)
     // → produce the signed PDF now, like the finalize path in /approve.

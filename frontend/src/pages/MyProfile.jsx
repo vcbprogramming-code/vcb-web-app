@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { profileApi, ROLE_LABELS } from '../lib/ememo.js';
 import Icon from '../components/Icon.jsx';
+import Spinner, { BusyLabel } from '../components/Spinner.jsx';
 import { PageHeader } from '../components/ui/index.js';
 
 /**
@@ -18,6 +19,7 @@ export default function MyProfile() {
   const [sigUrl, setSigUrl] = useState(null);   // shown signature (blob url)
   const [sigFile, setSigFile] = useState(null);  // newly picked file
   const [busy, setBusy] = useState(false);
+  const [removingSig, setRemovingSig] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
 
@@ -72,13 +74,13 @@ export default function MyProfile() {
   };
 
   const removeSig = async () => {
-    setBusy(true);
+    setRemovingSig(true);
     try {
       await profileApi.update({ signatureUrl: null });
       setSigUrl((old) => { if (old?.startsWith('blob:')) URL.revokeObjectURL(old); return null; });
       setSigFile(null);
     } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
+    finally { setRemovingSig(false); }
   };
 
   if (!profile) {
@@ -93,7 +95,7 @@ export default function MyProfile() {
         </div>
       );
     }
-    return <div className="text-slate-400">กำลังโหลด…</div>;
+    return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
   }
   const field = 'field';
 
@@ -136,7 +138,9 @@ export default function MyProfile() {
                   เปลี่ยนรูป
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => pickSig(e.target.files?.[0])} />
                 </label>
-                <button onClick={removeSig} disabled={busy} className="text-sm text-red-500 hover:underline">ลบลายเซ็น</button>
+                <button onClick={removeSig} disabled={busy || removingSig} className="text-sm text-red-500 hover:underline disabled:opacity-50">
+                  <BusyLabel busy={removingSig} busyText="กำลังลบ…">ลบลายเซ็น</BusyLabel>
+                </button>
               </div>
             </div>
           ) : (
@@ -153,7 +157,7 @@ export default function MyProfile() {
         {saved && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">บันทึกโปรไฟล์เรียบร้อยแล้ว</div>}
 
         <div className="flex justify-end">
-          <button onClick={save} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+          <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">บันทึก</BusyLabel></button>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 
 const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#0d9488'];
 
@@ -31,6 +32,7 @@ function ProjectModal({ project, onClose, onSaved }) {
   const [users, setUsers] = useState([]); // system accounts, for the manager picker (#3)
   const [sigUploading, setSigUploading] = useState(false);
   const [sigPreview, setSigPreview] = useState(null); // object URL of the current signature
+  const [lhLoading, setLhLoading] = useState(editing); // loading the per-project letterhead (edit only)
 
   // list of บริษัท/ตรา to bind this project to (#4) + system accounts for the
   // project-manager (approver) picker (#3)
@@ -42,6 +44,7 @@ function ProjectModal({ project, onClose, onSaved }) {
   // when editing an existing project, load its per-project letterhead config
   useEffect(() => {
     if (!editing) return;
+    setLhLoading(true);
     adminApi.getLetterhead(project.id).then((r) => {
       const d = r.data || {};
       setLetter({
@@ -51,7 +54,7 @@ function ProjectModal({ project, onClose, onSaved }) {
         signatoryName: d.signatory_name || '', signatoryTitle: d.signatory_title || '',
         closingLine: d.closing_line || '', defaultRecipient: d.default_recipient || '',
       });
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLhLoading(false));
   }, [editing, project?.id]);
 
   // upload a new signature image (#6) — store its key, save happens with the form
@@ -137,7 +140,10 @@ function ProjectModal({ project, onClose, onSaved }) {
 
           {/* ── หัวจดหมายของโครงการนี้ (per-project letterhead) ── */}
           <div className="border-t border-slate-100 pt-4">
-            <h4 className="text-sm font-bold text-slate-700">หัวจดหมายของโครงการนี้</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-slate-700">หัวจดหมายของโครงการนี้</h4>
+              {lhLoading && <Spinner className="h-4 w-4" label="กำลังโหลดข้อมูล…" />}
+            </div>
             <p className="mb-3 text-xs text-slate-400">ชื่อบริษัท/หน่วยงานและข้อมูลนี้จะแสดงบนหนังสือของโครงการนี้ (แต่ละโครงการตั้งได้ต่างกัน)</p>
             <div className="space-y-3">
               {/* บริษัท/ตราหัวจดหมายเริ่มต้น — ล็อกตราของโครงการนี้ (#4) */}
@@ -269,6 +275,8 @@ export default function ProjectsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [edit, setEdit] = useState(undefined);
+  const [busyKey, setBusyKey] = useState(null); // `${action}:${id}` of a row action in flight
+  const rowBusy = (p) => Boolean(busyKey && busyKey.endsWith(`:${p.id}`));
 
   const load = () => { setLoading(true); return adminApi.listProjects().then((r) => setProjects(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
@@ -278,8 +286,10 @@ export default function ProjectsTab() {
       const ok = await confirm({ title: 'ปิดใช้งานโครงการ', message: `ปิดใช้งานโครงการ "${p.code}"?\nจะไม่แสดงให้เลือกตอนสร้างเอกสารใหม่`, confirmLabel: 'ปิดใช้งาน' });
       if (!ok) return;
     }
-    try { await adminApi.updateProject(p.id, { isActive: !p.is_active }); toast.success(p.is_active ? 'ปิดใช้งานโครงการแล้ว' : 'เปิดใช้งานโครงการแล้ว'); load(); }
+    setBusyKey(`toggle:${p.id}`);
+    try { await adminApi.updateProject(p.id, { isActive: !p.is_active }); toast.success(p.is_active ? 'ปิดใช้งานโครงการแล้ว' : 'เปิดใช้งานโครงการแล้ว'); await load(); }
     catch (e) { toast.error(e.message); }
+    finally { setBusyKey(null); }
   };
 
   return (
@@ -332,8 +342,10 @@ export default function ProjectsTab() {
                   <span className={`chip ${p.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{p.is_active ? 'ใช้งาน' : 'ปิด'}</span>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setEdit(p)} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
-                  <button onClick={() => toggleActive(p)} className="text-slate-500 hover:underline text-sm">{p.is_active ? 'ปิด' : 'เปิด'}</button>
+                  <button onClick={() => setEdit(p)} disabled={rowBusy(p)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>
+                  <button onClick={() => toggleActive(p)} disabled={rowBusy(p)} className="text-slate-500 hover:underline text-sm disabled:opacity-50">
+                    <BusyLabel busy={busyKey === `toggle:${p.id}`} busyText="กำลังบันทึก…">{p.is_active ? 'ปิด' : 'เปิด'}</BusyLabel>
+                  </button>
                 </td>
               </tr>
             ))}

@@ -266,7 +266,9 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     drawSignature({
       image: sigImage,
       name: doc.signer_name || letter.signatoryName,
-      title: doc.signer_title || letter.signatoryTitle,
+      // The signer is the ผู้จัดการโครงการ — label them clearly so the reader can
+      // tell who signed (#10). Fall back to that title when none is configured.
+      title: doc.signer_title || letter.signatoryTitle || 'ผู้จัดการโครงการ',
     });
 
     // The APPROVED version stamps each approver below the signer. They are captioned
@@ -346,51 +348,43 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
 
     // (verification QR is now stamped on EVERY page via stampQr/pageAdded — see top)
 
-    // ---- ความเห็น / การพิจารณา box — moved to the LAST page (#7) ----
-    // The client wants the body to flow naturally across 1–2 pages and this box to
-    // appear at the END (not forced onto the foot of page 1, where it used to push
-    // the content up). Shows any approver comments recorded, plus a checker/approver
-    // signature row. Skipped when opts.commentBox === false (clean original).
+    // ---- ความเห็น / บันทึก / การพิจารณา — on its OWN page (#14) ----
+    // The client wants this on a separate page (never on the memo body page), and it
+    // must include BOTH the approvers' decision comments AND the conversation thread
+    // (บันทึก/ขอความเห็น). Skipped when opts.commentBox === false (clean original) or
+    // when there is nothing to show (an empty titled box says nothing).
     const commentSteps = Array.isArray(opts.auditSteps)
       ? opts.auditSteps.filter((s) => s.comment && s.comment.trim())
       : [];
-    // Approvers now sign digitally (their signature blocks are stamped above), so the
-    // box no longer carries blank "ลงชื่อ ..... ผู้ตรวจสอบ / ผู้อนุมัติ" slots for a wet
-    // signature — that implied the memo still needed signing by hand. It now only
-    // reports what the approvers actually wrote, and is skipped entirely when nobody
-    // left a comment (an empty titled box says nothing).
-    const wantCommentBox = opts.commentBox !== false && commentSteps.length > 0;
+    const threadMsgs = Array.isArray(opts.messages)
+      ? opts.messages.filter((m) => m.body && m.body.trim())
+      : [];
+    const boxEntries = [
+      ...commentSteps.map((s) => ({ who: s.approver_name || s.approver_email || '', tag: 'การพิจารณา', text: s.comment })),
+      ...threadMsgs.map((m) => ({ who: m.author_name || 'ผู้ใช้', tag: m.kind === 'consult' ? 'ขอความเห็น' : 'บันทึก', text: m.body })),
+    ];
+    const wantCommentBox = opts.commentBox !== false && boxEntries.length > 0;
     if (wantCommentBox) {
-      // measure the real wrapped height of each comment line first, so the box
-      // rectangle is tall enough and long comments never spill outside its border.
-      pdf.font('th').fontSize(10.5);
-      const commentLines = commentSteps.map((s) => {
-        const who = s.approver_name || s.approver_email || '';
-        const textLine = `• ${who}: ${s.comment}`;
-        const h = pdf.heightOfString(textLine, { width: contentW - 24 });
-        return { text: textLine, h };
-      });
-      const commentsH = commentLines.reduce((sum, c) => sum + c.h + 3, 0);
-      const headerH = 26;   // "ความเห็น / การพิจารณา" title band
-      const boxNeed = headerH + commentsH + 18;
+      pdf.addPage(); // #14: always its own page, separate from the memo body
 
-      const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
-      // start a fresh page only if the box won't fit in the remaining space
-      if (pdf.y + boxNeed > bottomLimit) pdf.addPage();
-      else pdf.y = pdf.y + 18;
+      pdf.font('th-bold').fontSize(16).fillColor('#000')
+        .text('ความเห็นและบันทึกการสนทนา', left, pdf.y, { width: contentW, align: 'center' });
+      pdf.moveDown(0.3);
+      pdf.font('th').fontSize(12).fillColor('#555')
+        .text(`เลขที่เอกสาร ${doc.doc_number}  ·  เรื่อง ${doc.subject || ''}`, left, pdf.y, { width: contentW, align: 'center' });
+      pdf.moveDown(1);
 
-      const boxTop = pdf.y;
-      pdf.rect(left, boxTop, contentW, boxNeed - 8).lineWidth(0.6).strokeColor('#94a3b8').stroke();
-      pdf.font('th-bold').fontSize(11).fillColor('#0f172a')
-        .text('ความเห็น / การพิจารณา', left + 10, boxTop + 8, { width: contentW - 20 });
-
-      let cy = boxTop + headerH;
-      pdf.font('th').fontSize(10.5).fillColor('#334155');
-      for (const c of commentLines) {
-        pdf.text(c.text, left + 12, cy, { width: contentW - 24 });
-        cy = pdf.y + 3;
+      // each entry: "[tag] who" heading, then the comment/message text below it
+      for (const e of boxEntries) {
+        const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
+        if (pdf.y > bottomLimit) pdf.addPage();
+        pdf.font('th-bold').fontSize(11.5).fillColor('#0f172a')
+          .text(`• ${e.who}`, left + 4, pdf.y, { width: contentW - 8, continued: true })
+          .font('th').fontSize(10).fillColor('#64748b').text(`   (${e.tag})`);
+        pdf.font('th').fontSize(11).fillColor('#334155')
+          .text(e.text, left + 16, pdf.y + 1, { width: contentW - 24 });
+        pdf.moveDown(0.7);
       }
-      pdf.y = boxTop + boxNeed;
     }
 
     // ---- "บันทึกการพิจารณา" page (approval trail) ----

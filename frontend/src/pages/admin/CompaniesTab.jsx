@@ -3,6 +3,7 @@ import { adminApi } from '../../lib/ememo.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
+import { BusyLabel } from '../../components/Spinner.jsx';
 
 const EMPTY = { name: '', nameEn: '', address: '', phone: '', fax: '', telex: '', logoUrl: '', isDefault: false };
 
@@ -40,7 +41,9 @@ export default function CompaniesTab() {
   const [form, setForm] = useState(EMPTY);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [rowKey, setRowKey] = useState(null); // `${action}:${id}` of a list-row action in flight
   const [localLogo, setLocalLogo] = useState(null); // preview for a freshly-picked logo
+  const rowBusy = (c) => Boolean(rowKey && rowKey.endsWith(`:${c.id}`));
 
   const load = () => { setLoading(true); return adminApi.listCompanies().then((r) => setCompanies(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
@@ -92,15 +95,18 @@ export default function CompaniesTab() {
   };
 
   const makeDefault = async (id) => {
-    try { await adminApi.updateCompany(id, { isDefault: true }); toast.success('ตั้งเป็นบริษัทหลักแล้ว'); load(); }
+    setRowKey(`default:${id}`);
+    try { await adminApi.updateCompany(id, { isDefault: true }); toast.success('ตั้งเป็นบริษัทหลักแล้ว'); await load(); }
     catch (err) { toast.error(err.message); }
+    finally { setRowKey(null); }
   };
 
   const remove = async (c) => {
     const ok = await confirm({ title: 'ลบบริษัท', message: `ลบบริษัท "${c.name}"?`, confirmLabel: 'ลบบริษัท' });
     if (!ok) return;
-    try { await adminApi.deleteCompany(c.id); toast.success('ลบบริษัทแล้ว'); load(); }
-    catch (err) { toast.error(err.message); }
+    setRowKey(`del:${c.id}`);
+    try { await adminApi.deleteCompany(c.id); toast.success('ลบบริษัทแล้ว'); await load(); }
+    catch (err) { toast.error(err.message); setRowKey(null); }
   };
 
   const field = 'field';
@@ -194,11 +200,15 @@ export default function CompaniesTab() {
             </div>
             <div className="flex shrink-0 items-center gap-3 text-sm">
               {!c.is_default && (
-                <button onClick={() => makeDefault(c.id)} className="text-slate-500 hover:text-brand hover:underline">ตั้งเป็นค่าเริ่มต้น</button>
+                <button onClick={() => makeDefault(c.id)} disabled={rowBusy(c)} className="text-slate-500 hover:text-brand hover:underline disabled:opacity-50">
+                  <BusyLabel busy={rowKey === `default:${c.id}`} busyText="กำลังตั้งค่า…">ตั้งเป็นค่าเริ่มต้น</BusyLabel>
+                </button>
               )}
-              <button onClick={() => startEdit(c)} className="text-blue-600 hover:underline">แก้ไข</button>
+              <button onClick={() => startEdit(c)} disabled={rowBusy(c)} className="text-blue-600 hover:underline disabled:opacity-50">แก้ไข</button>
               {!c.is_default && (
-                <button onClick={() => remove(c)} className="text-red-500 hover:underline">ลบ</button>
+                <button onClick={() => remove(c)} disabled={rowBusy(c)} className="text-red-500 hover:underline disabled:opacity-50">
+                  <BusyLabel busy={rowKey === `del:${c.id}`} busyText="กำลังลบ…">ลบ</BusyLabel>
+                </button>
               )}
             </div>
           </div>

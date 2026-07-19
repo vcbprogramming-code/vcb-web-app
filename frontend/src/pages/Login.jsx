@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { api, takeRedirectAfterLogin } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
+import Spinner from '../components/Spinner.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
 
@@ -37,6 +38,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleClientId, setGoogleClientId] = useState(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const googleBtnRef = useRef(null);
 
   const goDest = useCallback(() => {
@@ -67,11 +69,13 @@ export default function Login() {
           client_id: googleClientId,
           callback: async (resp) => {
             setError('');
+            setGoogleBusy(true);
             try {
               await loginWithGoogle(resp.credential);
               goDest();
             } catch (err) {
               setError(err.message || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ');
+              setGoogleBusy(false);
             }
           },
         });
@@ -159,10 +163,15 @@ export default function Login() {
           <>
             {/* wrapper clips the GIS iframe's default light frame to a clean pill */}
             <div className="flex justify-center">
-              <div className="overflow-hidden rounded-full ring-1 ring-cyan-300/25" style={{ colorScheme: 'dark', lineHeight: 0 }}>
+              <div className={`overflow-hidden rounded-full ring-1 ring-cyan-300/25 ${googleBusy ? 'pointer-events-none opacity-50' : ''}`} style={{ colorScheme: 'dark', lineHeight: 0 }}>
                 <div ref={googleBtnRef} />
               </div>
             </div>
+            {googleBusy && (
+              <div className="mt-3 flex justify-center text-cyan-200">
+                <Spinner tone="inherit" className="h-4 w-4" label="กำลังเข้าสู่ระบบด้วย Google…" />
+              </div>
+            )}
             <div className="my-5 flex items-center gap-3">
               <span className="h-px flex-1 bg-cyan-300/15" />
               <span className="cyber-label text-[10px] text-cyan-200/50">หรือ</span>

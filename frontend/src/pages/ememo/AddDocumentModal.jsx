@@ -198,14 +198,14 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     };
   }, [projectId, docCode]);
 
-  const MAX_BYTES = 25 * 1024 * 1024; // must match backend MAX_UPLOAD_BYTES (env.js)
+  const MAX_BYTES = 200 * 1024 * 1024; // must match backend MAX_UPLOAD_BYTES (env.js)
   // add one or more files (from picker or drop); reject oversized ones + dedupe
   const pickFiles = (fileList) => {
     const incoming = Array.from(fileList || []);
     if (!incoming.length) return;
     const tooBig = incoming.filter((f) => f.size > MAX_BYTES);
     const ok = incoming.filter((f) => f.size <= MAX_BYTES);
-    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 25 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
+    setError(tooBig.length ? `ไฟล์ใหญ่เกิน 200 MB: ${tooBig.map((f) => f.name).join(', ')}` : null);
     setFiles((prev) => {
       const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
       return [...prev, ...ok.filter((f) => !seen.has(`${f.name}:${f.size}`))];
@@ -620,7 +620,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             >
               <Icon name="download" className="h-6 w-6 text-slate-400" />
               <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
-              <span className="text-xs text-slate-400">PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 25 MB/ไฟล์</span>
+              <span className="text-xs text-slate-400">PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์</span>
               <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
             </label>
           </div>
@@ -635,9 +635,14 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             {pmConfigured ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                 <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
-                <span className="text-sm font-medium text-slate-800">{signerName || pmEmail}</span>
-                {signerTitle && <span className="text-sm text-slate-500">· {signerTitle}</span>}
-                <span className="ml-auto text-[11px] text-slate-400">กำหนดจากโครงการ</span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                    <span className="font-medium text-slate-800">{signerName || pmEmail}</span>
+                    {signerTitle && <span className="text-slate-500">· {signerTitle}</span>}
+                  </div>
+                  {pmEmail && signerName && <div className="truncate text-xs text-slate-500">{pmEmail}</div>}
+                </div>
+                <span className="ml-auto shrink-0 text-[11px] text-slate-400">กำหนดจากโครงการ</span>
               </div>
             ) : projectId ? (
               <>

@@ -23,8 +23,8 @@ export const env = {
   // Access-token lifetime (seconds). Default 7 days.
   jwtExpiresIn: Number(process.env.JWT_EXPIRES_IN) || 60 * 60 * 24 * 7,
 
-  // Max attachment upload size (bytes). Default 25 MB.
-  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES) || 25 * 1024 * 1024,
+  // Max attachment upload size (bytes). Default 200 MB.
+  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES) || 200 * 1024 * 1024,
 
   // S3-compatible object storage (Supabase Storage via the S3 protocol).
   s3: {

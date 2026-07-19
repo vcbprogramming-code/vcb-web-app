@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/ememo.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
+import { BusyLabel } from '../../components/Spinner.jsx';
 
 export default function DocTypesTab() {
   const toast = useToast();
@@ -13,6 +14,8 @@ export default function DocTypesTab() {
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [rowKey, setRowKey] = useState(null); // `${action}:${id}` of a row action in flight
+  const rowBusy = (id) => Boolean(rowKey && rowKey.endsWith(`:${id}`));
 
   const load = () => { setLoading(true); return adminApi.listDocTypes().then((r) => setTypes(r.data)).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
@@ -26,21 +29,24 @@ export default function DocTypesTab() {
       await adminApi.createDocType({ name: newName.trim() });
       setNewName('');
       toast.success('เพิ่มประเภทเอกสารแล้ว');
-      load();
+      await load();
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
 
   const saveEdit = async (id) => {
-    try { await adminApi.updateDocType(id, { name: editName.trim() }); setEditId(null); toast.success('บันทึกแล้ว'); load(); }
+    setRowKey(`save:${id}`);
+    try { await adminApi.updateDocType(id, { name: editName.trim() }); setEditId(null); toast.success('บันทึกแล้ว'); await load(); }
     catch (err) { toast.error(err.message); }
+    finally { setRowKey(null); }
   };
 
   const remove = async (id, name) => {
     const ok = await confirm({ title: 'ลบประเภทเอกสาร', message: `ลบประเภทเอกสาร "${name}"?`, confirmLabel: 'ลบ' });
     if (!ok) return;
-    try { await adminApi.deleteDocType(id); toast.success('ลบประเภทเอกสารแล้ว'); load(); }
-    catch (err) { toast.error(err.message); }
+    setRowKey(`del:${id}`);
+    try { await adminApi.deleteDocType(id); toast.success('ลบประเภทเอกสารแล้ว'); await load(); }
+    catch (err) { toast.error(err.message); setRowKey(null); }
   };
 
   const field = 'field';
@@ -49,7 +55,7 @@ export default function DocTypesTab() {
     <div className="space-y-4 max-w-2xl">
       <form onSubmit={add} className="flex gap-2">
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="ชื่อประเภทเอกสารใหม่" className={`${field} flex-1`} />
-        <button type="submit" disabled={busy} className="btn-primary">+ เพิ่ม</button>
+        <button type="submit" disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังเพิ่ม…">+ เพิ่ม</BusyLabel></button>
       </form>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
@@ -68,13 +74,17 @@ export default function DocTypesTab() {
             <div className="whitespace-nowrap">
               {editId === t.id ? (
                 <>
-                  <button onClick={() => saveEdit(t.id)} className="text-emerald-600 hover:underline text-sm mr-3">บันทึก</button>
-                  <button onClick={() => setEditId(null)} className="text-slate-400 hover:underline text-sm">ยกเลิก</button>
+                  <button onClick={() => saveEdit(t.id)} disabled={rowBusy(t.id)} className="text-emerald-600 hover:underline text-sm mr-3 disabled:opacity-50">
+                    <BusyLabel busy={rowKey === `save:${t.id}`} busyText="กำลังบันทึก…">บันทึก</BusyLabel>
+                  </button>
+                  <button onClick={() => setEditId(null)} disabled={rowBusy(t.id)} className="text-slate-400 hover:underline text-sm disabled:opacity-50">ยกเลิก</button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => { setEditId(t.id); setEditName(t.name); }} className="text-blue-600 hover:underline text-sm mr-3">แก้ไข</button>
-                  <button onClick={() => remove(t.id, t.name)} className="text-red-500 hover:underline text-sm">ลบ</button>
+                  <button onClick={() => { setEditId(t.id); setEditName(t.name); }} disabled={rowBusy(t.id)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>
+                  <button onClick={() => remove(t.id, t.name)} disabled={rowBusy(t.id)} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+                    <BusyLabel busy={rowKey === `del:${t.id}`} busyText="กำลังลบ…">ลบ</BusyLabel>
+                  </button>
                 </>
               )}
             </div>

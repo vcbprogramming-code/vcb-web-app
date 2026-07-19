@@ -13,16 +13,22 @@ import { useToast } from '../../components/Toast.jsx';
 const STATUS_OPTIONS = ['draft', 'pending', 'approved', 'rejected', 'returned', 'cancelled']
   .map((value) => ({ value, label: STATUS_META[value].label }));
 
-function ProjectChip({ code, color, active, onClick }) {
+function ProjectChip({ code, color, active, onClick, subtle }) {
+  // `subtle` = the "ทุกโครงการ" (no-filter) chip: its active state is the DEFAULT,
+  // so a loud solid-blue pill misreads as "a filter is applied". Use a soft tint
+  // instead; real project chips keep their bold colored active state.
+  const activeClass = subtle
+    ? 'bg-brand/10 text-brand border-brand/30'
+    : 'bg-brand text-white border-brand';
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+      className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
         active
-          ? 'bg-brand text-white border-brand'
+          ? activeClass
           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
       }`}
-      style={active && color ? { backgroundColor: color, borderColor: color } : undefined}
+      style={active && !subtle && color ? { backgroundColor: color, borderColor: color } : undefined}
     >
       {code}
     </button>
@@ -301,7 +307,7 @@ export default function DocumentRegister() {
 
           {/* project chips — scroll horizontally on narrow screens instead of walling up */}
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">
-            <ProjectChip code="ทุกโครงการ" active={!projectId} onClick={() => setProjectId('')} />
+            <ProjectChip code="ทุกโครงการ" subtle active={!projectId} onClick={() => setProjectId('')} />
             {projects.map((p) => (
               <ProjectChip
                 key={p.id}

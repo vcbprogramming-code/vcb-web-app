@@ -3,6 +3,7 @@ import { adminApi } from '../../lib/ememo.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
+import { BusyLabel } from '../../components/Spinner.jsx';
 
 /**
  * Admin config: document codes. Each code can be added / edited (department +
@@ -18,6 +19,7 @@ export default function DocCodeApproversTab() {
   const [editCode, setEditCode] = useState(null);   // code whose approvers are being edited
   const [rows, setRows] = useState([]);             // approver rows in the editor
   const [busy, setBusy] = useState(false);
+  const [delCode, setDelCode] = useState(null);     // code whose row-delete is in flight
 
   // add / edit the code itself (code + department + recipient title)
   const [showAdd, setShowAdd] = useState(false);
@@ -104,14 +106,14 @@ export default function DocCodeApproversTab() {
   const removeCode = async (code) => {
     const ok = await confirm({ title: 'ลบรหัสเอกสาร', message: `ลบรหัสเอกสาร "${code}"?\n(ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`, confirmLabel: 'ลบรหัส' });
     if (!ok) return;
-    setBusy(true);
+    setDelCode(code);
     setError(null);
     try {
       await adminApi.deleteDocCode(code);
       toast.success('ลบรหัสเอกสารแล้ว');
-      load();
+      await load();
     } catch (e) { toast.error(e.message); }
-    finally { setBusy(false); }
+    finally { setDelCode(null); }
   };
 
   const field = 'field';
@@ -176,11 +178,13 @@ export default function DocCodeApproversTab() {
                 </div>
                 {editCode !== c.code && editMeta !== c.code && (
                   <div className="flex shrink-0 items-center gap-3">
-                    <button onClick={() => startEdit(c)} className="text-sm font-medium text-blue-600 hover:underline">
+                    <button onClick={() => startEdit(c)} disabled={delCode === c.code} className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50">
                       {count > 0 ? 'ผู้อนุมัติ' : 'กำหนดผู้อนุมัติ'}
                     </button>
-                    <button onClick={() => startEditMeta(c)} className="text-sm font-medium text-slate-500 hover:underline">แก้รหัส</button>
-                    <button onClick={() => removeCode(c.code)} className="text-sm font-medium text-red-500 hover:underline">ลบ</button>
+                    <button onClick={() => startEditMeta(c)} disabled={delCode === c.code} className="text-sm font-medium text-slate-500 hover:underline disabled:opacity-50">แก้รหัส</button>
+                    <button onClick={() => removeCode(c.code)} disabled={delCode === c.code} className="text-sm font-medium text-red-500 hover:underline disabled:opacity-50">
+                      <BusyLabel busy={delCode === c.code} busyText="กำลังลบ…">ลบ</BusyLabel>
+                    </button>
                   </div>
                 )}
               </div>

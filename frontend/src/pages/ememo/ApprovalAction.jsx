@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { ememoApi, APPROVAL_META, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import SignaturePad from '../../components/SignaturePad.jsx';
 import Icon from '../../components/Icon.jsx';
+import Spinner from '../../components/Spinner.jsx';
 
 // NOTE: these are declared at module level (NOT inside ApprovalAction) so they
 // keep a stable identity across renders — otherwise the textarea loses focus on
@@ -105,6 +106,7 @@ export default function ApprovalAction() {
   const [fwdName, setFwdName] = useState('');
   const [forwarded, setForwarded] = useState(null);
   const [viewerUrl, setViewerUrl] = useState(null); // inline PDF viewer
+  const [attBusy, setAttBusy] = useState(null); // attachment id whose blob is being fetched
 
   useEffect(() => {
     ememoApi.lookupApproval(token).then((r) => setInfo(r.data)).catch((e) => setError(e.message));
@@ -167,11 +169,14 @@ export default function ApprovalAction() {
   };
 
   const openAttachment = async (attId) => {
+    setAttBusy(attId);
     try {
       const url = await ememoApi.approvalAttachmentBlobUrl(token, attId);
       setViewerUrl(url);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setAttBusy(null);
     }
   };
   const closeViewer = () => setViewerUrl((u) => { if (u) URL.revokeObjectURL(u); return null; });
@@ -180,7 +185,7 @@ export default function ApprovalAction() {
   useEffect(() => () => { if (viewerUrl) URL.revokeObjectURL(viewerUrl); }, [viewerUrl]);
 
   if (error && !info) return <Wrap><p className="text-red-600">{error}</p></Wrap>;
-  if (!info) return <Wrap><p className="text-slate-400">กำลังโหลด…</p></Wrap>;
+  if (!info) return <Wrap><div className="flex justify-center py-6"><Spinner label="กำลังโหลด…" /></div></Wrap>;
 
   if (done) {
     return <DoneScreen done={done} />;
@@ -270,9 +275,11 @@ export default function ApprovalAction() {
         const mainPdf = (info.attachments || []).find((a) => a.version === 'approved')
           || (info.attachments || []).find((a) => a.version === 'original');
         return mainPdf ? (
-          <button onClick={() => openAttachment(mainPdf.id)}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand-tint px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10">
-            <Icon name="file" className="h-5 w-5" /> เปิดดูหนังสือฉบับเต็ม (PDF)
+          <button onClick={() => openAttachment(mainPdf.id)} disabled={attBusy === mainPdf.id}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand-tint px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60">
+            {attBusy === mainPdf.id
+              ? <><Spinner className="h-5 w-5" tone="inherit" /> กำลังเปิดเอกสาร…</>
+              : <><Icon name="file" className="h-5 w-5" /> เปิดดูหนังสือฉบับเต็ม (PDF)</>}
           </button>
         ) : (
           <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2.5 text-center text-xs text-amber-700">เอกสารนี้ยังไม่มีไฟล์ PDF (เป็นเอกสารที่สร้างก่อนระบบสร้างไฟล์อัตโนมัติ)</p>
@@ -334,8 +341,10 @@ export default function ApprovalAction() {
                   <Icon name={a.version === 'original' ? 'file' : 'paperclip'} className="h-4 w-4 text-slate-400" />
                   {a.file_name}{a.version === 'original' ? ' (หนังสือฉบับเต็ม)' : ''}
                 </span>
-                <button onClick={() => openAttachment(a.id)} className="inline-flex items-center gap-1 text-brand hover:underline">
-                  <Icon name="eye" className="h-4 w-4" /> เปิดดู
+                <button onClick={() => openAttachment(a.id)} disabled={attBusy === a.id} className="inline-flex items-center gap-1 text-brand hover:underline disabled:opacity-60">
+                  {attBusy === a.id
+                    ? <><Spinner className="h-4 w-4" tone="inherit" /> กำลังเปิด…</>
+                    : <><Icon name="eye" className="h-4 w-4" /> เปิดดู</>}
                 </button>
               </li>
             ))}

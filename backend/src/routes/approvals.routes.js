@@ -157,8 +157,10 @@ router.post(
       );
     }
 
-    // When the whole chain is approved, generate the signed APPROVED PDF.
-    if (result.finalized) {
+    // Regenerate the signed APPROVED PDF after EVERY approval (not just the final
+    // one) so each approver's signature appears immediately — the next approver
+    // then sees the previous signature already on the letter (#9).
+    if (result.finalized || parsed.data.action === 'approved') {
       await generateApprovedPdf(result.document.id).catch((e) =>
         console.error('approved-pdf generation failed:', e.message)
       );

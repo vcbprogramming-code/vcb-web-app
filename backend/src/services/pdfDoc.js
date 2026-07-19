@@ -208,8 +208,17 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     [documentId]
   );
 
+  // conversation thread (บันทึก/ขอความเห็น) — surfaced on the comment page (#14)
+  const { rows: messages } = await query(
+    `select m.body, m.kind, coalesce(pr.full_name, m.author_label) as author_name
+       from document_messages m
+       left join profiles pr on pr.id = m.author_id
+      where m.document_id = $1 order by m.created_at`,
+    [documentId]
+  );
+
   const qr = await buildVerifyQr(doc);
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature: signerSignature, signatures, auditSteps, qr });
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature: signerSignature, signatures, auditSteps, messages, qr });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'approved', key);

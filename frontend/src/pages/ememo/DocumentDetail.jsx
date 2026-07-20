@@ -276,10 +276,7 @@ export default function DocumentDetail() {
   const consultForMe = !myApproval.canApprove && (doc.messages || []).some(
     (m) => m.kind === 'consult' && (m.consult_email || '').toLowerCase() === myEmail
   );
-  // owner-facing "why it came back" banner + reason
   const steps = doc.approval_steps || [];
-  const lastDecision = [...steps].reverse().find((s) => s.action === 'returned' || s.action === 'rejected');
-  const showOwnerReturnBanner = canManage && (doc.status === 'returned' || doc.status === 'rejected');
   // for the approve modal: who's next / is this the final step?
   const curIdx = steps.findIndex((s) => s.action === 'pending');
   const nextApproverName = curIdx >= 0 && steps[curIdx + 1] ? (steps[curIdx + 1].approver_name || steps[curIdx + 1].approver_email) : null;
@@ -311,30 +308,8 @@ export default function DocumentDetail() {
         </div>
       )}
 
-      {/* Owner cue when the document came back — surfaces the reason + edit path */}
-      {showOwnerReturnBanner && !postAction && (
-        <div className={`rounded-2xl border px-5 py-4 ${doc.status === 'returned' ? 'border-amber-200 bg-amber-50' : 'border-rose-200 bg-rose-50'}`}>
-          <div className="flex items-start gap-3">
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white ${doc.status === 'returned' ? 'bg-amber-500' : 'bg-rose-500'}`}>
-              <Icon name={doc.status === 'returned' ? 'undo' : 'x'} className="h-5 w-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-slate-900">{doc.status === 'returned' ? 'เอกสารนี้ถูกส่งกลับให้แก้ไข' : 'เอกสารนี้ไม่ได้รับการอนุมัติ'}</div>
-              {lastDecision?.comment
-                ? <p className="mt-0.5 text-sm text-slate-700"><span className="text-slate-500">เหตุผล:</span> {lastDecision.comment}</p>
-                : <p className="mt-0.5 text-xs text-slate-500">ไม่ได้ระบุเหตุผล</p>}
-              {/* #11: a returned OR rejected doc can be corrected and re-submitted */}
-              {notSubmitted && canManage && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button onClick={() => setShowEdit(true)} className="btn-outline !py-1.5 !text-sm"><Icon name="edit" className="h-4 w-4" /> แก้ไขเอกสาร</button>
-                  <button onClick={() => setShowSubmit(true)} className="btn-primary !py-1.5 !text-sm"><Icon name="check" className="h-4 w-4" /> แก้ไขแล้วส่งพิจารณาอีกครั้ง</button>
-                  <span className="text-xs text-slate-500">— ต้องระบุเหตุผลที่ส่งพิจารณาใหม่</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* (the red "ไม่อนุมัติ/ส่งกลับ" banner was removed — its edit/resubmit buttons
+          duplicated the header-card actions; the reason still shows in the timeline) */}
 
       {/* Consulted-user cue: you were asked for an opinion — reply below */}
       {consultForMe && !postAction && (

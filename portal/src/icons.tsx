@@ -71,6 +71,14 @@ export function AppIcon({ icon }: { icon: AppIconKey }) {
           <path d="M15 16h1" />
         </svg>
       )
+    case 'sysmap':
+      return (
+        <svg {...svgProps}>
+          <path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" />
+          <path d="M9 4v13" />
+          <path d="M15 6.5v13" />
+        </svg>
+      )
     case 'hr':
       return (
         <svg {...svgProps}>

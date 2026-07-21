@@ -11,7 +11,7 @@ export interface AppEntry {
 }
 
 /** Icon keys handled by the GAS scriptlet switch (others fall back to generic). */
-export type AppIconKey = 'memo' | 'minutes' | 'sop' | 'hr' | 'credit' | (string & {})
+export type AppIconKey = 'memo' | 'minutes' | 'sop' | 'sysmap' | 'hr' | 'credit' | (string & {})
 
 /**
  * The announcement record persisted in ScriptProperties as ANNOUNCEMENT_JSON.
@@ -39,12 +39,13 @@ export type Lang = 'en' | 'th'
 export interface AppI18n {
   name: string
   desc: string
+  /** Longer paragraph shown on the globe when hovering this app's card. */
+  preview: string
 }
 
 /** One language's dictionary — mirrors index.html I18N[lang]. */
 export interface Dict {
   brand_sub: string
-  hero_welcome: string
   hero_desc: string
   system_online: string
   apps_word: string
@@ -56,6 +57,7 @@ export interface Dict {
   guest: string
   toggle_title: string
   badge: string
+  mission: string[]
   apps: Record<string, AppI18n>
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { APPS, I18N } from './data'
 import { GlobeIcon, GearIcon, AnnouncementIcon, AppIcon } from './icons'
 import Globe from './Globe'
@@ -30,6 +30,30 @@ export default function App() {
   const [dismissed, setDismissed] = useState(false)
   const [adminVisible, setAdminVisible] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
+  const previewRestoreTimer = useRef<number | null>(null)
+
+  // Delays clearing the preview until after the globe panel's fade-out
+  // transition (260ms) finishes, so the mission text never flashes mid-fade.
+  function showPreview(key: string): void {
+    if (previewRestoreTimer.current !== null) {
+      window.clearTimeout(previewRestoreTimer.current)
+      previewRestoreTimer.current = null
+    }
+    setPreviewKey(key)
+  }
+  function hidePreview(): void {
+    if (previewRestoreTimer.current !== null) window.clearTimeout(previewRestoreTimer.current)
+    previewRestoreTimer.current = window.setTimeout(() => {
+      setPreviewKey(null)
+      previewRestoreTimer.current = null
+    }, 260)
+  }
+  useEffect(() => {
+    return () => {
+      if (previewRestoreTimer.current !== null) window.clearTimeout(previewRestoreTimer.current)
+    }
+  }, [])
 
   // reflect <html lang> + persist choice (mirrors applyLang + setLang)
   useEffect(() => {
@@ -210,7 +234,7 @@ export default function App() {
         <section className="hero">
           <div className="hero-text">
             <h1 className="reveal">
-              <span>{dict.hero_welcome}</span> <span className="glow-text">VCB&nbsp;Connect</span>
+              <span className="glow-text">VCB&nbsp;Connect</span>
             </h1>
             <p className="reveal">{dict.hero_desc}</p>
             <div className="hero-meta reveal">
@@ -222,11 +246,24 @@ export default function App() {
             </div>
           </div>
 
-          <Globe />
+          <Globe
+            label="Jump to applications"
+            mission={dict.mission}
+            previewApp={(() => {
+              if (!previewKey) return null
+              const entry = dict.apps[previewKey]
+              const app = APPS.find((a) => a.key === previewKey)
+              if (!entry || !app) return null
+              return { name: entry.name, preview: entry.preview, accent: app.accent }
+            })()}
+            onActivate={() =>
+              document.getElementById('apps-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          />
         </section>
 
         {/* ===== apps ===== */}
-        <div className="section-title reveal">
+        <div className="section-title reveal" id="apps-section">
           <h2>{dict.applications}</h2>
           <span className="count">
             {APPS.length} {dict.available}
@@ -246,6 +283,10 @@ export default function App() {
                 rel="noopener noreferrer"
                 data-key={a.key}
                 style={style}
+                onMouseEnter={() => showPreview(a.key)}
+                onMouseLeave={hidePreview}
+                onFocus={() => showPreview(a.key)}
+                onBlur={hidePreview}
               >
                 <div className="app-row">
                   <div className="app-icon">

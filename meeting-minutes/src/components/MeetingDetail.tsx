@@ -117,7 +117,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
         <h2>{m.title}</h2>
         {isAdmin && <button className={'dbtn' + (m.visible ? '' : ' danger')} id="d_vis" onClick={toggleVisibility}>{m.visible ? '👁 Visible to staff' : '🚫 Hidden'}</button>}
         {isAdmin && <button className="dbtn" id="d_pin" title="Pin" onClick={togglePin}>{m.pinned ? <>★ <span className="blbl">Pinned</span></> : <>☆ <span className="blbl">Pin</span></>}</button>}
-        {isAdmin && m.source === 'fathom' && (
+        {isAdmin && (m.source === 'fathom' || m.source === 'transkriptor') && (
           <button className="dbtn primary" id="d_file" title="Also show this in a project" onClick={() => setTagPickerOpen(true)}>📂 File into project…</button>
         )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
@@ -143,7 +143,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
         </div>
       )}
 
-      {isAdmin && m.source === 'fathom' && m.taggedProjectIds.length > 0 && (
+      {isAdmin && (m.source === 'fathom' || m.source === 'transkriptor') && m.taggedProjectIds.length > 0 && (
         <div className="attendees tag-chips">
           <span className="atl">Also tagged into</span>
           {m.taggedProjectIds.map(pid => {

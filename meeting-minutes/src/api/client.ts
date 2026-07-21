@@ -30,12 +30,11 @@ export const api: ServerApi = {
   getSessionState: (t) => delay(() => mockApi.getSessionState(t)),
   listMeetings: (t) => delay(() => mockApi.listMeetings(t)),
   getMeeting: (id, t) => delay(() => mockApi.getMeeting(id, t)),
-  autoSync: (t) => delay(() => mockApi.autoSync(t)),
   togglePin: (id, t) => delay(() => mockApi.togglePin(id, t)),
   setVisibility: (id, v, t) => delay(() => mockApi.setVisibility(id, v, t)),
   saveMeeting: (o, t) => delay(() => mockApi.saveMeeting(o, t)),
   deleteMeeting: (id, t) => delay(() => mockApi.deleteMeeting(id, t)),
-  saveEdit: (id, h, w, t) => delay(() => mockApi.saveEdit(id, h, w, t)),
+  saveEdit: (id, h, t, meta) => delay(() => mockApi.saveEdit(id, h, t, meta)),
   getProjectAccess: (t) => delay(() => mockApi.getProjectAccess(t)),
   setProjectDomain: (id, a, t) => delay(() => mockApi.setProjectDomain(id, a, t)),
   addProjectViewer: (id, e, t) => delay(() => mockApi.addProjectViewer(id, e, t)),
@@ -44,5 +43,8 @@ export const api: ServerApi = {
   untagFathomMeeting: (id, pid, t) => delay(() => mockApi.untagFathomMeeting(id, pid, t)),
   searchMeetings: (q, t) => delay(() => mockApi.searchMeetings(q, t)),
   createProject: (n, ne, c, t) => delay(() => mockApi.createProject(n, ne, c, t)),
-  renameProject: (id, patch, t) => delay(() => mockApi.renameProject(id, patch, t))
+  renameProject: (id, patch, t) => delay(() => mockApi.renameProject(id, patch, t)),
+  getAuditHistory: (id, t) => delay(() => mockApi.getAuditHistory(id, t)),
+  getOriginalContent: (id, t) => delay(() => mockApi.getOriginalContent(id, t)),
+  getVersionContent: (id, seq, t) => delay(() => mockApi.getVersionContent(id, seq, t))
 }

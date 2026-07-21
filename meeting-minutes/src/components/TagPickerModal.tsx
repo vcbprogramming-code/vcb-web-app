@@ -1,5 +1,5 @@
 import type { MeetingFull, Project } from '../types'
-import { FATHOM_INBOX_ID } from '../types'
+import { isInboxProject } from '../types'
 import { api, getToken } from '../api/client'
 
 interface Props {
@@ -68,7 +68,7 @@ export default function TagPickerModal({ open, meeting, projects, onClose, onTag
   if (!open || !meeting) return null
 
   const already = new Set(meeting.taggedProjectIds)
-  const candidates = projects.filter(p => p.id !== FATHOM_INBOX_ID && !already.has(p.id))
+  const candidates = projects.filter(p => !isInboxProject(p.id) && !already.has(p.id))
   const suggestion = suggestProjectFor(meeting, candidates)
 
   const pick = (target: Project) => {

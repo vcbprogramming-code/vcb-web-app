@@ -35,6 +35,13 @@ export const FATHOM_INBOX_PROJECT: SeedProject = {
   id: 'FATHOM_INBOX', name: 'Fathom Inbox', nameEn: 'Fathom Inbox', cadence: 'As recorded', color: '#57606a', order: 99
 }
 
+// Transkriptor Inbox mirrors Fathom Inbox exactly — a second pseudo-project
+// (no Doc backing) for recordings pulled via the Transkriptor API (polling,
+// no webhook). Mirrors TRANSKRIPTOR_INBOX_META in Config.js.
+export const TRANSKRIPTOR_INBOX_PROJECT: SeedProject = {
+  id: 'TRANSKRIPTOR_INBOX', name: 'Transkriptor Inbox', nameEn: 'Transkriptor Inbox', cadence: 'As recorded', color: '#bc4c00', order: 100
+}
+
 export const ADMIN_EMAIL = 'c.chavananand@vcb-con.com'
 export const APP_TITLE = 'VCB Meeting Minutes'
 export const APP_DISPLAY_TITLE = 'Meeting Minutes'
@@ -59,9 +66,12 @@ export interface SeedRow {
   visible: boolean
   pinned: boolean
   content: string
-  /** Fathom rows only: projects this recording is ALSO tagged into (in
-   *  addition to always staying listed under FATHOM_INBOX). */
+  /** Inbox rows only (fathom/transkriptor source): projects this recording is
+   *  ALSO tagged into (in addition to always staying listed under its inbox). */
   taggedProjectIds?: ProjectId[]
+  /** ISO timestamp — powers the Edit History "Original" row's real creation
+   *  date. Defaults to a fixed seed timestamp if omitted (see makeSeedRows). */
+  createdAt?: string
 }
 
 interface BodyOpts {
@@ -250,6 +260,43 @@ export function makeSeedRows(): SeedRow[] {
       excerpt: 'Demonstrate Fathom\'s automated meeting recording and note-taking capabilities.',
       fathomUrl: 'https://fathom.video/calls/410091837', attendees: [], tabId: '', source: 'fathom', visible: false, pinned: false,
       content: '<p><a href="https://fathom.video/calls/410091837">Watch on Fathom</a></p><h3>Meeting Purpose</h3><p>Demonstrate Fathom\'s automated meeting recording and note-taking capabilities.</p>'
+    },
+
+    // ---- Transkriptor Inbox seed rows ----
+    // Mirrors the Fathom Inbox rows exactly: projectId is ALWAYS
+    // TRANSKRIPTOR_INBOX (permanent — the row never moves), source is
+    // 'transkriptor', visible is false (admin-only until reviewed).
+    // taggedProjectIds is the ADDITIONAL project(s) it also shows under, if
+    // any — never removes it from the inbox. Transkriptor's summary shape is
+    // an array of { section_title, section_content } (section_content is
+    // Markdown) — rendered here the same way transkriptorRecordToHtml_ does
+    // server-side (h2 per section, markdown body).
+    {
+      id: 'transkriptor-bt12-siteissue', projectId: 'TRANSKRIPTOR_INBOX', meetingKey: 'transkriptor-88213', date: '2026-07-15', dateLabel: 'BT1+2 Site Coordination Call', time: '',
+      title: 'BT1+2 Site Coordination Call', kind: 'meeting',
+      excerpt: 'Coordinate rebar delivery schedule and resolve access-road blockage for Bang Toey Sections 1+2.',
+      fathomUrl: '', attendees: [], tabId: '', source: 'transkriptor', visible: false, pinned: false,
+      // Tagged on purpose — demonstrates a Transkriptor row filed into a real
+      // project exactly like a Fathom row can be (File into project… gate
+      // checks source === 'fathom' || 'transkriptor').
+      content:
+        '<h2>Summary</h2><p>Rebar delivery for the BT1+2 slab pour is delayed by two days; the access road near gate 3 is partially blocked by a neighboring site\'s equipment.</p>' +
+        '<h2>Action items</h2><ul>' +
+        '<li>Escalate access-road blockage to the neighboring site\'s project manager</li>' +
+        '<li>Confirm revised rebar delivery date with the supplier</li>' +
+        '</ul>',
+      taggedProjectIds: ['BT12']
+    },
+    {
+      id: 'transkriptor-untagged-standup', projectId: 'TRANSKRIPTOR_INBOX', meetingKey: 'transkriptor-88477', date: '2026-07-17', dateLabel: 'Weekly Ops Standup', time: '',
+      title: 'Weekly Ops Standup', kind: 'meeting',
+      excerpt: 'Cross-project standup covering procurement delays and headcount requests.',
+      fathomUrl: '', attendees: [], tabId: '', source: 'transkriptor', visible: false, pinned: false,
+      // Untagged on purpose — shows up in the tag picker's candidate list like
+      // any untagged inbox row.
+      content:
+        '<h2>Summary</h2><p>General cross-project operations standup. Procurement flagged a steel price increase; HR flagged two open engineering requisitions.</p>' +
+        '<h2>Action items</h2><ul><li>Procurement to circulate updated steel pricing by Friday</li></ul>'
     }
   ]
 }

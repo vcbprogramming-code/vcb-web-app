@@ -9,13 +9,13 @@
 // added feature — the GAS code already branches on isAdmin everywhere.
 
 import type {
-  CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditResult,
-  SaveMeetingInput, ServerApi, SessionState, SyncResult, ProjectId
+  AuditEntry, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
+  SaveMeetingInput, ServerApi, SessionState, ProjectId
 } from '../types'
-import { FATHOM_INBOX_ID } from '../types'
+import { isInboxProject } from '../types'
 import {
   ADMIN_EMAIL, APP_DISPLAY_TITLE, APP_SUBTITLE, APP_TITLE, DOMAIN,
-  SOURCE_PROJECTS, FATHOM_INBOX_PROJECT, makeSeedRows, type SeedRow, type SeedProject
+  SOURCE_PROJECTS, FATHOM_INBOX_PROJECT, TRANSKRIPTOR_INBOX_PROJECT, makeSeedRows, type SeedRow, type SeedProject
 } from './seed'
 
 interface AccessRule { domain: boolean; emails: string[] }
@@ -47,6 +47,30 @@ function allProjects(): SeedProject[] {
   })
 }
 function getProjectById(id: ProjectId): SeedProject | undefined { return allProjects().find(p => p.id === id) }
+
+// ---- audit log + version history (mirrors AUDIT_LOG / Versions sheets) ----
+// Append-only in-memory history of content/permission-relevant mutations, and
+// a parallel append-only snapshot store of pre-edit content — powers the
+// Edit History panel (getAuditHistory) and its "View" / "View Original"
+// preview (getVersionContent / getOriginalContent).
+const auditLog: AuditEntry[] = []
+function logAudit(action: string, targetType: string, targetId: string, details: Record<string, unknown> = {}): void {
+  const { email } = resolveIdentity()
+  auditLog.push({ when: new Date().toISOString(), who: email || '(anonymous)', action, targetType, targetId, details })
+}
+interface VersionSnapshot { meetingId: string; savedAt: string; seq: string; html: string }
+const versions: VersionSnapshot[] = []
+let versionSeqCounter = 0
+// Snapshots the CURRENT content of a row (before it's overwritten) as a new
+// version, returning the seq so the caller's audit entry can reference it —
+// mirrors saveContent_/snapshotVersion_ in Code.js. Skipped if there's nothing
+// to snapshot yet (brand-new row with no content).
+function snapshotVersion(meetingId: string, html: string): string | null {
+  if (!html) return null
+  const seq = 'v' + (++versionSeqCounter)
+  versions.push({ meetingId, savedAt: new Date().toISOString(), seq, html })
+  return seq
+}
 
 const EMPLOYEE_VISIBLE_DEFAULT: Record<ProjectId, boolean> = { FIN: true, BD: true, BT12: true, BV: true, PN34: true }
 function docVisibleDefault(projectId: ProjectId): boolean { return !!EMPLOYEE_VISIBLE_DEFAULT[projectId] }
@@ -99,13 +123,15 @@ function buildProjects(admin: boolean): Project[] {
     count: counts[d.id] || 0, canSee: true,
     docUrl: admin ? 'https://docs.google.com/document/d/EXAMPLE_' + d.id + '/edit' : ''
   }))
-  // Fathom Inbox is admin-only — mirrors the `if (admin)` gate in
-  // getPublicBootstrap/getSessionState (Auth.js).
+  // Fathom Inbox and Transkriptor Inbox are both admin-only — mirrors the
+  // `if (admin)` gate in getPublicBootstrap/getSessionState (Auth.js).
   if (admin) {
-    projects.push({
-      id: FATHOM_INBOX_PROJECT.id, name: FATHOM_INBOX_PROJECT.name, nameEn: FATHOM_INBOX_PROJECT.nameEn,
-      cadence: FATHOM_INBOX_PROJECT.cadence, color: FATHOM_INBOX_PROJECT.color,
-      count: counts[FATHOM_INBOX_PROJECT.id] || 0, canSee: true, docUrl: ''
+    ;[FATHOM_INBOX_PROJECT, TRANSKRIPTOR_INBOX_PROJECT].forEach(inbox => {
+      projects.push({
+        id: inbox.id, name: inbox.name, nameEn: inbox.nameEn,
+        cadence: inbox.cadence, color: inbox.color,
+        count: counts[inbox.id] || 0, canSee: true, docUrl: ''
+      })
     })
   }
   return projects
@@ -171,14 +197,9 @@ export const mockApi: ServerApi = {
       pinned: r.pinned, visible: r.visible, taggedProjectIds: (r.taggedProjectIds || []).slice(), fathomUrl: r.fathomUrl,
       source: r.source, attendees: r.attendees.slice(), html: r.content, css: '',
       docUrl: isAdmin && proj ? 'https://docs.google.com/document/d/EXAMPLE_' + proj.id + '/edit?tab=' + r.tabId : '',
-      projectName: proj ? proj.name : r.projectId, updatedAt: '2026-06-21T03:00:00.000Z'
+      projectName: proj ? proj.name : r.projectId,
+      createdAt: r.createdAt || '2026-06-21T03:00:00.000Z', updatedAt: '2026-06-21T03:00:00.000Z'
     }
-  },
-
-  async autoSync(): Promise<SyncResult> {
-    const { isAdmin } = resolveIdentity()
-    if (!isAdmin) return { ok: false, reason: 'anonymous' }
-    return { ok: true, added: 0, updated: 0, skipped: rows.length, total: rows.length }
   },
 
   async togglePin(id: string): Promise<boolean> {
@@ -199,6 +220,7 @@ export const mockApi: ServerApi = {
     const excerpt = stripTags(html).slice(0, 200)
     const attendees = extractAttendees(html)
     const iso = parseDateLabel(obj.dateLabel || '')
+    const now = new Date().toISOString()
     if (obj.id) {
       const r = rows.find(x => x.id === obj.id)
       if (r) {
@@ -220,29 +242,48 @@ export const mockApi: ServerApi = {
       id, projectId: obj.projectId, meetingKey: 'manual-' + Date.now(), date: iso,
       dateLabel: obj.dateLabel || '', time: obj.time || '', title: obj.title || 'Untitled meeting',
       kind: 'meeting', excerpt, fathomUrl: obj.fathomUrl || '', attendees, tabId: '',
-      source: obj.source || 'manual', visible: !!obj.visible, pinned: false, content: html
+      source: obj.source || 'manual', visible: !!obj.visible, pinned: false, content: html,
+      createdAt: now
     })
+    logAudit('create_meeting', 'meeting', id, { title: obj.title, projectId: obj.projectId })
     return id
   },
 
+  // Deleting an inbox-sourced (fathom/transkriptor) meeting doesn't tell the
+  // source API anything server-side (see PROP_DELETED_INBOX_KEYS in
+  // Config.js) — the mock has no polling backfill to re-suppress, so there's
+  // nothing to mirror here beyond the row removal + audit entry.
   async deleteMeeting(id: string): Promise<boolean> {
     requireAdmin()
     const i = rows.findIndex(x => x.id === id)
     if (i === -1) return false
+    const r = rows[i]
+    logAudit('delete_meeting', 'meeting', id, { title: r.title, projectId: r.projectId })
     rows.splice(i, 1); return true
   },
 
-  async saveEdit(id: string, html: string, writeToDoc: boolean): Promise<SaveEditResult> {
+  // meta (optional): { title, dateLabel, time } — lets the same content editor
+  // also fix a mis-set title/date/time in one save. Mirrors saveEdit in Code.js.
+  async saveEdit(id: string, html: string, _token: string, meta?: SaveEditMeta): Promise<SaveEditResult> {
     requireAdmin()
     const r = rows.find(x => x.id === id)
     if (!r) throw new Error('Meeting not found.')
+    const versionSeq = snapshotVersion(id, r.content)
     r.content = html
     r.excerpt = stripTags(html).slice(0, 200)
     r.attendees = extractAttendees(html)
     if (r.source === 'doc-import') r.source = 'doc-edited'
-    const doc = { attempted: false, ok: false, msg: '' }
-    if (writeToDoc && r.tabId) { doc.attempted = true; doc.ok = true }
-    return { ok: true, doc }
+    if (meta) {
+      if (meta.title) r.title = meta.title
+      if (meta.dateLabel) {
+        r.dateLabel = meta.dateLabel
+        const iso = parseDateLabel(meta.dateLabel)
+        if (iso) r.date = iso
+      }
+      if (meta.time != null) r.time = meta.time
+    }
+    logAudit('edit_content', 'meeting', id, { title: r.title, versionSeq })
+    return { ok: true }
   },
 
   async getProjectAccess(): Promise<ProjectAccess[]> { requireAdmin(); return accessList() },
@@ -270,16 +311,20 @@ export const mockApi: ServerApi = {
   },
 
   // Adds projectId to the recording's tag list (never removes existing tags,
-  // never moves the row out of FATHOM_INBOX). Mirrors setFathomTag in Code.js.
+  // never moves the row out of its inbox). Accepts rows from EITHER inbox
+  // (Fathom or Transkriptor) — mirrors the generalized setFathomTag in
+  // Code.js, which checks projectId !== FATHOM_INBOX_ID &&
+  // projectId !== TRANSKRIPTOR_INBOX_ID rather than Fathom-only.
   async setFathomTag(id, projectId): Promise<ProjectId[]> {
     requireAdmin()
     if (!getProjectById(projectId)) throw new Error('Unknown project: ' + projectId)
     const r = rows.find(x => x.id === id)
     if (!r) return []
-    if (r.projectId !== FATHOM_INBOX_ID) throw new Error('Only Fathom Inbox recordings can be tagged.')
+    if (!isInboxProject(r.projectId)) throw new Error('Only inbox recordings can be tagged.')
     const list = r.taggedProjectIds || []
     if (list.indexOf(projectId) === -1) list.push(projectId)
     r.taggedProjectIds = list
+    logAudit('tag', 'meeting', id, { projectId })
     return list.slice()
   },
 
@@ -290,6 +335,7 @@ export const mockApi: ServerApi = {
     const r = rows.find(x => x.id === id)
     if (!r) return []
     r.taggedProjectIds = (r.taggedProjectIds || []).filter(p => p !== projectId)
+    logAudit('untag', 'meeting', id, { projectId })
     return r.taggedProjectIds.slice()
   },
 
@@ -330,6 +376,7 @@ export const mockApi: ServerApi = {
     const order = allProjects().reduce((max, p) => Math.max(max, p.order || 0), 0) + 1
 
     extraProjects.push({ id, name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order })
+    logAudit('create_project', 'project', id, { name: trimmedName })
     return { id, docId: '', name: trimmedName, nameEn: trimmedNameEn, cadence: trimmedCadence, color, order, docUrl: '' }
   },
 
@@ -347,7 +394,40 @@ export const mockApi: ServerApi = {
     const overrides = projectOverrides.get(projectId) || {}
     projectOverrides.set(projectId, { ...overrides, ...clean })
     const updated = getProjectById(projectId)!
+    logAudit('rename_project', 'project', projectId, clean)
     return { id: updated.id, name: updated.name, nameEn: updated.nameEn, cadence: updated.cadence, color: updated.color, count: 0, canSee: true }
+  },
+
+  // Every audit entry for one meeting id, newest first. Mirrors getAuditHistory in Code.js.
+  async getAuditHistory(targetId): Promise<AuditEntry[]> {
+    requireAdmin()
+    return auditLog.filter(e => e.targetId === targetId).slice().reverse()
+  },
+
+  // Always-available "View Original" — the oldest snapshot for this meeting,
+  // or the current live content if no snapshot exists yet (never edited since
+  // this feature shipped — current IS the original). Mirrors getOriginalContent.
+  async getOriginalContent(meetingId): Promise<string> {
+    requireAdmin()
+    const mine = versions.filter(v => v.meetingId === meetingId)
+    if (mine.length) {
+      const oldest = mine.reduce((min, v) => v.savedAt < min.savedAt ? v : min, mine[0])
+      return oldest.html
+    }
+    const r = rows.find(x => x.id === meetingId)
+    return r ? r.content : ''
+  },
+
+  // Fetches one version's full HTML — either a numbered snapshot (seq) or the
+  // live current content ('current'). Mirrors getVersionContent.
+  async getVersionContent(meetingId, seq): Promise<string> {
+    requireAdmin()
+    if (seq === 'current' || seq == null) {
+      const r = rows.find(x => x.id === meetingId)
+      return r ? r.content : ''
+    }
+    const hit = versions.find(v => v.meetingId === meetingId && v.seq === seq)
+    return hit ? hit.html : ''
   }
 }
 

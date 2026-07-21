@@ -1,5 +1,5 @@
 import type { Project, MeetingListItem, ProjectId } from '../types'
-import { FATHOM_INBOX_ID } from '../types'
+import { isInboxProject } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { inRange, type Range } from '../lib/ui'
@@ -26,14 +26,31 @@ const RANGE_LABELS: Record<Range, string> = { all: 'All', week: 'This week', mon
 
 export default function MeetingList(props: Props) {
   const { meetings, byId, isAdmin, activeProject, activeId, query, searchMatchIds, range, loaded, onRange, onOpen, tr } = props
+
+  // Timeline mode replaces the list column entirely — the timeline itself
+  // renders in the detail pane (see App.tsx); mirrors renderList()'s early
+  // branch in JavaScript.html (listHead -> "Timeline", rangeFilter/cards cleared).
+  if (activeProject === 'TIMELINE') {
+    return (
+      <section className="list">
+        <div className="mobile-backbar">
+          <button type="button" className="mobile-back-btn" data-back-to="projects">{tr('backProjects')}</button>
+        </div>
+        <div className="list-head">Timeline</div>
+        <div className="range" />
+        <div id="cards" />
+      </section>
+    )
+  }
+
   const label = activeProject === 'ALL' ? tr('allMeetings') : (byId[activeProject]?.name ?? '')
 
-  // "All meetings" is every tracked project's meetings — Fathom Inbox is a
-  // standalone review queue and never folds into the ALL aggregate, even
-  // though it happens to share the same meetings array (mirrors the
-  // FATHOM_INBOX_ID exclusion in JavaScript.html's visibleMeetings/countInRange).
+  // "All meetings" is every tracked project's meetings — neither inbox
+  // pseudo-project folds into the ALL aggregate, even though they happen to
+  // share the same meetings array (mirrors the isInboxProject_ exclusion in
+  // JavaScript.html's visibleMeetings/countInRange).
   const passesProjectFilter = (m: MeetingListItem): boolean =>
-    activeProject === 'ALL' ? m.projectId !== FATHOM_INBOX_ID : m.projectId === activeProject
+    activeProject === 'ALL' ? !isInboxProject(m.projectId) : m.projectId === activeProject
 
   const countInRange = (r: Range): number =>
     meetings.filter(m => passesProjectFilter(m) && inRange(m, r)).length
@@ -88,7 +105,7 @@ export default function MeetingList(props: Props) {
                 {m.pinned && <span className="badge pin">★ Pinned</span>}
                 {m.kind === 'overview' && <span className="badge overview">Overview</span>}
                 {m.hasFathom && <span className="badge fathom">▶ Fathom</span>}
-                {(m.source === 'manual' || m.source === 'fathom') && <span className="badge manual">{m.source}</span>}
+                {m.source === 'transkriptor' && <span className="badge fathom">▤ Transkriptor</span>}
               </div>
               <div className="ttl">{m.title}</div>
               <div className="ex">{m.excerpt || ''}</div>

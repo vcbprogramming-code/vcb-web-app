@@ -13,6 +13,7 @@ import MeetingList from './components/MeetingList'
 import Dashboard from './components/Dashboard'
 import ProjectDashboard from './components/ProjectDashboard'
 import MeetingDetail from './components/MeetingDetail'
+import Timeline from './components/Timeline'
 import SettingsModal from './components/SettingsModal'
 import AccessModal from './components/AccessModal'
 import MeetingModal from './components/MeetingModal'
@@ -20,6 +21,8 @@ import EditorModal from './components/EditorModal'
 import NewProjectModal from './components/NewProjectModal'
 import RenameProjectModal from './components/RenameProjectModal'
 import { Busy, Toast } from './components/Overlays'
+
+const TIMELINE_PROJECT: ProjectId = 'TIMELINE'
 
 const EMPTY_SESSION: SessionState = {
   appTitle: 'VCB Meeting Minutes', appDisplayTitle: 'Meeting Minutes', subtitle: '',
@@ -103,8 +106,6 @@ export default function App() {
       if (isMobile()) setMobilePane(pendingMeeting ? 'detail' : 'projects')
       setBootHidden(true)
       prefetchLatest(s.projects, m, () => setDetailVersion(v => v + 1))
-      // background autoSync (admin only returns changes)
-      api.autoSync(getToken()).then(r => { if (r.ok && (r.added || r.updated)) refreshAll() }).catch(() => { /* silent */ })
     }).catch(() => { setLoaded(true); setBootHidden(true) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -132,6 +133,10 @@ export default function App() {
   // ---- navigation ----
   const pickProject = (id: ProjectId) => {
     setActiveProject(id); setActiveId(null)
+    if (isMobile()) setMobilePane('list')
+  }
+  const openTimeline = () => {
+    setActiveProject(TIMELINE_PROJECT); setActiveId(null)
     if (isMobile()) setMobilePane('list')
   }
   const openMeeting = (id: string) => {
@@ -166,15 +171,6 @@ export default function App() {
     toast('Created ' + p.name)
   }
 
-  const manualRefresh = () => {
-    setSettingsOpen(false); onBusy(tr('refreshing'))
-    api.autoSync(getToken()).then(async r => {
-      await refreshAll()
-      if (r && (r.added || r.updated)) toast(`${tr('updated')} · ${r.added || 0} ${tr('newWord')}, ${r.updated || 0} ${tr('changedWord')}`)
-      else toast(tr('alreadyUpToDate'))
-    }).catch(e => toast(tr('refreshFailed') + ': ' + (e instanceof Error ? e.message : String(e)))).finally(() => onBusy(null))
-  }
-
   const onMeetingSaved = async (id: string) => {
     setMeetingModalOpen(false)
     await refreshAll(); openMeeting(id)
@@ -187,9 +183,16 @@ export default function App() {
     setEditorTarget(null)
     await refreshAll(); setDetailVersion(v => v + 1); openMeeting(id)
   }
+  const onEditorDeleted = async () => {
+    setEditorTarget(null); setActiveId(null)
+    await refreshAll()
+  }
 
   // ---- detail pane content ----
   const detailPane = (() => {
+    if (activeProject === TIMELINE_PROJECT && !activeId) {
+      return <Timeline projects={session.projects} meetings={meetings} byId={byId} loaded={loaded} onOpen={openMeeting} />
+    }
     if (activeId) {
       return (
         <MeetingDetail
@@ -214,11 +217,12 @@ export default function App() {
 
       <Topbar session={session} query={query} onQuery={onQuery} onSettings={() => setSettingsOpen(true)} tr={tr} />
 
-      <div className="body">
+      <div className={'body' + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')}>
         <Sidebar
           projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin}
           active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
-          onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId} tr={tr}
+          onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId}
+          onTimeline={openTimeline} tr={tr}
         />
         <MeetingList
           meetings={meetings} byId={byId} isAdmin={session.isAdmin}
@@ -239,7 +243,7 @@ export default function App() {
       <SettingsModal
         open={settingsOpen} onClose={() => setSettingsOpen(false)} session={session}
         theme={theme} lang={lang} setTheme={setTheme} setLang={setLang}
-        onRefresh={manualRefresh} onAccess={() => { setSettingsOpen(false); setAccessOpen(true) }} tr={tr}
+        onAccess={() => { setSettingsOpen(false); setAccessOpen(true) }} tr={tr}
       />
       <AccessModal open={accessOpen} onClose={() => { setAccessOpen(false); setSettingsOpen(true) }} onBusy={onBusy} onToast={toast} />
       <MeetingModal
@@ -247,7 +251,11 @@ export default function App() {
         onClose={() => setMeetingModalOpen(false)} onSaved={onMeetingSaved} onDeleted={onMeetingDeleted}
         onBusy={onBusy} onToast={toast}
       />
-      <EditorModal meeting={editorTarget} onClose={() => setEditorTarget(null)} onSaved={onEditSaved} onBusy={onBusy} onToast={toast} />
+      <EditorModal
+        meeting={editorTarget} projectName={editorTarget ? byId[editorTarget.projectId]?.name : undefined}
+        onClose={() => setEditorTarget(null)} onSaved={onEditSaved} onDeleted={onEditorDeleted}
+        onBusy={onBusy} onToast={toast}
+      />
       <NewProjectModal
         open={newProjectOpen} onClose={() => setNewProjectOpen(false)}
         onCreated={onProjectCreated} onBusy={onBusy} onToast={toast}

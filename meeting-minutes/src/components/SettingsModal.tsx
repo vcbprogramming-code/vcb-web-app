@@ -9,13 +9,15 @@ interface Props {
   lang: Lang
   setTheme: (t: Theme) => void
   setLang: (l: Lang) => void
-  onRefresh: () => void
   onAccess: () => void
   tr: Tr
 }
 
-// Mirrors the Settings sheet in Index.html + openSettings().
-export default function SettingsModal({ open, onClose, session, theme, lang, setTheme, setLang, onRefresh, onAccess, tr }: Props) {
+// Mirrors the Settings sheet in Index.html + openSettings(). The "🔄 Refresh
+// now" button (manualRefresh()/backgroundAutoSync()) was removed 2026-07-19 —
+// Docs stopped being the source of truth, so autoSync became a permanent
+// server no-op and was later deleted entirely; see PORT_NOTES.md.
+export default function SettingsModal({ open, onClose, session, theme, lang, setTheme, setLang, onAccess, tr }: Props) {
   if (!open) return null
   const dep = (session.execUrl || '').split('/s/')[1] || ''
   const depId = dep.split('/')[0] || ''
@@ -49,7 +51,6 @@ export default function SettingsModal({ open, onClose, session, theme, lang, set
 
           {session.isAdmin && (
             <div className="set-actions-inline">
-              <button className="dbtn" onClick={onRefresh}>{tr('refreshNow')}</button>
               <button className="dbtn" onClick={onAccess}>{tr('projectAccess')}</button>
             </div>
           )}

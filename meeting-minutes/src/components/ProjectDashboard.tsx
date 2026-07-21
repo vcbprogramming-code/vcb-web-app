@@ -53,6 +53,7 @@ export default function ProjectDashboard({ project, meetings, onOpen, tr }: Prop
         <div className="pbig-ttl">🗓 {fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}
           {m.pinned && <>&nbsp;<span className="badge pin">★ Pinned</span></>}
           {m.hasFathom && <>&nbsp;<span className="badge fathom">▶ Fathom</span></>}
+          {m.source === 'transkriptor' && <>&nbsp;<span className="badge fathom">▤ Transkriptor</span></>}
         </div>
         {!titleIsDate && <div className="pbig-sub">{m.title}</div>}
         <div className="pbig-body" dangerouslySetInnerHTML={{ __html: sum }} />

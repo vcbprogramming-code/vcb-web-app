@@ -1,5 +1,5 @@
 import type { Project, MeetingListItem } from '../types'
-import { FATHOM_INBOX_ID } from '../types'
+import { isInboxProject } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { cssVar } from '../lib/ui'
@@ -13,11 +13,11 @@ interface Props {
 }
 
 // Compact "latest 2" strip shown at the top of the mobile projects pane
-// (hidden on desktop via CSS). Mirrors renderMobileLatest(). Fathom Inbox is
-// excluded — same standalone-queue rule as Dashboard/MeetingList.
+// (hidden on desktop via CSS). Mirrors renderMobileLatest(). Both inbox
+// pseudo-projects are excluded — same standalone-queue rule as Dashboard/MeetingList.
 export default function MobileLatest({ meetings, byId, isAdmin, onOpen, tr }: Props) {
   const latest = meetings
-    .filter(m => m.kind !== 'overview' && m.projectId !== FATHOM_INBOX_ID && (isAdmin || m.visible !== false))
+    .filter(m => m.kind !== 'overview' && !isInboxProject(m.projectId) && (isAdmin || m.visible !== false))
     .slice()
     .sort((a, b) => (b.date || '0000-00-00').localeCompare(a.date || '0000-00-00'))
     .slice(0, 2)

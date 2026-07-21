@@ -1,5 +1,5 @@
 import type { Project, MeetingListItem } from '../types'
-import { FATHOM_INBOX_ID } from '../types'
+import { isInboxProject } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { cssVar } from '../lib/ui'
@@ -12,8 +12,8 @@ interface Props {
 }
 
 // ALL-projects dashboard: the latest meeting per project. Mirrors renderDashboard().
-// Fathom Inbox never gets a card here — it's a standalone review queue, not
-// one of the tracked projects (mirrors the S.projects.filter exclusion in
+// Neither inbox pseudo-project gets a card here — they're standalone review
+// queues, not tracked projects (mirrors the S.projects.filter exclusion in
 // JavaScript.html's renderDashboard()).
 export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
   const by: Record<string, MeetingListItem> = {}
@@ -22,7 +22,7 @@ export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
     const cur = by[m.projectId]
     if (!cur || (m.date || '') > (cur.date || '')) by[m.projectId] = m
   })
-  const cards = projects.filter(p => p.id !== FATHOM_INBOX_ID)
+  const cards = projects.filter(p => !isInboxProject(p.id))
     .map(p => ({ p, m: by[p.id] })).filter((x): x is { p: Project; m: MeetingListItem } => !!x.m)
 
   return (
@@ -37,6 +37,7 @@ export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
             <div className="dash-proj"><span className="dot" style={{ background: p.color }} />{p.name}</div>
             <div className="dash-date">🗓 {fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}
               {m.hasFathom && <>&nbsp;<span className="badge fathom">▶ Fathom</span></>}
+              {m.source === 'transkriptor' && <>&nbsp;<span className="badge fathom">▤ Transkriptor</span></>}
             </div>
             <div className="dash-ttl">{m.title}</div>
             <div className="dash-ex">{m.excerpt || ''}</div>

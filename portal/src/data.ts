@@ -38,7 +38,7 @@ export const APPS: AppEntry[] = [
     key: 'hr',
     name: 'HR Work Log',
     desc: 'Attendance, task logs & timesheet for the HR team.',
-    url: 'https://script.google.com/a/macros/vcb-con.com/s/AKfycbzRll0RWwjBcFVWsCiyeM8x6AqlOzeOxaZx6qEmbD-lJepMJn2dUWsL08T0ubOjhy3lNg/exec',
+    url: 'https://script.google.com/macros/s/AKfycbzEg5Sn0tNnciRkWmwnsEM9cmq0NVmy6weblTLPqlAOccsDKkh9m6dmLMRVBpqspBblUA/exec',
     icon: 'hr',
     accent: '#34d399',
   },

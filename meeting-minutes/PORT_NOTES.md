@@ -13,9 +13,151 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-07-21
+- **Synced at:** 2026-07-22
 - **Live deployment referenced:** `@60` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed 2026-07-22 sync:**
+  - **File attachments (backfilled from an earlier, previously-uncommitted
+    pass).** Upload/remove attachments on a meeting, a 📎 count badge on
+    cards, and an attachment list in the detail view — `Attachment` type
+    (`types.ts`), `addAttachment`/`removeAttachment` (`ServerApi`/`mock.ts`/
+    `client.ts`), the attachment chips + upload button + remove confirm in
+    `MeetingDetail.tsx`, the 📎 badge in `MeetingList.tsx`, and the file-type
+    icon/size helpers in `lib/ui.ts` (`fileIconKind`/`fmtFileSize`/
+    `fileToBase64`). This existed in the working tree before this sync
+    started (verified working via a real browser test) but had never been
+    committed — *Known deviations* #2 is updated below to reflect that
+    attachments ARE now ported (it previously said they were out of scope
+    entirely).
+  - **Fathom transcript pulling removed entirely** — mirrors
+    `registerFathomWebhook` dropping `include_transcript` and
+    `ingestFathomPayloadLocked_`/`fathomRecordToHtml_` never reading/
+    rendering a transcript field in Code.js (a real payload's transcript
+    turn-shape didn't match `t.text`/`t.speaker`, producing literal
+    `"[object Object]:"` lines). The mock never had a transcript concept for
+    Fathom rows to begin with (`SeedRow`/`MeetingFull` have no transcript
+    field, and the Fathom seed content in `seed.ts` was always
+    recording-link + summary + action items only) — nothing to remove,
+    confirmed already correct.
+  - **Fathom/Transkriptor AI-summary section headers are bold paragraphs,
+    never real `<h1>`-`<h6>` tags** — mirrors `fathomMarkdownToHtml_`/
+    `transkriptorMarkdownToHtml_`/`transkriptorRecordToHtml_`'s 2026-07-21
+    change in Code.js (a real heading is a colored block container that
+    contenteditable silently continues into on Enter, with no visible
+    boundary; a bold run has a clear one). The Fathom/Transkriptor sample
+    rows in `seed.ts` (`fathom-erp-po`, `fathom-bv-overview`,
+    `fathom-untitled-call`, `transkriptor-bt12-siteissue`,
+    `transkriptor-untagged-standup`) previously used real `<h3>`/`<h2>` tags
+    for their "Key Takeaways"/"Meeting Purpose"/"Summary"/"Action items"
+    section headers — converted to `<p><b>...</b></p>` to match. The 5
+    Doc-import seed meetings (FIN/BD/BT12/BV/PN34) intentionally keep real
+    `<h1>` tags — those model actual Google Doc content, which still uses
+    real headings; only AI-generated Fathom/Transkriptor summaries changed.
+  - **Editor Enter-key handling rewritten to direct Range/DOM manipulation,
+    off `document.execCommand`** — `EditorModal.tsx`'s `.ed-area` (a real
+    `contentEditable` div, so this ports directly) gained a
+    `splitBlockAtCursor` helper + `onKeyDown` handler mirroring
+    `splitBlockAtCursor_`/the `#edArea` keydown listener in JavaScript.html
+    verbatim: finds the closest `li`/heading ancestor of the cursor via
+    `.closest()`, and if found, manually splits it via
+    `Range.cloneRange()`/`setEnd()`/`extractContents()` into a new sibling
+    element — never `execCommand('insertParagraph'/'formatBlock')`, which
+    browser vendors never implemented consistently for list-splitting. An
+    Enter at the very start of a heading (cursor position 0) removes the
+    original (now-empty) heading and keeps only the new paragraph, exactly
+    like the GAS version. Toolbar buttons (Bold/Italic/lists/link) still use
+    `execCommand` — only Enter-key and paste were rewritten, matching GAS.
+  - **Editor paste handling rewritten, also off `execCommand`** — a new
+    `onPaste` handler + `sanitizePastedNode`/`PASTE_ALLOWED_TAGS` in
+    `EditorModal.tsx` mirror `sanitizePastedNode_`/the `#edArea` paste
+    listener in JavaScript.html verbatim: reads `clipboardData.getData
+    ('text/html')`; falls through to the browser's default plain-text paste
+    if there's no HTML; otherwise parses via `DOMParser`, recursively
+    sanitizes (allow-list `B,STRONG,I,EM,U,A,UL,OL,LI,BR,P` keep their tag
+    with all attributes stripped except `href`+`target=_blank` on `<a>`;
+    `DIV`→`<p>`; everything else unwrapped to its children), and inserts the
+    sanitized fragment via `Range.insertNode()` — never
+    `execCommand('insertHTML', ...)`, same root-cause reasoning as the
+    Enter-key fix (execCommand's insertion logic mis-nests lists when the
+    target is already inside an existing `<li>`/`<ul>`).
+  - **Version history now captures title/dateLabel/time alongside body
+    content** — real schema change, mirrors `getVersionsSheet_`'s 8-column
+    schema / `snapshotVersion_(meetingId, html, meta)` / `saveContent_(id,
+    html, skipSnapshot, preEditMeta)` in Code.js. `getOriginalContent`/
+    `getVersionContent` now return `VersionContent`
+    (`{ html, title, dateLabel, time }`, `types.ts`) instead of a bare HTML
+    string. `mock.ts`'s in-memory `versions` store gained `title`/
+    `dateLabel`/`time` fields; `snapshotVersion(meetingId, html, meta)` takes
+    a 3rd `meta` param, and `saveEdit`'s call site passes the row's PRE-edit
+    `{ title, dateLabel, time }` (captured before the row is overwritten a
+    few lines later — same ordering constraint as Code.js's preEditMeta).
+    `VersionPreviewModal.tsx` now reads title/dateLabel/time from the
+    fetched `VersionContent` result for its header (falling back to the live
+    `meeting` prop only when the snapshot's title is `''` — a pre-fix
+    snapshot with no captured metadata, same fallback Code.js documents),
+    fixing the same bug the GAS change fixed: renaming a meeting no longer
+    changes what its own "Original"/past-version previews show. Note:
+    `mock.ts`'s `saveMeeting` (the New/Edit meeting modal path) still does
+    not call `snapshotVersion`/`logAudit` at all on its edit branch — that
+    was already true before this sync (Code.js's `saveMeeting` does call
+    both) and is unrelated to today's schema change; flagging it here as a
+    pre-existing gap for whoever picks this up next, not something this
+    sync introduced or fixed.
+  - **A4 render dark-mode support (new — this pass, not carried from
+    2026-07-21 as previously assumed)** — `lib/docRender.ts` gained
+    `DARK_OVERRIDE_CSS` (verbatim from JavaScript.html, `@media screen`-only
+    so it can never leak into Print/PDF) and `buildMeetingSrcdoc` takes a 4th
+    `opts: { isDark?, aiDisclaimer? }` param. `MeetingDetail.tsx` now takes a
+    `theme` prop (threaded from `App.tsx`'s `theme` state) purely so the
+    component re-renders — and therefore recomputes `srcdoc` — on every
+    theme toggle, not just once when a meeting first opens; mirrors
+    `applyTheme`'s `renderDetail()` re-render call in JavaScript.html. Before
+    this pass `docRender.ts` had no dark-mode CSS at all, so this was a real
+    gap, not just a "verify" item.
+  - **Company letterhead + date line hidden on-screen, kept for print only**
+    — `OVERRIDE_CSS` in `docRender.ts` gained the same
+    `@media screen{.vcb-letterhead,.vcb-letterdate{display:none}}` rule as
+    JavaScript.html (duplicated the title+date already shown in the outer
+    detail-bar header).
+  - **AI-generated-summary disclaimer banner (new), display-only** —
+    `docRender.ts` exports `AI_DISCLAIMER_HTML` (verbatim banner markup/copy)
+    plus the `.ai-disclaimer` rule in `OVERRIDE_CSS`/`DARK_OVERRIDE_CSS`.
+    `MeetingDetail.tsx` passes `aiDisclaimer: m.source === 'fathom' ||
+    m.source === 'transkriptor'` into `buildMeetingSrcdoc`;
+    `VersionPreviewModal.tsx` does the same gated on the live `meeting`
+    prop's source (versions don't carry their own source field). Purely
+    injected into the srcdoc string at render time — never written into
+    `m.content`/the mock row — so it can never pollute `excerpt`
+    (`stripTags(html).slice(0,200)`) or `searchMeetings`, mirroring the
+    explicit "display-only" constraint in Code.js/JavaScript.html. Note:
+    `.ai-disclaimer` is NOT in `Stylesheet.html`'s `<style>` block (it's
+    built into the `OVERRIDE_CSS`/`DARK_OVERRIDE_CSS` JS strings instead), so
+    it correctly does not appear in `src/styles.css` after re-extraction —
+    verified.
+  - **In-app editor always re-fetches fresh content before opening** —
+    `MeetingDetail.tsx`'s "Edit here" button now calls a new `openEditFresh`
+    handler that fetches `api.getMeeting(m.id, token)` fresh (with
+    `onBusy('Loading…')`/`onBusy(null)` around it), updates the shared
+    content cache via `setCached`, and only then calls `onEdit(fresh || m)`
+    — instead of the previous `onClick={() => onEdit(m)}`, which reused
+    whatever `MeetingDetail`'s own component state already held from when
+    the detail view first loaded. Mirrors `d_editapp`'s onclick handler in
+    JavaScript.html (fixes the same bug: a Fathom/Transkriptor force-refresh
+    landing on the server while a tab already had the meeting open used to
+    show stale content in the editor, risking silently overwriting the
+    server's newer version on save).
+  - **Fathom/Transkriptor Inbox sidebar dot color changed to neutral grey**
+    — `FATHOM_INBOX_PROJECT`/`TRANSKRIPTOR_INBOX_PROJECT` in `seed.ts` both
+    changed to `'#8b949e'` (was `'#57606a'` for Fathom, `'#bc4c00'` orange
+    for Transkriptor), mirrors `FATHOM_INBOX_META`/`TRANSKRIPTOR_INBOX_META`
+    in Config.js — an inbox is a temporary review queue, not a real
+    designated project, so it shouldn't have its own distinct accent color.
+  - `src/styles.css` re-extracted verbatim per the documented `sed` command;
+    picked up two small unrelated dark-mode fixes already present in the
+    current `Stylesheet.html` (`.date-field input` selector broadened from
+    `input#m_date`, `.cal-pop` background switched to `var(--panel))`, and a
+    new `html.theme-dark .paper{background:#161b22}` rule) — verbatim
+    re-extraction, not something to second-guess.
 - **What changed 2026-07-18 sync:** Fathom Inbox (webhook/backfill intake, permanent
   archive, never in "All meetings"), multi-project tagging (a recording can be
   tagged into more than one project, each independently removable — never a
@@ -192,8 +334,10 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `createProject` | `mockApi.createProject` | `CreatedProject` (docId/docUrl always `''` — tag-only) |
 | `renameProject` | `mockApi.renameProject` | `Project` |
 | `getAuditHistory` | `mockApi.getAuditHistory` | `AuditEntry[]` |
-| `getOriginalContent` | `mockApi.getOriginalContent` | `string` (html) |
-| `getVersionContent` | `mockApi.getVersionContent` | `string` (html) |
+| `getOriginalContent` | `mockApi.getOriginalContent` | `VersionContent` (`{html,title,dateLabel,time}` — 2026-07-22, was a bare `string`) |
+| `getVersionContent` | `mockApi.getVersionContent` | `VersionContent` (`{html,title,dateLabel,time}` — 2026-07-22, was a bare `string`) |
+| `addAttachment` | `mockApi.addAttachment` | `Attachment[]` (full updated list) |
+| `removeAttachment` | `mockApi.removeAttachment` | `Attachment[]` (full updated list) |
 
 `autoSync` is no longer in this table — it was removed from Code.js entirely
 2026-07-21 (had been a permanent no-op since Docs stopped being the source of
@@ -209,8 +353,10 @@ API polling + hourly trigger + summary markdown parsing
 `autoCleanupErpDoc_` — these populate/repair the row store that
 `listMeetings`/`getMeeting` read from; the mock's Fathom/Transkriptor seed rows
 in `seed.ts` stand in for what a real backfill/webhook/poll delivery would
-have produced. `addAttachment`/`removeAttachment` (file attachments) are also
-not ported — see *Known deviations* #2.
+have produced. `addAttachment`/`removeAttachment` (file attachments) ARE
+ported (see the table above and *Known deviations* #2) — the underlying Drive
+upload/storage plumbing they wrap in Code.js is what's out of scope, not the
+client-facing feature itself.
 
 ## Component mapping (GAS → React)
 | GAS (Index.html / JavaScript.html) | React component |
@@ -223,12 +369,12 @@ not ported — see *Known deviations* #2.
 | project dashboard `renderProjectDashboard()` + `loadSummary()` | `components/ProjectDashboard.tsx` |
 | detail `openMeeting()` / `renderDetail()` | `components/MeetingDetail.tsx` |
 | New/Edit modal `openModal()` | `components/MeetingModal.tsx` |
-| in-app editor `openEditor()` | `components/EditorModal.tsx` |
+| in-app editor `openEditor()`, `splitBlockAtCursor_`, `sanitizePastedNode_` (Enter/paste — off `execCommand`, direct Range/DOM) | `components/EditorModal.tsx` |
 | project access `openAccess()` | `components/AccessModal.tsx` |
 | settings sheet `openSettings()` | `components/SettingsModal.tsx` |
 | busy / toast | `components/Overlays.tsx` |
 | `I18N`, `fmtDate`/`fmtTime`/`fmtThaiDate` | `lib/i18n.ts` |
-| `OVERRIDE_CSS`, section extraction, bullets | `lib/docRender.ts` |
+| `OVERRIDE_CSS`/`DARK_OVERRIDE_CSS`, AI disclaimer banner, section extraction, bullets | `lib/docRender.ts` |
 | mobile panes, range math, theme/lang apply, `applyMobileScale` | `lib/ui.ts` |
 | `S.contentCache`, `prefetchLatest()` | `api/contentCache.ts` |
 | tag picker `openTagPicker()` / `suggestProjectFor_()` | `components/TagPickerModal.tsx` |
@@ -292,9 +438,14 @@ on `isAdmin` everywhere.
    (they shape the stored HTML). The mock ships already-rendered sample HTML, so the
    render path is identical; the import-time transforms are out of scope for the SPA.
    **File attachments** (`addAttachment`/`removeAttachment`, the 📎 count badge,
-   the attachment list/upload UI in `renderDetail()`) fall under this same
-   deviation — they're a Drive-storage concern with no client-facing mock
-   equivalent, so they're not ported at all (not even the read-only display).
+   the attachment list/upload UI in `renderDetail()`) ARE ported (2026-07-22 —
+   this note previously said they were out of scope entirely, which is now
+   stale) — see `types.ts`'s `Attachment`, `mock.ts`'s upload/remove handlers,
+   and the attachment chips/upload button in `MeetingDetail.tsx`. The one real
+   deviation: the mock has no Drive/file host, so an uploaded file is kept as
+   an in-memory `data:` URL instead of a real Drive share link — good enough
+   to actually open/download in the browser, which is all the UI needs to
+   prove; same MIME allow-list and 25MB cap as Code.js.
 3. **Magic-link sign-in** is retired/vestigial in the GAS source and not reproduced.
 4. **Timeline per-project toggle state / mode / year** are component-local
    `useState` in `Timeline.tsx` rather than the GAS module-level `TL_*`

@@ -198,7 +198,7 @@ export default function App() {
         <MeetingDetail
           key={activeId} id={activeId} byId={byId} projects={session.projects} isAdmin={session.isAdmin}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
-          onMutated={() => { refreshAll() }} execUrl={session.execUrl}
+          onMutated={() => { refreshAll() }} execUrl={session.execUrl} theme={theme}
         />
       )
     }

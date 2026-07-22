@@ -35,6 +35,21 @@ export interface SessionState {
   execUrl: string
 }
 
+/** One file attached to a meeting (Code.js's addAttachment/removeAttachment).
+ *  Stored in Drive in the real app; here it's an in-memory data: URL so
+ *  "download" still works in the mock without a real file host. */
+export interface Attachment {
+  fileId: string
+  name: string
+  mimeType: string
+  size: number
+  uploadedAt: string
+  uploadedBy: string
+  /** Mock-only: object/data URL to open on click. The real GAS app instead
+   *  points this at a Drive file's share link (see Code.js addAttachment). */
+  url: string
+}
+
 /** listMeetings() row — the lightweight list shape. A Fathom recording tagged
  *  into one or more projects appears once per projectId (FATHOM_INBOX always,
  *  plus one entry per tagged project) — same id, taggedFromInbox marks the
@@ -55,6 +70,8 @@ export interface MeetingListItem {
   attendees: string[]
   excerpt: string
   taggedFromInbox?: boolean
+  /** Count only, for the 📎 badge on cards — full list is in getMeeting(). */
+  attachmentCount: number
 }
 
 /** getMeeting() — full record incl. rendered html + content meta. */
@@ -81,6 +98,7 @@ export interface MeetingFull {
   projectName: string
   createdAt: string
   updatedAt: string
+  attachments: Attachment[]
 }
 
 /** saveEdit() result. */
@@ -95,6 +113,23 @@ export interface SaveEditMeta {
   title?: string
   dateLabel?: string
   time?: string
+}
+
+/** getVersionContent()/getOriginalContent() return shape (2026-07-22 schema
+ *  change — previously a bare HTML string). title/dateLabel/time are the
+ *  meeting's metadata AS IT WAS at the moment of that snapshot, not
+ *  whatever the live row currently holds — fixes a confirmed bug where
+ *  renaming a meeting made its own "Original"/version previews show the new
+ *  name. title/dateLabel/time are '' for a version snapshotted before this
+ *  fix shipped (metadata wasn't captured yet); the caller falls back to the
+ *  live meeting's current values only in that specific case. Mirrors the
+ *  { html, title, dateLabel, time } return of getVersionContent/
+ *  getOriginalContent in Code.js. */
+export interface VersionContent {
+  html: string
+  title: string
+  dateLabel: string
+  time: string
 }
 
 /** getAuditHistory() row — one entry in a meeting's unified activity timeline. */
@@ -195,8 +230,14 @@ export interface ServerApi {
   renameProject(projectId: ProjectId, patch: ProjectRenamePatch, token: string): Promise<Project>
   /** Every audit entry for one meeting id, newest first. Admin only. */
   getAuditHistory(targetId: string, token: string): Promise<AuditEntry[]>
-  /** The oldest content snapshot for a meeting (or current content if never edited). Admin only. */
-  getOriginalContent(meetingId: string, token: string): Promise<string>
-  /** One numbered version's full HTML. Admin only. */
-  getVersionContent(meetingId: string, seq: string, token: string): Promise<string>
+  /** The oldest content snapshot for a meeting (or current content if never edited),
+   *  plus the title/dateLabel/time captured with it. Admin only. */
+  getOriginalContent(meetingId: string, token: string): Promise<VersionContent>
+  /** One numbered version's full HTML plus the title/dateLabel/time captured with it. Admin only. */
+  getVersionContent(meetingId: string, seq: string, token: string): Promise<VersionContent>
+  /** Uploads a file (base64) and attaches it to a meeting. Admin only.
+   *  Mirrors Code.js's addAttachment — same MIME allow-list, 25MB cap. */
+  addAttachment(meetingId: string, fileName: string, mimeType: string, base64Data: string, token: string): Promise<Attachment[]>
+  /** Removes one attachment by fileId. Admin only. Returns the remaining list. */
+  removeAttachment(meetingId: string, fileId: string, token: string): Promise<Attachment[]>
 }

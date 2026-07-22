@@ -46,5 +46,7 @@ export const api: ServerApi = {
   renameProject: (id, patch, t) => delay(() => mockApi.renameProject(id, patch, t)),
   getAuditHistory: (id, t) => delay(() => mockApi.getAuditHistory(id, t)),
   getOriginalContent: (id, t) => delay(() => mockApi.getOriginalContent(id, t)),
-  getVersionContent: (id, seq, t) => delay(() => mockApi.getVersionContent(id, seq, t))
+  getVersionContent: (id, seq, t) => delay(() => mockApi.getVersionContent(id, seq, t)),
+  addAttachment: (id, name, mime, b64, t) => delay(() => mockApi.addAttachment(id, name, mime, b64, t)),
+  removeAttachment: (id, fileId, t) => delay(() => mockApi.removeAttachment(id, fileId, t))
 }

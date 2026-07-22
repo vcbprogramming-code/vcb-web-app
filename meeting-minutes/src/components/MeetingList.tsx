@@ -106,6 +106,7 @@ export default function MeetingList(props: Props) {
                 {m.kind === 'overview' && <span className="badge overview">Overview</span>}
                 {m.hasFathom && <span className="badge fathom">▶ Fathom</span>}
                 {m.source === 'transkriptor' && <span className="badge fathom">▤ Transkriptor</span>}
+                {m.attachmentCount > 0 && <span className="badge manual">📎 {m.attachmentCount}</span>}
               </div>
               <div className="ttl">{m.title}</div>
               <div className="ex">{m.excerpt || ''}</div>

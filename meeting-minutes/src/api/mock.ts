@@ -9,8 +9,8 @@
 // added feature — the GAS code already branches on isAdmin everywhere.
 
 import type {
-  AuditEntry, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
-  SaveMeetingInput, ServerApi, SessionState, ProjectId
+  Attachment, AuditEntry, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
+  SaveMeetingInput, ServerApi, SessionState, ProjectId, VersionContent
 } from '../types'
 import { isInboxProject } from '../types'
 import {
@@ -58,17 +58,25 @@ function logAudit(action: string, targetType: string, targetId: string, details:
   const { email } = resolveIdentity()
   auditLog.push({ when: new Date().toISOString(), who: email || '(anonymous)', action, targetType, targetId, details })
 }
-interface VersionSnapshot { meetingId: string; savedAt: string; seq: string; html: string }
+interface VersionSnapshot { meetingId: string; savedAt: string; seq: string; html: string; title: string; dateLabel: string; time: string }
 const versions: VersionSnapshot[] = []
 let versionSeqCounter = 0
 // Snapshots the CURRENT content of a row (before it's overwritten) as a new
-// version, returning the seq so the caller's audit entry can reference it —
-// mirrors saveContent_/snapshotVersion_ in Code.js. Skipped if there's nothing
-// to snapshot yet (brand-new row with no content).
-function snapshotVersion(meetingId: string, html: string): string | null {
+// version, AS WELL AS the title/dateLabel/time that were in effect at that
+// moment (2026-07-22 schema change — previously only body HTML was
+// versioned, so "View Original"/any past version always showed whatever
+// title/date/time happened to be on the row RIGHT NOW, not what they
+// actually were back then — confirmed bug: renaming a meeting made its own
+// "Original" preview show the new name). Returns the seq so the caller's
+// audit entry can reference it — mirrors saveContent_/snapshotVersion_ in
+// Code.js. Skipped if there's nothing to snapshot yet (brand-new row with no
+// content). `meta` must be the PRE-edit {title,dateLabel,time} — callers
+// capture it from their own row object before overwriting it, same as
+// preEditMeta in Code.js.
+function snapshotVersion(meetingId: string, html: string, meta: { title: string; dateLabel: string; time: string }): string | null {
   if (!html) return null
   const seq = 'v' + (++versionSeqCounter)
-  versions.push({ meetingId, savedAt: new Date().toISOString(), seq, html })
+  versions.push({ meetingId, savedAt: new Date().toISOString(), seq, html, title: meta.title, dateLabel: meta.dateLabel, time: meta.time })
   return seq
 }
 
@@ -141,12 +149,17 @@ function requireAdmin(): void {
   if (!resolveIdentity().isAdmin) throw new Error('Not authorized.')
 }
 
+// Mirrors ATTACHMENT_ALLOWED_MIME / ATTACHMENT_MAX_BYTES in Code.js verbatim.
+const ATTACHMENT_ALLOWED_MIME = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.|application\/vnd\.ms-(excel|powerpoint)|application\/msword|image\/(png|jpe?g|gif|webp)|text\/(plain|csv))/i
+const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024 // 25MB per file
+
 function toListItem(r: SeedRow, projectId: ProjectId, taggedFromInbox?: boolean): MeetingListItem {
   return {
     id: r.id, projectId, title: r.title, kind: r.kind,
     date: r.date, dateLabel: r.dateLabel, time: r.time,
     pinned: r.pinned, visible: r.visible, hasFathom: !!r.fathomUrl,
     source: r.source, attendeeCount: r.attendees.length, attendees: r.attendees.slice(), excerpt: r.excerpt,
+    attachmentCount: (r.attachments || []).length,
     ...(taggedFromInbox ? { taggedFromInbox: true } : {})
   }
 }
@@ -198,7 +211,8 @@ export const mockApi: ServerApi = {
       source: r.source, attendees: r.attendees.slice(), html: r.content, css: '',
       docUrl: isAdmin && proj ? 'https://docs.google.com/document/d/EXAMPLE_' + proj.id + '/edit?tab=' + r.tabId : '',
       projectName: proj ? proj.name : r.projectId,
-      createdAt: r.createdAt || '2026-06-21T03:00:00.000Z', updatedAt: '2026-06-21T03:00:00.000Z'
+      createdAt: r.createdAt || '2026-06-21T03:00:00.000Z', updatedAt: '2026-06-21T03:00:00.000Z',
+      attachments: (r.attachments || []).slice()
     }
   },
 
@@ -268,7 +282,10 @@ export const mockApi: ServerApi = {
     requireAdmin()
     const r = rows.find(x => x.id === id)
     if (!r) throw new Error('Meeting not found.')
-    const versionSeq = snapshotVersion(id, r.content)
+    // Capture title/dateLabel/time BEFORE they're overwritten below — the
+    // snapshot must reflect what the meeting looked like right before this
+    // edit, not the just-written new values (mirrors preEditMeta in Code.js).
+    const versionSeq = snapshotVersion(id, r.content, { title: r.title, dateLabel: r.dateLabel, time: r.time })
     r.content = html
     r.excerpt = stripTags(html).slice(0, 200)
     r.attendees = extractAttendees(html)
@@ -406,28 +423,67 @@ export const mockApi: ServerApi = {
 
   // Always-available "View Original" — the oldest snapshot for this meeting,
   // or the current live content if no snapshot exists yet (never edited since
-  // this feature shipped — current IS the original). Mirrors getOriginalContent.
-  async getOriginalContent(meetingId): Promise<string> {
+  // this feature shipped — current IS the original). Returns
+  // { html, title, dateLabel, time } — title/dateLabel/time are '' for a
+  // version snapshotted before the 2026-07-22 metadata-capture fix; the
+  // caller falls back to the live meeting's current values only in that
+  // case. Mirrors getOriginalContent in Code.js.
+  async getOriginalContent(meetingId): Promise<VersionContent> {
     requireAdmin()
     const mine = versions.filter(v => v.meetingId === meetingId)
     if (mine.length) {
       const oldest = mine.reduce((min, v) => v.savedAt < min.savedAt ? v : min, mine[0])
-      return oldest.html
+      return { html: oldest.html, title: oldest.title, dateLabel: oldest.dateLabel, time: oldest.time }
     }
     const r = rows.find(x => x.id === meetingId)
-    return r ? r.content : ''
+    return r ? { html: r.content, title: r.title, dateLabel: r.dateLabel, time: r.time } : { html: '', title: '', dateLabel: '', time: '' }
   },
 
-  // Fetches one version's full HTML — either a numbered snapshot (seq) or the
-  // live current content ('current'). Mirrors getVersionContent.
-  async getVersionContent(meetingId, seq): Promise<string> {
+  // Fetches one version's full HTML plus the title/dateLabel/time captured
+  // with it — either a numbered snapshot (seq) or the live current content/
+  // row ('current'). Mirrors getVersionContent in Code.js.
+  async getVersionContent(meetingId, seq): Promise<VersionContent> {
     requireAdmin()
     if (seq === 'current' || seq == null) {
       const r = rows.find(x => x.id === meetingId)
-      return r ? r.content : ''
+      return r ? { html: r.content, title: r.title, dateLabel: r.dateLabel, time: r.time } : { html: '', title: '', dateLabel: '', time: '' }
     }
     const hit = versions.find(v => v.meetingId === meetingId && v.seq === seq)
-    return hit ? hit.html : ''
+    return hit ? { html: hit.html, title: hit.title, dateLabel: hit.dateLabel, time: hit.time } : { html: '', title: '', dateLabel: '', time: '' }
+  },
+
+  // Mirrors addAttachment in Code.js: same MIME allow-list and 25MB cap. The
+  // real app uploads to Drive and shares the file link; the mock has no file
+  // host, so it keeps the upload as a data: URL instead — good enough to
+  // actually open/download in the browser, which is all the UI needs to prove.
+  async addAttachment(meetingId, fileName, mimeType, base64Data): Promise<Attachment[]> {
+    requireAdmin()
+    const r = rows.find(x => x.id === meetingId)
+    if (!r) throw new Error('Meeting not found.')
+    if (!ATTACHMENT_ALLOWED_MIME.test(mimeType || '')) {
+      throw new Error('File type not allowed. Supported: PDF, Word, Excel, PowerPoint, images, text/CSV.')
+    }
+    const sizeBytes = Math.ceil((base64Data.length * 3) / 4)
+    if (sizeBytes > ATTACHMENT_MAX_BYTES) throw new Error('File is too large (max 25MB).')
+    const { email } = resolveIdentity()
+    const att: Attachment = {
+      fileId: uuid(), name: fileName, mimeType, size: sizeBytes,
+      uploadedAt: new Date().toISOString(), uploadedBy: email || '(anonymous)',
+      url: 'data:' + (mimeType || 'application/octet-stream') + ';base64,' + base64Data
+    }
+    r.attachments = [...(r.attachments || []), att]
+    logAudit('add_attachment', 'meeting', meetingId, { name: fileName })
+    return r.attachments.slice()
+  },
+
+  async removeAttachment(meetingId, fileId): Promise<Attachment[]> {
+    requireAdmin()
+    const r = rows.find(x => x.id === meetingId)
+    if (!r) throw new Error('Meeting not found.')
+    const target = (r.attachments || []).find(a => a.fileId === fileId)
+    r.attachments = (r.attachments || []).filter(a => a.fileId !== fileId)
+    logAudit('remove_attachment', 'meeting', meetingId, { name: target ? target.name : fileId })
+    return r.attachments.slice()
   }
 }
 

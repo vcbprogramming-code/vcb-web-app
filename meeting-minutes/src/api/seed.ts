@@ -3,7 +3,7 @@
 // content carrying a real Executive Summary + Action Items section so the
 // project-tab summary extraction has something to pull — exactly like live docs.
 
-import type { MeetingKind, MeetingSource, ProjectId } from '../types'
+import type { Attachment, MeetingKind, MeetingSource, ProjectId } from '../types'
 
 export interface SeedProject {
   id: ProjectId
@@ -30,16 +30,22 @@ export const SOURCE_PROJECTS: SeedProject[] = [
 
 // Fathom Inbox is a pseudo-project (no Doc backing) — recordings ingested via
 // the Fathom webhook/backfill land here permanently and stay admin-only.
-// Mirrors FATHOM_INBOX_META in Config.js.
+// Mirrors FATHOM_INBOX_META in Config.js. Color is neutral grey (2026-07-22,
+// was '#57606a' — a darker slate grey) — same reasoning as the Transkriptor
+// Inbox below: an inbox is a temporary review queue, not a real project, so
+// it shouldn't have its own distinct accent color competing with the sidebar's
+// real project colors.
 export const FATHOM_INBOX_PROJECT: SeedProject = {
-  id: 'FATHOM_INBOX', name: 'Fathom Inbox', nameEn: 'Fathom Inbox', cadence: 'As recorded', color: '#57606a', order: 99
+  id: 'FATHOM_INBOX', name: 'Fathom Inbox', nameEn: 'Fathom Inbox', cadence: 'As recorded', color: '#8b949e', order: 99
 }
 
 // Transkriptor Inbox mirrors Fathom Inbox exactly — a second pseudo-project
 // (no Doc backing) for recordings pulled via the Transkriptor API (polling,
-// no webhook). Mirrors TRANSKRIPTOR_INBOX_META in Config.js.
+// no webhook). Mirrors TRANSKRIPTOR_INBOX_META in Config.js. Same neutral grey
+// as Fathom Inbox, deliberately (2026-07-22, was '#bc4c00' orange) — "make
+// them light grey so it does not intervene with the other colors."
 export const TRANSKRIPTOR_INBOX_PROJECT: SeedProject = {
-  id: 'TRANSKRIPTOR_INBOX', name: 'Transkriptor Inbox', nameEn: 'Transkriptor Inbox', cadence: 'As recorded', color: '#bc4c00', order: 100
+  id: 'TRANSKRIPTOR_INBOX', name: 'Transkriptor Inbox', nameEn: 'Transkriptor Inbox', cadence: 'As recorded', color: '#8b949e', order: 100
 }
 
 export const ADMIN_EMAIL = 'c.chavananand@vcb-con.com'
@@ -72,6 +78,8 @@ export interface SeedRow {
   /** ISO timestamp — powers the Edit History "Original" row's real creation
    *  date. Defaults to a fixed seed timestamp if omitted (see makeSeedRows). */
   createdAt?: string
+  /** Files attached via addAttachment/removeAttachment. '' or [] = none. */
+  attachments?: Attachment[]
 }
 
 interface BodyOpts {
@@ -118,6 +126,10 @@ export function makeSeedRows(): SeedRow[] {
       excerpt: 'ภาพรวมกระแสเงินสดทั้ง 3 โครงการเป็นบวก รายจ่ายรวมต่ำกว่างบประมาณ 4.2% เน้นการเร่งเก็บหนี้ค้างชำระงวดที่ 3',
       fathomUrl: '', attendees: ['c.chavananand@vcb-con.com'],
       tabId: 't.fin06', source: 'doc-import', visible: true, pinned: true,
+      attachments: [
+        { fileId: 'seed-att-1', name: 'กระแสเงินสด Q2-2569.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 48213, uploadedAt: '2026-06-12T04:10:00.000Z', uploadedBy: ADMIN_EMAIL, url: '#' },
+        { fileId: 'seed-att-2', name: 'สรุปงบประมาณจัดซื้อเหล็ก.pdf', mimeType: 'application/pdf', size: 152430, uploadedAt: '2026-06-12T04:12:00.000Z', uploadedBy: ADMIN_EMAIL, url: '#' }
+      ],
       content: body({
         h1: 'รายงานการประชุมงบการเงิน — มิถุนายน 2569',
         summary: 'กระแสเงินสดรวมของทั้ง 3 โครงการอยู่ในเกณฑ์บวก รายจ่ายรวมต่ำกว่างบประมาณที่ตั้งไว้ 4.2% ที่ประชุมมีมติให้เร่งติดตามการเก็บหนี้ค้างชำระงวดที่ 3 ของโครงการบางวัว',
@@ -226,13 +238,18 @@ export function makeSeedRows(): SeedRow[] {
       // prove the tag-picker suggestion correctly picks ERP over FIN (both
       // mention money/budget-adjacent terms, but only ERP's own name/id is a
       // direct hit; see the WEAK_SUGGEST_WORDS fix in TagPickerModal.tsx).
+      // AI-summary section headers are bold paragraphs, never real <h1>-<h6>
+      // tags (2026-07-21 GAS fix — see fathomMarkdownToHtml_/
+      // transkriptorRecordToHtml_ in Code.js) — a real heading is a colored
+      // block container that contenteditable silently continues into on
+      // Enter/paste, with no visible boundary; a bold run has a clear one.
       content:
         '<p><a href="https://fathom.video/calls/744007526">Watch on Fathom</a></p>' +
-        '<h3>Key Takeaways</h3>' +
+        '<p><b>Key Takeaways</b></p>' +
         '<p>PO Approvals Blocked: pending POs are blocked by missing material codes (MatCode). The fix is to import the full item master list from the old ERP system.</p>' +
         '<p>Unit Code Mismatch: mismatched unit codes (e.g. PR in kg vs. PO in ton) prevent PO creation. The solution is for users to create PRs in the required PO unit.</p>' +
         '<p>Legacy Data Integrity: the 31 Dec AP balance is incorrect, differing from the GL by ~748,000 THB. The fix is to use the correct GL balance as the source of truth.</p>' +
-        '<h3>Action items</h3><ul>' +
+        '<p><b>Action items</b></p><ul>' +
         '<li>Send Mango Excel extract to Suthira; then Suthira send to ดวง for 2-day cleanup</li>' +
         '<li>Set Area Type to ใช้งาน across all projects; then delete unused Area Types</li>' +
         '<li>Verify 53 carryforward POs; then approve in new system</li>' +
@@ -248,18 +265,18 @@ export function makeSeedRows(): SeedRow[] {
       // (should suggest BV, whose id/name/alias appear directly in the title).
       content:
         '<p><a href="https://fathom.video/calls/597341158">Watch on Fathom</a></p>' +
-        '<h3>Meeting Purpose</h3><p>Review BV project progress, resolve blockers, and align on next steps.</p>' +
-        '<h3>Key Takeaways</h3>' +
+        '<p><b>Meeting Purpose</b></p><p>Review BV project progress, resolve blockers, and align on next steps.</p>' +
+        '<p><b>Key Takeaways</b></p>' +
         '<p><b>Critical Blocker:</b> Pipe delivery is stalled because CCP requires upfront payment, but the PO voucher is stuck in ERP.</p>' +
         '<p><b>Concrete Plan:</b> Use Cement Thai One for structural work (~30 tons) until supply ends in 2026.</p>' +
-        '<h3>Action items</h3><ul><li>Finalize pricing and submit a proposal immediately to capture the Thai Terrace market.</li></ul>'
+        '<p><b>Action items</b></p><ul><li>Finalize pricing and submit a proposal immediately to capture the Thai Terrace market.</li></ul>'
     },
     {
       id: 'fathom-untitled-call', projectId: 'FATHOM_INBOX', meetingKey: 'fathom-410091837', date: '2025-09-13', dateLabel: 'Test call', time: '',
       title: 'Test call', kind: 'meeting',
       excerpt: 'Demonstrate Fathom\'s automated meeting recording and note-taking capabilities.',
       fathomUrl: 'https://fathom.video/calls/410091837', attendees: [], tabId: '', source: 'fathom', visible: false, pinned: false,
-      content: '<p><a href="https://fathom.video/calls/410091837">Watch on Fathom</a></p><h3>Meeting Purpose</h3><p>Demonstrate Fathom\'s automated meeting recording and note-taking capabilities.</p>'
+      content: '<p><a href="https://fathom.video/calls/410091837">Watch on Fathom</a></p><p><b>Meeting Purpose</b></p><p>Demonstrate Fathom\'s automated meeting recording and note-taking capabilities.</p>'
     },
 
     // ---- Transkriptor Inbox seed rows ----
@@ -279,9 +296,13 @@ export function makeSeedRows(): SeedRow[] {
       // Tagged on purpose — demonstrates a Transkriptor row filed into a real
       // project exactly like a Fathom row can be (File into project… gate
       // checks source === 'fathom' || 'transkriptor').
+      // Section titles are bold paragraphs, never real <h1>-<h6> tags — mirrors
+      // transkriptorRecordToHtml_'s section_title handling in Code.js (was
+      // <h2>title</h2>, changed 2026-07-21; see the note on the Fathom rows
+      // above for the full reasoning).
       content:
-        '<h2>Summary</h2><p>Rebar delivery for the BT1+2 slab pour is delayed by two days; the access road near gate 3 is partially blocked by a neighboring site\'s equipment.</p>' +
-        '<h2>Action items</h2><ul>' +
+        '<p><b>Summary</b></p><p>Rebar delivery for the BT1+2 slab pour is delayed by two days; the access road near gate 3 is partially blocked by a neighboring site\'s equipment.</p>' +
+        '<p><b>Action items</b></p><ul>' +
         '<li>Escalate access-road blockage to the neighboring site\'s project manager</li>' +
         '<li>Confirm revised rebar delivery date with the supplier</li>' +
         '</ul>',
@@ -295,8 +316,8 @@ export function makeSeedRows(): SeedRow[] {
       // Untagged on purpose — shows up in the tag picker's candidate list like
       // any untagged inbox row.
       content:
-        '<h2>Summary</h2><p>General cross-project operations standup. Procurement flagged a steel price increase; HR flagged two open engineering requisitions.</p>' +
-        '<h2>Action items</h2><ul><li>Procurement to circulate updated steel pricing by Friday</li></ul>'
+        '<p><b>Summary</b></p><p>General cross-project operations standup. Procurement flagged a steel price increase; HR flagged two open engineering requisitions.</p>' +
+        '<p><b>Action items</b></p><ul><li>Procurement to circulate updated steel pricing by Friday</li></ul>'
     }
   ]
 }

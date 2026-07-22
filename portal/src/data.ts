@@ -67,6 +67,7 @@ export const I18N: I18nDict = {
     guest: 'Guest',
     toggle_title: 'เปลี่ยนเป็นภาษาไทย',
     badge: 'EN',
+    mission_link: 'Read more',
     mission: [
       'VCB Connect is a centralized digital platform that connects information across the organization. It integrates documents, files, and day-to-day operational data through APIs and AI, transforming fragmented information into connected knowledge that can be searched, referenced, and reused.',
       'Every time an employee records information, they contribute to an Enterprise Knowledge Base that continuously captures experience and lessons learned, preserving institutional knowledge and making it available for future use.',
@@ -125,6 +126,7 @@ export const I18N: I18nDict = {
     guest: 'ผู้เยี่ยมชม',
     toggle_title: 'Switch to English',
     badge: 'ไทย',
+    mission_link: 'อ่านเพิ่มเติม',
     mission: [
       'VCB Connect คือแพลตฟอร์มดิจิทัลที่เชื่อมโยงข้อมูลทั้งองค์กร โดยรวบรวมข้อมูลจากเอกสาร ระบบงาน ไฟล์ต่าง ๆ และการปฏิบัติงานประจำวัน ผ่าน API และ AI เพื่อเปลี่ยนข้อมูลที่กระจัดกระจายให้เป็นข้อมูลที่เชื่อมโยงกัน สามารถค้นหา อ้างอิง และนำกลับมาใช้ได้ตลอดเวลา',
       'การเชื่อมโยงข้อมูลในลักษณะนี้ไม่สามารถเกิดขึ้นได้จากกระบวนการทำงานที่อาศัยเอกสารกระดาษเป็นหลัก เนื่องจากข้อมูลไม่ได้อยู่ในรูปแบบ machine readable จึงไม่สามารถรองรับ AI, semantic search, AI Agents และ automation',

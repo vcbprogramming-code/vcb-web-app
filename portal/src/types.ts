@@ -57,6 +57,7 @@ export interface Dict {
   guest: string
   toggle_title: string
   badge: string
+  mission_link: string
   mission: string[]
   apps: Record<string, AppI18n>
 }

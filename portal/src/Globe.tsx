@@ -15,10 +15,13 @@ interface GlobeProps {
   onActivate?: () => void
   label?: string
   mission: string[]
+  missionLink: string
   previewApp?: PreviewApp | null | undefined
 }
 
-export default function Globe({ onActivate, label, mission, previewApp }: GlobeProps) {
+const MISSION_URL = 'https://foreview.substack.com/p/the-enterprise-second-brain-rethinking'
+
+export default function Globe({ onActivate, label, mission, missionLink, previewApp }: GlobeProps) {
   const [isTouch, setIsTouch] = useState(false)
   const [missionOpen, setMissionOpen] = useState(false)
   // Content shown right now, kept one tick behind `previewApp`/`mission` so a
@@ -104,7 +107,20 @@ export default function Globe({ onActivate, label, mission, previewApp }: GlobeP
               <p>{displayedApp.preview}</p>
             </>
           ) : (
-            mission.map((paragraph, idx) => <p key={idx}>{paragraph}</p>)
+            <>
+              {mission.map((paragraph, idx) => (
+                <p key={idx}>{paragraph}</p>
+              ))}
+              <a
+                className="globe-mission-link"
+                href={MISSION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {missionLink} →
+              </a>
+            </>
           )}
         </div>
       </div>

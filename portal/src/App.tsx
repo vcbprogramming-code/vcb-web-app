@@ -249,6 +249,7 @@ export default function App() {
           <Globe
             label="Jump to applications"
             mission={dict.mission}
+            missionLink={dict.mission_link}
             previewApp={(() => {
               if (!previewKey) return null
               const entry = dict.apps[previewKey]

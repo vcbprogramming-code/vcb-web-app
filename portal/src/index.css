@@ -315,6 +315,23 @@
   .globe-mission-app-name {
     font-size: 17px;
   }
+  .globe-mission-link {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--mission-accent, var(--accent-2));
+    text-decoration: none;
+    text-shadow: 0 2px 10px rgba(2,5,13,.9), 0 0 24px rgba(2,5,13,.9);
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .globe-mission-link:hover,
+  .globe-mission-link:focus-visible {
+    text-decoration: underline;
+  }
   .globe-mission-backdrop {
     display: none;
   }

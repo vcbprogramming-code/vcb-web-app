@@ -102,7 +102,7 @@ export default function MeetingList(props: Props) {
                 <span className="dot" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color }} />
                 <span className="date">{fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}</span>
                 {hidden && <span className="badge hiddenb">🚫 Hidden</span>}
-                {m.pinned && <span className="badge pin">★ Pinned</span>}
+                {m.pinned && <span className="badge pin" title="Pinned">★</span>}
                 {m.kind === 'overview' && <span className="badge overview">Overview</span>}
                 {m.hasFathom && <span className="badge fathom">▶ Fathom</span>}
                 {m.source === 'transkriptor' && <span className="badge fathom">▤ Transkriptor</span>}

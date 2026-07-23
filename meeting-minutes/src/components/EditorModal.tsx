@@ -176,14 +176,33 @@ export default function EditorModal({ meeting, projectName, onClose, onSaved, on
 
   function handleAreaPaste(e: React.ClipboardEvent<HTMLDivElement>): void {
     const html = e.clipboardData.getData('text/html')
-    if (!html) return // no HTML on the clipboard (plain text, or an image) — let the browser's default plain-text paste happen
-    e.preventDefault()
-    const doc = new DOMParser().parseFromString(html, 'text/html')
     const frag = document.createDocumentFragment()
-    Array.prototype.forEach.call(doc.body.childNodes, (n: Node) => {
-      const cleaned = sanitizePastedNode(n)
-      if (cleaned) frag.appendChild(cleaned)
-    })
+    if (html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      Array.prototype.forEach.call(doc.body.childNodes, (n: Node) => {
+        const cleaned = sanitizePastedNode(n)
+        if (cleaned) frag.appendChild(cleaned)
+      })
+    } else {
+      // Plain-text clipboard (no HTML at all — e.g. copied from a terminal,
+      // plain-text editor, or an explicit "paste as plain text"). Previously
+      // this branch just returned and let the browser's native plain-text
+      // paste happen — which inserts the text AT THE CURSOR, inheriting
+      // whatever formatting/font-size the surrounding contenteditable
+      // context already had there. Since the whole point of the sanitizer is
+      // "everything entering this editor gets ONE standard format regardless
+      // of source," plain text needs the same explicit normalization as
+      // HTML: split into paragraphs and inserted as plain <p> elements, never
+      // left to inherit ambient formatting from wherever the cursor sits.
+      // Mirrors JavaScript.html's #edArea paste listener verbatim.
+      const text = e.clipboardData.getData('text/plain')
+      if (!text) return // nothing on the clipboard at all (e.g. an image) — let the browser handle it
+      text.replace(/\r\n/g, '\n').split('\n').forEach(line => {
+        if (line) { const p = document.createElement('p'); p.textContent = line; frag.appendChild(p) }
+        else frag.appendChild(document.createElement('br'))
+      })
+    }
+    e.preventDefault()
     // Inserted via Range, NOT execCommand('insertHTML', ...) — same root-cause
     // reasoning as the Enter-key handler above: execCommand's insertion logic
     // is what mis-nests lists when the paste target is already inside an
@@ -209,6 +228,26 @@ export default function EditorModal({ meeting, projectName, onClose, onSaved, on
   const focusArea = () => areaRef.current?.focus()
   const cmd = (c: string) => { document.execCommand(c, false); focusArea() }
   const prevent = (e: React.MouseEvent) => e.preventDefault()
+
+  // Checklist (green tick) list — there's no native execCommand for this, so
+  // it reuses insertUnorderedList to get a real, correctly-nested <ul> (the
+  // one part of list creation execCommand IS reliable for — see the Enter-key
+  // handler's comment for why execCommand is instead avoided for SPLITTING an
+  // existing list), then tags whichever <ul> the selection ended up in with
+  // .tick-list, which CSS (.ed-area .tick-list / OVERRIDE_CSS) renders as a
+  // green check instead of a bullet dot via ::before, in both the editor and
+  // the final A4 render. Mirrors #edTickList in JavaScript.html verbatim.
+  function tickList(): void {
+    document.execCommand('insertUnorderedList', false)
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      const node = sel.getRangeAt(0).startContainer
+      const el = (node.nodeType === 1 ? node : node.parentElement) as Element | null
+      const ul = el?.closest('ul')
+      if (ul && areaRef.current?.contains(ul)) ul.classList.add('tick-list')
+    }
+    focusArea()
+  }
 
   async function addLink(): Promise<void> {
     // Selection is lost once the dialog steals focus, so it must be captured
@@ -288,6 +327,7 @@ export default function EditorModal({ meeting, projectName, onClose, onSaved, on
             <span className="ed-group">
               <button type="button" title="Bullet list" onMouseDown={prevent} onClick={() => cmd('insertUnorderedList')}>• List</button>
               <button type="button" title="Numbered list" onMouseDown={prevent} onClick={() => cmd('insertOrderedList')}>1. List</button>
+              <button type="button" title="Checklist (green tick)" onMouseDown={prevent} onClick={tickList}>✓ List</button>
             </span>
             <span className="ed-sep" />
             <span className="ed-group">

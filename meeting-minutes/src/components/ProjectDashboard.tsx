@@ -51,7 +51,7 @@ export default function ProjectDashboard({ project, meetings, onOpen, tr }: Prop
       </div>
       <div className="pbig-card" style={cssVar('--c', project.color || '#888')} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) return; onOpen(m.id) }}>
         <div className="pbig-ttl">🗓 {fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}
-          {m.pinned && <>&nbsp;<span className="badge pin">★ Pinned</span></>}
+          {m.pinned && <>&nbsp;<span className="badge pin" title="Pinned">★</span></>}
           {m.hasFathom && <>&nbsp;<span className="badge fathom">▶ Fathom</span></>}
           {m.source === 'transkriptor' && <>&nbsp;<span className="badge fathom">▤ Transkriptor</span></>}
         </div>

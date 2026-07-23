@@ -13,9 +13,52 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-07-22
+- **Synced at:** 2026-07-23
 - **Live deployment referenced:** `@60` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed 2026-07-23 sync:**
+  - **6-card desktop cap on "Latest meetings"** — `Dashboard.tsx` mirrors
+    `renderDashboard()`'s change in JavaScript.html.
+  - **Anti-tampering QR print stamp** — `docRender.ts` gained
+    `verifyQrDataUri`/`buildQrPageCss` (ported from `buildQrPageCss_`/the QR
+    stamp logic added to Code.js/JavaScript.html this session), backed by a
+    new `src/lib/vendor/qrcodeGenerator.ts` (`@ts-nocheck`, vendored TS port
+    of the same MIT-licensed QR encoder as `QrCode.html`). Also picked up the
+    `@page{margin-top:2.7cm;margin-bottom:1.5cm}` print/PDF margin fix and
+    the screen-only `body` top padding fix in `OVERRIDE_CSS`.
+  - **PDF filename fix** — `buildMeetingSrcdoc` (`docRender.ts`) takes new
+    `pdfTitle`/`execUrl`/`meetingId` options and sets `document.title` inside
+    the iframe so a browser's Print-to-PDF picks up a meaningful filename.
+    Unlike the GAS version (blocked there by the IFRAME-sandbox host page
+    problem), this React SPA's iframe has no such nesting issue, so the fix
+    applies cleanly. `MeetingDetail.tsx` wires the new options through.
+  - **Pin badge simplified** — `MeetingList.tsx`/`ProjectDashboard.tsx`:
+    `★ Pinned` text badge → bare `★` with a `title="Pinned"` tooltip, mirrors
+    the same GAS-side change made earlier this session.
+  - **Checklist (green tick) list button** — `EditorModal.tsx` gained
+    `tickList()` + a `✓ List` toolbar button, mirrors `#edTickList`/
+    `el('edTickList').onclick` in JavaScript.html verbatim (reuses
+    `execCommand('insertUnorderedList')` for correct `<ul>` nesting, then
+    tags the resulting `<ul>` with `.tick-list`). The matching `.tick-list`
+    CSS (list-style:none + green `✓` via `::before`) was ported to both
+    `styles.css` (`.ed-area .tick-list`, live editor) and `docRender.ts`'s
+    `OVERRIDE_CSS` (`.tick-list`, A4/print render) — this CSS was initially
+    missing from both files when first reviewed and has been added to match
+    `Stylesheet.html`/`JavaScript.html`'s `OVERRIDE_CSS` exactly.
+  - **Plain-text paste normalization** — `handleAreaPaste` in
+    `EditorModal.tsx` no longer falls through to the browser's native
+    plain-text paste; plain-text clipboard content (no HTML) is now split on
+    newlines into `<p>` elements (blank lines → `<br>`) and inserted via
+    Range, same as the HTML branch, so pasted plain text can never inherit
+    ambient formatting from the cursor's surrounding context. Mirrors the
+    `#edArea` paste listener's `else` branch in JavaScript.html verbatim.
+  - **Attachment URL fix (`uc?export=download` → `/view`) — verified N/A for
+    React.** Code.js's `getMeeting` builds a real Drive share URL from a
+    `fileId`; the React mock (`mock.ts`'s `addAttachment`/`getMeeting`) has
+    no Drive host at all and stores a `data:` URL directly at upload time
+    (documented, intentional deviation — see *Known deviations* #2), so
+    there is no `uc?export=download` string anywhere in the React tree to
+    fix. Confirmed via full-tree grep — no action needed.
 - **What changed 2026-07-22 sync:**
   - **File attachments (backfilled from an earlier, previously-uncommitted
     pass).** Upload/remove attachments on a meeting, a 📎 count badge on

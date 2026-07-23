@@ -2,7 +2,13 @@ import type { Project, MeetingListItem } from '../types'
 import { isInboxProject } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
-import { cssVar } from '../lib/ui'
+import { cssVar, isMobile } from '../lib/ui'
+
+// Desktop shows at most the 6 most-recently-updated projects — beyond that
+// the grid just kept growing with every new project, past the point of being
+// a quick "what's new" glance. Mobile is unaffected (its own separate,
+// already-compact card layout). Mirrors renderDashboard()'s 2026-07-24 change.
+const DESKTOP_CARD_CAP = 6
 
 interface Props {
   projects: Project[]
@@ -22,8 +28,11 @@ export default function Dashboard({ projects, meetings, onOpen, tr }: Props) {
     const cur = by[m.projectId]
     if (!cur || (m.date || '') > (cur.date || '')) by[m.projectId] = m
   })
-  const cards = projects.filter(p => !isInboxProject(p.id))
+  let cards = projects.filter(p => !isInboxProject(p.id))
     .map(p => ({ p, m: by[p.id] })).filter((x): x is { p: Project; m: MeetingListItem } => !!x.m)
+  if (!isMobile()) {
+    cards = cards.slice().sort((a, b) => (b.m.date || '').localeCompare(a.m.date || '')).slice(0, DESKTOP_CARD_CAP)
+  }
 
   return (
     <div className="dash-wrap">

@@ -167,7 +167,10 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
   const editable = isAdmin && m.source !== 'doc-import'
   const srcdoc = buildMeetingSrcdoc(m.html, m.css, fmtThaiDate(m), {
     isDark: theme === 'dark',
-    aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor'
+    aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor',
+    pdfTitle: m.title,
+    execUrl,
+    meetingId: m.id
   })
 
   return (

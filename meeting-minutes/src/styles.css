@@ -302,6 +302,16 @@
   .ed-area h1, .ed-area h2 { color: #0b3d62; }
   .ed-area table { border-collapse: collapse; width: 100%; margin: 12px 0; }
   .ed-area td, .ed-area th { border: 1px solid var(--line); padding: 6px 9px; }
+  /* Checklist (green tick) list — .tick-list is added to a <ul> by
+     tickList() in EditorModal.tsx; renders as a check instead of a bullet
+     dot via ::before (list-style:none first, since ::before can't replace
+     a marker set by list-style-type directly). Same rule also lives in
+     OVERRIDE_CSS (docRender.ts) so it renders identically in the final A4
+     view. Mirrors Stylesheet.html verbatim. */
+  .ed-area .tick-list, .ed-area .tick-list li { list-style: none; }
+  .ed-area .tick-list { padding-left: 24px; }
+  .ed-area .tick-list li { position: relative; }
+  .ed-area .tick-list li::before { content: '✓'; position: absolute; left: -22px; color: #1a7f37; font-weight: 700; }
   .editor .actions { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: none; }
   .ac-status { font-size: 13px; padding: 9px 12px; border-radius: 8px; background: #eef6ff; color: #0b3d62; font-weight: 600; }
   .ac-status.restricted { background: #fff4d6; color: #9a6700; }

@@ -5,9 +5,9 @@
  * the returned object down to the panes/modals.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SopData, Scenario, ScenarioEdit } from './data/types';
+import type { SopData, Scenario, ScenarioEdit, ScenarioCreate } from './data/types';
 import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
-import { bootstrap, getSopDataForClient, syncFromDoc, editScenario } from './lib/api';
+import { bootstrap, getSopDataForClient, syncFromDoc, editScenario, createScenario } from './lib/api';
 
 export type View = 'sop' | 'flows' | 'reports';
 export type MobileView = 'list' | 'detail' | null;
@@ -85,6 +85,7 @@ export interface Store {
   mobileView: MobileView;
   settingsOpen: boolean;
   editNo: number | null;
+  newScenarioOpen: boolean;
   syncing: boolean;
   // helpers
   t: (key: string) => any;
@@ -105,6 +106,9 @@ export interface Store {
   openEditModal: (no: number) => void;
   closeEdit: () => void;
   saveScenario: (payload: ScenarioEdit) => Promise<void>;
+  openNewScenarioModal: () => void;
+  closeNewScenario: () => void;
+  createNewScenario: (payload: ScenarioCreate) => Promise<number>;
   openSettings: () => void;
   closeSettings: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
@@ -130,6 +134,7 @@ export function useStore(): Store {
   const [mobileView, setMobileViewState] = useState<MobileView>(() => (detectMobile() ? null : null));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editNo, setEditNo] = useState<number | null>(null);
+  const [newScenarioOpen, setNewScenarioOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const t = useCallback((key: string) => tr(lang, key), [lang]);
@@ -286,6 +291,22 @@ export function useStore(): Store {
     [refreshClientData],
   );
 
+  const openNewScenarioModal = useCallback(() => {
+    if (!data.meta.isAdmin) return;
+    setNewScenarioOpen(true);
+  }, [data.meta.isAdmin]);
+  const closeNewScenario = useCallback(() => setNewScenarioOpen(false), []);
+
+  const createNewScenario = useCallback(
+    async (payload: ScenarioCreate) => {
+      const result = await createScenario(payload);
+      setNewScenarioOpen(false);
+      await refreshClientData();
+      return result.no;
+    },
+    [refreshClientData],
+  );
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
@@ -362,6 +383,7 @@ export function useStore(): Store {
       mobileView,
       settingsOpen,
       editNo,
+      newScenarioOpen,
       syncing,
       t,
       labels,
@@ -380,6 +402,9 @@ export function useStore(): Store {
       openEditModal,
       closeEdit,
       saveScenario,
+      openNewScenarioModal,
+      closeNewScenario,
+      createNewScenario,
       openSettings,
       closeSettings,
       setTheme,
@@ -396,6 +421,7 @@ export function useStore(): Store {
       mobileView,
       settingsOpen,
       editNo,
+      newScenarioOpen,
       syncing,
       t,
       labels,
@@ -413,6 +439,9 @@ export function useStore(): Store {
       openEditModal,
       closeEdit,
       saveScenario,
+      openNewScenarioModal,
+      closeNewScenario,
+      createNewScenario,
       openSettings,
       closeSettings,
       setTheme,

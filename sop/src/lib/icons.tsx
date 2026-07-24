@@ -27,6 +27,8 @@ export const ICONS: Record<string, string> = {
   arrowleft:'<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   copy:'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check:'<path d="M20 6 9 17l-5-5"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  calendar:'<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
 };
 /* eslint-enable */
 

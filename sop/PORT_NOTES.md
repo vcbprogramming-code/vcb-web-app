@@ -6,6 +6,12 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 
 - **Last synced from:** `index.html` @ `APP_VERSION = 'build 26 · 2026-06-03'`
   (`../apps-script/Code.gs` server contract: getSopDataForClient / syncFromDoc / editScenario).
+  Additionally hand-synced 2026-07-24 with the live `apps-script/Code.js`/`index.html`
+  changes made directly on `script.google.com` (not yet reflected in this repo's own
+  `apps-script/` mirror): **createScenario()** ("+ เพิ่มกรณีใหม่" button + modal, admin-only,
+  server assigns `no`), **dateAdded** field on `Scenario` (Thai-formatted, stamped on
+  create, shown under the ref footer), and the **edit-modal backdrop-click fix**
+  (clicking outside `#editBg`/`#newScenarioBg` no longer discards unsaved input).
 - **Stack:** Vite + React 18 + TypeScript (strict). No UI library (original has none).
 - **Data layer:** typed **mock** mirroring the REST contract (see `src/lib/api.ts`),
   seeded from `src/data/sop.json` (copy of `../data/sop.json`) + the 33 bundled flows.
@@ -30,6 +36,7 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 | `renderDetail()` + `placeholder()` + `stepsHtml()`   | `src/components/DetailPane.tsx`     |
 | `diagramHtml/flowLegendHtml/narrativeHtml/layoutFlowEdges` | `src/components/FlowDiagram.tsx` |
 | `#editBg` + `openEditModal()` + `doSave()`           | `src/components/EditModal.tsx`      |
+| `#editBg` (create mode) + `openNewScenarioModal()`   | `src/components/NewScenarioModal.tsx` |
 | `#settingsBg` + `updateSettingsModal()` + `copyEmail()` | `src/components/SettingsModal.tsx` |
 | `<head>` mobile-detection / pref IIFE                | `index.html` head + `src/store.tsx` effects |
 

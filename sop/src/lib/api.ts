@@ -10,7 +10,7 @@
  *   editScenario(payload)  ← POST /api/scenario  (admin-gated)
  */
 import seed from '../data/sop.json';
-import type { SopData, ScenarioEdit, Scenario } from '../data/types';
+import type { SopData, ScenarioEdit, ScenarioCreate, Scenario } from '../data/types';
 
 /* ----- Admin / session simulation -----
  * The real backend marks the request admin via a signed cookie / allow-listed
@@ -85,6 +85,58 @@ export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: num
   store.scenarios[idx] = next;
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, no: payload.no, scenarios: store.scenarios.length });
+}
+
+/** Module code → SOP manual chapter number, mirrors MODULE_CHAPTER in Code.js. */
+const MODULE_CHAPTER: Record<string, string> = {
+  SE: '1', BD: '2', OF: '3', PO: '4', IC: '5',
+  AP: '6', AR: '7', PM: '8', FA: '9', GL: '10',
+};
+
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+];
+
+/** Format a Date as "D เดือน พ.ศ." (Thai Buddhist-era month name + year),
+ * mirrors formatThaiDate_() in Code.js. */
+function formatThaiDate(d: Date): string {
+  return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
+}
+
+/** POST /api/scenario/new — create a new scenario (admin only). Mirrors
+ * createScenario() in Code.js: server assigns `no` (max existing + 1) and
+ * stamps dateAdded with today's date. */
+export function createScenario(payload: ScenarioCreate): Promise<{ ok: true; no: number; scenarios: number }> {
+  if (!session.isAdmin) {
+    return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));
+  }
+  if (!payload || !payload.module) {
+    return Promise.reject(new Error('Missing module.'));
+  }
+  if (!payload.titleTH || !payload.titleTH.trim()) {
+    return Promise.reject(new Error('Missing title.'));
+  }
+  const nextNo = store.scenarios.reduce((max, s) => Math.max(max, s.no), 0) + 1;
+  const chapter = MODULE_CHAPTER[payload.module] || '';
+  let ref = (payload.ref && payload.ref.trim()) || (chapter ? `ERP Manual 14.3.68 – บทที่ ${chapter}` : '');
+  if (chapter && ref.indexOf(`บทที่ ${chapter}`) < 0) {
+    ref += (ref ? ' | ' : '') + `บทที่ ${chapter}`;
+  }
+  const scenario: Scenario = {
+    no: nextNo,
+    module: payload.module,
+    titleTH: payload.titleTH.trim(),
+    titleEN: (payload.titleEN || '').trim(),
+    when: (payload.when || '').trim() || '-',
+    steps: (payload.steps || []).map((s) => s.trim()).filter(Boolean),
+    ref,
+    note: (payload.note || '').trim(),
+    dateAdded: formatThaiDate(new Date()),
+  };
+  store.scenarios = [...store.scenarios, scenario];
+  store.meta.updatedAt = new Date().toISOString();
+  return defer({ ok: true as const, no: nextNo, scenarios: store.scenarios.length });
 }
 
 /** The bootstrap payload the page boots with (mirrors doGet's BOOTSTRAP). */

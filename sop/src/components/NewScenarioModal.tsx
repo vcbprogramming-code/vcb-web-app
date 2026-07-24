@@ -1,39 +1,36 @@
-/** Admin-only "edit scenario" modal. Mirrors the #editBg markup + openEditModal()
- *  + doSave() in index.html. Labels here are hardcoded Thai, as in the original. */
+/** Admin-only "add new scenario" modal. Mirrors #editBg in "new" mode +
+ *  openNewScenarioModal() + doSave() in the canonical index.html/apps-script
+ *  port. Structurally close to EditModal.tsx but adds the module picker and
+ *  starts every field blank. */
 import { useState } from 'react';
 import type { Store } from '../store';
+import { MODULES, MODULES_EN } from '../data/config';
 
-export default function EditModal({ s }: { s: Store }) {
-  const sc = s.scenarios.find((x) => x.no === s.editNo);
-  // Re-key on scenario no so the form re-initialises when a different row opens.
-  if (!sc) return null;
-  return <EditForm key={sc.no} s={s} no={sc.no} initial={sc} />;
-}
+export default function NewScenarioModal({ s }: { s: Store }) {
+  const labels = s.lang === 'en' ? MODULES_EN : MODULES;
+  const preferred = s.nav.mod !== 'ALL' ? s.nav.mod : Object.keys(MODULES)[0];
 
-function EditForm({
-  s,
-  no,
-  initial,
-}: {
-  s: Store;
-  no: number;
-  initial: { titleTH: string; titleEN: string; when: string; steps: string[]; note: string; ref: string };
-}) {
-  const [titleTH, setTitleTH] = useState(initial.titleTH);
-  const [titleEN, setTitleEN] = useState(initial.titleEN);
-  const [when, setWhen] = useState(initial.when);
-  const [steps, setSteps] = useState((initial.steps || []).join('\n'));
-  const [note, setNote] = useState(initial.note || '');
-  const [ref, setRef] = useState(initial.ref || '');
+  const [module, setModule] = useState(preferred);
+  const [titleTH, setTitleTH] = useState('');
+  const [titleEN, setTitleEN] = useState('');
+  const [when, setWhen] = useState('');
+  const [steps, setSteps] = useState('');
+  const [note, setNote] = useState('');
+  const [ref, setRef] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function doSave() {
     if (!s.isAdmin) return;
+    const th = titleTH.trim();
+    if (!th) {
+      alert('กรุณากรอกชื่อ (ไทย) / Title (Thai) is required');
+      return;
+    }
     setSaving(true);
     try {
-      await s.saveScenario({
-        no,
-        titleTH: titleTH.trim(),
+      const no = await s.createNewScenario({
+        module,
+        titleTH: th,
         titleEN: titleEN.trim(),
         when: when.trim(),
         steps: steps
@@ -43,6 +40,8 @@ function EditForm({
         note: note.trim(),
         ref: ref.trim(),
       });
+      s.selectModule(module);
+      s.selectItem(no);
       // success: store closes the modal + refreshes data
     } catch (e: any) {
       setSaving(false);
@@ -51,13 +50,20 @@ function EditForm({
   }
 
   return (
-    // Backdrop click intentionally does nothing — this form can hold a lot of
-    // typed content; only ยกเลิก/Cancel or Save should close it.
-    <div className="modal-bg open" id="editBg">
+    // Backdrop click intentionally does nothing — see EditModal.tsx.
+    <div className="modal-bg open" id="newScenarioBg">
       <div className="modal" style={{ maxWidth: '780px' }}>
-        <h3 id="editTitle">
-          แก้ไขกรณีที่ {no} · {initial.titleTH}
-        </h3>
+        <h3>เพิ่มกรณีศึกษาใหม่ · New case</h3>
+        <div className="row">
+          <label>หมวด (Module)</label>
+          <select value={module} onChange={(e) => setModule(e.target.value)}>
+            {Object.keys(MODULES).map((m) => (
+              <option key={m} value={m}>
+                {m} · {(labels as Record<string, string>)[m] || m}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />
@@ -103,10 +109,10 @@ function EditForm({
           />
         </div>
         <div className="actions">
-          <button className="btn" onClick={s.closeEdit}>
+          <button className="btn" onClick={s.closeNewScenario}>
             ยกเลิก
           </button>
-          <button className="btn primary" id="editSave" disabled={saving} onClick={doSave}>
+          <button className="btn primary" disabled={saving} onClick={doSave}>
             {saving ? 'กำลังบันทึก…' : 'บันทึก'}
           </button>
         </div>

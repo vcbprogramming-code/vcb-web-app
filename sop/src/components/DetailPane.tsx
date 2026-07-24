@@ -142,6 +142,12 @@ function ScenarioDetail({ s, sc }: { s: Store; sc: Scenario }) {
         </svg>
         {sc.ref}
       </div>
+      {sc.dateAdded && (
+        <div className="d-ref">
+          <Icon name="calendar" />
+          {s.t('dateAddedLbl')} {sc.dateAdded}
+        </div>
+      )}
     </div>
   );
 }

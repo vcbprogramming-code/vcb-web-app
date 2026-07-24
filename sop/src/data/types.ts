@@ -42,6 +42,9 @@ export interface Scenario {
   ref: string;
   /** Optional caveat shown in red. */
   note: string;
+  /** Thai-formatted creation date, e.g. "24 กรกฎาคม 2569". Cases written before
+   * this field existed carry a stand-in backfill date, not a real one. */
+  dateAdded?: string;
 }
 
 /** A row in the "which report do I run" table. */
@@ -63,6 +66,18 @@ export interface SopData {
 export interface ScenarioEdit {
   no: number;
   titleTH?: string;
+  titleEN?: string;
+  when?: string;
+  steps?: string[];
+  note?: string;
+  ref?: string;
+}
+
+/** Payload accepted by createScenario() / POST /api/scenario/new. Server/mock
+ * assigns `no` and stamps `dateAdded` with today's date. */
+export interface ScenarioCreate {
+  module: string;
+  titleTH: string;
   titleEN?: string;
   when?: string;
   steps?: string[];

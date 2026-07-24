@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import type { Store } from '../store';
 import { MODULES, MODULES_EN, MODULE_INFO } from '../data/config';
 import { SOP_FLOWS } from '../data/flows';
+import { Icon } from '../lib/icons';
 
 const FLOW_GROUP_ORDER = ['BD', 'PO', 'IC', 'OF', 'AP', 'AR', 'FA', 'GL'];
 
@@ -64,7 +65,17 @@ function ScenarioList({ s }: { s: Store }) {
   return (
     <>
       <div className="list-head" id="listHead">
-        {headText}
+        {s.isAdmin ? (
+          <>
+            <span className="lh-text">{headText}</span>
+            <button type="button" className="lh-new" onClick={s.openNewScenarioModal}>
+              <Icon name="plus" />
+              <span>{s.t('newCaseBtn')}</span>
+            </button>
+          </>
+        ) : (
+          headText
+        )}
       </div>
       <div id="cards">
         {mi && (

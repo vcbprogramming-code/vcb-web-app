@@ -271,7 +271,14 @@
 
   /* ----- Middle list ----- */
   .list{background:var(--bg);border-right:1px solid var(--line);overflow-y:auto}
-  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1}
+  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .list-head .lh-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lh-new{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);color:var(--brand);
+    border-radius:8px;padding:5px 10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .lh-new:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .lh-new .ico{--ico:13px}
+  html.dark .lh-new{background:#1a2230;border-color:#30363d;color:#9cc2ea}
+  html.dark .lh-new:hover{background:var(--brand-soft);border-color:#2e4d7a}
   .lcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 12px;padding:10px 12px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
   .lcard:hover{border-color:#c0c8d0;box-shadow:var(--shadow)}
   .lcard.active{border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(46,117,182,.18)}

@@ -43,6 +43,7 @@ function EditForm({
   const [saving, setSaving] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const labels = s.lang === 'en' ? MODULES_EN : MODULES;
 
@@ -106,13 +107,8 @@ function EditForm({
     }
   }
 
-  async function doDelete() {
-    const label = initial.displayNo || no;
-    const msg =
-      s.lang === 'en'
-        ? `Delete case ${label} — "${initial.titleTH}"?\n\nThis cannot be undone from the app (only via the Doc's version history). Every later case in the same module will renumber up by one.`
-        : `ลบกรณี ${label} — "${initial.titleTH}" ใช่หรือไม่?\n\nไม่สามารถกู้คืนได้จากในแอป (ต้องใช้ประวัติเวอร์ชันของ Doc เท่านั้น) กรณีอื่นในหมวดเดียวกันที่อยู่หลังจากนี้จะเลื่อนหมายเลขขึ้นทั้งหมด`;
-    if (!confirm(msg)) return;
+  async function confirmDelete() {
+    setConfirmDeleteOpen(false);
     setDeleting(true);
     try {
       await s.deleteScenario(no);
@@ -210,7 +206,7 @@ function EditForm({
             type="button"
             style={{ marginRight: 'auto' }}
             disabled={deleting}
-            onClick={doDelete}
+            onClick={() => setConfirmDeleteOpen(true)}
           >
             {deleting ? 'กำลังลบ…' : 'ลบกรณีนี้ · Delete'}
           </button>
@@ -222,6 +218,26 @@ function EditForm({
           </button>
         </div>
       </div>
+      {confirmDeleteOpen && (
+        <div className="modal-bg open" onClick={(e) => e.target === e.currentTarget && setConfirmDeleteOpen(false)}>
+          <div className="modal" style={{ maxWidth: '440px' }}>
+            <h3>{s.lang === 'en' ? 'Delete this case?' : 'ยืนยันการลบ'}</h3>
+            <p className="confirm-msg">
+              {s.lang === 'en'
+                ? `Delete case ${initial.displayNo || no} — "${initial.titleTH}"?\n\nThis cannot be undone from the app (only via the Doc's version history). Every later case in the same module will renumber up by one.`
+                : `ลบกรณี ${initial.displayNo || no} — "${initial.titleTH}" ใช่หรือไม่?\n\nไม่สามารถกู้คืนได้จากในแอป (ต้องใช้ประวัติเวอร์ชันของ Doc เท่านั้น) กรณีอื่นในหมวดเดียวกันที่อยู่หลังจากนี้จะเลื่อนหมายเลขขึ้นทั้งหมด`}
+            </p>
+            <div className="actions">
+              <button className="btn" onClick={() => setConfirmDeleteOpen(false)}>
+                ยกเลิก
+              </button>
+              <button className="btn primary btn-danger-solid" onClick={confirmDelete}>
+                ลบ · Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

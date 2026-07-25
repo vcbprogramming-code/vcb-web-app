@@ -100,7 +100,7 @@ function ScenarioList({ s }: { s: Store }) {
                 onClick={() => s.selectItem(sc.no)}
               >
                 <div className="lc-top">
-                  <span className="lc-no">{sc.displayNo || sc.no}</span>
+                  <span className="lc-no lc-no-mod">{sc.displayNo || sc.no}</span>
                 </div>
                 <div className="lc-title">{title}</div>
                 <div className="lc-ex">{sc.when}</div>

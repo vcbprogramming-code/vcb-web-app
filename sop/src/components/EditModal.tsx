@@ -71,7 +71,7 @@ function EditForm({
         <h3 id="editTitle">
           แก้ไขกรณีที่ {initial.displayNo || no} · {initial.titleTH}
         </h3>
-        <ExtraModuleChecks s={s} primaryMod={initial.module} checked={extraModules} onChange={setExtraModules} />
+        <ExtraModuleChecks primaryMod={initial.module} checked={extraModules} onChange={setExtraModules} />
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />

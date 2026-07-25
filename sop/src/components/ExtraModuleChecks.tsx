@@ -1,22 +1,17 @@
 /** Shared "หมวดเพิ่มเติม" (extra modules) checkbox grid used by EditModal and
  *  NewScenarioModal — lets a case be tagged into other modules' lists beyond
  *  its primary one. Mirrors renderExtraModuleChecks() in index.html. */
-import type { Store } from '../store';
-import { MODULES, MODULES_EN } from '../data/config';
+import { MODULES } from '../data/config';
 
 export default function ExtraModuleChecks({
-  s,
   primaryMod,
   checked,
   onChange,
 }: {
-  s: Store;
   primaryMod: string;
   checked: Set<string>;
   onChange: (next: Set<string>) => void;
 }) {
-  const labels = s.lang === 'en' ? MODULES_EN : MODULES;
-
   function toggle(m: string) {
     const next = new Set(checked);
     if (next.has(m)) next.delete(m);
@@ -36,7 +31,7 @@ export default function ExtraModuleChecks({
               return (
                 <label key={m} htmlFor={id}>
                   <input id={id} type="checkbox" checked={checked.has(m)} onChange={() => toggle(m)} />
-                  {m} · {(labels as Record<string, string>)[m] || m}
+                  {m}
                 </label>
               );
             })}

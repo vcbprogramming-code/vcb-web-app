@@ -78,7 +78,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
             ))}
           </select>
         </div>
-        <ExtraModuleChecks s={s} primaryMod={module} checked={extraModules} onChange={setExtraModules} />
+        <ExtraModuleChecks primaryMod={module} checked={extraModules} onChange={setExtraModules} />
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />

@@ -40,7 +40,9 @@ function ScenarioList({ s }: { s: Store }) {
           ' ' +
           sc.module +
           ' ' +
-          sc.ref
+          sc.ref +
+          ' ' +
+          (sc.displayNo || '')
         ).toLowerCase();
         return hay.indexOf(q) >= 0;
       }),
@@ -98,8 +100,7 @@ function ScenarioList({ s }: { s: Store }) {
                 onClick={() => s.selectItem(sc.no)}
               >
                 <div className="lc-top">
-                  <span className="lc-no">{sc.no}</span>
-                  <span className="lc-badge">{sc.module}</span>
+                  <span className="lc-no">{sc.displayNo || sc.no}</span>
                 </div>
                 <div className="lc-title">{title}</div>
                 <div className="lc-ex">{sc.when}</div>

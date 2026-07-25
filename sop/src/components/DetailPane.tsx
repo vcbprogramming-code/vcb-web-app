@@ -106,12 +106,11 @@ function ScenarioDetail({ s, sc }: { s: Store; sc: Scenario }) {
   return (
     <div className={'d-wrap m-' + sc.module}>
       <div className="d-head">
-        <div className="d-num">{sc.no}</div>
+        <div className="d-num">{sc.displayNo || sc.no}</div>
         <div className="d-titles">
           <div className="d-th">{primaryTitle}</div>
           <div className="d-en">{secondaryTitle}</div>
         </div>
-        <span className="d-badge">{sc.module}</span>
         {s.isAdmin && (
           <button className="d-edit" onClick={() => s.openEditModal(sc.no)}>
             <Icon name="edit" />

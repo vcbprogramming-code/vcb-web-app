@@ -45,6 +45,10 @@ export interface Scenario {
   /** Thai-formatted creation date, e.g. "24 กรกฎาคม 2569". Cases written before
    * this field existed carry a stand-in backfill date, not a real one. */
   dateAdded?: string;
+  /** Per-module display label, e.g. "PO-1", "IC-3" — restarts at 1 within each
+   * module. Derived, not an identity: `no` is still the unique key used for
+   * lookups/selection/edits; this is only ever shown to the user. */
+  displayNo?: string;
 }
 
 /** A row in the "which report do I run" table. */

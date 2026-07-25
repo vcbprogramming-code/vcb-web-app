@@ -26,8 +26,24 @@ export function setSession(isAdmin: boolean, userEmail = isAdmin ? ADMIN_EMAIL :
   session = { isAdmin, userEmail };
 }
 
+/**
+ * Assigns each scenario a per-module display label ("PO-1", "IC-3", …) —
+ * restarts at 1 within each module, in store order. Mirrors assignDisplayNo_()
+ * in Code.js. `no` stays the unique identity used for lookups/selection/edits;
+ * `displayNo` is purely a derived label, recomputed whenever the store changes.
+ */
+function assignDisplayNo(scenarios: Scenario[]): void {
+  const counters: Record<string, number> = {};
+  scenarios.forEach((s) => {
+    const m = s.module || '?';
+    counters[m] = (counters[m] || 0) + 1;
+    s.displayNo = `${m}-${counters[m]}`;
+  });
+}
+
 /** Mutable in-memory store (deep clone of the seed so edits don't touch the import). */
 const store: SopData = JSON.parse(JSON.stringify(seed));
+assignDisplayNo(store.scenarios);
 
 /** Attach per-request session fields, mirroring server.ts withSession(). */
 function withSession(): SopData {
@@ -135,6 +151,7 @@ export function createScenario(payload: ScenarioCreate): Promise<{ ok: true; no:
     dateAdded: formatThaiDate(new Date()),
   };
   store.scenarios = [...store.scenarios, scenario];
+  assignDisplayNo(store.scenarios);
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, no: nextNo, scenarios: store.scenarios.length });
 }

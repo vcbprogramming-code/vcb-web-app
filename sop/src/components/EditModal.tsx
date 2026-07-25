@@ -17,7 +17,15 @@ function EditForm({
 }: {
   s: Store;
   no: number;
-  initial: { titleTH: string; titleEN: string; when: string; steps: string[]; note: string; ref: string };
+  initial: {
+    titleTH: string;
+    titleEN: string;
+    when: string;
+    steps: string[];
+    note: string;
+    ref: string;
+    displayNo?: string;
+  };
 }) {
   const [titleTH, setTitleTH] = useState(initial.titleTH);
   const [titleEN, setTitleEN] = useState(initial.titleEN);
@@ -56,7 +64,7 @@ function EditForm({
     <div className="modal-bg open" id="editBg">
       <div className="modal" style={{ maxWidth: '780px' }}>
         <h3 id="editTitle">
-          แก้ไขกรณีที่ {no} · {initial.titleTH}
+          แก้ไขกรณีที่ {initial.displayNo || no} · {initial.titleTH}
         </h3>
         <div className="row">
           <label>ชื่อ (ไทย)</label>

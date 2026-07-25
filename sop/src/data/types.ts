@@ -49,6 +49,10 @@ export interface Scenario {
    * module. Derived, not an identity: `no` is still the unique key used for
    * lookups/selection/edits; this is only ever shown to the user. */
   displayNo?: string;
+  /** Additional modules this case also belongs to, beyond its primary `module`
+   * (which still drives displayNo/color/chapter ref). Purely additive — the
+   * case shows up whenever the sidebar filters to any of these too. */
+  extraModules?: string[];
 }
 
 /** A row in the "which report do I run" table. */
@@ -75,6 +79,9 @@ export interface ScenarioEdit {
   steps?: string[];
   note?: string;
   ref?: string;
+  /** Replaces the case's extra-module tags wholesale, including clearing them
+   * with an empty array. Omit to leave existing tags untouched. */
+  extraModules?: string[];
 }
 
 /** Payload accepted by createScenario() / POST /api/scenario/new. Server/mock
@@ -87,6 +94,7 @@ export interface ScenarioCreate {
   steps?: string[];
   note?: string;
   ref?: string;
+  extraModules?: string[];
 }
 
 /* ----- Process Flow (swimlane diagram) shapes ----- */

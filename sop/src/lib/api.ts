@@ -96,9 +96,14 @@ export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: num
     steps: payload.steps ?? target.steps,
     note: payload.note ?? target.note,
     ref: payload.ref ?? target.ref,
+    // Undefined = leave existing tags untouched; an array (even []) replaces
+    // them wholesale, mirroring editScenario()'s extraModules handling in Code.js.
+    extraModules: payload.extraModules !== undefined ? payload.extraModules : target.extraModules,
   };
-  const idx = store.scenarios.indexOf(target);
-  store.scenarios[idx] = next;
+  // Replace with a NEW array (not mutate in place) — React's useMemo in
+  // Sidebar.tsx keys off array identity to recompute per-module counts, so an
+  // in-place store.scenarios[idx] = next left counts stale after an edit.
+  store.scenarios = store.scenarios.map((s) => (s.no === payload.no ? next : s));
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, no: payload.no, scenarios: store.scenarios.length });
 }
@@ -149,6 +154,7 @@ export function createScenario(payload: ScenarioCreate): Promise<{ ok: true; no:
     ref,
     note: (payload.note || '').trim(),
     dateAdded: formatThaiDate(new Date()),
+    extraModules: (payload.extraModules || []).filter((m) => m && m !== payload.module),
   };
   store.scenarios = [...store.scenarios, scenario];
   assignDisplayNo(store.scenarios);

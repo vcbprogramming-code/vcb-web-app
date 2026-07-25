@@ -526,6 +526,9 @@
   .modal textarea{resize:vertical;min-height:60px;line-height:1.55;font-family:var(--sans)}
   .modal .hint{font-size:.74rem;color:var(--faint);margin-top:4px;line-height:1.5}
   .modal .hint code{background:var(--line-soft);padding:1px 5px;border-radius:4px;font-size:.86em}
+  .chk-grid{display:flex;flex-wrap:wrap;gap:6px 14px}
+  .chk-grid label{display:inline-flex;align-items:center;gap:5px;font-size:.86rem;font-weight:500;color:var(--ink);cursor:pointer;width:auto}
+  .chk-grid input[type=checkbox]{margin:0;cursor:pointer}
   .modal .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid var(--line-soft);padding-top:14px}
   .btn{padding:8px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);
     border-radius:8px;font-family:var(--sans);font-size:.92rem;font-weight:600;cursor:pointer}

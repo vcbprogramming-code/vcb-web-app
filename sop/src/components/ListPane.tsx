@@ -9,6 +9,13 @@ import { Icon } from '../lib/icons';
 
 const FLOW_GROUP_ORDER = ['BD', 'PO', 'IC', 'OF', 'AP', 'AR', 'FA', 'GL'];
 
+// True if a case belongs to `mod` — either as its primary module or one of
+// its extra tags. Numbering/color/badge still come only from the primary
+// module; this only affects list membership.
+function caseInModule(sc: { module: string; extraModules?: string[] }, mod: string): boolean {
+  return sc.module === mod || (sc.extraModules || []).indexOf(mod) >= 0;
+}
+
 function MBack({ s }: { s: Store }) {
   return (
     <button className="mback" type="button" onClick={s.mobileBack} aria-label="ย้อนกลับ">
@@ -27,7 +34,7 @@ function ScenarioList({ s }: { s: Store }) {
   const rows = useMemo(
     () =>
       s.scenarios.filter((sc) => {
-        if (nav.mod !== 'ALL' && sc.module !== nav.mod) return false;
+        if (nav.mod !== 'ALL' && !caseInModule(sc, nav.mod)) return false;
         if (!q) return true;
         const hay = (
           sc.titleTH +
@@ -42,7 +49,9 @@ function ScenarioList({ s }: { s: Store }) {
           ' ' +
           sc.ref +
           ' ' +
-          (sc.displayNo || '')
+          (sc.displayNo || '') +
+          ' ' +
+          (sc.extraModules || []).join(' ')
         ).toLowerCase();
         return hay.indexOf(q) >= 0;
       }),

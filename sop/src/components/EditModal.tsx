@@ -2,6 +2,7 @@
  *  + doSave() in index.html. Labels here are hardcoded Thai, as in the original. */
 import { useState } from 'react';
 import type { Store } from '../store';
+import ExtraModuleChecks from './ExtraModuleChecks';
 
 export default function EditModal({ s }: { s: Store }) {
   const sc = s.scenarios.find((x) => x.no === s.editNo);
@@ -18,6 +19,7 @@ function EditForm({
   s: Store;
   no: number;
   initial: {
+    module: string;
     titleTH: string;
     titleEN: string;
     when: string;
@@ -25,6 +27,7 @@ function EditForm({
     note: string;
     ref: string;
     displayNo?: string;
+    extraModules?: string[];
   };
 }) {
   const [titleTH, setTitleTH] = useState(initial.titleTH);
@@ -33,6 +36,7 @@ function EditForm({
   const [steps, setSteps] = useState((initial.steps || []).join('\n'));
   const [note, setNote] = useState(initial.note || '');
   const [ref, setRef] = useState(initial.ref || '');
+  const [extraModules, setExtraModules] = useState<Set<string>>(new Set(initial.extraModules || []));
   const [saving, setSaving] = useState(false);
 
   async function doSave() {
@@ -50,6 +54,7 @@ function EditForm({
           .filter(Boolean),
         note: note.trim(),
         ref: ref.trim(),
+        extraModules: Array.from(extraModules),
       });
       // success: store closes the modal + refreshes data
     } catch (e: any) {
@@ -66,6 +71,7 @@ function EditForm({
         <h3 id="editTitle">
           แก้ไขกรณีที่ {initial.displayNo || no} · {initial.titleTH}
         </h3>
+        <ExtraModuleChecks s={s} primaryMod={initial.module} checked={extraModules} onChange={setExtraModules} />
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />

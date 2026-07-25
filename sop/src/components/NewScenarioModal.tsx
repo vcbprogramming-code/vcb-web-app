@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import type { Store } from '../store';
 import { MODULES, MODULES_EN } from '../data/config';
+import ExtraModuleChecks from './ExtraModuleChecks';
 
 export default function NewScenarioModal({ s }: { s: Store }) {
   const labels = s.lang === 'en' ? MODULES_EN : MODULES;
@@ -17,7 +18,19 @@ export default function NewScenarioModal({ s }: { s: Store }) {
   const [steps, setSteps] = useState('');
   const [note, setNote] = useState('');
   const [ref, setRef] = useState('');
+  const [extraModules, setExtraModules] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+
+  function changeModule(next: string) {
+    setModule(next);
+    // Picking a new primary can't also be an extra tag — drop it if checked.
+    setExtraModules((prev) => {
+      if (!prev.has(next)) return prev;
+      const copy = new Set(prev);
+      copy.delete(next);
+      return copy;
+    });
+  }
 
   async function doSave() {
     if (!s.isAdmin) return;
@@ -39,6 +52,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
           .filter(Boolean),
         note: note.trim(),
         ref: ref.trim(),
+        extraModules: Array.from(extraModules),
       });
       s.selectModule(module);
       s.selectItem(no);
@@ -56,7 +70,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
         <h3>เพิ่มกรณีศึกษาใหม่ · New case</h3>
         <div className="row">
           <label>หมวด (Module)</label>
-          <select value={module} onChange={(e) => setModule(e.target.value)}>
+          <select value={module} onChange={(e) => changeModule(e.target.value)}>
             {Object.keys(MODULES).map((m) => (
               <option key={m} value={m}>
                 {m} · {(labels as Record<string, string>)[m] || m}
@@ -64,6 +78,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
             ))}
           </select>
         </div>
+        <ExtraModuleChecks s={s} primaryMod={module} checked={extraModules} onChange={setExtraModules} />
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />

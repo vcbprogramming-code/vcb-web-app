@@ -41,6 +41,12 @@ function assignDisplayNo(scenarios: Scenario[]): void {
   });
 }
 
+/** Module code → SOP manual chapter number, mirrors MODULE_CHAPTER in Code.js. */
+const MODULE_CHAPTER: Record<string, string> = {
+  SE: '1', BD: '2', OF: '3', PO: '4', IC: '5',
+  AP: '6', AR: '7', PM: '8', FA: '9', GL: '10',
+};
+
 /** Mutable in-memory store (deep clone of the seed so edits don't touch the import). */
 const store: SopData = JSON.parse(JSON.stringify(seed));
 assignDisplayNo(store.scenarios);
@@ -88,14 +94,28 @@ export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: num
   if (!target) {
     return Promise.reject(new Error('Scenario #' + payload.no + ' not found.'));
   }
+  let ref = payload.ref ?? target.ref;
+  // Module changed (case moved to a different module, e.g. PO → IC)? Swap
+  // ONLY the "บทที่ N (MOD)" chapter+label pair in the ref, mirroring
+  // editScenario()'s ref surgery in Code.js — leaves any other chapter
+  // references or custom wording in the ref text untouched.
+  if (payload.module && payload.module !== target.module) {
+    const newChapter = MODULE_CHAPTER[payload.module] || '';
+    if (newChapter) {
+      const oldChapterPattern = /บทที่\s*\d+(\s*\([^)]*\))?/;
+      const newChapterText = `บทที่ ${newChapter} (${payload.module})`;
+      ref = oldChapterPattern.test(ref) ? ref.replace(oldChapterPattern, newChapterText) : (ref ? ref + ' | ' : '') + newChapterText;
+    }
+  }
   const next: Scenario = {
     ...target,
+    module: payload.module ?? target.module,
     titleTH: payload.titleTH ?? target.titleTH,
     titleEN: payload.titleEN ?? target.titleEN,
     when: payload.when ?? target.when,
     steps: payload.steps ?? target.steps,
     note: payload.note ?? target.note,
-    ref: payload.ref ?? target.ref,
+    ref,
     // Undefined = leave existing tags untouched; an array (even []) replaces
     // them wholesale, mirroring editScenario()'s extraModules handling in Code.js.
     extraModules: payload.extraModules !== undefined ? payload.extraModules : target.extraModules,
@@ -104,15 +124,12 @@ export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: num
   // Sidebar.tsx keys off array identity to recompute per-module counts, so an
   // in-place store.scenarios[idx] = next left counts stale after an edit.
   store.scenarios = store.scenarios.map((s) => (s.no === payload.no ? next : s));
+  // A module change shifts this case's position within its (old and new)
+  // module counters — displayNo must be recomputed, same as after a create.
+  assignDisplayNo(store.scenarios);
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, no: payload.no, scenarios: store.scenarios.length });
 }
-
-/** Module code → SOP manual chapter number, mirrors MODULE_CHAPTER in Code.js. */
-const MODULE_CHAPTER: Record<string, string> = {
-  SE: '1', BD: '2', OF: '3', PO: '4', IC: '5',
-  AP: '6', AR: '7', PM: '8', FA: '9', GL: '10',
-};
 
 const THAI_MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',

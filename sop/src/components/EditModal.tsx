@@ -2,6 +2,7 @@
  *  + doSave() in index.html. Labels here are hardcoded Thai, as in the original. */
 import { useState } from 'react';
 import type { Store } from '../store';
+import { MODULES, MODULES_EN } from '../data/config';
 import ExtraModuleChecks from './ExtraModuleChecks';
 
 export default function EditModal({ s }: { s: Store }) {
@@ -30,6 +31,7 @@ function EditForm({
     extraModules?: string[];
   };
 }) {
+  const [module, setModuleState] = useState(initial.module);
   const [titleTH, setTitleTH] = useState(initial.titleTH);
   const [titleEN, setTitleEN] = useState(initial.titleEN);
   const [when, setWhen] = useState(initial.when);
@@ -39,12 +41,26 @@ function EditForm({
   const [extraModules, setExtraModules] = useState<Set<string>>(new Set(initial.extraModules || []));
   const [saving, setSaving] = useState(false);
 
+  const labels = s.lang === 'en' ? MODULES_EN : MODULES;
+
+  function changeModule(next: string) {
+    setModuleState(next);
+    // Picking a new primary can't also be an extra tag — drop it if checked.
+    setExtraModules((prev) => {
+      if (!prev.has(next)) return prev;
+      const copy = new Set(prev);
+      copy.delete(next);
+      return copy;
+    });
+  }
+
   async function doSave() {
     if (!s.isAdmin) return;
     setSaving(true);
     try {
       await s.saveScenario({
         no,
+        module,
         titleTH: titleTH.trim(),
         titleEN: titleEN.trim(),
         when: when.trim(),
@@ -56,6 +72,13 @@ function EditForm({
         ref: ref.trim(),
         extraModules: Array.from(extraModules),
       });
+      if (module !== initial.module) {
+        // selectModule() clears the selection (its normal sidebar-click
+        // behaviour) — re-select this case so it doesn't drop back to the
+        // welcome screen after moving it to a different module's list.
+        s.selectModule(module);
+        s.selectItem(no);
+      }
       // success: store closes the modal + refreshes data
     } catch (e: any) {
       setSaving(false);
@@ -71,7 +94,17 @@ function EditForm({
         <h3 id="editTitle">
           แก้ไขกรณีที่ {initial.displayNo || no} · {initial.titleTH}
         </h3>
-        <ExtraModuleChecks primaryMod={initial.module} checked={extraModules} onChange={setExtraModules} />
+        <div className="row">
+          <label>หมวด (Module)</label>
+          <select value={module} onChange={(e) => changeModule(e.target.value)}>
+            {Object.keys(MODULES).map((m) => (
+              <option key={m} value={m}>
+                {m} · {(labels as Record<string, string>)[m] || m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <ExtraModuleChecks primaryMod={module} checked={extraModules} onChange={setExtraModules} />
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />

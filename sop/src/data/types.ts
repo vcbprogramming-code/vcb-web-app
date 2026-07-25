@@ -73,6 +73,9 @@ export interface SopData {
 /** Payload accepted by editScenario() / POST /api/scenario. */
 export interface ScenarioEdit {
   no: number;
+  /** Changes the case's PRIMARY module — moves it to a new module's numbering
+   * (e.g. PO-4 → IC-6). Omit to leave the primary module unchanged. */
+  module?: string;
   titleTH?: string;
   titleEN?: string;
   when?: string;

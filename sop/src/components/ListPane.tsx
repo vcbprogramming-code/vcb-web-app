@@ -31,32 +31,41 @@ function ScenarioList({ s }: { s: Store }) {
   const { nav } = s;
   const q = nav.q.toLowerCase();
 
-  const rows = useMemo(
-    () =>
-      s.scenarios.filter((sc) => {
-        if (nav.mod !== 'ALL' && !caseInModule(sc, nav.mod)) return false;
-        if (!q) return true;
-        const hay = (
-          sc.titleTH +
-          ' ' +
-          sc.titleEN +
-          ' ' +
-          sc.when +
-          ' ' +
-          sc.steps.join(' ') +
-          ' ' +
-          sc.module +
-          ' ' +
-          sc.ref +
-          ' ' +
-          (sc.displayNo || '') +
-          ' ' +
-          (sc.extraModules || []).join(' ')
-        ).toLowerCase();
-        return hay.indexOf(q) >= 0;
-      }),
-    [s.scenarios, nav.mod, q],
-  );
+  const rows = useMemo(() => {
+    const filtered = s.scenarios.filter((sc) => {
+      if (nav.mod !== 'ALL' && !caseInModule(sc, nav.mod)) return false;
+      if (!q) return true;
+      const hay = (
+        sc.titleTH +
+        ' ' +
+        sc.titleEN +
+        ' ' +
+        sc.when +
+        ' ' +
+        sc.steps.join(' ') +
+        ' ' +
+        sc.module +
+        ' ' +
+        sc.ref +
+        ' ' +
+        (sc.displayNo || '') +
+        ' ' +
+        (sc.extraModules || []).join(' ')
+      ).toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+    // When viewing a specific module, cases whose PRIMARY module matches come
+    // first (in their normal order); cases only present via an extra tag are
+    // pushed after — otherwise a tagged-in case interleaves with real PO-N
+    // cases by row position, which reads as broken numbering (Array.sort is
+    // stable, so relative order within each group is preserved).
+    if (nav.mod !== 'ALL') {
+      return filtered
+        .slice()
+        .sort((a, b) => (a.module === nav.mod ? 0 : 1) - (b.module === nav.mod ? 0 : 1));
+    }
+    return filtered;
+  }, [s.scenarios, nav.mod, q]);
 
   const modLbl =
     s.lang === 'en'

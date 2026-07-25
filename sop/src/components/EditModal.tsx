@@ -39,7 +39,10 @@ function EditForm({
   const [note, setNote] = useState(initial.note || '');
   const [ref, setRef] = useState(initial.ref || '');
   const [extraModules, setExtraModules] = useState<Set<string>>(new Set(initial.extraModules || []));
+  const [swapWith, setSwapWith] = useState('');
   const [saving, setSaving] = useState(false);
+  const [swapping, setSwapping] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const labels = s.lang === 'en' ? MODULES_EN : MODULES;
 
@@ -86,6 +89,40 @@ function EditForm({
     }
   }
 
+  async function doSwap() {
+    if (!s.isAdmin) return;
+    const target = swapWith.trim().toUpperCase();
+    if (!target) {
+      alert('กรุณาระบุกรณีที่ต้องการสลับ เช่น PO-5 / Enter a case to swap with, e.g. PO-5');
+      return;
+    }
+    setSwapping(true);
+    try {
+      await s.swapScenario({ no, swapWith: target });
+      // success: store closes the modal + refreshes data
+    } catch (e: any) {
+      setSwapping(false);
+      alert('สลับไม่สำเร็จ / Swap failed:\n' + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function doDelete() {
+    const label = initial.displayNo || no;
+    const msg =
+      s.lang === 'en'
+        ? `Delete case ${label} — "${initial.titleTH}"?\n\nThis cannot be undone from the app (only via the Doc's version history). Every later case in the same module will renumber up by one.`
+        : `ลบกรณี ${label} — "${initial.titleTH}" ใช่หรือไม่?\n\nไม่สามารถกู้คืนได้จากในแอป (ต้องใช้ประวัติเวอร์ชันของ Doc เท่านั้น) กรณีอื่นในหมวดเดียวกันที่อยู่หลังจากนี้จะเลื่อนหมายเลขขึ้นทั้งหมด`;
+    if (!confirm(msg)) return;
+    setDeleting(true);
+    try {
+      await s.deleteScenario(no);
+      // success: store closes the modal + refreshes data
+    } catch (e: any) {
+      setDeleting(false);
+      alert('ลบไม่สำเร็จ / Delete failed:\n' + (e && e.message ? e.message : e));
+    }
+  }
+
   return (
     // Backdrop click intentionally does nothing — this form can hold a lot of
     // typed content; only ยกเลิก/Cancel or Save should close it.
@@ -105,6 +142,24 @@ function EditForm({
           </select>
         </div>
         <ExtraModuleChecks primaryMod={module} checked={extraModules} onChange={setExtraModules} />
+        <div className="row">
+          <label>สลับตำแหน่ง</label>
+          <div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="เช่น PO-5"
+                style={{ flex: '1 1 auto' }}
+                value={swapWith}
+                onChange={(e) => setSwapWith(e.target.value)}
+              />
+              <button className="btn" type="button" disabled={swapping} onClick={doSwap}>
+                {swapping ? 'กำลังสลับ…' : '↔ สลับ'}
+              </button>
+            </div>
+            <div className="hint">สลับเนื้อหาทั้งหมดกับกรณีที่ระบุ (เช่น PO-5) · กรณีอื่นๆ ไม่ถูกเลื่อนตำแหน่ง</div>
+          </div>
+        </div>
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />
@@ -150,6 +205,15 @@ function EditForm({
           />
         </div>
         <div className="actions">
+          <button
+            className="btn btn-danger"
+            type="button"
+            style={{ marginRight: 'auto' }}
+            disabled={deleting}
+            onClick={doDelete}
+          >
+            {deleting ? 'กำลังลบ…' : 'ลบกรณีนี้ · Delete'}
+          </button>
           <button className="btn" onClick={s.closeEdit}>
             ยกเลิก
           </button>

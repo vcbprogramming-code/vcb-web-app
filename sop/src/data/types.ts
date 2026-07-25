@@ -100,6 +100,21 @@ export interface ScenarioCreate {
   extraModules?: string[];
 }
 
+/** Payload accepted by swapScenarioPositions() / POST /api/scenario/swap.
+ * Trades the ENTIRE content of two cases (title/problem/steps/ref/etc.) —
+ * every other case's position is unaffected. `swapWith` is a displayNo
+ * label like "PO-5", not a raw `no`. */
+export interface ScenarioSwap {
+  no: number;
+  swapWith: string;
+}
+
+/** Payload accepted by deleteScenario() / POST /api/scenario/delete. Removes
+ * the case entirely — every later case in the same module renumbers up by one. */
+export interface ScenarioDelete {
+  no: number;
+}
+
 /* ----- Process Flow (swimlane diagram) shapes ----- */
 
 /** A column in a swimlane diagram: a responsible actor + the ERP module used. */

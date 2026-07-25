@@ -5,9 +5,17 @@
  * the returned object down to the panes/modals.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SopData, Scenario, ScenarioEdit, ScenarioCreate } from './data/types';
+import type { SopData, Scenario, ScenarioEdit, ScenarioCreate, ScenarioSwap } from './data/types';
 import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
-import { bootstrap, getSopDataForClient, syncFromDoc, editScenario, createScenario } from './lib/api';
+import {
+  bootstrap,
+  getSopDataForClient,
+  syncFromDoc,
+  editScenario,
+  createScenario,
+  swapScenarioPositions,
+  deleteScenario,
+} from './lib/api';
 
 export type View = 'sop' | 'flows' | 'reports';
 export type MobileView = 'list' | 'detail' | null;
@@ -106,6 +114,8 @@ export interface Store {
   openEditModal: (no: number) => void;
   closeEdit: () => void;
   saveScenario: (payload: ScenarioEdit) => Promise<void>;
+  swapScenario: (payload: ScenarioSwap) => Promise<void>;
+  deleteScenario: (no: number) => Promise<void>;
   openNewScenarioModal: () => void;
   closeNewScenario: () => void;
   createNewScenario: (payload: ScenarioCreate) => Promise<number>;
@@ -291,6 +301,25 @@ export function useStore(): Store {
     [refreshClientData],
   );
 
+  const swapScenario = useCallback(
+    async (payload: ScenarioSwap) => {
+      await swapScenarioPositions(payload);
+      setEditNo(null);
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
+  const deleteScenarioAction = useCallback(
+    async (no: number) => {
+      await deleteScenario({ no });
+      setEditNo(null);
+      setNav((n) => (n.sel === no ? { ...n, sel: null } : n));
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
   const openNewScenarioModal = useCallback(() => {
     if (!data.meta.isAdmin) return;
     setNewScenarioOpen(true);
@@ -402,6 +431,8 @@ export function useStore(): Store {
       openEditModal,
       closeEdit,
       saveScenario,
+      swapScenario,
+      deleteScenario: deleteScenarioAction,
       openNewScenarioModal,
       closeNewScenario,
       createNewScenario,
@@ -439,6 +470,8 @@ export function useStore(): Store {
       openEditModal,
       closeEdit,
       saveScenario,
+      swapScenario,
+      deleteScenarioAction,
       openNewScenarioModal,
       closeNewScenario,
       createNewScenario,

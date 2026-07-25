@@ -10,7 +10,7 @@
  *   editScenario(payload)  ← POST /api/scenario  (admin-gated)
  */
 import seed from '../data/sop.json';
-import type { SopData, ScenarioEdit, ScenarioCreate, Scenario } from '../data/types';
+import type { SopData, ScenarioEdit, ScenarioCreate, ScenarioSwap, ScenarioDelete, Scenario } from '../data/types';
 
 /* ----- Admin / session simulation -----
  * The real backend marks the request admin via a signed cookie / allow-listed
@@ -177,6 +177,72 @@ export function createScenario(payload: ScenarioCreate): Promise<{ ok: true; no:
   assignDisplayNo(store.scenarios);
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, no: nextNo, scenarios: store.scenarios.length });
+}
+
+/** POST /api/scenario/swap — trade the ENTIRE content of two cases (e.g.
+ * PO-3 ↔ PO-5); every other case's position is unaffected. Mirrors
+ * swapScenarioPositions() in Code.js. `no` (the real identity) and the
+ * derived `displayNo` are NOT swapped — only the content fields are, which
+ * is what makes the two cases appear to have traded places. */
+export function swapScenarioPositions(payload: ScenarioSwap): Promise<{ ok: true; scenarios: number }> {
+  if (!session.isAdmin) {
+    return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));
+  }
+  if (!payload || !payload.no || payload.no < 1) {
+    return Promise.reject(new Error('Missing scenario number.'));
+  }
+  if (!payload.swapWith) {
+    return Promise.reject(new Error('Missing target case (swapWith).'));
+  }
+  const a = store.scenarios.find((s) => s.no === payload.no);
+  if (!a) {
+    return Promise.reject(new Error('Scenario #' + payload.no + ' not found.'));
+  }
+  const target = payload.swapWith.trim().toUpperCase();
+  const b = store.scenarios.find((s) => s.displayNo === target);
+  if (!b) {
+    return Promise.reject(new Error(`Case "${payload.swapWith}" not found — check the label and try again.`));
+  }
+  if (a === b) {
+    return Promise.reject(new Error('Cannot swap a case with itself.'));
+  }
+  const CONTENT_FIELDS: (keyof Scenario)[] = [
+    'module', 'titleTH', 'titleEN', 'when', 'steps', 'ref', 'note', 'dateAdded', 'extraModules',
+  ];
+  const aContent: Partial<Scenario> = {};
+  const bContent: Partial<Scenario> = {};
+  CONTENT_FIELDS.forEach((k) => {
+    (aContent as any)[k] = a[k];
+    (bContent as any)[k] = b[k];
+  });
+  store.scenarios = store.scenarios.map((s) => {
+    if (s === a) return { ...s, ...bContent };
+    if (s === b) return { ...s, ...aContent };
+    return s;
+  });
+  assignDisplayNo(store.scenarios);
+  store.meta.updatedAt = new Date().toISOString();
+  return defer({ ok: true as const, scenarios: store.scenarios.length });
+}
+
+/** POST /api/scenario/delete — remove a case entirely. Every later case in
+ * the same module renumbers up by one (displayNo is recomputed from array
+ * order, same as everywhere else). Mirrors deleteScenario() in Code.js. */
+export function deleteScenario(payload: ScenarioDelete): Promise<{ ok: true; scenarios: number }> {
+  if (!session.isAdmin) {
+    return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));
+  }
+  if (!payload || !payload.no || payload.no < 1) {
+    return Promise.reject(new Error('Missing scenario number.'));
+  }
+  const exists = store.scenarios.some((s) => s.no === payload.no);
+  if (!exists) {
+    return Promise.reject(new Error('Scenario #' + payload.no + ' not found.'));
+  }
+  store.scenarios = store.scenarios.filter((s) => s.no !== payload.no);
+  assignDisplayNo(store.scenarios);
+  store.meta.updatedAt = new Date().toISOString();
+  return defer({ ok: true as const, scenarios: store.scenarios.length });
 }
 
 /** The bootstrap payload the page boots with (mirrors doGet's BOOTSTRAP). */

@@ -540,6 +540,10 @@
   .d-edit{background:#fff;border:1px solid var(--line);color:var(--brand);
     border-radius:8px;padding:5px 11px;font-size:.82rem;font-weight:700;cursor:pointer;margin-left:8px;font-family:var(--sans)}
   .d-edit:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .btn-danger{color:#B5302A}
+  .btn-danger:hover{background:#FBEBEA;border-color:#E3A8A2}
+  html.dark .btn-danger{color:#e08b83}
+  html.dark .btn-danger:hover{background:#3a2422;border-color:#5a3330}
 
   /* ===== Process-flow diagrams (Process Flows view) =====
      Each flow is a swimlane diagram: lanes = responsible actors/modules,

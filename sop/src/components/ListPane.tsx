@@ -110,10 +110,13 @@ function ScenarioList({ s }: { s: Store }) {
         ) : (
           rows.map((sc) => {
             const title = s.lang === 'en' && sc.titleEN ? sc.titleEN : sc.titleTH;
-            // Showing here only via an extra-module tag (not its primary
-            // module) — mark with a lighter-toned badge instead of the solid
-            // module color, so it reads as related-but-not-native.
+            // When filtered to a specific module and this card is showing only
+            // via an extra-module tag (not its primary module), badge it with
+            // its true home module. Otherwise (viewing "All", or viewing the
+            // card's own primary module) show its extra tags, if any — so the
+            // tagging is visible no matter which list you're looking at.
             const isTag = nav.mod !== 'ALL' && sc.module !== nav.mod;
+            const tagMods = isTag ? [sc.module] : sc.extraModules || [];
             return (
               <div
                 key={sc.no}
@@ -123,7 +126,15 @@ function ScenarioList({ s }: { s: Store }) {
               >
                 <div className="lc-top">
                   <span className="lc-no lc-no-mod">{sc.displayNo || sc.no}</span>
-                  {isTag && <span className={'lc-badge lc-badge-tag m-' + sc.module}>{sc.module}</span>}
+                  {tagMods.length > 0 && (
+                    <span className="lc-tags">
+                      {tagMods.map((m) => (
+                        <span key={m} className={'lc-badge lc-badge-tag m-' + m}>
+                          {m}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
                 <div className="lc-title">{title}</div>
                 <div className="lc-ex">{sc.when}</div>

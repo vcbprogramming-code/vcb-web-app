@@ -7,6 +7,11 @@ import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 import ReferencePicker from './ReferencePicker.jsx';
 
+// stable per-row id so removable input rows keep a key tied to the row, not its
+// index — deleting a middle row then doesn't re-point the surviving DOM inputs
+// (which can commit an in-flight Thai IME composition to the wrong row).
+const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
+
 export default function AddDocumentModal({ projects, docTypes, onClose, onCreated, initial = null }) {
   const { profile, user } = useAuth();
   const authorName = profile?.full_name || user?.email || '';
@@ -25,11 +30,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
   const [enclosures, setEnclosures] = useState(
     Array.isArray(initial?.enclosures) && initial.enclosures.length
-      ? initial.enclosures.map((e) => ({ name: e.name || '', qty: e.qty != null ? String(e.qty) : '', unit: e.unit || 'ชุด' }))
-      : [{ name: '', qty: '', unit: 'ชุด' }]
+      ? initial.enclosures.map((e) => ({ _id: rid(), name: e.name || '', qty: e.qty != null ? String(e.qty) : '', unit: e.unit || 'ชุด' }))
+      : [{ _id: rid(), name: '', qty: '', unit: 'ชุด' }]
   );
   const setEncl = (i, key, val) => setEnclosures((prev) => prev.map((e, idx) => (idx === i ? { ...e, [key]: val } : e)));
-  const addEncl = () => setEnclosures((prev) => [...prev, { name: '', qty: '', unit: 'ชุด' }]);
+  const addEncl = () => setEnclosures((prev) => [...prev, { _id: rid(), name: '', qty: '', unit: 'ชุด' }]);
   const removeEncl = (i) => setEnclosures((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   // rows with a name → the payload shape the API/preview expect
   const enclList = enclosures
@@ -55,7 +60,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [dragOver, setDragOver] = useState(false);
   const [compressing, setCompressing] = useState(false); // shrinking picked images
   const [compressNote, setCompressNote] = useState(null); // "บีบรูป N ไฟล์ ประหยัด X"
-  const [approvers, setApprovers] = useState([{ name: '', email: '' }]);
+  const [approvers, setApprovers] = useState([{ _id: rid(), name: '', email: '' }]);
   const [approverUsers, setApproverUsers] = useState([]); // system accounts, for the picker
   const [approversLocked, setApproversLocked] = useState(false); // true when filled from doc-code config
   // mirror `approversLocked` into a ref so the projectId effect (deps: [projectId])
@@ -129,7 +134,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // pick a user by email → fill name + email for that row
   const pickApprover = (i, email) => {
     const u = approverUsers.find((x) => x.email === email);
-    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { name: u?.full_name || '', email } : a)));
+    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, name: u?.full_name || '', email } : a)));
   };
 
   // load the project's letterhead so the live A4 preview renders the real header.
@@ -174,7 +179,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         }
         // the ผู้อนุมัติ list holds only the HIGHER approvers (steps after the PM);
         // the PM is handled separately as the signer/first step.
-        if (!approversLockedRef.current) setApprovers([{ name: '', email: '' }]);
+        if (!approversLockedRef.current) setApprovers([{ _id: rid(), name: '', email: '' }]);
       })
       .catch(() => !cancelled && setLetter({}));
     return () => { cancelled = true; };
@@ -231,7 +236,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   };
   const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx));
 
-  const addApprover = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
+  const addApprover = () => setApprovers((prev) => [...prev, { _id: rid(), name: '', email: '' }]);
   const removeApprover = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
   const moveApprover = (i, dir) => setApprovers((prev) => {
     const j = i + dir;
@@ -494,11 +499,11 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   // chain. The PM (signer/first step) is separate — not prepended here.
                   const cfg = Array.isArray(c?.default_approvers) ? c.default_approvers : [];
                   if (cfg.length) {
-                    setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
+                    setApprovers(cfg.map((a) => ({ _id: rid(), name: a.name || '', email: a.email || '' })));
                     setApproversLocked(true);
                   } else {
                     // switching to a code with no config: clear any previously-locked rows
-                    if (approversLocked) setApprovers([{ name: '', email: '' }]);
+                    if (approversLocked) setApprovers([{ _id: rid(), name: '', email: '' }]);
                     setApproversLocked(false);
                   }
                 }}
@@ -573,7 +578,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <label className="block text-sm font-medium text-slate-600 mb-1">สิ่งที่ส่งมาด้วย (ไม่บังคับ)</label>
             <div className="space-y-2">
               {enclosures.map((e, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={e._id} className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-center text-sm text-slate-400">{i + 1}.</span>
                   <input value={e.name} onChange={(ev) => setEncl(i, 'name', ev.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
                   <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-20`} />
@@ -731,7 +736,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             )}
             <div className="space-y-2">
               {approvers.map((a, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={a._id} className="flex items-center gap-2">
                   <span className="w-6 shrink-0 text-center font-semibold text-slate-400">{i + 1}</span>
                   {approversLocked ? (
                     <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />

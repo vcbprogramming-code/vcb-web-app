@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 
+// stable per-row id so removable rows key by identity, not index (see AddDocumentModal)
+const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
+
 export default function SubmitApprovalModal({ documentId, docCode, projectManager, resubmit = false, onClose, onSubmitted }) {
-  const [approvers, setApprovers] = useState([{ name: '', email: '' }]); // higher approvers only
+  const [approvers, setApprovers] = useState([{ _id: rid(), name: '', email: '' }]); // higher approvers only
   const [locked, setLocked] = useState(false);
   const [users, setUsers] = useState([]); // system accounts, for the picker
   const [submitting, setSubmitting] = useState(false);
@@ -26,7 +29,7 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
     ememoApi.listDocCodes().then((r) => {
       const cfg = r.data.find((c) => c.code === docCode)?.default_approvers;
       if (Array.isArray(cfg) && cfg.length) {
-        setApprovers(cfg.map((a) => ({ name: a.name || '', email: a.email || '' })));
+        setApprovers(cfg.map((a) => ({ _id: rid(), name: a.name || '', email: a.email || '' })));
         setLocked(true);
       }
     }).catch(() => {});
@@ -35,9 +38,9 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
   // pick a user by email → fill name+email for that row
   const pick = (i, email) => {
     const u = users.find((x) => x.email === email);
-    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { name: u?.full_name || '', email } : a)));
+    setApprovers((prev) => prev.map((a, idx) => (idx === i ? { ...a, name: u?.full_name || '', email } : a)));
   };
-  const add = () => setApprovers((prev) => [...prev, { name: '', email: '' }]);
+  const add = () => setApprovers((prev) => [...prev, { _id: rid(), name: '', email: '' }]);
   const remove = (i) => setApprovers((prev) => prev.filter((_, idx) => idx !== i));
 
   const submit = async (e) => {
@@ -119,7 +122,7 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
           <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติที่สูงกว่า (ลำดับถัดจากผู้จัดการโครงการ){locked ? '' : ' — ไม่บังคับ'}</label>
           <div className="space-y-2">
             {approvers.map((a, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={a._id} className="flex items-center gap-2">
                 <span className="w-6 text-center text-slate-400 font-semibold">{i + 1}</span>
                 {locked ? (
                   <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />

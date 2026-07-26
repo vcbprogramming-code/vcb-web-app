@@ -95,7 +95,7 @@ export default function Performance() {
       {view === 'entry' && (
         boot.sites.length === 0
           ? <div className="card text-center text-sm text-slate-400">ยังไม่มีไซต์งานในขอบเขตของคุณ</div>
-          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} />
+          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
 
       {view === 'index' && <WorkIndex />}

@@ -40,10 +40,12 @@ const todayStr = () => { const t = new Date(); return ymd(t.getFullYear(), t.get
 const addDaysStr = (s, n) => { const [Y, M, D] = s.split('-').map(Number); const d = new Date(Y, M - 1, D + n); return ymd(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
 // reference: weekend = Sunday only (dow === 0)
 const isWeekend = (Y, M, d) => new Date(Y, M - 1, d).getDay() === 0;
-/** editable window = [today − lockDays, today + 1]; locked if before that. */
+/** editable window = [today − lockDays, today + 1]; locked outside it. */
 function isLocked(ds, lockDays) {
+  const today = todayStr();
+  if (ds > addDaysStr(today, 1)) return true; // no logging beyond tomorrow (upper bound)
   if (!lockDays || lockDays <= 0) return false;
-  return ds < addDaysStr(todayStr(), -lockDays);
+  return ds < addDaysStr(today, -lockDays);
 }
 const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
@@ -358,7 +360,11 @@ router.get('/admin-summary', asyncHandler(async (req, res) => {
         if (!weekend && !away) total++;
         const c = cellBy.get(`${e.id}_${ds}`);
         if (cellFilled(c)) {
-          filled++; entriesCount++;
+          entriesCount++;
+          // count toward the fill rate only when this employee/day is in the denominator
+          // (not a weekend, not marked away) — otherwise an away day with a stray log
+          // could push filled past total and show >100%.
+          if (!weekend && !away) filled++;
           (e.kind === 'operation' ? startedOp : startedSup).add(e.id);
           // top lists — slots weighted 0.5 each when a 2nd task exists
           const slots = [c.team || c.detail, c.pm].filter((s) => s && s.trim());

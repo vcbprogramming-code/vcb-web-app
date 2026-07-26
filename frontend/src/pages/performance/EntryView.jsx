@@ -7,7 +7,17 @@ import Picker from './Picker.jsx';
 import EmployeesPanel from './EmployeesPanel.jsx';
 
 const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-const isoAdd = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+// Add n days to a YYYY-MM-DD string. Built purely in UTC so it never shifts a
+// day in local timezones (e.g. Asia/Bangkok UTC+7): `new Date("2026-07-10T00:00:00")`
+// parses as LOCAL then toISOString() prints UTC, landing one day early. Using
+// Date.UTC + UTC arithmetic keeps the edit-lock window aligned with the backend
+// (which does the same string math), so cells the grid marks editable really are.
+const isoAdd = (iso, n) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+};
 const dnum = (iso) => Number(iso.slice(8, 10));
 
 /**
@@ -16,7 +26,7 @@ const dnum = (iso) => Number(iso.slice(8, 10));
  *  • รายสัปดาห์ (Weekly): 7-day grid, each cell = primary task (op→team / sup→detail)
  *    + optional 2nd task (pm). Click a slot → Picker. Autosaves per field.
  */
-export default function EntryView({ siteKey, siteName, cur, canEdit }) {
+export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) {
   const toast = useToast();
   const [base, setBase] = useState(null);   // SiteMonth from server
   const [entries, setEntries] = useState({});
@@ -72,22 +82,27 @@ export default function EntryView({ siteKey, siteName, cur, canEdit }) {
   };
 
   const doFlash = (msg) => { setFlash(msg); clearTimeout(flashTimer.current); flashTimer.current = setTimeout(() => setFlash(''), 1400); };
+  useEffect(() => () => clearTimeout(flashTimer.current), []); // clear pending flash on unmount
 
-  // update one cell field locally + autosave; revert on failure
-  const setCell = (eid, date, field, value) => {
-    const prevEntries = entries;
-    setEntries((prev) => {
-      const next = { ...prev };
+  // update one cell field locally + autosave. On failure revert ONLY this field
+  // via a functional update — a whole-map snapshot revert would wipe any other
+  // cell edited while this save was still in flight. Flash the "saved" toast only
+  // after the server confirms, so a failed save can't show success + error at once.
+  const setCell = (eid, date, field, value, unlock = false) => {
+    const applyField = (map, v) => {
+      const next = { ...map };
       const row = { ...(next[eid] || {}) };
       const cell = { ...(row[date] || {}) };
-      if (value) cell[field] = value; else delete cell[field];
+      if (v) cell[field] = v; else delete cell[field];
       if (Object.keys(cell).length) row[date] = cell; else delete row[date];
       next[eid] = row;
       return next;
-    });
-    doFlash(value ? 'บันทึกแล้ว ✓' : 'ล้างเซลล์');
-    perfApi.saveCell({ site: siteKey, eid, date, field, value })
-      .catch((e) => { toast.error(e.message || 'บันทึกไม่สำเร็จ'); setEntries(prevEntries); });
+    };
+    const prevValue = entries[eid]?.[date]?.[field] || null;
+    setEntries((prev) => applyField(prev, value));
+    perfApi.saveCell({ site: siteKey, eid, date, field, value, adminUnlock: unlock })
+      .then(() => doFlash(value ? 'บันทึกแล้ว ✓' : 'ล้างเซลล์'))
+      .catch((e) => { toast.error(e.message || 'บันทึกไม่สำเร็จ'); setEntries((prev) => applyField(prev, prevValue)); });
   };
 
   const jump = (eid, date) => {
@@ -140,12 +155,12 @@ export default function EntryView({ siteKey, siteName, cur, canEdit }) {
       ) : mode === 'coverage'
         ? <Coverage d={d} today={today} cutoff={cutoff} ahead={ahead} lockDays={lockDays} jump={jump} ccodes={ccodes} cellTitle={cellTitle} />
         : <Weekly d={d} today={today} cutoff={cutoff} ahead={ahead} lockDays={lockDays} weekStart={weekStart} setWeekStart={setWeekStart}
-            focus={focus} canEdit={canEdit} openPicker={(eid, date, field, anchor) => setPicker({ eid, date, field, anchor })}
+            focus={focus} canEdit={canEdit} isAdmin={isAdmin} openPicker={(eid, date, field, anchor, unlock) => setPicker({ eid, date, field, anchor, unlock })}
             cellDisplay={cellDisplay} cellTitle={cellTitle} />}
 
       {picker && (
         <Picker anchor={picker.anchor} activities={base.teams} categories={base.costs}
-          onApply={(value) => { setCell(picker.eid, picker.date, picker.field, value); setPicker(null); }}
+          onApply={(value) => { setCell(picker.eid, picker.date, picker.field, value, picker.unlock); setPicker(null); }}
           onClose={() => setPicker(null)} />
       )}
       {empPanel}
@@ -251,7 +266,7 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
 }
 
 // ── Weekly: 7-day grid, each cell has primary + 2nd (pm) slot ─────────────────
-function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, focus, canEdit, openPicker, cellDisplay, cellTitle }) {
+function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, focus, canEdit, isAdmin, openPicker, cellDisplay, cellTitle }) {
   const start = Math.min(Math.max(0, weekStart), Math.max(0, d.days.length - 1));
   const count = Math.min(7, d.days.length - start);
   const visible = d.days.slice(start, start + count);
@@ -259,10 +274,13 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
 
   const Slot = ({ val, field, isSecond, weekend, locked, onOpen }) => {
     const ph = isSecond ? '+ งานที่ 2' : (weekend ? 'วันหยุด' : '');
-    const clickable = !locked && canEdit;
+    // admins may still edit locked (back-dated) cells — the save carries an
+    // adminUnlock flag; everyone else can only touch cells inside the window.
+    const clickable = (!locked || isAdmin) && canEdit;
+    const hint = locked && isAdmin ? 'เลยกำหนดแก้ไข — ผู้ดูแลระบบแก้ได้ (ปลดล็อก)' : undefined;
     return (
       <div
-        title={val ? cellTitle(val) : undefined}
+        title={val ? cellTitle(val) : hint}
         onClick={clickable ? (ev) => onOpen(field, ev.currentTarget) : undefined}
         className={`min-h-[22px] rounded px-1 py-0.5 text-[11px] leading-tight ${isSecond ? 'mt-0.5 border-t border-dashed border-slate-200 pt-1' : ''} ${
           val ? 'font-medium text-slate-800' : 'text-slate-300'
@@ -308,7 +326,8 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                     const amVal = op ? (v.team || '') : (v.detail || '');
                     const locked = day.date < cutoff || day.date > ahead;
                     const isFocus = focus && focus.eid === e.eid && focus.date === day.date;
-                    const onOpen = (field, anchor) => openPicker(e.eid, day.date, field, anchor);
+                    // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window
+                    const onOpen = (field, anchor) => openPicker(e.eid, day.date, field, anchor, locked && isAdmin);
                     return (
                       <td key={day.date} className={`rounded border align-top ${day.weekend ? 'bg-amber-50/40' : 'bg-white'} ${locked ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
                         <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked} onOpen={onOpen} />

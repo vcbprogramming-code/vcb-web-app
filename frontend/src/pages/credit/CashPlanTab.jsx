@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { creditApi, formatMoney } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 
 function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved }) {
   const editing = Boolean(row);
@@ -116,10 +117,11 @@ export default function CashPlanTab({ projects, onChanged }) {
   }, [projectId, month]);
   useEffect(() => { load(); }, [load]);
 
+  const confirm = useConfirm();
   const projName = Object.fromEntries(projects.map((p) => [p.id, p.name || p.code]));
   const refresh = () => { load(); onChanged?.(); setEdit(undefined); };
   const remove = async (id) => {
-    if (!window.confirm('ลบงวดนี้?')) return;
+    if (!(await confirm({ title: 'ลบงวดแผนเงินสด', message: 'ต้องการลบงวดนี้หรือไม่?', confirmLabel: 'ลบ', danger: true }))) return;
     try { await creditApi.deleteCashPlan(id); load(); } catch (e) { setError(e.message); }
   };
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Icon from '../Icon.jsx';
+/* eslint-disable react-hooks/exhaustive-deps */
 
 const SIZES = {
   md: 'max-w-md',
@@ -16,14 +17,23 @@ const SIZES = {
  */
 export default function Modal({ title, onClose, size = 'lg', footer, children }) {
   const panelRef = useRef(null);
+  // Keep the latest onClose without re-running the mount effect. Callers often
+  // pass a fresh inline arrow every render (e.g. onClose={() => setX(false)}); if
+  // the effect below depended on `onClose` it would re-run on every keystroke and
+  // steal focus back to the panel via panelRef.focus() — breaking typing in the
+  // modal's inputs. Reading through a ref keeps the handler current while the
+  // effect stays mount-only.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
 
+  // Mount-only: scroll lock, one-time focus, and the Escape/Tab key trap.
   useEffect(() => {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden'; // lock background scroll
     panelRef.current?.focus();
 
     const onKey = (e) => {
-      if (e.key === 'Escape' && onClose) { onClose(); return; }
+      if (e.key === 'Escape' && onCloseRef.current) { onCloseRef.current(); return; }
       if (e.key === 'Tab' && panelRef.current) {
         const nodes = panelRef.current.querySelectorAll(
           'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -40,7 +50,7 @@ export default function Modal({ title, onClose, size = 'lg', footer, children })
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

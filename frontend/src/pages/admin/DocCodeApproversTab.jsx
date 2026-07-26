@@ -5,6 +5,9 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
 
+// stable per-row id so removable rows key by identity, not index (see AddDocumentModal)
+const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
+
 /**
  * Admin config: document codes. Each code can be added / edited (department +
  * recipient title) / deleted, and has a default approver chain. When a code has
@@ -36,10 +39,10 @@ export default function DocCodeApproversTab() {
     setEditMeta(null);
     setEditCode(c.code);
     const existing = Array.isArray(c.default_approvers) ? c.default_approvers : [];
-    setRows(existing.length ? existing.map((a) => ({ name: a.name || '', email: a.email || '' })) : [{ name: '', email: '' }]);
+    setRows(existing.length ? existing.map((a) => ({ _id: rid(), name: a.name || '', email: a.email || '' })) : [{ _id: rid(), name: '', email: '' }]);
   };
   const updateRow = (i, key, val) => setRows((p) => p.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
-  const addRow = () => setRows((p) => [...p, { name: '', email: '' }]);
+  const addRow = () => setRows((p) => [...p, { _id: rid(), name: '', email: '' }]);
   const removeRow = (i) => setRows((p) => p.filter((_, idx) => idx !== i));
 
   const save = async () => {
@@ -211,7 +214,7 @@ export default function DocCodeApproversTab() {
               {editCode === c.code && (
                 <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
                   {rows.map((r, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={r._id} className="flex items-center gap-2">
                       <span className="w-5 shrink-0 text-center text-sm font-semibold text-slate-400">{i + 1}</span>
                       <input value={r.name} onChange={(e) => updateRow(i, 'name', e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className={`${field} w-36`} />
                       <input value={r.email} onChange={(e) => updateRow(i, 'email', e.target.value)} placeholder="อีเมล" type="email" className={`${field} flex-1`} />

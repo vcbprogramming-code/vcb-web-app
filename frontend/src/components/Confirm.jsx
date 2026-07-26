@@ -14,6 +14,9 @@ export function ConfirmProvider({ children }) {
   const resolver = useRef(null);
 
   const confirm = useCallback((opts = {}) => new Promise((resolve) => {
+    // if a previous confirm is still open, settle it as cancelled instead of
+    // orphaning its promise (which would leave that caller awaiting forever)
+    if (resolver.current) resolver.current(false);
     resolver.current = resolve;
     setState({
       title: opts.title || 'ยืนยันการทำรายการ',

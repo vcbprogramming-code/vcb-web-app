@@ -131,7 +131,12 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
     if (frameRef.current) ro.observe(frameRef.current);
     if (measureRef.current) ro.observe(measureRef.current);
     return () => ro.disconnect();
-  }, []);
+    // Re-measure when the letter CONTENT changes, not just its box size — editing
+    // within an existing line keeps the measurer's overall height the same, so the
+    // ResizeObserver may not fire and the page-break offsets would go stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.body, doc.subject, recipient, doc.reference, doc.doc_number, doc.date_received,
+      doc.cc_recipients, signerName, signerTitle, showPreparer, preparerName, logoSrc, enclosures.length]);
 
   const padTop = pageH * PAD_TOP;
   const padX = pageH * PAD_X;
@@ -140,7 +145,11 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
 
   // The letter markup — rendered in the hidden measurer (withSigRef) and in each
   // visible page slice. `spacer` pushes the signature block down when needed.
-  const Letter = ({ withSigRef, spacer }) => (
+  // NOTE: invoked as a plain function ({renderLetter(...)}), NOT as <Letter/>. As a
+  // component it would be a NEW type every render, so React would unmount+remount the
+  // whole A4 preview (and reload the logo <img>) on every keystroke. A function call
+  // returns the element tree inline, so it reconciles in place with no remount.
+  const renderLetter = ({ withSigRef, spacer }) => (
     <div style={{ paddingLeft: padX, paddingRight: padX }}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
@@ -227,7 +236,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
         className="pointer-events-none fixed -left-[9999px] top-0 -z-10 text-[13px] leading-relaxed text-slate-900 opacity-0"
         style={{ width: pageH ? pageH / A4_RATIO : 500, paddingTop: padTop }}
       >
-        <Letter withSigRef spacer={0} />
+        {renderLetter({ withSigRef: true, spacer: 0 })}
       </div>
 
       {/* visible A4 sheets — one per page, each showing its printable slice */}
@@ -244,7 +253,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
               Slice height = next offset − this offset (usableH for the last page). */}
           <div style={{ height: (p + 1 < offsets.length ? offsets[p + 1] - offsets[p] : usableH), overflow: 'hidden' }}>
             <div style={{ transform: `translateY(-${offsets[p] || 0}px)` }}>
-              <Letter spacer={sigSpacer} />
+              {renderLetter({ spacer: sigSpacer })}
             </div>
           </div>
           {/* blank footer band with a subtle page number */}

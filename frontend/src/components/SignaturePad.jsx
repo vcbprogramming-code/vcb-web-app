@@ -9,20 +9,35 @@ export default function SignaturePad({ onChange, height = 140 }) {
   const drawing = useRef(false);
   const hasInk = useRef(false); // ref, not state — avoids stale closure in end()
 
-  // Size the canvas once on mount. (Setting width/height clears the canvas, so
-  // we must NOT re-run this on every render or the signature would be wiped.)
+  // Keep the canvas BITMAP width in sync with its CSS (100%) width. The bitmap is
+  // separate from the displayed size; if the container resizes after mount (window
+  // resize, layout shift, orientation) but the bitmap doesn't, pos() — computed from
+  // the live rect — maps strokes to the wrong bitmap coordinates and the ink no
+  // longer follows the pointer. A ResizeObserver re-sizes the bitmap and rescales
+  // any existing ink so the drawn signature is preserved across the resize.
   useEffect(() => {
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1e3a8a';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!canvas) return undefined;
+    const applyCtx = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e3a8a';
+    };
+    const sizeTo = (w) => {
+      const nextW = Math.max(1, Math.round(w));
+      if (nextW === canvas.width && canvas.height === height) return;
+      const prev = document.createElement('canvas');
+      prev.width = canvas.width; prev.height = canvas.height;
+      if (prev.width && prev.height) prev.getContext('2d').drawImage(canvas, 0, 0);
+      canvas.width = nextW;
+      canvas.height = height;
+      applyCtx();
+      if (prev.width && prev.height) canvas.getContext('2d').drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, canvas.width, canvas.height);
+    };
+    sizeTo(canvas.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect?.width; if (w) sizeTo(w); });
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [height]);
 
   const pos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();

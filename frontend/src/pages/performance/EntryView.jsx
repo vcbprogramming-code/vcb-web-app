@@ -36,7 +36,14 @@ export default function EntryView({ siteKey, siteName, cur, canEdit }) {
     let cancelled = false;
     setLoading(true); setError(null);
     perfApi.siteMonth(siteKey, cur.y, cur.m)
-      .then((r) => { if (cancelled) return; setBase(r); setEntries(structuredClone(r.entries || {})); setWeekStart(0); })
+      .then((r) => {
+        if (cancelled) return;
+        setBase(r); setEntries(structuredClone(r.entries || {}));
+        // open the weekly grid on the week that contains "today" (not always week 1),
+        // so a user viewing the current month doesn't have to page forward to reach now.
+        const ti = (r.days || []).findIndex((x) => x.date === r.today);
+        setWeekStart(ti >= 0 ? Math.floor(ti / 7) * 7 : 0);
+      })
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };

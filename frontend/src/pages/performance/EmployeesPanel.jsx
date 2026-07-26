@@ -45,7 +45,7 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
 
   const field = 'field';
   return (
-    <Modal title={`จัดการพนักงาน · ${siteName || ''}`} onClose={() => { onClose(); if (dirty) onChanged?.(); }} size="lg"
+    <Modal title={`จัดการพนักงาน · ${siteName || ''}`} onClose={() => { onClose(); if (dirty) onChanged?.(); }} size="2xl"
       footer={<button onClick={() => { onClose(); if (dirty) onChanged?.(); }} className="btn-primary">เสร็จสิ้น</button>}>
       {/* add form */}
       <form onSubmit={add} className="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_120px_140px_auto]">

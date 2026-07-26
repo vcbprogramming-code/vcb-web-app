@@ -69,9 +69,8 @@ export default function ModuleShell() {
               className="group flex min-w-0 items-center gap-3 rounded-xl px-1 py-0.5 transition hover:opacity-90"
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl transition group-hover:scale-105 ${navyHeader ? 'bg-gradient-to-br from-cyan-400/15 to-blue-500/10 ring-1 ring-cyan-300/30' : 'bg-white shadow-sm ring-1 ring-slate-200'}`}>
-                {navyHeader
-                  ? <GlobeMark className="h-6 w-6" />
-                  : <img src="/logo.png" alt="VCB" className="h-9 w-9 object-contain" />}
+                {/* crisp SVG mark on every theme — the old /logo.png rasterised badly when scaled */}
+                <GlobeMark className="h-6 w-6" />
               </span>
               <span className="min-w-0 text-left leading-tight">
                 <span className={`block text-sm font-bold tracking-tight ${navyHeader ? 'text-white' : 'text-slate-900'}`}>{brand}</span>

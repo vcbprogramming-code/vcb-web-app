@@ -1,0 +1,106 @@
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+
+/**
+ * Two-step searchable picker (port of the reference oppOpen/oppRender flow).
+ * Step 1 = กิจกรรม (Activity), Step 2 = หมวดงาน (Cost Category). A one-to-one
+ * activity skips step 2 and auto-applies its fixed cost. Stored value = "A-1 / 5".
+ * Floats next to `anchor`; onApply('') clears the cell.
+ */
+export default function Picker({ anchor, activities, categories, onApply, onClose }) {
+  const [step, setStep] = useState(1);
+  const [q, setQ] = useState('');
+  const [pending, setPending] = useState(null);
+  const boxRef = useRef(null);
+  const searchRef = useRef(null);
+  const [pos, setPos] = useState({ left: 0, top: 0, width: 360, maxHeight: 460 });
+
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight, margin = 8, gap = 4;
+    const w = Math.min(560, vw - 2 * margin);
+    const left = Math.max(margin, Math.min(r.left, vw - w - margin));
+    const spaceBelow = vh - r.bottom - margin - gap;
+    const spaceAbove = r.top - margin - gap;
+    let h, top;
+    if (Math.max(spaceBelow, spaceAbove) < 260) { h = Math.min(460, vh - 2 * margin); top = Math.max(margin, Math.round((vh - h) / 2)); }
+    else if (spaceBelow >= spaceAbove) { h = Math.min(460, spaceBelow); top = r.bottom + gap; }
+    else { h = Math.min(460, spaceAbove); top = Math.max(margin, r.top - gap - h); }
+    setPos({ left, top, width: w, maxHeight: h });
+  }, [anchor, step]);
+
+  useEffect(() => { searchRef.current?.focus(); }, [step]);
+  useEffect(() => {
+    const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') { if (step === 2) { setStep(1); setQ(''); } else onClose(); } };
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [step, onClose]);
+
+  const items = step === 1 ? activities : categories;
+  const query = q.trim().toLowerCase();
+  const filtered = query
+    ? items.filter((it) => [it.name, it.desc, it.category, it.code].some((x) => String(x || '').toLowerCase().includes(query)))
+    : items;
+
+  const groups = {}; const order = [];
+  filtered.forEach((it) => {
+    const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดงาน (Work Category)';
+    if (!groups[c]) { groups[c] = []; order.push(c); }
+    groups[c].push(it);
+  });
+
+  const pick = (it) => {
+    if (step === 1) {
+      const oneToOne = (it.mapping || 'one-to-many') === 'one-to-one';
+      if (oneToOne) { onApply(it.fixed_cost ? `${it.code} / ${it.fixed_cost}` : it.code); return; }
+      setPending(it); setStep(2); setQ('');
+    } else {
+      onApply(`${pending ? pending.code : ''} / ${it.code}`);
+    }
+  };
+
+  return (
+    <div ref={boxRef} className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+      style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxHeight }}>
+      <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${step === 2 ? 'cursor-pointer text-brand' : 'text-slate-700'} bg-slate-50 border-b border-slate-200`}
+        onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
+        {step === 1
+          ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> เลือกกิจกรรม (Activity)</>
+          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> เลือกหมวดงาน · งาน: <b>{pending?.code}</b></>}
+      </div>
+      <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1.5">
+        <input ref={searchRef} type="text" placeholder="ค้นหา…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+        <span className="shrink-0 text-[11px] text-slate-400">{filtered.length}/{items.length}</span>
+        <button onMouseDown={(e) => { e.preventDefault(); onApply(''); }} className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">ล้าง</button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+        {order.length === 0
+          ? <div className="px-3 py-6 text-center text-sm text-slate-400">ไม่พบรายการ "{q}"</div>
+          : order.map((c) => (
+            <div key={c}>
+              <div className="sticky top-0 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{c}</div>
+              {groups[c].map((it) => {
+                const oneToOne = step === 1 && (it.mapping || 'one-to-many') === 'one-to-one';
+                return (
+                  <div key={it.code} onMouseDown={(e) => { e.preventDefault(); pick(it); }}
+                    className="cursor-pointer px-3 py-1.5 hover:bg-brand-tint">
+                    <div className="flex items-center gap-1.5 text-sm text-slate-800">
+                      {it.code && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{it.code}</span>}
+                      {step === 1 && it.code && (
+                        <span title={oneToOne ? 'กำหนดต้นทุนอัตโนมัติ · ขั้นตอนเดียว' : 'เลือกหมวดต้นทุนต่อ · 2 ขั้นตอน'}
+                          className={`inline-block h-1.5 w-1.5 rounded-full ${oneToOne ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                      )}
+                      <span className="truncate">{it.name}</span>
+                    </div>
+                    {it.desc && <div className="truncate pl-1 text-xs text-slate-400">{it.desc}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}

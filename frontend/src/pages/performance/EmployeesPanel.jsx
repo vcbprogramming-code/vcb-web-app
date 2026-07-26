@@ -1,109 +1,91 @@
-import { useEffect, useState, useCallback } from 'react';
-import { performanceApi } from '../../lib/modules.js';
+import { useEffect, useState } from 'react';
+import { perfApi } from '../../lib/performance.js';
+import { useToast } from '../../components/Toast.jsx';
 import { Modal } from '../../components/ui/index.js';
+import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 
-export default function EmployeesPanel({ site, onClose, onChanged }) {
-  const [employees, setEmployees] = useState([]);
+/**
+ * Manage the employee roster for one site — add / edit / activate. Employees are
+ * what the Entry grid records against, so a site needs its roster set up before
+ * HR can log work. Opened from the Entry screen.
+ */
+export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }) {
+  const toast = useToast();
+  const [list, setList] = useState(null);
   const [error, setError] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ fullName: '', employeeCode: '', kind: 'operation', team: '' });
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const [form, setForm] = useState({ fullName: '', employeeCode: '', kind: 'operation' });
+  const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState(null);
+  const [dirty, setDirty] = useState(false);
 
-  const load = useCallback(() => {
-    performanceApi.employees(site.id).then((r) => setEmployees(r.data)).catch((e) => setError(e.message));
-  }, [site.id]);
-  useEffect(() => { load(); }, [load]);
+  const load = () => perfApi.employees(siteKey).then((r) => setList(r.data)).catch((e) => setError(e.message));
+  useEffect(() => { load(); }, [siteKey]);
 
-  const submit = async (e) => {
+  const add = async (e) => {
     e.preventDefault();
-    setError(null);
+    if (!form.fullName.trim()) { toast.error('กรุณากรอกชื่อพนักงาน'); return; }
+    setBusy(true);
     try {
-      await performanceApi.addEmployee({ unitId: site.id, ...form });
-      setForm({ fullName: '', employeeCode: '', kind: 'operation', team: '' });
-      setAdding(false);
-      load();
-      onChanged?.();
-    } catch (err) {
-      setError(err.message);
-    }
+      await perfApi.createEmployee({ site: siteKey, fullName: form.fullName.trim(), employeeCode: form.employeeCode.trim() || null, kind: form.kind });
+      setForm({ fullName: '', employeeCode: '', kind: form.kind });
+      setDirty(true); toast.success('เพิ่มพนักงานแล้ว'); await load();
+    } catch (e2) { toast.error(e2.message); } finally { setBusy(false); }
+  };
+  const toggleKind = async (emp) => {
+    setRowBusy(emp.eid);
+    try { await perfApi.updateEmployee(emp.eid, { kind: emp.kind === 'operation' ? 'support' : 'operation' }); setDirty(true); await load(); }
+    catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
+  };
+  const toggleActive = async (emp) => {
+    setRowBusy(emp.eid);
+    try { await perfApi.updateEmployee(emp.eid, { isActive: false }); setDirty(true); toast.success('ปิดใช้งานพนักงานแล้ว'); await load(); }
+    catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
   };
 
-  const toggle = async (emp) => {
-    try { await performanceApi.updateEmployee(emp.id, { isActive: !emp.is_active }); load(); onChanged?.(); }
-    catch (e) { setError(e.message); }
-  };
-
+  const field = 'field';
   return (
-    <Modal
-      title={`พนักงาน · ${site.name}`}
-      onClose={onClose}
-      size="2xl"
-      footer={<button onClick={onClose} className="btn-outline">ปิด</button>}
-    >
-      {error && <div className="mb-3 bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+    <Modal title={`จัดการพนักงาน · ${siteName || ''}`} onClose={() => { onClose(); if (dirty) onChanged?.(); }} size="lg"
+      footer={<button onClick={() => { onClose(); if (dirty) onChanged?.(); }} className="btn-primary">เสร็จสิ้น</button>}>
+      {/* add form */}
+      <form onSubmit={add} className="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_120px_140px_auto]">
+        <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} placeholder="ชื่อ-นามสกุล" className={field} />
+        <input value={form.employeeCode} onChange={(e) => setForm((f) => ({ ...f, employeeCode: e.target.value }))} placeholder="รหัส (ถ้ามี)" className={field} />
+        <select value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} className={field}>
+          <option value="operation">สายปฏิบัติการ</option>
+          <option value="support">สายสนับสนุน</option>
+        </select>
+        <button type="submit" disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังเพิ่ม…"><Icon name="plus" className="h-4 w-4" /> เพิ่ม</BusyLabel></button>
+      </form>
 
-      {!adding ? (
-        <button onClick={() => setAdding(true)} className="btn-primary mb-3"><Icon name="plus" className="h-4 w-4" /> เพิ่มพนักงาน</button>
-      ) : (
-        <form onSubmit={submit} className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 p-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
-            <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className="field" required />
+      {error ? <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        : !list ? <div className="flex justify-center py-10"><Spinner label="กำลังโหลด…" /></div>
+        : list.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">ยังไม่มีพนักงานในไซต์นี้ — เพิ่มด้านบนได้เลย</p>
+        : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="tbl min-w-[440px]">
+              <thead><tr className="tbl-head"><th className="tbl-th">ชื่อ</th><th className="tbl-th">รหัส</th><th className="tbl-th">ประเภท</th><th className="tbl-th text-right">จัดการ</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {list.map((e) => (
+                  <tr key={e.eid} className="tbl-row">
+                    <td className="tbl-td font-medium text-slate-800">{e.name}</td>
+                    <td className="tbl-td text-slate-500">{e.emp_id || '—'}</td>
+                    <td className="tbl-td">
+                      <button onClick={() => toggleKind(e)} disabled={rowBusy === e.eid} title="สลับประเภท" className={`chip disabled:opacity-50 ${e.kind === 'operation' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}`}>
+                        {e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'} ⇄
+                      </button>
+                    </td>
+                    <td className="tbl-td text-right">
+                      <button onClick={() => toggleActive(e)} disabled={rowBusy === e.eid} className="text-sm text-red-500 hover:underline disabled:opacity-50">
+                        <BusyLabel busy={rowBusy === e.eid} busyText="…">ปิดใช้งาน</BusyLabel>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">รหัสพนักงาน</label>
-            <input value={form.employeeCode} onChange={(e) => set('employeeCode', e.target.value)} className="field" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">ประเภท <span className="text-red-500">*</span></label>
-            <select value={form.kind} onChange={(e) => set('kind', e.target.value)} className="field">
-              <option value="operation">สายปฏิบัติการ (OT)</option>
-              <option value="support">สายสนับสนุน (ไดอารี่)</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">ทีม/ตำแหน่ง</label>
-            <input value={form.team} onChange={(e) => set('team', e.target.value)} className="field" />
-          </div>
-          <div className="col-span-2 flex justify-end gap-2">
-            <button type="button" onClick={() => setAdding(false)} className="btn-outline">ยกเลิก</button>
-            <button type="submit" className="btn-primary">เพิ่ม</button>
-          </div>
-        </form>
-      )}
-
-      <div className="overflow-hidden rounded-xl border border-slate-200">
-        <table className="tbl">
-          <thead>
-            <tr className="tbl-head">
-              <th className="tbl-th">ชื่อ</th>
-              <th className="tbl-th">ประเภท</th>
-              <th className="tbl-th">ทีม</th>
-              <th className="tbl-th text-right">สถานะ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {employees.map((e) => (
-              <tr key={e.id} className="tbl-row">
-                <td className="tbl-td font-medium text-slate-800">{e.full_name}</td>
-                <td className="tbl-td">
-                  <span className={`chip ${e.kind === 'operation' ? 'bg-blue-50 text-blue-700' : 'bg-violet-50 text-violet-700'}`}>
-                    {e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'}
-                  </span>
-                </td>
-                <td className="tbl-td text-slate-500">{e.team || '—'}</td>
-                <td className="tbl-td text-right">
-                  <button onClick={() => toggle(e)} className={`text-sm hover:underline ${e.is_active ? 'text-slate-500' : 'text-emerald-600'}`}>
-                    {e.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {employees.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">ยังไม่มีพนักงาน</td></tr>}
-          </tbody>
-        </table>
-      </div>
+        )}
     </Modal>
   );
 }

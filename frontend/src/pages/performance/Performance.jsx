@@ -1,127 +1,110 @@
 import { useEffect, useState } from 'react';
-import { performanceApi } from '../../lib/modules.js';
-import { formatThaiLongDate } from '../../lib/ememo.js';
+import { perfApi } from '../../lib/performance.js';
+import { useToast } from '../../components/Toast.jsx';
 import { PageHeader } from '../../components/ui/index.js';
+import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
-import PerformanceGrid from './PerformanceGrid.jsx';
+import EntryView from './EntryView.jsx';
+import Dashboard from './Dashboard.jsx';
+import WorkIndex from './WorkIndex.jsx';
+import SettingsView from './SettingsView.jsx';
 
-const THAI_MONTHS = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-];
-function monthLabel(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  return `${THAI_MONTHS[m - 1]} ${y + 543}`;
-}
-function shiftMonth(ym, delta) {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function Ring({ pct, color }) {
-  const r = 18;
-  const c = 2 * Math.PI * r;
-  const off = c - (Math.min(100, pct) / 100) * c;
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" className="shrink-0">
-      <circle cx="24" cy="24" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
-      <circle cx="24" cy="24" r={r} fill="none" stroke={color || '#2563EB'} strokeWidth="5"
-        strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" transform="rotate(-90 24 24)" />
-      <text x="24" y="28" textAnchor="middle" className="fill-slate-700 text-[11px] font-bold">{pct}%</text>
-    </svg>
-  );
-}
+const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+const monthLabel = ({ y, m }) => `${THAI_MONTHS[m - 1]} ${y + 543}`;
+const shift = ({ y, m }, delta) => { const d = new Date(y, m - 1 + delta, 1); return { y: d.getFullYear(), m: d.getMonth() + 1 }; };
 
 export default function Performance() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [data, setData] = useState(null);
+  const now = new Date();
+  const toast = useToast();
+  const [boot, setBoot] = useState(null);
   const [error, setError] = useState(null);
-  const [openSite, setOpenSite] = useState(null); // {id, name, color}
+  const [view, setView] = useState('entry'); // entry | dashboard | index | settings
+  const [cur, setCur] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
+  const [siteKey, setSiteKey] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const downloadExcel = async () => {
+    if (!siteKey) return;
+    setExporting(true);
+    try {
+      const url = await perfApi.exportUrl(siteKey, cur.y, cur.m);
+      const a = document.createElement('a');
+      a.href = url; a.download = `worklog-${siteKey}-${cur.y}-${String(cur.m).padStart(2, '0')}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message || 'ส่งออกไม่สำเร็จ'); }
+    finally { setExporting(false); }
+  };
 
   useEffect(() => {
-    performanceApi.dashboard(month).then((r) => setData(r.data)).catch((e) => setError(e.message));
-  }, [month]);
+    perfApi.bootstrap()
+      .then((r) => { setBoot(r); if (r.sites?.length) setSiteKey(r.sites[0].key); if (!r.canEntry) setView('dashboard'); })
+      .catch((e) => setError(e.message));
+  }, []);
 
-  if (openSite) {
-    return (
-      <PerformanceGrid
-        site={openSite}
-        month={month}
-        onBack={() => {
-          setOpenSite(null);
-          performanceApi.dashboard(month).then((r) => setData(r.data)).catch(() => {});
-        }}
-      />
-    );
-  }
+  if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
+  if (!boot) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
 
-  const cards = data?.cards || [];
+  const tabs = [
+    { key: 'dashboard', label: 'ภาพรวม', show: true },
+    { key: 'entry', label: 'บันทึกงาน', show: boot.canEntry },
+    { key: 'index', label: 'ทะเบียนงาน', show: boot.isAdmin },
+    { key: 'settings', label: 'ตั้งค่า', show: boot.isAdmin },
+  ].filter((t) => t.show);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="รายงานการปฏิบัติงาน"
-        subtitle="ภาพรวมการบันทึกการทำงานรายหน่วยงาน · บันทึกงาน + OT"
+        subtitle="บันทึกกิจกรรมงานรายวันของพนักงานแต่ละไซต์ พร้อมภาพรวมความครบถ้วน"
         right={
           <div className="flex items-center gap-2">
-            <button onClick={() => setMonth(shiftMonth(month, -1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
-            <span className="chip bg-brand/10 text-brand min-w-[120px] justify-center">{monthLabel(month)}</span>
-            <button onClick={() => setMonth(shiftMonth(month, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, -1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
+            <span className="chip bg-brand/10 text-brand min-w-[130px] justify-center">{monthLabel(cur)}</span>
+            <button onClick={() => setCur(shift(cur, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
           </div>
         }
       />
 
-      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {/* view tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        {tabs.map((t) => (
+          <button key={t.key} onClick={() => setView(t.key)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === t.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            {t.label}
+          </button>
+        ))}
+        {/* site picker + export (entry view) */}
+        {view === 'entry' && boot.sites.length > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
+              <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> Excel</BusyLabel>
+            </button>
+            <select value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+              {boot.sites.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
 
-      {!data ? (
-        <div className="text-slate-400">กำลังโหลด…</div>
-      ) : cards.length === 0 ? (
-        <div className="card text-center text-slate-400">ยังไม่มีหน่วยงานในขอบเขตของคุณ — เพิ่มหน่วยงานได้ที่ตั้งค่าระบบ</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {cards.map((c) => {
-            const color = c.color || '#2563EB';
-            return (
-              <div key={c.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <div className="h-1.5" style={{ backgroundColor: color }} />
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="truncate font-bold text-slate-800" style={{ color }}>{c.name}</h3>
-                      <p className="truncate text-xs text-slate-500">{c.company || 'วิจิตรภัณฑ์ก่อสร้าง'}</p>
-                    </div>
-                    <Ring pct={c.pct} color={color} />
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-lg font-bold text-slate-900">{c.employees}</div>
-                      <div className="text-[11px] text-slate-400">พนักงาน</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-slate-900">{c.filled}</div>
-                      <div className="text-[11px] text-slate-400">บันทึกแล้ว</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-slate-900">{c.pct}%</div>
-                      <div className="text-[11px] text-slate-400">ครบถ้วน</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[11px] text-slate-400">
-                    {c.op_count} ปฏิบัติการ · {c.sup_count} สนับสนุน
-                  </div>
-                  <button
-                    onClick={() => setOpenSite({ id: c.id, name: c.name, color })}
-                    className="mt-4 w-full rounded-xl py-2.5 text-sm font-semibold text-white transition"
-                    style={{ backgroundColor: color }}
-                  >
-                    เปิดบันทึก →
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {view === 'dashboard' && (
+        <Dashboard cur={cur} onOpenSite={(key) => { setSiteKey(key); setView('entry'); }} />
+      )}
+
+      {view === 'entry' && (
+        boot.sites.length === 0
+          ? <div className="card text-center text-sm text-slate-400">ยังไม่มีไซต์งานในขอบเขตของคุณ</div>
+          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} />
+      )}
+
+      {view === 'index' && <WorkIndex />}
+
+      {view === 'settings' && (
+        <SettingsView
+          sites={boot.sites}
+          onSitesChange={(key, lockDays) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, lockDays } : s)) }))}
+        />
       )}
     </div>
   );

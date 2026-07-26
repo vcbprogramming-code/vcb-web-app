@@ -6,10 +6,15 @@ import { requireAuth, requireRole, requirePermission } from '../middleware/auth.
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
+// =============================================================================
+// Module 2 — daily work-ACTIVITY log (hr-worklog). API mirrors the reference
+// app's server contract: bootstrap / site-month / admin-summary / cell save,
+// plus activity + cost-category catalogs. A cell is team (operation composite
+// "A-1 / 5") | detail (support free text) | pm (optional 2nd task). No OT.
+// =============================================================================
+
 const router = Router();
 router.use(requireAuth);
-
-const EMPLOYEE_KINDS = ['operation', 'support'];
 
 // ── helpers ──────────────────────────────────────────────────────────────
 /** Units this user may see. admin/executive = null (all); hr = their unit ids. */
@@ -25,298 +30,390 @@ function assertUnitInScope(scoped, unitId) {
 }
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
-const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
-function isLocked(ymdStr, lockDays) {
-  if (!lockDays || lockDays <= 0) return false;
-  const today = new Date();
-  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const [Y, M, D] = ymdStr.split('-').map(Number);
-  const diff = Math.round((t - new Date(Y, M - 1, D)) / 86400000);
-  return diff > lockDays;
-}
-const unitOut = (u) => ({ id: u.id, name: u.name, code: u.code, company: u.company, color: u.color, lock_days: u.lock_days });
-const empOut = (e) => ({ id: e.id, full_name: e.full_name, employee_code: e.employee_code, unit_id: e.unit_id, kind: e.kind, team: e.team, is_active: e.is_active });
-// Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts.
-// Using toISOString() here would shift the day on any server with a +UTC offset
-// (e.g. Asia/Bangkok), breaking coverage/export key matching against ymd().
-const dateStr = (d) => {
-  if (!d) return null;
-  const dt = new Date(d);
-  return ymd(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+const daysInMonthN = (y, m) => new Date(y, m, 0).getDate();
+/** Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts. */
+const dateStr = (v) => {
+  const d = v instanceof Date ? v : new Date(v);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-const logOut = (l) => ({
-  id: l.id, employee_id: l.employee_id, ymd: dateStr(l.ymd), kind: l.kind, team: l.team,
-  work_type_id: l.work_type_id, work_type_name: l.work_type_name,
-  ot_hours: l.ot_hours != null ? Number(l.ot_hours) : null, ot_rate: l.ot_rate != null ? Number(l.ot_rate) : null,
-  ot_amount: l.ot_amount != null ? Number(l.ot_amount) : null, reason: l.reason,
-  detail: l.detail, note: l.note, status: l.status || '',
-});
+const todayStr = () => { const t = new Date(); return ymd(t.getFullYear(), t.getMonth() + 1, t.getDate()); };
+const addDaysStr = (s, n) => { const [Y, M, D] = s.split('-').map(Number); const d = new Date(Y, M - 1, D + n); return ymd(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+// reference: weekend = Sunday only (dow === 0)
+const isWeekend = (Y, M, d) => new Date(Y, M - 1, d).getDay() === 0;
+/** editable window = [today − lockDays, today + 1]; locked if before that. */
+function isLocked(ds, lockDays) {
+  if (!lockDays || lockDays <= 0) return false;
+  return ds < addDaysStr(todayStr(), -lockDays);
+}
+const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
-// ── sites + dashboard ──────────────────────────────────────────────────────
-router.get('/sites', asyncHandler(async (req, res) => {
+const siteOut = (u) => ({ key: u.code, name: u.name, company: u.company, color: u.color, lockDays: u.lock_days ?? 3 });
+const activityOut = (a) => ({ code: a.code, name: a.name, desc: a.description || '', category: a.category, mapping: a.mapping || 'one-to-many', fixed_cost: a.fixed_cost || undefined, sites: '' });
+const categoryOut = (c) => ({ code: c.code, name: c.name, name_en: c.name_en || '' });
+
+async function loadUnitByKey(key) {
+  return queryOne('select * from units where code = $1', [key]);
+}
+async function loadActivities() {
+  // hr-worklog activities MUST have a code (used in the "A-1 / 5" composite); skip
+  // legacy code-less work_types left over from the old OT module.
+  return (await query("select id, code, name, description, category, mapping, fixed_cost, sort_order from work_types where is_active = true and code is not null order by sort_order, code, name")).rows;
+}
+async function loadCategories() {
+  return (await query('select code, name, name_en, sort_order from cost_categories where is_active = true order by sort_order, code')).rows;
+}
+
+// canEntry = may record work (admin/hr, or explicit performance.edit); executives view only.
+function canEntry(profile) {
+  return profile.role === 'admin' || profile.role === 'hr';
+}
+
+// ── bootstrap ──────────────────────────────────────────────────────────────
+router.get('/bootstrap', asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
-  const { rows } = scoped
-    ? await query('select * from units where id = any($1) order by name', [scoped])
-    : await query('select * from units order by name');
-  res.json({ data: rows.map(unitOut) });
+  const units = (scoped
+    ? await query('select code, name, company, color, lock_days from units where id = any($1) and code is not null order by name', [scoped])
+    : await query('select code, name, company, color, lock_days from units where code is not null order by name')).rows;
+  res.json({
+    ok: true,
+    email: req.profile.email,
+    role: req.profile.role,
+    isAdmin: req.profile.role === 'admin',
+    canEntry: canEntry(req.profile),
+    sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, lockDays: u.lock_days ?? 3 })),
+  });
 }));
 
-router.get('/dashboard', asyncHandler(async (req, res) => {
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  const [Y, M] = month.split('-').map(Number);
-  const dim = daysInMonth(Y, M);
-  const today = new Date();
-  const lastDay = (Y === today.getFullYear() && M === today.getMonth() + 1) ? today.getDate() : dim;
-  const scoped = scopedUnitIds(req.profile);
+// ── catalogs (Work Index) ───────────────────────────────────────────────────
+router.get('/activities', asyncHandler(async (req, res) => {
+  res.json({ data: (await loadActivities()).map(activityOut) });
+}));
+router.get('/cost-categories', asyncHandler(async (req, res) => {
+  res.json({ data: (await loadCategories()).map(categoryOut) });
+}));
 
-  const units = (scoped
-    ? await query('select * from units where id = any($1) order by name', [scoped])
-    : await query('select * from units order by name')).rows;
+const activitySchema = z.object({
+  code: z.string().min(1), name: z.string().min(1), description: z.string().optional().nullable(),
+  category: z.string().min(1), mapping: z.enum(['one-to-one', 'one-to-many']).optional(),
+  fixedCost: z.string().optional().nullable(), sortOrder: z.number().int().optional(),
+});
+router.post('/activities', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = activitySchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const d = p.data;
+  const row = await queryOne(
+    `insert into work_types (code, name, description, category, mapping, fixed_cost, sort_order)
+     values ($1,$2,$3,$4,$5,$6,$7) returning *`,
+    [d.code, d.name, d.description || null, d.category, d.mapping || 'one-to-many', d.fixedCost || null, d.sortOrder ?? 0]
+  ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสกิจกรรมนี้มีอยู่แล้ว'); throw e; });
+  res.status(201).json({ data: activityOut(row) });
+}));
+router.patch('/activities/:code', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = activitySchema.partial().extend({ isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const map = { name: 'name', description: 'description', category: 'category', mapping: 'mapping', fixedCost: 'fixed_cost', sortOrder: 'sort_order', isActive: 'is_active' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'No fields to update');
+  vals.push(req.params.code);
+  const row = await queryOne(`update work_types set ${sets.join(', ')} where code = $${vals.length} returning *`, vals);
+  if (!row) throw new ApiError(404, 'ไม่พบกิจกรรม');
+  res.json({ data: activityOut(row) });
+}));
 
-  const empAgg = (await query(
-    `select unit_id, count(*)::int total, count(*) filter (where kind='operation')::int op
-       from employees where is_active = true ${scoped ? 'and unit_id = any($1)' : ''} group by unit_id`,
-    scoped ? [scoped] : []
-  )).rows;
-  const logAgg = (await query(
-    `select unit_id, count(*)::int filled from work_logs
-       where ymd >= $1 and ymd <= $2 ${scoped ? 'and unit_id = any($3)' : ''} group by unit_id`,
-    scoped ? [ymd(Y, M, 1), ymd(Y, M, lastDay), scoped] : [ymd(Y, M, 1), ymd(Y, M, lastDay)]
-  )).rows;
+const categorySchema = z.object({ code: z.string().min(1), name: z.string().min(1), nameEn: z.string().optional().nullable(), sortOrder: z.number().int().optional() });
+router.post('/cost-categories', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = categorySchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const d = p.data;
+  const row = await queryOne(
+    `insert into cost_categories (code, name, name_en, sort_order) values ($1,$2,$3,$4) returning *`,
+    [d.code, d.name, d.nameEn || null, d.sortOrder ?? 0]
+  ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสหมวดต้นทุนนี้มีอยู่แล้ว'); throw e; });
+  res.status(201).json({ data: categoryOut(row) });
+}));
+router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = categorySchema.partial().extend({ isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const map = { name: 'name', nameEn: 'name_en', sortOrder: 'sort_order', isActive: 'is_active' };
+  const sets = []; const vals = [];
+  for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'No fields to update');
+  vals.push(req.params.code);
+  const row = await queryOne(`update cost_categories set ${sets.join(', ')} where code = $${vals.length} returning *`, vals);
+  if (!row) throw new ApiError(404, 'ไม่พบหมวดต้นทุน');
+  res.json({ data: categoryOut(row) });
+}));
 
-  const empBy = Object.fromEntries(empAgg.map((e) => [e.unit_id, e]));
-  const filledBy = Object.fromEntries(logAgg.map((l) => [l.unit_id, l.filled]));
-  const cards = units.map((u) => {
-    const e = empBy[u.id] || { total: 0, op: 0 };
-    const expected = e.total * lastDay;
-    const filled = filledBy[u.id] || 0;
-    return { ...unitOut(u), employees: e.total, op_count: e.op, sup_count: e.total - e.op,
-      filled, expected, pct: expected ? Math.round((filled / expected) * 100) : 0 };
-  });
-  res.json({ data: { month, cards } });
+// set a site's back-date lock window (admin, Settings screen)
+router.patch('/sites/:code', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ lockDays: z.number().int().min(0).max(60) }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const unit = await loadUnitByKey(req.params.code);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  const row = await queryOne('update units set lock_days = $1 where id = $2 returning code, name, company, color, lock_days', [p.data.lockDays, unit.id]);
+  res.json({ data: siteOut(row) });
 }));
 
 // ── employees ────────────────────────────────────────────────────────────
+async function employeesForUnit(unitId, month) {
+  const emps = (await query(
+    `select e.*, d.name as department_name, p.name as position_name
+       from employees e
+       left join departments d on d.id = e.department_id
+       left join positions p on p.id = e.position_id
+      where e.unit_id = $1 and e.is_active = true
+      order by e.kind, e.full_name`, [unitId]
+  )).rows;
+  const ids = emps.map((e) => e.id);
+  let awayBy = {};
+  if (ids.length) {
+    const from = month ? `${month}-01` : null;
+    const to = month ? `${month}-31` : null;
+    const rows = month
+      ? (await query('select employee_id, ymd from employee_away where employee_id = any($1) and ymd >= $2 and ymd <= $3', [ids, from, to])).rows
+      : (await query('select employee_id, ymd from employee_away where employee_id = any($1)', [ids])).rows;
+    for (const r of rows) (awayBy[r.employee_id] ||= []).push(dateStr(r.ymd));
+  }
+  return emps.map((e) => ({
+    eid: e.id, name: e.full_name, emp_id: e.employee_code || '',
+    department: e.department_name || '', position: e.position_name || '',
+    kind: e.kind, team: e.team || '', away: awayBy[e.id] || [],
+    moved_in: '', moved_out: '',
+  }));
+}
+
 router.get('/employees', asyncHandler(async (req, res) => {
-  const { unitId } = req.query;
-  if (!unitId) throw new ApiError(400, 'unitId is required');
-  assertUnitInScope(scopedUnitIds(req.profile), unitId);
-  const { rows } = await query('select * from employees where unit_id = $1 order by kind, full_name', [unitId]);
-  res.json({ data: rows.map(empOut) });
+  const key = req.query.site;
+  if (!key) throw new ApiError(400, 'site is required');
+  const unit = await loadUnitByKey(key);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  res.json({ data: await employeesForUnit(unit.id, req.query.month) });
 }));
 
 const employeeSchema = z.object({
-  unitId: z.string().uuid(), fullName: z.string().min(1),
-  employeeCode: z.string().optional().nullable(), kind: z.enum(EMPLOYEE_KINDS),
-  team: z.string().optional().nullable(),
+  site: z.string().min(1), fullName: z.string().min(1),
+  employeeCode: z.string().optional().nullable(), kind: z.enum(['operation', 'support']),
 });
 router.post('/employees', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
-  const parsed = employeeSchema.safeParse(req.body);
-  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-  assertUnitInScope(scopedUnitIds(req.profile), parsed.data.unitId);
-  const d = parsed.data;
+  const p = employeeSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const unit = await loadUnitByKey(p.data.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
   const row = await queryOne(
-    `insert into employees (unit_id, full_name, employee_code, kind, team, is_active)
-     values ($1,$2,$3,$4,$5,true) returning *`,
-    [d.unitId, d.fullName, d.employeeCode || null, d.kind, d.team || null]
+    `insert into employees (unit_id, full_name, employee_code, kind, is_active) values ($1,$2,$3,$4,true) returning id`,
+    [unit.id, p.data.fullName, p.data.employeeCode || null, p.data.kind]
   );
-  res.status(201).json({ data: empOut(row) });
+  res.status(201).json({ data: { eid: row.id } });
 }));
 router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
-  const parsed = employeeSchema.partial().extend({ isActive: z.boolean().optional() }).safeParse(req.body);
-  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-  const f = parsed.data;
-  const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', team: 'team', isActive: 'is_active' };
+  const p = z.object({ fullName: z.string().optional(), employeeCode: z.string().optional().nullable(), kind: z.enum(['operation', 'support']).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', isActive: 'is_active' };
   const sets = []; const vals = [];
-  for (const [k, col] of Object.entries(map)) if (f[k] !== undefined) { vals.push(f[k]); sets.push(`${col} = $${vals.length}`); }
+  for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
   vals.push(req.params.id);
-  const row = await queryOne(`update employees set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
-  if (!row) throw new ApiError(404, 'Employee not found');
-  res.json({ data: empOut(row) });
+  const row = await queryOne(`update employees set ${sets.join(', ')} where id = $${vals.length} returning id`, vals);
+  if (!row) throw new ApiError(404, 'ไม่พบพนักงาน');
+  res.json({ data: { eid: row.id } });
+}));
+// mark / unmark an away (leave) day for an employee
+router.post('/employees/:id/away', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), away: z.boolean() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  if (p.data.away) await query('insert into employee_away (employee_id, ymd) values ($1,$2) on conflict do nothing', [req.params.id, p.data.date]);
+  else await query('delete from employee_away where employee_id = $1 and ymd = $2', [req.params.id, p.data.date]);
+  res.json({ data: { ok: true } });
 }));
 
-// ── work-type master index ──────────────────────────────────────────────
-router.get('/work-types', asyncHandler(async (req, res) => {
-  const { rows } = await query('select id, code, name, description, category from work_types where is_active = true order by category, sort_order, name');
-  res.json({ data: rows });
-}));
-router.post('/work-types', requireRole('admin'), asyncHandler(async (req, res) => {
-  const parsed = z.object({ code: z.string().optional().nullable(), name: z.string().min(1),
-    description: z.string().optional().nullable(), category: z.string().optional(), sortOrder: z.number().int().optional() }).safeParse(req.body);
-  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
-  const d = parsed.data;
-  const row = await queryOne(
-    `insert into work_types (code, name, description, category, sort_order)
-     values ($1,$2,$3,$4,$5) returning id, code, name, description, category`,
-    [d.code || null, d.name, d.description || null, d.category || 'ทั่วไป', d.sortOrder ?? 0]
-  );
-  res.status(201).json({ data: row });
-}));
+// ── site-month (grid) ───────────────────────────────────────────────────────
+router.get('/site-month', asyncHandler(async (req, res) => {
+  const key = req.query.site;
+  const Y = Number(req.query.year), M = Number(req.query.month);
+  if (!key || !Y || !M) throw new ApiError(400, 'site, year, month are required');
+  const unit = await loadUnitByKey(key);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
 
-// ── grid load + save ──────────────────────────────────────────────────────
-router.get('/grid', asyncHandler(async (req, res) => {
-  const { unitId } = req.query;
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  if (!unitId) throw new ApiError(400, 'unitId is required');
-  assertUnitInScope(scopedUnitIds(req.profile), unitId);
-  const unit = await queryOne('select * from units where id = $1', [unitId]);
-  if (!unit) throw new ApiError(404, 'Site not found');
-  const lockDays = unit.lock_days ?? 3;
-  const [Y, M] = month.split('-').map(Number);
-  const dim = daysInMonth(Y, M);
-  const today = new Date();
-  const todayYmd = ymd(today.getFullYear(), today.getMonth() + 1, today.getDate());
-
+  const dim = daysInMonthN(Y, M);
   const days = [];
   for (let d = 1; d <= dim; d++) {
     const ds = ymd(Y, M, d);
-    const dow = new Date(Y, M - 1, d).getDay();
-    days.push({ ymd: ds, day: d, weekend: dow === 0 || dow === 6, today: ds === todayYmd, future: ds > todayYmd, locked: isLocked(ds, lockDays) });
+    days.push({ date: ds, dow: new Date(Y, M - 1, d).getDay(), weekend: isWeekend(Y, M, d) });
   }
-  const employees = (await query('select * from employees where unit_id = $1 and is_active = true order by kind, full_name', [unitId])).rows;
-  const logs = (await query('select * from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unitId, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
-  res.json({ data: { month, unit: unitOut(unit), days, employees: employees.map(empOut), logs: logs.map(logOut) } });
+  const month = `${Y}-${pad(M)}`;
+  const employees = await employeesForUnit(unit.id, month);
+  const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+  const entries = {};
+  for (const l of logs) {
+    const ds = dateStr(l.ymd);
+    const cell = {};
+    if (l.team) cell.team = l.team;
+    if (l.detail) cell.detail = l.detail;
+    if (l.pm) cell.pm = l.pm;
+    if (Object.keys(cell).length) (entries[l.employee_id] ||= {})[ds] = cell;
+  }
+  const teams = (await loadActivities()).map(activityOut);
+  const costs = (await loadCategories()).map((c) => ({ code: c.code, name: c.name }));
+  res.json({
+    ok: true, days, employees, entries, teams, costs,
+    today: todayStr(), lockDays: unit.lock_days ?? 3, edits: {},
+  });
 }));
 
-const cellSchema = z.object({
-  employeeId: z.string().uuid(), ymd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), kind: z.enum(EMPLOYEE_KINDS),
-  team: z.string().optional().nullable(), workTypeId: z.string().uuid().optional().nullable(),
-  workTypeName: z.string().optional().nullable(), otHours: z.number().optional().nullable(),
-  otRate: z.number().optional().nullable(), otAmount: z.number().optional().nullable(),
-  reason: z.string().optional().nullable(), detail: z.string().optional().nullable(),
-  note: z.string().optional().nullable(), status: z.enum(['', 'leave', 'off']).optional(),
+// ── save one cell field (autosave) ──────────────────────────────────────────
+const cellSaveSchema = z.object({
+  site: z.string().min(1),
+  eid: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  field: z.enum(['team', 'detail', 'pm']),
+  value: z.string().optional().default(''),
+  adminUnlock: z.boolean().optional(),
 });
-router.post('/grid/save', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
-  const body = z.object({ unitId: z.string().uuid(), cells: z.array(cellSchema).min(1).max(500), adminUnlock: z.boolean().optional() }).safeParse(req.body);
-  if (!body.success) throw new ApiError(400, 'Invalid input', body.error.flatten());
-  const { unitId, cells, adminUnlock } = body.data;
-  assertUnitInScope(scopedUnitIds(req.profile), unitId);
-  const unit = await queryOne('select lock_days from units where id = $1', [unitId]);
-  if (!unit) throw new ApiError(404, 'Site not found');
+router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = cellSaveSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const { site, eid, date, field, value, adminUnlock } = p.data;
+  const unit = await loadUnitByKey(site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  const emp = await queryOne('select id, unit_id, kind from employees where id = $1', [eid]);
+  if (!emp || emp.unit_id !== unit.id) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+
   const lockDays = unit.lock_days ?? 3;
   const canUnlock = req.profile.role === 'admin' && adminUnlock;
+  if (isLocked(date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว (ผู้ดูแลระบบปลดล็อกได้)');
 
-  // guard: every cell's employee must belong to this unit, otherwise a user
-  // scoped to unit A could overwrite unit B's logs by passing a foreign employeeId
-  // (work_logs.unique(employee_id, ymd) ignores unit_id on conflict).
-  const empIds = [...new Set(cells.map((c) => c.employeeId))];
-  const { rows: unitEmps } = await query('select id from employees where unit_id = $1 and id = any($2::uuid[])', [unitId, empIds]);
-  const allowedEmp = new Set(unitEmps.map((e) => e.id));
-  for (const c of cells) {
-    if (!allowedEmp.has(c.employeeId)) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
-  }
+  const existing = await queryOne('select team, detail, pm from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
+  const next = { team: existing?.team || null, detail: existing?.detail || null, pm: existing?.pm || null };
+  next[field] = value && value.trim() ? value.trim() : null;
 
-  const saved = [];
-  for (const c of cells) {
-    if (isLocked(c.ymd, lockDays) && !canUnlock) continue;
-    const otAmount = c.otAmount != null ? c.otAmount : (c.otHours != null && c.otRate != null ? c.otHours * c.otRate : null);
-    const row = await queryOne(
-      `insert into work_logs
-         (employee_id, unit_id, ymd, kind, team, work_type_id, work_type_name, ot_hours, ot_rate, ot_amount, reason, detail, note, status, updated_by)
-       values ($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       on conflict (employee_id, ymd) do update set
-         kind=excluded.kind, team=excluded.team, work_type_id=excluded.work_type_id, work_type_name=excluded.work_type_name,
-         ot_hours=excluded.ot_hours, ot_rate=excluded.ot_rate, ot_amount=excluded.ot_amount, reason=excluded.reason,
-         detail=excluded.detail, note=excluded.note, status=excluded.status, updated_by=excluded.updated_by, updated_at=now()
-       returning *`,
-      [c.employeeId, unitId, c.ymd, c.kind, c.team ?? null, c.workTypeId || null, c.workTypeName ?? null,
-       c.otHours ?? null, c.otRate ?? null, otAmount, c.reason ?? null, c.detail ?? null, c.note ?? null, c.status ?? '', req.profile.id]
-    );
-    saved.push(logOut(row));
+  if (!next.team && !next.detail && !next.pm) {
+    await query('delete from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
+    return res.json({ data: { ok: true, cleared: true } });
   }
-  res.json({ data: { saved, count: saved.length } });
+  await query(
+    `insert into work_logs (employee_id, unit_id, ymd, kind, team, detail, pm, status, updated_by)
+     values ($1,$2,$3,$4,$5,$6,$7,'',$8)
+     on conflict (employee_id, ymd) do update set
+       unit_id=excluded.unit_id, kind=excluded.kind, team=excluded.team, detail=excluded.detail,
+       pm=excluded.pm, updated_by=excluded.updated_by, updated_at=now()`,
+    [eid, unit.id, date, emp.kind, next.team, next.detail, next.pm, req.profile.id]
+  );
+  res.json({ data: { ok: true } });
 }));
 
-// ── coverage ──────────────────────────────────────────────────────────────
-router.get('/coverage', asyncHandler(async (req, res) => {
-  const { unitId } = req.query;
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  if (!unitId) throw new ApiError(400, 'unitId is required');
-  assertUnitInScope(scopedUnitIds(req.profile), unitId);
-  const [Y, M] = month.split('-').map(Number);
-  const dim = daysInMonth(Y, M);
-  const today = new Date();
-  const todayYmd = ymd(today.getFullYear(), today.getMonth() + 1, today.getDate());
+// ── admin summary (dashboard) ────────────────────────────────────────────────
+router.get('/admin-summary', asyncHandler(async (req, res) => {
+  const Y = Number(req.query.year), M = Number(req.query.month);
+  if (!Y || !M) throw new ApiError(400, 'year, month are required');
+  const scoped = scopedUnitIds(req.profile);
+  const units = (scoped
+    ? await query('select * from units where id = any($1) and code is not null order by name', [scoped])
+    : await query('select * from units where code is not null order by name')).rows;
 
-  const employees = (await query('select * from employees where unit_id = $1 and is_active = true order by kind, full_name', [unitId])).rows;
-  const logs = (await query('select * from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unitId, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
-  const byKey = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
+  const dim = daysInMonthN(Y, M);
+  const tStr = todayStr();
+  const actMap = new Map((await loadActivities()).map((a) => [a.code, a.name]));
+  const catMap = new Map((await loadCategories()).map((c) => [c.code, c.name]));
 
-  const cellStatus = (emp, ds, dow) => {
-    if (ds > todayYmd) return 'future';
-    const log = byKey.get(`${emp.id}_${ds}`);
-    if (log) {
-      if (log.status === 'leave') return 'leave';
-      if (log.status === 'off') return 'off';
-      const has = log.kind === 'operation' ? (log.work_type_name || log.ot_hours != null || log.team) : (log.detail || log.note);
-      return has ? 'filled' : 'missed';
-    }
-    if (dow === 0 || dow === 6) return 'off';
-    return 'missed';
-  };
-  const rows = employees.map((emp) => {
-    const cells = [];
+  const rows = [];
+  for (const u of units) {
+    const emps = (await query("select id, kind from employees where unit_id = $1 and is_active = true", [u.id])).rows;
+    const awayRows = emps.length ? (await query('select employee_id, ymd from employee_away where employee_id = any($1) and ymd >= $2 and ymd <= $3', [emps.map((e) => e.id), ymd(Y, M, 1), ymd(Y, M, dim)])).rows : [];
+    const awayBy = {}; for (const a of awayRows) (awayBy[a.employee_id] ||= new Set()).add(dateStr(a.ymd));
+    const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [u.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+    const cellBy = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
+
+    const nOp = emps.filter((e) => e.kind === 'operation').length;
+    const nSup = emps.length - nOp;
+    const startedOp = new Set(), startedSup = new Set();
+    const daysFilled = [];
+    let fillRateDenom = 0, filledSum = 0, entriesCount = 0;
+    const actAgg = new Map(), costAgg = new Map();
+    let topTotal = 0;
+
     for (let d = 1; d <= dim; d++) {
       const ds = ymd(Y, M, d);
-      cells.push({ ymd: ds, status: cellStatus(emp, ds, new Date(Y, M - 1, d).getDay()) });
+      const weekend = isWeekend(Y, M, d);
+      let total = 0, filled = 0;
+      for (const e of emps) {
+        const away = awayBy[e.id]?.has(ds);
+        if (!weekend && !away) total++;
+        const c = cellBy.get(`${e.id}_${ds}`);
+        if (cellFilled(c)) {
+          filled++; entriesCount++;
+          (e.kind === 'operation' ? startedOp : startedSup).add(e.id);
+          // top lists — slots weighted 0.5 each when a 2nd task exists
+          const slots = [c.team || c.detail, c.pm].filter((s) => s && s.trim());
+          const w = slots.length > 1 ? 0.5 : 1;
+          for (const s of slots) {
+            const [actCode, costCode] = s.split(' / ').map((x) => x && x.trim());
+            const actName = actMap.get(actCode) || actCode;
+            actAgg.set(actName, (actAgg.get(actName) || 0) + w);
+            if (costCode) { const cn = catMap.get(costCode) || costCode; costAgg.set(cn, (costAgg.get(cn) || 0) + w); }
+            topTotal += w;
+          }
+        }
+      }
+      daysFilled.push({ date: ds, weekend, total, filled });
+      if (ds <= tStr && !weekend) { fillRateDenom += total; filledSum += filled; }
     }
-    return { employee: empOut(emp), cells };
-  });
-  const days = [];
-  for (let d = 1; d <= dim; d++) {
-    const ds = ymd(Y, M, d);
-    if (ds > todayYmd) { days.push({ ymd: ds, pct: null }); continue; }
-    let exp = 0, ok = 0;
-    for (const r of rows) {
-      const c = r.cells[d - 1];
-      if (c.status === 'off' || c.status === 'future') continue;
-      exp++;
-      if (c.status === 'filled' || c.status === 'leave') ok++;
-    }
-    days.push({ ymd: ds, pct: exp ? Math.round((ok / exp) * 100) : null });
+    const toTop = (agg) => [...agg.entries()]
+      .map(([name, x]) => ({ name, count: Math.round(x * 10) / 10, pct: topTotal ? Math.round((x / topTotal) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    rows.push({
+      site_key: u.code, site_name: u.name, company: u.company, color: u.color,
+      n_emp: emps.length, n_support: nSup, n_operation: nOp,
+      support_started: startedSup.size, operation_started: startedOp.size,
+      entries: entriesCount,
+      fillRate: fillRateDenom ? Math.round((filledSum / fillRateDenom) * 100) : 0,
+      fillRateDenom, daysFilled,
+      topActivities: toTop(actAgg), topCostCodes: toTop(costAgg),
+    });
   }
-  res.json({ data: { month, days, rows } });
+  res.json({ ok: true, rows, today: tStr, lockDays: 3 });
 }));
 
 // ── export xlsx ───────────────────────────────────────────────────────────
 router.get('/export', asyncHandler(async (req, res) => {
-  const { unitId } = req.query;
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  if (!unitId) throw new ApiError(400, 'unitId is required');
-  assertUnitInScope(scopedUnitIds(req.profile), unitId);
-  const unit = await queryOne('select * from units where id = $1', [unitId]);
-  const [Y, M] = month.split('-').map(Number);
-  const dim = daysInMonth(Y, M);
-  const employees = (await query('select * from employees where unit_id = $1 and is_active = true order by kind, full_name', [unitId])).rows;
-  const logs = (await query('select * from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unitId, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+  const key = req.query.site;
+  const Y = Number(req.query.year), M = Number(req.query.month);
+  if (!key || !Y || !M) throw new ApiError(400, 'site, year, month are required');
+  const unit = await loadUnitByKey(key);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  const dim = daysInMonthN(Y, M);
+  const employees = await employeesForUnit(unit.id, `${Y}-${pad(M)}`);
+  const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
   const byKey = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
 
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet(`${unit?.name || 'site'} ${month}`);
+  const ws = wb.addWorksheet(`${unit.name} ${Y}-${pad(M)}`.slice(0, 30));
   const header = ['พนักงาน', 'ประเภท'];
   for (let d = 1; d <= dim; d++) header.push(String(d));
   ws.addRow(header);
   for (const e of employees) {
-    const row = [e.full_name, e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'];
+    const row = [e.name, e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'];
     for (let d = 1; d <= dim; d++) {
-      const l = byKey.get(`${e.id}_${ymd(Y, M, d)}`);
+      const l = byKey.get(`${e.eid}_${ymd(Y, M, d)}`);
       let v = '';
       if (l) {
-        if (l.status === 'leave') v = 'ลา';
-        else if (l.status === 'off') v = 'พัก';
-        else if (e.kind === 'operation') v = l.ot_hours != null ? `OT ${l.ot_hours}` : (l.work_type_name || l.team || '✓');
-        else v = l.detail ? '✓' : '';
+        const primary = e.kind === 'operation' ? l.team : l.detail;
+        v = [primary, l.pm].filter(Boolean).join(' + ');
       }
       row.push(v);
     }
     ws.addRow(row);
   }
-  ws.getRow(1).font = { bold: true };
+  const buf = await wb.xlsx.writeBuffer();
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename="performance-${month}.xlsx"`);
-  await wb.xlsx.write(res);
-  res.end();
+  res.setHeader('Content-Disposition', `attachment; filename="worklog-${key}-${Y}-${pad(M)}.xlsx"`);
+  res.send(Buffer.from(buf));
 }));
 
 export default router;

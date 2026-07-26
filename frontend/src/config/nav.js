@@ -15,10 +15,10 @@ export const apps = [
   {
     to: '/performance',
     title: 'รายงานการปฏิบัติงาน',
-    desc: 'บันทึกงานรายวัน + OT รายหน่วยงาน พร้อมแดชบอร์ดความครบถ้วน',
+    desc: 'บันทึกกิจกรรมงานรายวันของพนักงานแต่ละไซต์ พร้อมแดชบอร์ดความครบถ้วน',
     icon: 'chart',
     color: 'bg-emerald-50 text-emerald-600',
-    enabled: false, // soft-launch: เปิดเฉพาะ E-Memo ก่อน
+    enabled: true, // live (Module 2 — hr-worklog)
   },
   {
     to: '/credit',

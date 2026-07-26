@@ -127,12 +127,15 @@ async function loadVisibility(profile) {
   };
 }
 
-/** True if `vis` (from loadVisibility) permits a doc with this project/code. */
+/** True if `vis` (from loadVisibility) permits a doc with this project/code.
+ *  Scopes are a UNION, not an intersection: a user granted project P *and*
+ *  doc_code X may see docs in P OR docs coded X. AND-combining them (the old
+ *  behaviour) hid docs the user was explicitly granted. */
 function visibilityAllows(vis, projectId, docCode) {
   if (!vis) return true;
-  const projOk = !vis.projectIds.length || vis.projectIds.includes(projectId);
-  const codeOk = !vis.docCodes.length || vis.docCodes.includes(docCode);
-  return projOk && codeOk;
+  if (vis.projectIds.length && vis.projectIds.includes(projectId)) return true;
+  if (vis.docCodes.length && vis.docCodes.includes(docCode)) return true;
+  return false;
 }
 
 /** Throw 403 if this scoped user may not access the given document (#8).
@@ -177,10 +180,13 @@ function buildWhere(q, visibility = null) {
     const i = params.length;
     where.push(`(d.subject ilike $${i} or d.doc_number ilike $${i} or d.recipient ilike $${i} or d.remarks ilike $${i})`);
   }
-  // per-user visibility scoping (#8)
+  // per-user visibility scoping (#8) — UNION of granted scopes (project OR code),
+  // matching visibilityAllows(). AND-ing them hid explicitly-granted docs.
   if (visibility) {
-    if (visibility.projectIds.length) add('d.project_id = any($$::uuid[])', visibility.projectIds);
-    if (visibility.docCodes.length) add('d.doc_code = any($$::text[])', visibility.docCodes);
+    const scope = [];
+    if (visibility.projectIds.length) { params.push(visibility.projectIds); scope.push(`d.project_id = any($${params.length}::uuid[])`); }
+    if (visibility.docCodes.length) { params.push(visibility.docCodes); scope.push(`d.doc_code = any($${params.length}::text[])`); }
+    if (scope.length) where.push(`(${scope.join(' or ')})`);
   }
   return { whereSql: where.length ? `where ${where.join(' and ')}` : '', params };
 }
@@ -487,7 +493,7 @@ router.post(
   '/:id/messages',
   asyncHandler(async (req, res) => {
     const doc = await getDocOr404(req.params.id);
-    await assertDocVisible(req.profile, doc);
+    await assertCanView(req.profile, doc); // #7: need view perm (or be a pending approver), not just visibility
     const parsed = messageSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const row = await queryOne(
@@ -504,7 +510,7 @@ router.post(
   '/:id/messages/:msgId/attachments',
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    await assertDocVisible(req.profile, await getDocOr404(req.params.id));
+    await assertCanView(req.profile, await getDocOr404(req.params.id)); // #7
     const msg = await queryOne('select id from document_messages where id = $1 and document_id = $2', [req.params.msgId, req.params.id]);
     if (!msg) throw new ApiError(404, 'Message not found');
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
@@ -537,7 +543,7 @@ router.post(
   '/:id/consult',
   asyncHandler(async (req, res) => {
     const doc = await getDocOr404(req.params.id);
-    await assertDocVisible(req.profile, doc);
+    await assertCanView(req.profile, doc); // #7
     const parsed = consultSchema.safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const { email, name, question } = parsed.data;
@@ -658,6 +664,15 @@ router.patch(
     const doc = await loadDocForMutation(req);
     if (!['draft', 'pending', 'returned', 'rejected'].includes(doc.status)) {
       throw new ApiError(409, 'แก้ไขได้เฉพาะเอกสารที่ยังไม่อนุมัติ/ปิดเรื่อง');
+    }
+    // #5: once ANY approver in the chain has acted (approved/signed), the content
+    // they endorsed must not change under them. Edits only while nobody has acted.
+    if (doc.status === 'pending') {
+      const acted = await queryOne(
+        "select 1 from approval_steps where document_id = $1 and action <> 'pending' limit 1",
+        [doc.id]
+      );
+      if (acted) throw new ApiError(409, 'มีผู้อนุมัติในสายทางแล้ว ไม่สามารถแก้ไขเนื้อหาได้ (ให้ตีกลับเพื่อแก้ไข)');
     }
     const f = parsed.data;
     const sets = [];
@@ -1083,9 +1098,10 @@ router.post(
       ).catch((e) => console.error('resubmit audit failed:', e.message));
     }
 
-    // Chain fully approved on submit (creator IS the signer and no higher approvers)
-    // → produce the signed PDF now, like the finalize path in /approve.
-    if (chain.finalized) {
+    // Produce the signed PDF now when either the chain fully approved on submit
+    // (creator IS the signer, no higher approvers), OR the PM/signer step was
+    // auto-approved but execs remain — the next exec must see the PM's signature (#6).
+    if (chain.finalized || chain.signerAutoApproved) {
       await generateApprovedPdf(doc.id).catch((e) => console.error('approved-pdf failed:', e.message));
       await autoCombine(doc.id);
     }

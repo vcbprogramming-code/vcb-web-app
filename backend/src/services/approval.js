@@ -86,7 +86,10 @@ export async function createApprovalChain(client, { documentId, approvers, actor
     [documentId, actorId || null, actorLabel || null, JSON.stringify({ steps: approvers.length })]
   );
 
-  return { firstStep: firstToEmail, finalized };
+  // signerAutoApproved: the PM/signer step was stamped now (activateIdx advanced
+  // past it). Even when the chain isn't finalized, the caller must regenerate the
+  // signed PDF so the next exec reviews the letter WITH the PM's signature (#6).
+  return { firstStep: firstToEmail, finalized, signerAutoApproved: activateIdx > 0 };
 }
 
 /**

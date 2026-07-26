@@ -53,14 +53,27 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
   );
   if (!doc) throw new Error('Document not found');
 
-  // base letter: the approved (signed) version if it exists, else the original
-  const base = await queryOne(
-    `select storage_key from document_attachments
-      where document_id = $1 and kind = 'generated_pdf'
-      order by (version = 'approved') desc, created_at desc
-      limit 1`,
-    [documentId]
-  );
+  // base letter: prefer the approved (signed) version ONLY when the document is
+  // actually approved. A rejected/returned doc still has an old approved PDF on
+  // file — combining that would show a signed letter for a doc that was rejected.
+  const preferApproved = doc.status === 'approved';
+  let base = null;
+  if (!preferApproved) {
+    base = await queryOne(
+      `select storage_key from document_attachments
+        where document_id = $1 and kind = 'generated_pdf' and version <> 'approved'
+        order by created_at desc limit 1`,
+      [documentId]
+    );
+  }
+  if (!base) {
+    base = await queryOne(
+      `select storage_key from document_attachments
+        where document_id = $1 and kind = 'generated_pdf'
+        order by (version = 'approved') desc, created_at desc limit 1`,
+      [documentId]
+    );
+  }
   if (!base) return null; // no letter generated yet — nothing to combine
 
   // supplementary uploads, in upload order

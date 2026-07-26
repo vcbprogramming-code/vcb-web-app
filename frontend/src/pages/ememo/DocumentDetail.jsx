@@ -95,9 +95,12 @@ export default function DocumentDetail() {
   // refresh manually. `combinePending` = there are mergeable uploads but no
   // combined file yet.
   const combinePollRef = useRef(0);
+  // Only PDF/image uploads get merged into the combined file — Excel/other files
+  // are never combined (backend skips them), so they must NOT count as "pending
+  // merge" or the poller spins forever + refetches 6× on an Excel-only doc (#8).
   const combinePending = doc
     ? (doc.attachments || []).some((a) => a.kind === 'upload'
-        && (/^(application\/pdf|image\/)/.test(a.content_type || '') || isSheet(a)))
+        && /^(application\/pdf|image\/)/.test(a.content_type || ''))
       && !(doc.attachments || []).some((a) => a.kind === 'combined_pdf')
     : false;
   useEffect(() => {
@@ -138,10 +141,11 @@ export default function DocumentDetail() {
   // "แสดงแค่บันทึกข้อความก็พอ"). Extra uploaded PDFs/images appear as their own
   // labelled tabs (B3). Excel is download-only (client #7).
   const previewables = doc ? (() => {
+    const atts = doc.attachments || []; // #9: guard — attachments may be absent
     const letter =
-      doc.attachments.find((a) => a.version === 'approved') ||
-      doc.attachments.find((a) => a.version === 'original');
-    const inlineKinds = doc.attachments.filter(
+      atts.find((a) => a.version === 'approved') ||
+      atts.find((a) => a.version === 'original');
+    const inlineKinds = atts.filter(
       (a) => (a.kind === 'upload') && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
     const list = [];
@@ -154,7 +158,7 @@ export default function DocumentDetail() {
   // Uploads that can't be shown inline (Word, zip, csv…) AND all spreadsheets
   // (Excel is download-only per client #7 — rendering the table inline is
   // redundant with the attached file) — listed as downloads so nothing is hidden.
-  const otherFiles = doc ? doc.attachments.filter(
+  const otherFiles = doc ? (doc.attachments || []).filter(
     (a) => a.kind === 'upload' && (isSheet(a) || !/^(application\/pdf|image\/)/.test(a.content_type || ''))
   ) : [];
   const fmtSize = (b) => (b == null ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1048576).toFixed(1)} MB`);

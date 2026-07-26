@@ -10,6 +10,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { verifyPassword, signToken, tokenExpiresAt } from '../utils/auth.js';
 import { putObject, openDownloadStream } from '../config/storage.js';
 import { effectivePermissions } from '../config/permissions.js';
+import { assertRasterImage } from '../utils/imageUpload.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -46,8 +47,11 @@ const LOGIN_MAX = 12;
 const loginHits = new Map(); // key -> { count, resetAt }
 
 function throttleKey(req) {
-  const ip = (req.headers['x-forwarded-for']?.split(',')[0] || req.ip || 'ip').trim();
-  const email = (req.body?.email || '').toString().toLowerCase();
+  // req.ip is the real client IP now that the app trusts the proxy (see app.js).
+  // Don't parse X-Forwarded-For by hand — a client can spoof that header to
+  // mint a fresh throttle bucket per request and defeat the limit entirely.
+  const ip = (req.ip || 'ip').toString().trim();
+  const email = (req.body?.email || req.body?.credential || '').toString().toLowerCase();
   return `${ip}|${email}`;
 }
 function loginThrottle(req, res, next) {
@@ -127,6 +131,7 @@ const googleSchema = z.object({ credential: z.string().min(10) });
  */
 router.post(
   '/google',
+  loginThrottle,
   asyncHandler(async (req, res) => {
     if (!googleClient) {
       throw new ApiError(501, 'ยังไม่ได้ตั้งค่า Google Sign-In (ไม่มี GOOGLE_CLIENT_ID)');
@@ -165,6 +170,7 @@ router.post(
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
     }
 
+    clearThrottle(req); // successful login — reset the attempt counter
     res.json(loginResponse(profile));
   })
 );
@@ -255,11 +261,9 @@ router.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
-    if (!String(req.file.mimetype || '').startsWith('image/')) {
-      throw new ApiError(400, 'ลายเซ็นต้องเป็นรูปภาพ');
-    }
+    const sigType = assertRasterImage(req.file, 'ลายเซ็น'); // #10: sniff bytes, reject SVG
     const key = `signatures/profile/${req.profile.id}-${crypto.randomUUID()}`;
-    await putObject(key, req.file.buffer, req.file.mimetype);
+    await putObject(key, req.file.buffer, sigType);
     res.status(201).json({ data: { key } });
   })
 );

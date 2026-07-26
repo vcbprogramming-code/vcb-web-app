@@ -168,8 +168,11 @@ async function employeesForUnit(unitId, month) {
   const ids = emps.map((e) => e.id);
   let awayBy = {};
   if (ids.length) {
+    // real month bounds — a literal `${month}-31` is an invalid date for 30/28-day
+    // months and makes the whole query 500.
+    const [mY, mM] = month ? month.split('-').map(Number) : [];
     const from = month ? `${month}-01` : null;
-    const to = month ? `${month}-31` : null;
+    const to = month ? `${month}-${pad(daysInMonthN(mY, mM))}` : null;
     const rows = month
       ? (await query('select employee_id, ymd from employee_away where employee_id = any($1) and ymd >= $2 and ymd <= $3', [ids, from, to])).rows
       : (await query('select employee_id, ymd from employee_away where employee_id = any($1)', [ids])).rows;
@@ -208,9 +211,17 @@ router.post('/employees', requirePermission('performance', 'edit'), asyncHandler
   );
   res.status(201).json({ data: { eid: row.id } });
 }));
+// load an employee and confirm it belongs to a unit the caller may write to
+async function assertEmployeeScoped(profile, employeeId) {
+  const emp = await queryOne('select id, unit_id, kind, is_active from employees where id = $1', [employeeId]);
+  if (!emp) throw new ApiError(404, 'ไม่พบพนักงาน');
+  assertUnitInScope(scopedUnitIds(profile), emp.unit_id);
+  return emp;
+}
 router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = z.object({ fullName: z.string().optional(), employeeCode: z.string().optional().nullable(), kind: z.enum(['operation', 'support']).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  await assertEmployeeScoped(req.profile, req.params.id); // #B: no cross-unit writes
   const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', isActive: 'is_active' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
@@ -224,6 +235,7 @@ router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHa
 router.post('/employees/:id/away', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), away: z.boolean() }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  await assertEmployeeScoped(req.profile, req.params.id); // #B: no cross-unit writes
   if (p.data.away) await query('insert into employee_away (employee_id, ymd) values ($1,$2) on conflict do nothing', [req.params.id, p.data.date]);
   else await query('delete from employee_away where employee_id = $1 and ymd = $2', [req.params.id, p.data.date]);
   res.json({ data: { ok: true } });
@@ -280,8 +292,9 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   const unit = await loadUnitByKey(site);
   if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
   assertUnitInScope(scopedUnitIds(req.profile), unit.id);
-  const emp = await queryOne('select id, unit_id, kind from employees where id = $1', [eid]);
+  const emp = await queryOne('select id, unit_id, kind, is_active from employees where id = $1', [eid]);
   if (!emp || emp.unit_id !== unit.id) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  if (emp.is_active === false) throw new ApiError(400, 'พนักงานคนนี้ถูกปิดการใช้งานแล้ว');
 
   const lockDays = unit.lock_days ?? 3;
   const canUnlock = req.profile.role === 'admin' && adminUnlock;
@@ -393,7 +406,9 @@ router.get('/export', asyncHandler(async (req, res) => {
   const byKey = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
 
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet(`${unit.name} ${Y}-${pad(M)}`.slice(0, 30));
+  // Excel sheet names reject * ? : \ / [ ] and cap at 31 chars — sanitize or addWorksheet throws 500
+  const wsName = `${unit.name} ${Y}-${pad(M)}`.replace(/[*?:\\/\[\]]/g, ' ').slice(0, 30) || 'Sheet1';
+  const ws = wb.addWorksheet(wsName);
   const header = ['พนักงาน', 'ประเภท'];
   for (let d = 1; d <= dim; d++) header.push(String(d));
   ws.addRow(header);

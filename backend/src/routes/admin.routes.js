@@ -9,6 +9,7 @@ import { ApiError } from '../middleware/errorHandler.js';
 import { hashPassword } from '../utils/auth.js';
 import { PERMISSION_CATALOG, effectivePermissions, overridesFromEffective } from '../config/permissions.js';
 import { putObject } from '../config/storage.js';
+import { assertRasterImage } from '../utils/imageUpload.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
 
@@ -330,11 +331,9 @@ router.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
-    if (!String(req.file.mimetype || '').startsWith('image/')) {
-      throw new ApiError(400, 'โลโก้ต้องเป็นไฟล์รูปภาพ');
-    }
+    const logoType = assertRasterImage(req.file, 'โลโก้'); // #10: sniff bytes, reject SVG
     const key = `companies/logo/${crypto.randomUUID()}`;
-    await putObject(key, req.file.buffer, req.file.mimetype);
+    await putObject(key, req.file.buffer, logoType);
     res.status(201).json({ data: { key } });
   })
 );
@@ -555,11 +554,9 @@ router.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
-    if (!String(req.file.mimetype || '').startsWith('image/')) {
-      throw new ApiError(400, 'ลายเซ็นต้องเป็นไฟล์รูปภาพ');
-    }
+    const sigType = assertRasterImage(req.file, 'ลายเซ็น'); // #10: sniff bytes, reject SVG
     const key = `projects/${req.params.id}/signature/${crypto.randomUUID()}`;
-    await putObject(key, req.file.buffer, req.file.mimetype);
+    await putObject(key, req.file.buffer, sigType);
     res.status(201).json({ data: { key } });
   })
 );

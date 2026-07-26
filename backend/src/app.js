@@ -9,6 +9,10 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
+  // Behind Render's proxy: trust the first hop so req.ip is the real client IP
+  // (used by the login throttle) instead of the proxy address.
+  app.set('trust proxy', 1);
+
   // CLIENT_ORIGIN may be a comma-separated list (dev + prod frontends).
   const allowedOrigins = env.clientOrigin.split(',').map((s) => s.trim()).filter(Boolean);
   const corsOrigin = (origin, cb) => {
@@ -18,7 +22,7 @@ export function createApp() {
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
-      /^https:\/\/project-bhq0j[a-z0-9-]*\.vercel\.app$/i.test(origin)
+      /^https:\/\/project-bhq0j(-[a-z0-9]+)*\.vercel\.app$/i.test(origin)
     ) {
       return cb(null, true);
     }

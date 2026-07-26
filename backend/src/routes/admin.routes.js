@@ -99,9 +99,14 @@ router.patch(
         throw new ApiError(400, 'ไม่สามารถปิดการใช้งานหรือลดสิทธิ์บัญชีของตนเองได้');
       }
       // Changing your own login method or email can lock you out (e.g. switching
-      // to Google with a non-Google email, or a typo). Only allow it when another
-      // active admin exists to recover the account.
-      if ((f.loginMethod && f.loginMethod !== 'email') || f.email !== undefined) {
+      // to Google with a non-Google email, or a typo). Only require a backup admin
+      // when the email/login-method ACTUALLY changes — the edit form always resends
+      // the current email, so comparing against the stored value avoids blocking a
+      // sole admin from editing just their name/title. (#D2)
+      const cur = await queryOne('select email, login_method from profiles where id = $1', [req.profile.id]);
+      const emailChanged = f.email !== undefined && String(f.email).toLowerCase() !== String(cur?.email || '').toLowerCase();
+      const loginChanged = f.loginMethod !== undefined && f.loginMethod !== cur?.login_method;
+      if (emailChanged || loginChanged) {
         const other = await queryOne(
           "select id from profiles where role = 'admin' and is_active = true and id <> $1 limit 1",
           [req.profile.id]
@@ -123,7 +128,10 @@ router.patch(
     const add = (col, val) => { vals.push(val); sets.push(`${col} = $${vals.length}`); };
     if (f.fullName !== undefined) add('full_name', f.fullName);
     if (f.email !== undefined) add('email', f.email);
-    if (f.role !== undefined) add('role', f.role);
+    // A role change re-baselines permissions against the NEW role's defaults, so any
+    // stored overrides (computed against the OLD role) must be cleared — otherwise a
+    // demoted admin keeps the all-true overrides its admin role implied. (#D1)
+    if (f.role !== undefined) { add('role', f.role); add('permissions', {}); }
     if (f.unitId !== undefined) add('unit_id', f.unitId);
     if (f.isActive !== undefined) add('is_active', f.isActive);
     if (f.loginMethod !== undefined) add('login_method', f.loginMethod);
@@ -374,6 +382,12 @@ router.patch(
     try {
       await client.query('begin');
       if (f.isDefault === true) await client.query('update companies set is_default = false where is_default = true and id <> $1', [req.params.id]);
+      // don't allow clearing the default directly — that would leave the system with
+      // no default company for the letterhead fallback. Set another as default instead. (#D6)
+      if (f.isDefault === false) {
+        const { rows: cur } = await client.query('select is_default from companies where id = $1', [req.params.id]);
+        if (cur[0]?.is_default) { await client.query('rollback'); throw new ApiError(409, 'ยกเลิกค่าเริ่มต้นโดยตรงไม่ได้ — ตั้งบริษัทอื่นเป็นค่าเริ่มต้นแทน'); }
+      }
       const sets = []; const vals = [];
       for (const [k, col] of Object.entries(map)) {
         if (f[k] !== undefined) { vals.push(f[k]); sets.push(`${col} = $${vals.length}`); }
@@ -455,6 +469,11 @@ router.patch(
     const parsed = projectSchema.partial().safeParse(req.body);
     if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
     const f = parsed.data;
+    // renaming to an existing code hits a unique index — return a clean 409, not a raw 500 (#D5)
+    if (f.code !== undefined) {
+      const dup = await queryOne('select id from projects where lower(code) = lower($1) and id <> $2', [f.code, req.params.id]);
+      if (dup) throw new ApiError(409, 'รหัสโครงการนี้มีอยู่แล้ว');
+    }
     const map = { code: 'code', name: 'name', docPrefix: 'doc_prefix', color: 'color', sortOrder: 'sort_order', isActive: 'is_active' };
     const sets = []; const vals = [];
     for (const [k, col] of Object.entries(map)) {

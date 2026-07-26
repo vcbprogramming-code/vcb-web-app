@@ -3,6 +3,11 @@ import Icon from './Icon.jsx';
 
 const ToastContext = createContext(null);
 
+// module-level sequence → every toast id is unique. (performance.now() is clamped
+// to ms in most browsers, so two same-message toasts in one tick collided → duplicate
+// React keys and a shared dismiss timer removing both.) (#D7)
+let toastSeq = 0;
+
 const VARIANTS = {
   success: { icon: 'check', ring: 'ring-emerald-200', bar: 'bg-emerald-500', iconBg: 'bg-emerald-50 text-emerald-600' },
   error: { icon: 'x', ring: 'ring-red-200', bar: 'bg-red-500', iconBg: 'bg-red-50 text-red-600' },
@@ -20,8 +25,7 @@ export function ToastProvider({ children }) {
   const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
   const push = useCallback((message, variant = 'info', ttl = 3500) => {
-    // no Date.now()/random needed — a monotonically increasing counter is enough
-    const id = `${message}-${Math.floor(performance.now() * 1000)}`;
+    const id = `toast-${++toastSeq}`;
     setToasts((t) => [...t, { id, message, variant }]);
     setTimeout(() => dismiss(id), ttl);
   }, [dismiss]);

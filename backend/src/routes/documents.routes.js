@@ -155,10 +155,13 @@ async function assertDocVisible(profile, doc) {
 async function assertCanView(profile, doc) {
   const approver = await queryOne(
     `select 1 from approval_steps
-      where document_id = $1 and action = 'pending' and lower(approver_email) = lower($2)
+      where document_id = $1 and action = 'pending' and action_token is not null
+        and lower(approver_email) = lower($2)
       limit 1`,
     [doc.id, profile.email || '']
   );
+  // only the CURRENTLY-active approver (their step is issued a token) bypasses view
+  // scope — a later approver in the chain shouldn't see the doc before it's their turn (#C7)
   if (approver) return;
   if (!hasPermission(profile, 'ememo', 'view')) throw new ApiError(403, 'ไม่มีสิทธิ์ดูเอกสาร');
   await assertDocVisible(profile, doc);
@@ -169,14 +172,18 @@ async function assertCanView(profile, doc) {
 function buildWhere(q, visibility = null) {
   const where = [];
   const params = [];
+  // a repeated query param (?projectId=a&projectId=b) arrives as an array; binding
+  // that where a scalar is expected makes Postgres reject the cast → 500. Coerce to
+  // the first value so a malformed URL can't crash the register. (#C3)
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
   const add = (clause, value) => { params.push(value); where.push(clause.replace('$$', `$${params.length}`)); };
-  if (q.projectId) add('d.project_id = $$', q.projectId);
-  if (q.status) add('d.status = $$', q.status);
-  if (q.docTypeId) add('d.doc_type_id = $$', q.docTypeId);
-  if (q.from) add('d.date_received >= $$', q.from);
-  if (q.to) add('d.date_received <= $$', q.to);
+  if (q.projectId) add('d.project_id = $$', one(q.projectId));
+  if (q.status) add('d.status = $$', one(q.status));
+  if (q.docTypeId) add('d.doc_type_id = $$', one(q.docTypeId));
+  if (q.from) add('d.date_received >= $$', one(q.from));
+  if (q.to) add('d.date_received <= $$', one(q.to));
   if (q.search) {
-    params.push(`%${q.search}%`);
+    params.push(`%${one(q.search)}%`);
     const i = params.length;
     where.push(`(d.subject ilike $${i} or d.doc_number ilike $${i} or d.recipient ilike $${i} or d.remarks ilike $${i})`);
   }
@@ -279,6 +286,7 @@ router.get(
 /** GET /api/documents/companies — active companies for the create-form picker. */
 router.get(
   '/companies',
+  requirePermission('ememo', 'view'), // #C8: don't expose the company directory to accounts with no E-Memo access
   asyncHandler(async (req, res) => {
     const { rows } = await query(
       `select id, name, name_en, address, phone, telex, fax, logo_url, is_default
@@ -291,6 +299,7 @@ router.get(
 /** GET /api/documents/companies/:id/logo — stream a company's logo image. */
 router.get(
   '/companies/:id/logo',
+  requirePermission('ememo', 'view'), // #C8
   asyncHandler(async (req, res) => {
     const c = await queryOne('select logo_url from companies where id = $1', [req.params.id]);
     if (!c?.logo_url) throw new ApiError(404, 'ไม่มีโลโก้');
@@ -304,6 +313,7 @@ router.get(
 
 router.get(
   '/next-number',
+  requirePermission('ememo', 'view'), // #C8: running-number lookup is document data, not public to any login
   asyncHandler(async (req, res) => {
     const { projectId, docCode } = req.query;
     if (!projectId || !docCode) throw new ApiError(400, 'projectId and docCode are required');
@@ -329,8 +339,10 @@ router.get(
       if (vis.projectIds.length) { vp.push(vis.projectIds); vparts.push(`d.project_id = any($${vp.length}::uuid[])`); }
       if (vis.docCodes.length) { vp.push(vis.docCodes); vparts.push(`d.doc_code = any($${vp.length}::text[])`); }
     }
-    const vAnd = vparts.length ? ' and ' + vparts.join(' and ') : '';
-    const vWhere = vparts.length ? ' where ' + vparts.join(' and ') : '';
+    // UNION of granted scopes (project OR doc_code), matching visibilityAllows() and
+    // buildWhere() — AND-ing them hid docs the user was explicitly granted. (#C1)
+    const vAnd = vparts.length ? ` and (${vparts.join(' or ')})` : '';
+    const vWhere = vparts.length ? ` where (${vparts.join(' or ')})` : '';
     const [byStatus, byProject, recent, pending, thisMonth] = await Promise.all([
       query(`select d.status, count(*)::int as count from documents d${vWhere} group by d.status`, vp),
       query(`select p.code, p.color, count(d.*)::int as count
@@ -417,7 +429,7 @@ router.get(
          left join projects pr on pr.id = d.project_id
         where d.status <> 'cancelled'
           and (d.doc_number ilike $1 or d.subject ilike $1)
-          ${scope.length ? 'and ' + scope.join(' and ') : ''}
+          ${scope.length ? `and (${scope.join(' or ')})` : ''}
         order by d.date_received desc
         limit 15`,
       params
@@ -575,6 +587,11 @@ router.post(
 
 // ── create / edit / cancel ──────────────────────────────────────────────────
 
+// YYYY-MM-DD, a real calendar date. Guards against `new Date(bad).toISOString()`
+// throwing RangeError → 500, and against Postgres rejecting a bad date cast. (#C2)
+const ymdField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)')
+  .refine((s) => { const d = new Date(`${s}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; }, 'วันที่ไม่ถูกต้อง');
+
 const createSchema = z.object({
   projectId: z.string().uuid(),
   companyId: z.string().uuid().optional().nullable(),
@@ -590,7 +607,7 @@ const createSchema = z.object({
   body: z.string().optional(),
   remarks: z.string().optional(),
   docTypeId: z.string().uuid().optional().nullable(),
-  dateReceived: z.string().optional(),
+  dateReceived: ymdField.optional(),
   workUnit: z.string().optional(),
   enclosures: z.array(z.object({ name: z.string(), qty: z.number().optional(), unit: z.string().optional() })).optional(),
 });
@@ -649,7 +666,7 @@ const editSchema = z.object({
   body: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   docTypeId: z.string().uuid().optional().nullable(),
-  dateReceived: z.string().optional(),
+  dateReceived: ymdField.optional(),
   workUnit: z.string().optional().nullable(),
   enclosures: z.array(z.object({ name: z.string(), qty: z.number().optional(), unit: z.string().optional() })).optional(),
 });
@@ -681,7 +698,7 @@ router.patch(
     // `label` is the Thai field name; `oldVal` reads from the pre-update row.
     const changes = [];
     const enclText = (e) => (Array.isArray(e) ? e.map((x, i) => `${i + 1}. ${x.name || ''}${x.qty != null ? ` (${x.qty} ${x.unit || 'ชุด'})` : ''}`).join(', ') : '');
-    const dateText = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const dateText = (d) => { if (!d) return ''; const dt = new Date(d); return Number.isNaN(dt.getTime()) ? String(d) : dt.toISOString().slice(0, 10); };
     const add = (col, val, cast = '', label = null, oldVal = undefined, format = (v) => (v == null || v === '' ? '' : String(v))) => {
       vals.push(val);
       sets.push(`${col} = $${vals.length}${cast}`);
@@ -1078,6 +1095,10 @@ router.post(
       await client.query('commit');
     } catch (err) {
       await client.query('rollback');
+      // two concurrent submits (double-click) race on approval_steps' unique
+      // (document_id, step_no) — the loser hits 23505. The winner already built the
+      // chain, so tell the loser it's already pending instead of a raw 500. (#C4)
+      if (err?.code === '23505') throw new ApiError(409, 'เอกสารนี้อยู่ระหว่างรออนุมัติแล้ว');
       throw err;
     } finally {
       client.release();

@@ -92,12 +92,16 @@ export function hasPermission(profile, module, action) {
  * keeps falling through to the (possibly new) role default.
  */
 export function overridesFromEffective(role, desired) {
+  // Admins implicitly have every permission (hasPermission short-circuits them),
+  // so their effective map is all-true. Without treating admin's default as true
+  // here, saving that map would persist an all-true override for EVERY action —
+  // which then survives a later demotion to a lower role and grants it everything.
   const out = {};
   for (const { module, actions } of PERMISSION_CATALOG) {
     for (const { key } of actions) {
       const want = desired?.[module]?.[key];
       if (typeof want !== 'boolean') continue;
-      const def = ROLE_DEFAULTS[role]?.[module]?.[key] === true;
+      const def = role === 'admin' ? true : (ROLE_DEFAULTS[role]?.[module]?.[key] === true);
       if (want !== def) {
         if (!out[module]) out[module] = {};
         out[module][key] = want;

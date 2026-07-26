@@ -29,7 +29,9 @@ export function useHeaderSlot(node, deps = []) {
   const { setSlot } = useContext(HeaderSlotContext);
   useEffect(() => {
     setSlot(node);
-    return () => setSlot(null);
+    // Only clear if OUR node is still the one showing — if a newer page already
+    // set its own slot before this cleanup runs (route transition), don't blank it. (#D8)
+    return () => setSlot((cur) => (cur === node ? null : cur));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

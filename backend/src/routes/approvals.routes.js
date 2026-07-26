@@ -6,9 +6,10 @@ import { ApiError } from '../middleware/errorHandler.js';
 import crypto from 'node:crypto';
 import { applyApprovalAction, forwardApprovalStep, sendApprovalRequest } from '../services/approval.js';
 import { sendAuthorNotification } from '../services/email.js';
-import { putObject, openDownloadStream } from '../config/storage.js';
+import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
 import { generateApprovedPdf, regenerateOriginalWithAudit } from '../services/pdfDoc.js';
 import { autoCombine } from '../services/pdfMerge.js';
+import { assertRasterImage } from '../utils/imageUpload.js';
 
 // PUBLIC routes — reached from email links, so NO requireAuth.
 // Security comes from the unguessable one-time token, not a login session.
@@ -91,10 +92,14 @@ async function storeSignatureDataUrl(token, dataUrl) {
   if (!dataUrl || !dataUrl.startsWith('data:image/')) return null;
   const m = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
   if (!m) return null;
-  const [, contentType, b64] = m;
-  const ext = contentType.split('/')[1] || 'png';
+  const [, , b64] = m;
+  const buffer = Buffer.from(b64, 'base64');
+  // don't trust the data-URL's declared content-type — sniff the real bytes and
+  // reject SVG / non-images (a valid signature is always a canvas PNG). (#C6)
+  const type = assertRasterImage({ buffer }, 'ลายเซ็น');
+  const ext = type.split('/')[1] || 'png';
   const key = `signatures/${token}-${crypto.randomUUID()}.${ext}`;
-  await putObject(key, Buffer.from(b64, 'base64'), contentType);
+  await putObject(key, buffer, type);
   return key;
 }
 
@@ -145,6 +150,9 @@ router.post(
       await client.query('commit');
     } catch (err) {
       if (!(err instanceof ApiError)) await client.query('rollback').catch(() => {});
+      // the signature was uploaded before the txn; if the action didn't take
+      // (already actioned / expired / error) the object would be orphaned. (#C5)
+      if (signatureUrl) await deleteObject(signatureUrl).catch(() => {});
       throw err;
     } finally {
       client.release();

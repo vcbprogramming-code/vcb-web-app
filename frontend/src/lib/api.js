@@ -15,6 +15,9 @@ const REDIRECT_KEY = 'hr_post_login_redirect';
 // Generous timeout: the Render free tier can cold-start for ~30–50s, so a short
 // timeout would falsely fail the very first request after the server sleeps.
 const DEFAULT_TIMEOUT_MS = 45000;
+// File transfers can be large (attachments up to 200 MB) and take far longer than
+// a JSON call — the 45s default would abort a healthy transfer mid-flight. (#D3)
+const TRANSFER_TIMEOUT_MS = 10 * 60 * 1000;
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -110,7 +113,7 @@ export async function apiUpload(path, file, { field = 'file', extra = {} } = {})
     if (v !== undefined && v !== null) form.append(k, v);
   }
 
-  const res = await timedFetch(`${BASE}${path}`, { method: 'POST', headers, body: form });
+  const res = await timedFetch(`${BASE}${path}`, { method: 'POST', headers, body: form }, TRANSFER_TIMEOUT_MS);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     handleUnauthorized(res, true);
@@ -129,7 +132,7 @@ export async function apiBlobUrl(path) {
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await timedFetch(`${BASE}${path}`, { headers });
+  const res = await timedFetch(`${BASE}${path}`, { headers }, TRANSFER_TIMEOUT_MS);
   if (!res.ok) {
     handleUnauthorized(res, true);
     const data = await res.json().catch(() => ({}));

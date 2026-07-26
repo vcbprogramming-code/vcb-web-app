@@ -67,8 +67,24 @@ function greetingKeyForHour(h: number): 'good_morning' | 'good_afternoon' | 'goo
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(getInitialLang)
+  const [langSwapping, setLangSwapping] = useState(false)
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const dict = I18N[lang]
+
+  // EN and TH strings differ enough in length/font metrics that swapping
+  // text in place visibly reflows the layout. Briefly fade the shell out,
+  // swap the language while invisible, then fade back in.
+  const changeLang = useCallback((next: Lang) => {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setLang(next)
+      return
+    }
+    setLangSwapping(true)
+    window.setTimeout(() => {
+      setLang(next)
+      requestAnimationFrame(() => setLangSwapping(false))
+    }, 100)
+  }, [])
   const t = useCallback(<K extends keyof Dict>(key: K): Dict[K] => I18N[lang][key], [lang])
 
   // null = still connecting, '' = guest, otherwise a formatted name
@@ -221,7 +237,7 @@ export default function App() {
   }, [q, dict])
 
   return (
-    <div className="shell">
+    <div className={`shell${langSwapping ? ' lang-swapping' : ''}`}>
       {/* ===== sidebar ===== */}
       <aside className={`sidebar${sidebarOpen ? ' is-open' : ''}`} id="sidebar">
         <div className="sidebar-brand">
@@ -246,10 +262,10 @@ export default function App() {
 
         <nav className="sidebar-nav">
           <div className="sidebar-label">{dict.nav_menu}</div>
-          <a className="nav-item active" href="#dashboard">
+          <button className="nav-item active" type="button">
             <DashboardIcon />
             <span>{dict.nav_dashboard}</span>
-          </a>
+          </button>
 
           <div className="sidebar-label">{dict.nav_applications}</div>
           {APPS.map((a) => {
@@ -286,10 +302,10 @@ export default function App() {
             <OnboardingIcon />
             <span>{dict.nav_onboarding}</span>
           </a>
-          <a className="nav-item" href="#ai-tavern">
+          <button className="nav-item" type="button" title="Coming soon" disabled>
             <AiTavernIcon />
             <span>{dict.nav_ai_tavern}</span>
-          </a>
+          </button>
           <button className="nav-item" type="button" onClick={() => setHelpOpen(true)}>
             <HelpIcon />
             <span>{dict.nav_help}</span>
@@ -371,14 +387,14 @@ export default function App() {
                     <button
                       type="button"
                       className={lang === 'en' ? 'is-active' : ''}
-                      onClick={() => setLang('en')}
+                      onClick={() => changeLang('en')}
                     >
                       EN
                     </button>
                     <button
                       type="button"
                       className={lang === 'th' ? 'is-active' : ''}
-                      onClick={() => setLang('th')}
+                      onClick={() => changeLang('th')}
                     >
                       ไทย
                     </button>

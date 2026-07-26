@@ -184,3 +184,65 @@ function getAnnouncementForEdit(token) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
 }
+
+/* ---------- help & support: issue reports ---------- */
+//
+// The Help modal's report form calls sendIssueReport(payload) directly —
+// no admin/auth needed, this is just a contact form. A per-reporter cache
+// key throttles repeat submissions so the mailbox can't be flooded.
+
+var SUPPORT_EMAIL      = 'c.chavananand@vcb-con.com';
+var ISSUE_THROTTLE_KEY = 'ISSUE_REPORT_';
+var ISSUE_THROTTLE_TTL = 60; // seconds between reports from the same visitor
+
+/**
+ * Sends an issue report to SUPPORT_EMAIL. `payload` = { area, message }.
+ * `area` must be one of APPS[].key or 'other'. Throws a friendly error on
+ * bad input or when throttled.
+ */
+function sendIssueReport(payload) {
+  if (!payload || typeof payload !== 'object') throw new Error('Bad payload.');
+
+  var area = String(payload.area || '').trim();
+  var message = String(payload.message || '').trim();
+  if (!area) throw new Error('Choose what you were trying to do.');
+  if (!message) throw new Error('Describe the issue.');
+  if (message.length > 2000) message = message.slice(0, 2000);
+
+  var areaLabel = 'Other / something else';
+  if (area !== 'other') {
+    var known = false;
+    for (var i = 0; i < APPS.length; i++) {
+      if (APPS[i].key === area) { areaLabel = APPS[i].name; known = true; break; }
+    }
+    if (!known) throw new Error('Unrecognized area.');
+  }
+
+  var reporterEmail = getActiveUserEmail() || 'unknown (anonymous visitor)';
+
+  // throttle repeat submissions per reporter (falls back to a shared bucket
+  // for anonymous visitors, which is an acceptable trade-off for a low-traffic
+  // internal contact form).
+  var cache = CacheService.getScriptCache();
+  var throttleKey = ISSUE_THROTTLE_KEY + reporterEmail;
+  if (cache.get(throttleKey)) {
+    throw new Error('Please wait a moment before sending another report.');
+  }
+  cache.put(throttleKey, '1', ISSUE_THROTTLE_TTL);
+
+  var subject = 'VCB Connect — issue report: ' + areaLabel;
+  var body =
+    'Area: ' + areaLabel + '\n' +
+    'Reported by: ' + reporterEmail + '\n' +
+    'When: ' + new Date().toISOString() + '\n\n' +
+    'Message:\n' + message + '\n';
+
+  MailApp.sendEmail({
+    to: SUPPORT_EMAIL,
+    subject: subject,
+    body: body,
+    replyTo: (reporterEmail.indexOf('@') !== -1) ? reporterEmail : SUPPORT_EMAIL
+  });
+
+  return { sent: true };
+}

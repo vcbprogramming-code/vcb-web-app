@@ -148,3 +148,38 @@ export async function getAnnouncementForEdit(token: string | null): Promise<Anno
     return null
   }
 }
+
+/* ---------- help & support: issue reports ---------- */
+// Mirrors sendIssueReport(payload) in Code.js. There's no real mail backend
+// here, so this just validates + throttles the same way and logs the
+// "would-be" email to the console — good enough for visual/UX sign-off.
+
+const ISSUE_THROTTLE_PREFIX = 'vcb_mock_issue_throttle_'
+const ISSUE_THROTTLE_MS = 60 * 1000
+
+export interface IssueReportInput {
+  area: string
+  message: string
+}
+
+/** Mirrors sendIssueReport({ area, message }): validates, throttles, "sends". */
+export async function sendIssueReport(payload: IssueReportInput): Promise<{ sent: true }> {
+  await wait(300) // simulate the google.script.run round-trip
+
+  const area = String(payload?.area || '').trim()
+  const message = String(payload?.message || '').trim()
+  if (!area) throw new Error('Choose what you were trying to do.')
+  if (!message) throw new Error('Describe the issue.')
+
+  const reporterEmail = (await getActiveUserEmail()) || 'unknown (anonymous visitor)'
+  const throttleKey = ISSUE_THROTTLE_PREFIX + reporterEmail
+  const last = Number(localStorage.getItem(throttleKey) || 0)
+  if (Date.now() - last < ISSUE_THROTTLE_MS) {
+    throw new Error('Please wait a moment before sending another report.')
+  }
+  localStorage.setItem(throttleKey, String(Date.now()))
+
+  // eslint-disable-next-line no-console
+  console.info('[mock sendIssueReport] would email:', { area, message: message.slice(0, 2000), reporterEmail })
+  return { sent: true }
+}

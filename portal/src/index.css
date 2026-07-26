@@ -259,6 +259,14 @@ a {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
 }
+.nav-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.nav-item:disabled:hover {
+  background: none;
+  color: var(--sidebar-text);
+}
 .nav-item.active {
   background: var(--sidebar-active);
   color: #fff;
@@ -505,6 +513,14 @@ a {
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* ---------- language-switch crossfade ---------- */
+.shell {
+  transition: opacity 0.1s ease;
+}
+.shell.lang-swapping {
+  opacity: 0;
 }
 
 .page-head {
@@ -1280,6 +1296,7 @@ a {
 .modal input[type='text'],
 .modal input[type='url'],
 .modal input[type='password'],
+.modal select,
 .modal textarea {
   width: 100%;
   background: var(--bg-1);
@@ -1293,11 +1310,15 @@ a {
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.modal select {
+  cursor: pointer;
+}
 .modal textarea {
   resize: vertical;
   min-height: 90px;
 }
 .modal input:focus,
+.modal select:focus,
 .modal textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -1407,27 +1428,6 @@ a {
 }
 .modal .msg.ok {
   color: #16a34a;
-}
-
-/* ---------- help & support modal ---------- */
-.help-email-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-1);
-  border: 1px solid var(--card-border);
-  color: var(--text);
-  font-size: 13.5px;
-  font-weight: 500;
-}
-.help-email-row svg {
-  width: 17px;
-  height: 17px;
-  flex: 0 0 17px;
-  color: var(--text-dim);
 }
 
 /* ---------- responsive ---------- */

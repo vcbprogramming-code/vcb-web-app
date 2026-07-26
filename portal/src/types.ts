@@ -81,8 +81,14 @@ export interface Dict {
   panel_birthdays_note: string
   help_title: string
   help_sub: string
+  help_area_label: string
+  help_area_placeholder: string
+  help_area_other: string
+  help_message_label: string
+  help_message_placeholder: string
   help_close: string
-  help_send_email: string
+  help_send: string
+  admin_role: string
   apps: Record<string, AppI18n>
 }
 

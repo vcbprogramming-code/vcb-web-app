@@ -234,6 +234,11 @@
     background: rgba(255,255,255,.06);
     color: #fff;
   }
+  .nav-item:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+  }
+  .nav-item:disabled:hover { background: none; color: var(--sidebar-text); }
   .nav-item.active {
     background: var(--sidebar-active);
     color: #fff;
@@ -444,6 +449,16 @@
     width: 100%;
     margin: 0 auto;
   }
+
+  /* ---------- language-switch crossfade ---------- */
+  /* EN and TH strings differ enough in length/font metrics that swapping
+     text in place visibly reflows the layout (cards resize, nav wraps,
+     etc.). Rather than fight every element's sizing, we briefly fade the
+     whole shell to (near-)transparent, swap all the text while invisible,
+     then fade back in — so the reflow itself is never seen, just a quick
+     flicker. */
+  .shell { transition: opacity .1s ease; }
+  .shell.lang-swapping { opacity: 0; }
 
   .page-head {
     margin-bottom: 18px;
@@ -1007,6 +1022,7 @@
   .modal input[type=text],
   .modal input[type=url],
   .modal input[type=password],
+  .modal select,
   .modal textarea {
     width: 100%;
     background: var(--bg-1);
@@ -1020,8 +1036,9 @@
     outline: none;
     transition: border-color .15s ease, box-shadow .15s ease;
   }
+  .modal select { cursor: pointer; }
   .modal textarea { resize: vertical; min-height: 90px; }
-  .modal input:focus, .modal textarea:focus {
+  .modal input:focus, .modal select:focus, .modal textarea:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
@@ -1095,21 +1112,6 @@
   .modal .msg.ok  { color: #16a34a; }
 
   /* ---------- help & support modal ---------- */
-  .help-email-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 4px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: var(--bg-1);
-    border: 1px solid var(--card-border);
-    color: var(--text);
-    font-size: 13.5px;
-    font-weight: 500;
-  }
-  .help-email-row svg { width: 17px; height: 17px; flex: 0 0 17px; color: var(--text-dim); }
-
   /* ---------- responsive ---------- */
   @media (max-width: 1080px) {
     .dash-grid { grid-template-columns: 1fr; }
@@ -1175,10 +1177,10 @@
 
     <nav class="sidebar-nav">
       <div class="sidebar-label" data-i18n="nav_menu">Menu</div>
-      <a class="nav-item active" href="#dashboard">
+      <button class="nav-item active" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span data-i18n="nav_dashboard">Dashboard</span>
-      </a>
+      </button>
 
       <div class="sidebar-label" data-i18n="nav_applications">Applications</div>
       <? apps.forEach(function(a){ ?>
@@ -1208,10 +1210,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.5"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
         <span data-i18n="nav_onboarding">Onboarding Portal</span>
       </a>
-      <a class="nav-item" href="#ai-tavern">
+      <button class="nav-item" type="button" title="Coming soon" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.3L18 9l-4.2 1.7L12 15l-1.8-4.3L6 9l4.2-1.7z"/><path d="M19 15l.8 1.9L21.5 18l-1.7.9L19 21l-.8-2.1-1.7-.9 1.7-1.1z"/></svg>
         <span data-i18n="nav_ai_tavern">AI Tavern</span>
-      </a>
+      </button>
       <button class="nav-item" id="nav-help" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4"/><path d="M12 17h.01"/></svg>
         <span data-i18n="nav_help">Help &amp; Support</span>
@@ -1453,17 +1455,28 @@
 <!-- ===== help & support modal ===== -->
 <div class="modal-backdrop" id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
   <div class="modal">
-    <h3 id="help-modal-title" data-i18n="help_title">Help &amp; Support</h3>
-    <p class="modal-sub" data-i18n="help_sub">Need help with VCB Connect or one of its apps? Reach out and we'll get back to you.</p>
-    <div class="help-email-row">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-      <span id="help-email">c.chavananand@vcb-con.com</span>
-    </div>
+    <h3 id="help-modal-title" data-i18n="help_title">Report an issue</h3>
+    <p class="modal-sub" data-i18n="help_sub">Tell us what happened — this goes straight to the VCB Connect team.</p>
+
+    <label for="help-area" data-i18n="help_area_label">When you noticed this, what were you trying to do?</label>
+    <select id="help-area">
+      <option value="" data-i18n="help_area_placeholder">Choose an option</option>
+      <? apps.forEach(function(a){ ?>
+        <option value="<?= a.key ?>"><?= a.name ?></option>
+      <? }); ?>
+      <option value="other" data-i18n="help_area_other">Other / something else</option>
+    </select>
+
+    <label for="help-message" data-i18n="help_message_label">Describe the issue</label>
+    <textarea id="help-message" maxlength="2000" data-i18n-placeholder="help_message_placeholder" placeholder="Tell us what happened and what's not working"></textarea>
+
+    <div class="msg" id="help-msg"></div>
+
     <div class="modal-actions">
       <button class="btn" id="help-close" data-i18n="help_close">Close</button>
-      <a class="btn primary" id="help-mailto" href="mailto:c.chavananand@vcb-con.com">
-        <span data-i18n="help_send_email">Send Email</span>
-      </a>
+      <button class="btn primary" id="help-send">
+        <span data-i18n="help_send">Send Report</span>
+      </button>
     </div>
   </div>
 </div>
@@ -1565,6 +1578,7 @@
     en: {
       brand_sub:     'Internal Intranet Portal',
       staff:         'Staff',
+      admin_role:    'Admin',
       nav_menu:      'Menu',
       nav_dashboard: 'Dashboard',
       nav_applications: 'Applications',
@@ -1616,6 +1630,7 @@
     th: {
       brand_sub:     'พอร์ทัลอินทราเน็ตภายในองค์กร',
       staff:         'พนักงาน',
+      admin_role:    'แอดมิน',
       nav_menu:      'เมนู',
       nav_dashboard: 'แดชบอร์ด',
       nav_applications: 'แอปพลิเคชัน',
@@ -1730,6 +1745,28 @@
 
     // per-app hover tooltips, now on the app cards / nav items themselves
     applyAppTooltips(dict);
+  }
+
+  // Fades the whole app shell out, swaps every string while invisible (so
+  // the EN/TH length difference never visibly reflows the layout), then
+  // fades back in. Falls back to an instant swap if the shell isn't found
+  // or the visitor prefers reduced motion.
+  var langFadeTimer = null;
+  function applyLangCrossfade(lang) {
+    var shell = document.querySelector('.shell');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!shell || reduce) { applyLang(lang); return; }
+
+    if (langFadeTimer) { clearTimeout(langFadeTimer); langFadeTimer = null; }
+    shell.classList.add('lang-swapping');
+    langFadeTimer = setTimeout(function () {
+      applyLang(lang);
+      // reflow with the new text has now happened while invisible; fade back in.
+      requestAnimationFrame(function () {
+        shell.classList.remove('lang-swapping');
+        langFadeTimer = null;
+      });
+    }, 100);
   }
 
   // Stashes each app's name + preview text on the element (as data
@@ -1894,8 +1931,8 @@
       if (e.key === 'Escape') close();
     });
 
-    document.getElementById('lang-en').addEventListener('click', function () { setLang('en'); applyLang('en'); });
-    document.getElementById('lang-th').addEventListener('click', function () { setLang('th'); applyLang('th'); });
+    document.getElementById('lang-en').addEventListener('click', function () { setLang('en'); applyLangCrossfade('en'); });
+    document.getElementById('lang-th').addEventListener('click', function () { setLang('th'); applyLangCrossfade('th'); });
     document.getElementById('theme-light').addEventListener('click', function () { setTheme('light'); applyTheme('light'); });
     document.getElementById('theme-dark').addEventListener('click', function () { setTheme('dark'); applyTheme('dark'); });
   })();
@@ -1953,6 +1990,18 @@
     if (a2) a2.textContent = initials;
   }
 
+  // Emails that see "Admin" instead of "Staff" under their name in the
+  // sidebar. Purely a display label — unrelated to the announcement-editor
+  // password gate (admin-btn/?admin=1), which is a separate mechanism.
+  var ADMIN_EMAILS = ['c.chavananand@vcb-con.com'];
+  function applyRoleLabel(email) {
+    var roleEl = document.querySelector('.sidebar-user-role');
+    if (!roleEl) return;
+    var isAdmin = email && ADMIN_EMAILS.indexOf(email.toLowerCase()) !== -1;
+    roleEl.setAttribute('data-i18n', isAdmin ? 'admin_role' : 'staff');
+    roleEl.textContent = t(isAdmin ? 'admin_role' : 'staff');
+  }
+
   google.script.run
     .withSuccessHandler(function (email) {
       var elTop = document.getElementById('user-name');
@@ -1975,6 +2024,7 @@
       elWelcome.textContent = display;
       elTop.title = email; elSide.title = email;
       setAvatars(display);
+      applyRoleLabel(email);
     })
     .withFailureHandler(function () {
       var guest = t('guest');

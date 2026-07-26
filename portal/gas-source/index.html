@@ -1,0 +1,2266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>document.documentElement.classList.add('js');</script>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VCB Connect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- theme tokens ---------- */
+  /* Dark is the historical VCB Connect look; light is the new default for
+     the dashboard-style redesign. Both are plain CSS-variable swaps off
+     [data-theme] on <html>, so every component below just reads var(...). */
+  :root,
+  :root[data-theme="light"] {
+    --bg-0: #eef1f8;
+    --bg-1: #f7f8fc;
+    --sidebar-0: #0a1440;
+    --sidebar-1: #101c56;
+    --sidebar-text: #c7cdf0;
+    --sidebar-text-dim: #8992c4;
+    --sidebar-active: #1b2a72;
+    --accent: #3a5bff;
+    --accent-2: #5b7cff;
+    --accent-soft: rgba(58, 91, 255, 0.35);
+    --accent-glow: rgba(58, 91, 255, 0.55);
+    --text: #171b2e;
+    --text-dim: #666f9c;
+    --card: #ffffff;
+    --card-border: #e4e7f4;
+    --card-border-hover: #c3caf2;
+    --topbar-bg: rgba(255, 255, 255, 0.85);
+    --shadow-card: 0 1px 2px rgba(23, 27, 46, .04), 0 8px 24px rgba(23, 27, 46, .06);
+    --shadow-card-hover: 0 4px 10px rgba(23, 27, 46, .06), 0 16px 36px rgba(23, 27, 46, .10);
+    --pill-bg: #eef1fb;
+    --status-good: #16a34a;
+    --globe-spec: rgba(255, 255, 255, .95);
+    --globe-core-a: rgba(255, 255, 255, .85);
+    --globe-core-b: rgba(213, 223, 255, .68);
+    --globe-core-c: rgba(168, 184, 246, .45);
+    --globe-core-d: rgba(120, 140, 230, .32);
+    --globe-shade: rgba(58, 91, 255, .28);
+    --globe-rim: rgba(255, 255, 255, .55);
+    --globe-drop-shadow: rgba(58, 91, 255, .18);
+    --globe-line: rgba(58, 91, 255, .4);
+    --globe-line-strong: rgba(58, 91, 255, .68);
+    --globe-glow-bg: rgba(58, 91, 255, .14);
+    --globe-accent-2: #7c5cff;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg-0: #02050d;
+    --bg-1: #061029;
+    --sidebar-0: #05070f;
+    --sidebar-1: #0a0f22;
+    --sidebar-text: #c9d6f0;
+    --sidebar-text-dim: #7686b3;
+    --sidebar-active: #16214a;
+    --accent: #4fd1ff;
+    --accent-2: #7ee8ff;
+    --accent-soft: rgba(79, 209, 255, 0.45);
+    --accent-glow: rgba(79, 209, 255, 0.75);
+    --text: #e6f3ff;
+    --text-dim: #93acce;
+    --card: rgba(15, 24, 48, 0.75);
+    --card-border: rgba(79, 209, 255, 0.16);
+    --card-border-hover: rgba(126, 232, 255, 0.5);
+    --topbar-bg: rgba(6, 12, 28, 0.85);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+    --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, .35), 0 16px 40px rgba(0, 0, 0, .4);
+    --pill-bg: rgba(79, 209, 255, 0.08);
+    --status-good: #34d399;
+    --globe-spec: rgba(220, 245, 255, .9);
+    --globe-core-a: rgba(126, 232, 255, .4);
+    --globe-core-b: rgba(38, 84, 156, .55);
+    --globe-core-c: rgba(10, 26, 58, .82);
+    --globe-core-d: rgba(2, 5, 13, .95);
+    --globe-shade: rgba(2, 5, 13, .55);
+    --globe-rim: rgba(126, 232, 255, .35);
+    --globe-drop-shadow: rgba(0, 0, 0, .45);
+    --globe-line: rgba(79, 209, 255, .55);
+    --globe-line-strong: rgba(126, 232, 255, .75);
+    --globe-glow-bg: rgba(79, 209, 255, .22);
+    --globe-accent-2: #a78bfa;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  .js .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity .5s ease, transform .6s cubic-bezier(.22,.61,.36,1);
+  }
+  .js .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .js .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg-0);
+    color: var(--text);
+    font-family: 'Inter', 'Noto Sans Thai', 'Leelawadee UI', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  html { transition: background .2s ease; }
+  body { transition: color .2s ease; }
+
+  a { color: inherit; }
+
+  /* ---------- app shell: fixed sidebar + scrolling content ---------- */
+  .shell {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ---------- sidebar ---------- */
+  .sidebar {
+    flex: 0 0 274px;
+    width: 274px;
+    background: linear-gradient(180deg, var(--sidebar-1), var(--sidebar-0));
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 20;
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 20px 18px;
+  }
+  .sidebar-logo {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    flex: 0 0 38px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset;
+  }
+  .sidebar-logo svg { width: 21px; height: 21px; color: #fff; }
+  .sidebar-brand-name {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    letter-spacing: .08em;
+    font-size: 15px;
+    color: #fff;
+    line-height: 1.15;
+  }
+  .sidebar-brand-sub {
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--sidebar-text-dim);
+    margin-top: 2px;
+  }
+
+  .sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 16px 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+  }
+  .sidebar-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    flex: 0 0 32px;
+  }
+  .sidebar-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sidebar-user-role {
+    font-size: 11px;
+    color: var(--sidebar-text-dim);
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar-label {
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--sidebar-text-dim);
+    padding: 14px 12px 6px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: background .15s ease, color .15s ease;
+    border: 1px solid transparent;
+  }
+  .nav-item svg { width: 18px; height: 18px; flex: 0 0 18px; opacity: .9; }
+  .nav-item:hover {
+    background: rgba(255,255,255,.06);
+    color: #fff;
+  }
+  .nav-item.active {
+    background: var(--sidebar-active);
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset;
+  }
+  .nav-item.active svg { color: var(--accent-2); opacity: 1; }
+  .nav-item .nav-arrow {
+    margin-left: auto;
+    width: 13px; height: 13px;
+    opacity: .5;
+  }
+
+  .sidebar-foot {
+    padding: 14px 20px 18px;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    color: var(--sidebar-text-dim);
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  /* ---------- main column ---------- */
+  .main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 28px;
+    background: var(--topbar-bg);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--card-border);
+  }
+  .topbar-search {
+    flex: 1;
+    max-width: 380px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+  }
+  .topbar-search svg { width: 16px; height: 16px; flex: 0 0 16px; }
+  .topbar-search input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13.5px;
+    color: var(--text);
+    width: 100%;
+    font-family: inherit;
+  }
+  .topbar-search input::placeholder { color: var(--text-dim); }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .icon-btn {
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-dim);
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    display: grid; place-items: center;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+    position: relative;
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--card-border-hover); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn .dot-badge {
+    position: absolute;
+    top: 7px; right: 7px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #f87171;
+    box-shadow: 0 0 0 2px var(--topbar-bg);
+  }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 12px 6px 6px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-left: 4px;
+  }
+  .user-chip .mini-avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  #user-name { color: var(--text); font-weight: 500; }
+
+  /* ---------- settings dropdown ---------- */
+  .settings-wrap { position: relative; }
+  .settings-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card-hover);
+    padding: 8px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity .15s ease, transform .15s ease, visibility 0s linear .15s;
+    z-index: 30;
+  }
+  .settings-menu[data-open] {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .settings-section {
+    padding: 8px 10px 4px;
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 9px;
+  }
+  .seg {
+    display: flex;
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 9px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s ease, color .15s ease;
+  }
+  .seg button.is-active {
+    background: var(--card);
+    color: var(--accent);
+    box-shadow: var(--shadow-card);
+  }
+  :root[data-theme="dark"] .seg button.is-active { background: rgba(79,209,255,.14); }
+  .settings-divider {
+    height: 1px;
+    background: var(--card-border);
+    margin: 6px 4px;
+  }
+  .settings-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    font-family: inherit;
+  }
+  .settings-link:hover { background: var(--pill-bg); }
+  .settings-link svg { width: 16px; height: 16px; color: var(--text-dim); }
+
+  /* ---------- page content ---------- */
+  .content {
+    padding: 26px 36px 56px;
+    max-width: 1600px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .page-head {
+    margin-bottom: 18px;
+  }
+  .page-head h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 3px;
+    color: var(--text);
+  }
+  .page-head p {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+
+  /* ---------- dashboard grid ---------- */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 2.3fr 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* welcome / status panel */
+  .welcome-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 26px 32px;
+    background: linear-gradient(120deg, var(--sidebar-0), var(--sidebar-1));
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .welcome-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(420px 220px at 90% 0%, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .welcome-text { position: relative; z-index: 1; }
+  .welcome-greeting {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 4px;
+  }
+  .welcome-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,.65);
+    margin: 0;
+  }
+  .welcome-status {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .status-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--status-good);
+    box-shadow: 0 0 8px var(--status-good);
+  }
+  .welcome-clock {
+    font-size: 12px;
+    color: rgba(255,255,255,.55);
+  }
+
+  /* section title */
+  .section-title {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 20px 0 12px;
+  }
+  .section-title h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin: 0;
+    color: var(--text);
+  }
+  .section-title .count {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .dash-grid .section-title:first-of-type { margin-top: 0; }
+
+  /* ---------- app grid ---------- */
+  .apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+  }
+  .app-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    text-decoration: none;
+    color: var(--text);
+    box-shadow: var(--shadow-card);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .app-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--card-border-hover);
+    box-shadow: var(--shadow-card-hover);
+  }
+  .app-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .app-icon {
+    width: 46px; height: 46px;
+    flex: 0 0 46px;
+    border-radius: 12px;
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    display: grid; place-items: center;
+    color: var(--card-accent, var(--accent));
+  }
+  .app-icon svg { width: 24px; height: 24px; }
+  .app-name {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    line-height: 1.3;
+    color: var(--text);
+    min-height: calc(1.3em * 2);
+    display: flex;
+    align-items: center;
+  }
+  .app-desc {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    flex: 1;
+    min-height: calc(1.5em * 3);
+  }
+  .app-cta {
+    display: flex; align-items: center; gap: 5px;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--card-accent, var(--accent));
+  }
+  .app-cta .arrow { display: inline-block; transition: transform .15s ease; }
+  .app-card:hover .app-cta .arrow { transform: translateX(3px); }
+
+  /* ---------- custom hover tooltip (app cards + sidebar nav items) ---------- */
+  /* A single reusable floating element, repositioned per hover instead of
+     the native title attribute, so it appears immediately and matches the
+     app's own look rather than the browser's slow, unstyled tooltip. */
+  #app-tooltip {
+    position: fixed;
+    z-index: 200;
+    max-width: 260px;
+    padding: 10px 13px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-card-hover);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.5;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px) scale(.98);
+    transition: opacity .28s cubic-bezier(.22,.61,.36,1), transform .28s cubic-bezier(.22,.61,.36,1);
+  }
+  #app-tooltip[data-open] { opacity: 1; transform: translateY(0) scale(1); }
+  #app-tooltip[data-closing] { transition-duration: .16s; }
+  #app-tooltip .tt-name {
+    display: block;
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  #app-tooltip .tt-desc { color: var(--text-dim); }
+  @media (hover: none), (pointer: coarse) {
+    #app-tooltip { display: none; }
+  }
+
+  /* ---------- globe panel (decorative, both themes) ---------- */
+  /* The globe visually floats up next to the "Dashboard" heading, well
+     above the top of the dash-grid row it's laid out in — so the box
+     used for layout/height (to keep Announcements level with the
+     Applications section) is deliberately short, while the globe itself
+     is pulled up out of it with a negative margin and allowed to overflow
+     that box freely in every direction (no clipping) so the orbit rings,
+     scan sweep and pulse rings can extend past its bounds uncropped.  */
+  .globe-card {
+    padding: 0;
+    overflow: visible;
+    position: relative;
+    background: none;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    /* matches the left column's welcome-card + section-title height, so
+       Announcements (right below) lines up with the Applications grid. */
+    height: 162px;
+  }
+  .globe-stage {
+    position: relative;
+    height: 280px;
+    width: 280px;
+    margin-top: -108px;
+    perspective: 1100px;
+    display: grid; place-items: center;
+    outline: none;
+    pointer-events: none;
+  }
+
+  .js .globe-stage { opacity: 0; animation: stageOn .5s ease both; }
+  @keyframes stageOn { from { opacity: 0; } to { opacity: 1; } }
+  .globe-wrap {
+    position: relative;
+    width: 190px; height: 190px;
+    transform-style: preserve-3d;
+  }
+  /* soft ambient bloom behind the whole assembly */
+  .globe-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--globe-glow-bg), transparent 60%, transparent 75%);
+    filter: blur(20px);
+    z-index: -1;
+  }
+  .globe {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    animation: globeSpin 26s linear infinite;
+  }
+  @keyframes globeSpin {
+    from { transform: rotateX(-16deg) rotateY(0deg); }
+    to   { transform: rotateX(-16deg) rotateY(360deg); }
+  }
+
+  /* shaded sphere body: layered radial gradients fake a lit, glassy globe
+     instead of a flat wireframe circle — a soft specular highlight up-left,
+     a mid-tone body, and a darker limb toward the edges for real volume. */
+  .globe-core {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 26%, var(--globe-spec), transparent 32%),
+      radial-gradient(circle at 34% 32%, var(--globe-core-a), var(--globe-core-b) 48%, var(--globe-core-c) 78%, var(--globe-core-d) 100%);
+    box-shadow:
+      inset -18px -14px 40px var(--globe-shade),
+      inset 0 0 50px var(--globe-glow-bg),
+      0 10px 34px var(--globe-drop-shadow);
+  }
+  /* thin crisp rim-light on the sphere's edge, like light wrapping the limb */
+  .globe-core::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px var(--globe-rim);
+    pointer-events: none;
+  }
+
+  .meridian, .parallel {
+    position: absolute;
+    border: 1px solid var(--globe-line);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--globe-glow-bg);
+  }
+  .meridian { inset: 0; }
+  .m1 { transform: rotateY(0deg); }
+  .m2 { transform: rotateY(30deg); }
+  .m3 { transform: rotateY(60deg); }
+  .m4 { transform: rotateY(90deg); border-color: var(--globe-line-strong); box-shadow: 0 0 12px var(--globe-glow-bg); }
+  .m5 { transform: rotateY(120deg); }
+  .m6 { transform: rotateY(150deg); }
+
+  .parallel { left: 50%; top: 50%; }
+  .p-eq  { width: 190px; height: 190px; margin: -95px 0 0 -95px; transform: rotateX(90deg); border-color: var(--globe-line-strong); box-shadow: 0 0 12px var(--globe-glow-bg); }
+  .p-n30 { width: 164px; height: 164px; margin: -82px 0 0 -82px; transform: translateY(-48px) rotateX(90deg); }
+  .p-s30 { width: 164px; height: 164px; margin: -82px 0 0 -82px; transform: translateY(48px)  rotateX(90deg); }
+  .p-n60 { width: 95px;  height: 95px;  margin: -48px 0 0 -48px; transform: translateY(-82px) rotateX(90deg); }
+  .p-s60 { width: 95px;  height: 95px;  margin: -48px 0 0 -48px; transform: translateY(82px)  rotateX(90deg); }
+
+  .orbit {
+    position: absolute;
+    border: 1px solid var(--globe-line);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .orbit::after {
+    content: '';
+    position: absolute;
+    top: 50%; right: -3px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--globe-line-strong);
+    box-shadow: 0 0 10px var(--globe-line-strong), 0 0 20px var(--globe-glow-bg);
+    transform: translateY(-50%);
+  }
+  .orbit-1 {
+    width: 258px; height: 258px;
+    left: 50%; top: 50%;
+    margin: -129px 0 0 -129px;
+    transform: rotateX(72deg) rotateZ(0deg);
+    animation: orbit1 16s linear infinite, ringOn .6s ease .9s both;
+  }
+  @keyframes orbit1 {
+    from { transform: rotateX(72deg) rotateZ(0deg); }
+    to   { transform: rotateX(72deg) rotateZ(360deg); }
+  }
+  .orbit-2 {
+    width: 300px; height: 300px;
+    left: 50%; top: 50%;
+    margin: -150px 0 0 -150px;
+    border-style: dashed;
+    border-color: var(--globe-line);
+    transform: rotateX(65deg) rotateZ(0deg);
+    animation: orbit2 32s linear infinite reverse, ringOn .6s ease 1.05s both;
+  }
+  .orbit-2::after { background: var(--globe-accent-2); box-shadow: 0 0 10px var(--globe-accent-2), 0 0 18px var(--globe-glow-bg); }
+  @keyframes orbit2 {
+    from { transform: rotateX(65deg) rotateZ(0deg); }
+    to   { transform: rotateX(65deg) rotateZ(360deg); }
+  }
+
+  .scan {
+    position: absolute;
+    width: 190px; height: 190px;
+    border-radius: 50%;
+    left: 50%; top: 50%;
+    margin: -95px 0 0 -95px;
+    background: conic-gradient(from 0deg,
+      var(--globe-line-strong) 0deg,
+      var(--globe-glow-bg) 26deg,
+      transparent 55deg,
+      transparent 360deg);
+    mix-blend-mode: var(--scan-blend, normal);
+    animation: scanSpin 7s linear infinite, sweepOn 1.1s ease 1s both;
+    pointer-events: none;
+    opacity: .45;
+    mask-image: radial-gradient(circle, black 60%, transparent 75%);
+    -webkit-mask-image: radial-gradient(circle, black 60%, transparent 75%);
+  }
+  :root[data-theme="dark"] .scan { --scan-blend: screen; }
+  @keyframes scanSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  .js .globe-core { opacity: 0; animation: coreOn .6s ease .15s both; }
+  @keyframes coreOn {
+    from { opacity: 0; transform: scale(.35); }
+    60%  { opacity: 1; }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .js .globe .meridian,
+  .js .globe .parallel {
+    opacity: 0;
+    animation: lineOn .5s ease both;
+    animation-delay: calc(var(--i, 0) * 55ms + 300ms);
+  }
+  @keyframes lineOn { from { opacity: 0; } to { opacity: 1; } }
+  .js .orbit { opacity: 0; }
+  .js .scan  { opacity: 0; }
+  @keyframes ringOn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes sweepOn { from { opacity: 0; } to { opacity: .45; } }
+
+  .globe-pulse {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 150px; height: 150px;
+    margin: -75px 0 0 -75px;
+    border-radius: 50%;
+    border: 1.5px solid var(--globe-line-strong);
+    box-shadow: 0 0 14px var(--globe-glow-bg), inset 0 0 14px var(--globe-glow-bg);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .js .globe-pulse    { animation: pulseOut 1.2s cubic-bezier(.16,.84,.44,1) 1.15s both; }
+  .js .globe-pulse.p2 { animation-delay: 1.4s; border-color: var(--globe-line); }
+  @keyframes pulseOut {
+    from { opacity: 0;   transform: scale(.25); }
+    12%  { opacity: .85; }
+    to   { opacity: 0;   transform: scale(3.4); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .js .globe-stage { opacity: 1; animation: none; }
+    .js .globe-core,
+    .js .globe .meridian,
+    .js .globe .parallel { opacity: 1; animation: none; }
+    .globe-pulse { display: none; }
+  }
+
+  /* ---------- side column panels ---------- */
+  .side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .panel {
+    padding: 18px 18px 14px;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .panel-head h3 {
+    font-size: 13.5px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+  }
+  .panel-head .see-all {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+  .panel-head .see-all:hover { text-decoration: underline; }
+
+  /* birthdays */
+  .bday-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .bday-row:last-child { border-bottom: none; }
+  .bday-avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    display: grid; place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex: 0 0 34px;
+  }
+  .bday-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .bday-when {
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .panel-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* announcements panel */
+  .ann-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .ann-item:last-child { border-bottom: none; }
+  .ann-item-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .ann-item-body {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .ann-empty {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    padding: 4px 0 6px;
+  }
+
+  /* ---------- admin modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(10,14,32,.55);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    padding: 24px;
+    animation: fadeIn .2s ease both;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-backdrop[open] { display: flex; }
+  .modal {
+    width: min(520px, 100%);
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 22px 24px 20px;
+    box-shadow: var(--shadow-card-hover);
+    color: var(--text);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+  .modal h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .modal .modal-sub {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
+  .modal label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 12px 0 6px;
+  }
+  .modal input[type=text],
+  .modal input[type=url],
+  .modal input[type=password],
+  .modal textarea {
+    width: 100%;
+    background: var(--bg-1);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .modal textarea { resize: vertical; min-height: 90px; }
+  .modal input:focus, .modal textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .modal .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal .toggle-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .modal .toggle-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .modal .modal-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .modal .confirm-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(248,113,113,.08);
+    border: 1px solid rgba(248,113,113,.3);
+    flex-wrap: wrap;
+    animation: fadeIn .15s ease both;
+  }
+  .modal .confirm-q {
+    flex: 1; min-width: 180px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.45;
+  }
+  .modal .confirm-q strong { color: #dc2626; font-weight: 600; }
+  .btn.danger {
+    background: #ef4444;
+    color: #fff;
+    border-color: transparent;
+  }
+  .btn.danger:hover { background: #dc2626; }
+  .btn {
+    background: var(--pill-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease;
+    font-family: inherit;
+  }
+  .btn:hover { border-color: var(--card-border-hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+  }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost-danger { color: #dc2626; }
+  .btn.ghost-danger:hover { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.4); }
+
+  .modal .msg {
+    margin-top: 10px;
+    font-size: 12px;
+    min-height: 16px;
+    color: var(--text-dim);
+  }
+  .modal .msg.err { color: #dc2626; }
+  .modal .msg.ok  { color: #16a34a; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 1080px) {
+    .dash-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 860px) {
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      transform: translateX(-100%);
+      transition: transform .2s ease;
+      box-shadow: 0 0 40px rgba(0,0,0,.35);
+    }
+    .sidebar.is-open { transform: translateX(0); }
+    .sidebar-scrim {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(10,14,32,.5);
+      z-index: 19;
+    }
+    .sidebar.is-open ~ .sidebar-scrim { display: block; }
+    .menu-btn { display: grid; }
+    .topbar-search { display: none; }
+  }
+  @media (min-width: 861px) {
+    .menu-btn { display: none; }
+  }
+  @media (max-width: 560px) {
+    .content { padding: 18px 16px 40px; }
+    .topbar { padding: 12px 16px; }
+    .welcome-card { flex-direction: column; align-items: flex-start; }
+    .welcome-status { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ===== sidebar ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M3 12h18"/>
+          <path d="M12 3a14 14 0 0 1 0 18"/>
+          <path d="M12 3a14 14 0 0 0 0 18"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">VCB CONNECT</div>
+        <div class="sidebar-brand-sub" data-i18n="brand_sub">Internal Intranet Portal</div>
+      </div>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+      <div>
+        <div class="sidebar-user-name" id="sidebar-user-name" data-i18n="connecting">Connecting…</div>
+        <div class="sidebar-user-role" data-i18n="staff">Staff</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-label" data-i18n="nav_menu">Menu</div>
+      <a class="nav-item active" href="#dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span data-i18n="nav_dashboard">Dashboard</span>
+      </a>
+
+      <div class="sidebar-label" data-i18n="nav_applications">Applications</div>
+      <? apps.forEach(function(a){ ?>
+        <a class="nav-item" href="<?= a.url ?>" target="_blank" rel="noopener" data-key="<?= a.key ?>">
+          <? if (a.icon === 'memo') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7"/><path d="M9 17h5"/><path d="M9 9h3"/></svg>
+          <? } else if (a.icon === 'minutes') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8l-4 4V5z"/><path d="M7 8h6"/><path d="M7 11h4"/><path d="M19 9a2 2 0 0 1 2 2v8l-3-3h-5a2 2 0 0 1-2-2"/></svg>
+          <? } else if (a.icon === 'sop') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4v-1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 10l1.5 1.5L13 9"/><path d="M9 15l1.5 1.5L13 14"/><path d="M15 11h1"/><path d="M15 16h1"/></svg>
+          <? } else if (a.icon === 'sysmap') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13"/><path d="M15 6.5v13"/></svg>
+          <? } else if (a.icon === 'hr') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.2"/><path d="M4 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><circle cx="17" cy="17" r="3.5"/><path d="M17 15v2l1.4 1"/></svg>
+          <? } else if (a.icon === 'credit') { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v8"/><path d="M9 10v8"/><path d="M15 10v8"/><path d="M19 10v8"/><path d="M3 20h18"/><path d="M12 13v3"/><path d="M11 14h2"/></svg>
+          <? } else { ?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+          <? } ?>
+          <span class="nav-app-name"><?= a.name ?></span>
+          <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>
+        </a>
+      <? }); ?>
+
+      <div class="sidebar-label" data-i18n="nav_more">More</div>
+      <a class="nav-item" href="#onboarding">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.5"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
+        <span data-i18n="nav_onboarding">Onboarding Portal</span>
+      </a>
+      <a class="nav-item" href="#ai-tavern">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.3L18 9l-4.2 1.7L12 15l-1.8-4.3L6 9l4.2-1.7z"/><path d="M19 15l.8 1.9L21.5 18l-1.7.9L19 21l-.8-2.1-1.7-.9 1.7-1.1z"/></svg>
+        <span data-i18n="nav_ai_tavern">AI Tavern</span>
+      </a>
+      <a class="nav-item" href="#help">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4"/><path d="M12 17h.01"/></svg>
+        <span data-i18n="nav_help">Help &amp; Support</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span data-i18n="footer_left">VCB Group · Internal Use Only</span>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+  <!-- ===== main column ===== -->
+  <div class="main">
+
+    <!-- ===== top bar ===== -->
+    <header class="topbar reveal">
+      <button class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+      </button>
+
+      <div class="topbar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="app-search" data-i18n-placeholder="search_placeholder" placeholder="Search applications…">
+      </div>
+
+      <div class="topbar-right">
+        <button class="icon-btn" id="admin-btn" title="Manage announcement" aria-label="Manage announcement" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.86-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.2 16.93l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 7.03 4.2l.06.06a1.7 1.7 0 0 0 1.86.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.86-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.86V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>
+          </svg>
+        </button>
+
+        <div class="settings-wrap">
+          <button class="icon-btn" id="settings-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.86-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.2 16.93l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 7.03 4.2l.06.06a1.7 1.7 0 0 0 1.86.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.86-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.86V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>
+            </svg>
+          </button>
+          <div class="settings-menu" id="settings-menu" role="menu">
+            <div class="settings-section" data-i18n="settings_language">Language</div>
+            <div class="settings-row">
+              <div class="seg" id="lang-seg" role="group" aria-label="Language">
+                <button type="button" data-lang="en" id="lang-en">EN</button>
+                <button type="button" data-lang="th" id="lang-th">ไทย</button>
+              </div>
+            </div>
+            <div class="settings-section" data-i18n="settings_theme">Appearance</div>
+            <div class="settings-row">
+              <div class="seg" id="theme-seg" role="group" aria-label="Theme">
+                <button type="button" data-theme-choice="light" id="theme-light" data-i18n="theme_light">Light</button>
+                <button type="button" data-theme-choice="dark" id="theme-dark" data-i18n="theme_dark">Dark</button>
+              </div>
+            </div>
+            <div class="settings-divider"></div>
+            <button class="settings-link" id="settings-help">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4"/><path d="M12 17h.01"/></svg>
+              <span data-i18n="nav_help">Help &amp; Support</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="user-chip">
+          <span class="mini-avatar" id="chip-avatar">?</span>
+          <span id="user-name" data-i18n="connecting">Connecting…</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ===== announcement banner (kept inline near the top, but as a panel now) ===== -->
+      <? if (announcement) { ?>
+        <div class="card" id="announcement" data-id="<?= announcement.id ?>" style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;margin-bottom:16px;">
+          <div class="app-icon" style="flex:0 0 32px;width:32px;height:32px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-4 16-5-5-5 2-4-6z"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <? if (announcement.title) { ?><div class="ann-item-title"><?= announcement.title ?></div><? } ?>
+            <? if (announcement.body)  { ?><div class="ann-item-body"><?= announcement.body ?></div><? } ?>
+          </div>
+          <button class="icon-btn" id="ann-dismiss" title="Dismiss" aria-label="Dismiss announcement" style="width:28px;height:28px;">×</button>
+        </div>
+      <? } ?>
+
+      <div class="page-head reveal">
+        <h1 data-i18n="nav_dashboard">Dashboard</h1>
+        <p data-i18n="dash_sub">One place for every internal VCB Group application.</p>
+      </div>
+
+      <div class="dash-grid">
+        <!-- ===== left: welcome + apps ===== -->
+        <div class="dash-main">
+
+          <div class="card welcome-card reveal">
+            <div class="welcome-text">
+              <p class="welcome-greeting"><span id="welcome-greeting-word">Good morning</span>, <span id="welcome-name">Guest</span></p>
+              <p class="welcome-sub" data-i18n="welcome_sub">Here's what's happening across VCB Connect today.</p>
+            </div>
+            <div class="welcome-status">
+              <span class="status-pill"><span class="dot"></span><span data-i18n="system_online">System Online</span></span>
+              <span class="welcome-clock" id="welcome-clock"></span>
+            </div>
+          </div>
+
+          <div class="section-title reveal" id="apps-section">
+            <h2 data-i18n="applications">Applications</h2>
+            <span class="count"><?= apps.length ?> <span data-i18n="available">available</span></span>
+          </div>
+
+          <div class="apps-grid" id="apps-grid">
+            <? apps.forEach(function(a){ ?>
+              <a class="app-card reveal" href="<?= a.url ?>" target="_blank" rel="noopener" data-key="<?= a.key ?>" data-search="<?= a.name ?> <?= a.desc ?>" style="--card-accent: <?= a.accent ?>">
+                <div class="app-row">
+                  <div class="app-icon">
+                    <? if (a.icon === 'memo') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 3h9l4 4v14H6z"/>
+                        <path d="M14 3v5h5"/>
+                        <path d="M9 13h7"/><path d="M9 17h5"/><path d="M9 9h3"/>
+                      </svg>
+                    <? } else if (a.icon === 'minutes') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8l-4 4V5z"/>
+                        <path d="M7 8h6"/><path d="M7 11h4"/>
+                        <path d="M19 9a2 2 0 0 1 2 2v8l-3-3h-5a2 2 0 0 1-2-2"/>
+                      </svg>
+                    <? } else if (a.icon === 'sop') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="6" y="4" width="12" height="17" rx="2"/>
+                        <path d="M9 4v-1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
+                        <path d="M9 10l1.5 1.5L13 9"/>
+                        <path d="M9 15l1.5 1.5L13 14"/>
+                        <path d="M15 11h1"/><path d="M15 16h1"/>
+                      </svg>
+                    <? } else if (a.icon === 'sysmap') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/>
+                        <path d="M9 4v13"/><path d="M15 6.5v13"/>
+                      </svg>
+                    <? } else if (a.icon === 'hr') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="10" cy="8" r="3.2"/>
+                        <path d="M4 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/>
+                        <circle cx="17" cy="17" r="3.5"/>
+                        <path d="M17 15v2l1.4 1"/>
+                      </svg>
+                    <? } else if (a.icon === 'credit') { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 10l9-6 9 6"/>
+                        <path d="M5 10v8"/><path d="M9 10v8"/><path d="M15 10v8"/><path d="M19 10v8"/>
+                        <path d="M3 20h18"/>
+                        <path d="M12 13v3"/><path d="M11 14h2"/>
+                      </svg>
+                    <? } else { ?>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/><path d="M12 8v8"/>
+                      </svg>
+                    <? } ?>
+                  </div>
+                  <div class="app-name"><?= a.name ?></div>
+                </div>
+                <div class="app-desc"><?= a.desc ?></div>
+                <div class="app-cta"><span data-i18n="launch">Launch</span> <span class="arrow">→</span></div>
+              </a>
+            <? }); ?>
+          </div>
+          <p class="ann-empty" id="apps-empty" hidden data-i18n="search_empty">No applications match your search.</p>
+
+        </div>
+
+        <!-- ===== right: globe + announcements + birthdays ===== -->
+        <div class="side-col">
+
+          <div class="card globe-card reveal" aria-hidden="true">
+            <div class="globe-stage" id="globe-stage">
+              <div class="orbit orbit-2"></div>
+              <div class="orbit orbit-1"></div>
+              <div class="globe-wrap">
+                <div class="globe">
+                  <div class="globe-core"></div>
+                  <div class="meridian m1" style="--i:1"></div>
+                  <div class="meridian m2" style="--i:2"></div>
+                  <div class="meridian m3" style="--i:3"></div>
+                  <div class="meridian m4" style="--i:4"></div>
+                  <div class="meridian m5" style="--i:5"></div>
+                  <div class="meridian m6" style="--i:6"></div>
+                  <div class="parallel p-eq"  style="--i:7"></div>
+                  <div class="parallel p-n30" style="--i:8"></div>
+                  <div class="parallel p-s30" style="--i:9"></div>
+                  <div class="parallel p-n60" style="--i:10"></div>
+                  <div class="parallel p-s60" style="--i:11"></div>
+                </div>
+                <div class="scan"></div>
+                <div class="globe-pulse"></div>
+                <div class="globe-pulse p2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card panel reveal">
+            <div class="panel-head">
+              <h3 data-i18n="panel_announcements">Announcements</h3>
+            </div>
+            <div id="announcements-list">
+              <? if (announcement && (announcement.title || announcement.body)) { ?>
+                <div class="ann-item">
+                  <? if (announcement.title) { ?><div class="ann-item-title"><?= announcement.title ?></div><? } ?>
+                  <? if (announcement.body)  { ?><div class="ann-item-body"><?= announcement.body ?></div><? } ?>
+                </div>
+              <? } else { ?>
+                <p class="ann-empty" data-i18n="panel_announcements_empty">No announcements right now.</p>
+              <? } ?>
+            </div>
+          </div>
+
+          <div class="card panel reveal">
+            <div class="panel-head">
+              <h3 data-i18n="panel_birthdays">Upcoming Birthdays</h3>
+            </div>
+            <div id="birthdays-list"></div>
+            <p class="panel-note" data-i18n="panel_birthdays_note">Sample data — connect a real source to replace this.</p>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="app-tooltip" role="tooltip">
+  <span class="tt-name" id="app-tooltip-name"></span>
+  <span class="tt-desc" id="app-tooltip-desc"></span>
+</div>
+
+<!-- ===== admin modal ===== -->
+<div class="modal-backdrop" id="admin-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+
+    <!-- unlock step -->
+    <div id="admin-unlock">
+      <h3 id="modal-title">Admin · Unlock</h3>
+      <p class="modal-sub" id="unlock-sub">Enter the admin password to manage the announcement.</p>
+      <label for="admin-password">Password</label>
+      <input type="password" id="admin-password" autocomplete="current-password" placeholder="••••••••">
+      <div class="msg" id="unlock-msg"></div>
+      <div class="modal-actions">
+        <button class="btn" id="unlock-cancel">Cancel</button>
+        <button class="btn primary" id="unlock-submit">Unlock</button>
+      </div>
+    </div>
+
+    <!-- editor step -->
+    <div id="admin-editor" hidden>
+      <h3>Announcement</h3>
+      <p class="modal-sub">Shown to every visitor at the top of the portal. Leave empty and turn off "show" to hide.</p>
+
+      <label for="f-title">Title</label>
+      <input type="text" id="f-title" maxlength="120" placeholder="e.g. Maintenance window this Saturday">
+
+      <label for="f-body">Message</label>
+      <textarea id="f-body" maxlength="600" placeholder="Short message. Line breaks are preserved."></textarea>
+
+      <div class="toggle-row">
+        <input type="checkbox" id="f-show">
+        <label for="f-show" style="margin:0;letter-spacing:0;text-transform:none;font-size:13px;color:var(--text)">Show banner to visitors</label>
+      </div>
+
+      <div class="msg" id="edit-msg"></div>
+
+      <div class="modal-actions" id="edit-actions">
+        <button class="btn ghost-danger" id="edit-clear">Clear</button>
+        <button class="btn" id="edit-cancel">Close</button>
+        <button class="btn primary" id="edit-save">Save</button>
+      </div>
+
+      <div class="confirm-row" id="edit-confirm" hidden>
+        <div class="confirm-q"><strong>Remove the current announcement?</strong><br>This hides the banner for everyone.</div>
+        <button class="btn" id="confirm-no">Cancel</button>
+        <button class="btn danger" id="confirm-yes">Yes, clear</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ----- bootstrap state from server -----
+  var ADMIN_INITIALIZED = <?= adminInitialized ? 'true' : 'false' ?>;
+  var TOKEN_STORE_KEY   = 'vcb_connect_admin_token';
+
+  // ===== theme (light / dark) =====
+  var THEME_STORE_KEY = 'vcb_connect_theme';
+  function getTheme() {
+    try {
+      var v = localStorage.getItem(THEME_STORE_KEY);
+      return (v === 'dark' || v === 'light') ? v : 'light';
+    } catch (e) { return 'light'; }
+  }
+  function setTheme(theme) {
+    try { localStorage.setItem(THEME_STORE_KEY, theme); } catch (e) {}
+  }
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    var lightBtn = document.getElementById('theme-light');
+    var darkBtn  = document.getElementById('theme-dark');
+    if (lightBtn) lightBtn.classList.toggle('is-active', theme === 'light');
+    if (darkBtn)  darkBtn.classList.toggle('is-active', theme === 'dark');
+  }
+  applyTheme(getTheme());
+
+  // ----- page-load reveal -----
+  (function () {
+    if (!document.documentElement.classList.contains('js')) return;
+    var reduce = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var els = document.querySelectorAll('.reveal');
+    for (var i = 0; i < els.length; i++) {
+      (function (el, idx) {
+        var d = reduce ? 0 : idx * 45;
+        setTimeout(function () { el.classList.add('in'); }, d);
+        setTimeout(function () { el.classList.remove('reveal', 'in'); }, d + 800);
+      })(els[i], i);
+    }
+  })();
+
+  // ===== language =====
+  var LANG_STORE_KEY = 'vcb_connect_lang';
+  var I18N = {
+    en: {
+      brand_sub:     'Internal Intranet Portal',
+      staff:         'Staff',
+      nav_menu:      'Menu',
+      nav_dashboard: 'Dashboard',
+      nav_applications: 'Applications',
+      nav_more:      'More',
+      nav_onboarding:'Onboarding Portal',
+      nav_ai_tavern: 'AI Tavern',
+      nav_help:      'Help & Support',
+      dash_sub:      'One place for every internal VCB Group application.',
+      welcome_sub:   'Here’s what’s happening across VCB Connect today.',
+      good_morning:  'Good morning',
+      good_afternoon:'Good afternoon',
+      good_evening:  'Good evening',
+      system_online: 'System Online',
+      applications:  'Applications',
+      available:     'available',
+      launch:        'Launch',
+      footer_left:   'VCB Group · Internal Use Only',
+      connecting:    'Connecting…',
+      guest:         'Guest',
+      settings_language: 'Language',
+      settings_theme:    'Appearance',
+      theme_light:   'Light',
+      theme_dark:    'Dark',
+      search_placeholder: 'Search applications…',
+      search_empty:  'No applications match your search.',
+      panel_announcements: 'Announcements',
+      panel_announcements_empty: 'No announcements right now.',
+      panel_birthdays: 'Upcoming Birthdays',
+      panel_birthdays_note: 'Sample data — connect a real source to replace this.',
+      apps: {
+        ememo:   { name: 'E-Memo',                          desc: 'Document control, memo issuance & approval workflow.',
+                   preview: 'Centralizes company documents and memos in one place, with a structured issuance and approval workflow so every record is version-controlled, traceable, and easy to find later.' },
+        minutes: { name: 'Meeting Minutes',                 desc: 'Meeting records, decisions & action-item tracking.',
+                   preview: 'Captures meeting records and decisions as they happen, then tracks the resulting action items to completion so agreements from a meeting are never lost or forgotten.' },
+        sop:     { name: 'Standard Operating Procedures',   desc: 'Browse, search & version-control company SOPs.',
+                   preview: 'Gives every team a single, searchable library of standard operating procedures, with version control so staff always work from the current approved process, not an outdated copy.' },
+        sysmap:  { name: 'System Map',                      desc: 'Interactive map of VCB Group systems & integrations.',
+                   preview: 'Visualizes how the functions of each department across VCB Group connect to one another, making it easy to see how work and responsibilities link across teams at a glance.' },
+        hr:      { name: 'HR Work Log',                     desc: 'Attendance, task logs & timesheet for the HR team.',
+                   preview: 'Lets the HR team log attendance, daily tasks, and timesheets in one system, replacing scattered spreadsheets with a single accurate record for the team’s work.' },
+        credit:  { name: 'Credit Facility Manager',         desc: 'Credit limits, drawdowns, requests & approvals.',
+                   preview: 'Manages the company’s bank credit facilities end to end — limits, drawdowns, requests, and approvals — giving the finance team a clear, auditable view of the company’s credit position with each bank.' }
+      }
+    },
+    th: {
+      brand_sub:     'พอร์ทัลอินทราเน็ตภายในองค์กร',
+      staff:         'พนักงาน',
+      nav_menu:      'เมนู',
+      nav_dashboard: 'แดชบอร์ด',
+      nav_applications: 'แอปพลิเคชัน',
+      nav_more:      'เพิ่มเติม',
+      nav_onboarding:'พอร์ทัลปฐมนิเทศ',
+      nav_ai_tavern: 'AI Tavern',
+      nav_help:      'ช่วยเหลือ',
+      dash_sub:      'ศูนย์รวมแอปพลิเคชันภายในของ VCB Group ไว้ในที่เดียว',
+      welcome_sub:   'ความเคลื่อนไหวของ VCB Connect ในวันนี้',
+      good_morning:  'สวัสดีตอนเช้า',
+      good_afternoon:'สวัสดีตอนบ่าย',
+      good_evening:  'สวัสดีตอนเย็น',
+      system_online: 'ระบบออนไลน์',
+      applications:  'แอปพลิเคชัน',
+      available:     'รายการ',
+      launch:        'เปิดใช้งาน',
+      footer_left:   'VCB Group · สำหรับใช้งานภายในเท่านั้น',
+      connecting:    'กำลังเชื่อมต่อ…',
+      guest:         'ผู้เยี่ยมชม',
+      settings_language: 'ภาษา',
+      settings_theme:    'ธีม',
+      theme_light:   'สว่าง',
+      theme_dark:    'มืด',
+      search_placeholder: 'ค้นหาแอปพลิเคชัน…',
+      search_empty:  'ไม่พบแอปพลิเคชันที่ค้นหา',
+      panel_announcements: 'ประกาศ',
+      panel_announcements_empty: 'ยังไม่มีประกาศในขณะนี้',
+      panel_birthdays: 'วันเกิดที่กำลังจะถึง',
+      panel_birthdays_note: 'ข้อมูลตัวอย่าง — เชื่อมต่อแหล่งข้อมูลจริงเพื่อแทนที่ส่วนนี้',
+      apps: {
+        ememo:   { name: 'อีเมโม',                          desc: 'ควบคุมเอกสาร การออกบันทึกข้อความ และขั้นตอนการอนุมัติ ระหว่างโครงการและสำนักงานใหญ่',
+                   preview: 'รวมเอกสารและบันทึกข้อความของบริษัทไว้ในที่เดียว พร้อมขั้นตอนการออกและอนุมัติที่เป็นระบบ ทำให้ทุกฉบับมีเวอร์ชันที่ตรวจสอบย้อนกลับได้และค้นหาได้ง่ายในภายหลัง' },
+        minutes: { name: 'รายงานการประชุม',                desc: 'บันทึกการประชุม มติที่ประชุม และการติดตามงานที่ได้รับมอบหมาย',
+                   preview: 'บันทึกรายละเอียดและมติที่ประชุมทันทีที่เกิดขึ้น พร้อมติดตามงานที่ได้รับมอบหมายจนเสร็จสิ้น เพื่อให้ข้อตกลงจากที่ประชุมไม่ถูกลืมหรือตกหล่น' },
+        sop:     { name: 'มาตรฐานการปฏิบัติงาน',     desc: 'เรียกดู ค้นหา และควบคุมเวอร์ชันเอกสาร SOP ของบริษัท',
+                   preview: 'เป็นคลังขั้นตอนการปฏิบัติงานมาตรฐานที่ค้นหาได้สำหรับทุกทีม พร้อมควบคุมเวอร์ชัน เพื่อให้พนักงานทำงานตามขั้นตอนที่อนุมัติล่าสุดเสมอ ไม่ใช่ฉบับที่ล้าสมัย' },
+        sysmap:  { name: 'แผนผังระบบ',                      desc: 'แผนผังเชื่อมโยงระบบและแอปพลิเคชันต่าง ๆ ของ VCB Group',
+                   preview: 'แสดงภาพรวมการเชื่อมโยงหน้าที่งานของแต่ละฝ่ายทั่วทั้ง VCB Group ทำให้เห็นความเชื่อมโยงของงานและความรับผิดชอบระหว่างทีมต่าง ๆ ได้ในทันที' },
+        hr:      { name: 'บันทึกงานฝ่ายบุคคล',              desc: 'การลงเวลา บันทึกงาน และตารางเวลาทำงานสำหรับทีม HR',
+                   preview: 'ให้ทีม HR ลงเวลา บันทึกงานประจำวัน และจัดตารางเวลาทำงานไว้ในระบบเดียว แทนที่ไฟล์ Excel ที่กระจัดกระจาย เพื่อให้มีบันทึกข้อมูลการทำงานของทีมที่ถูกต้องและเป็นระบบ' },
+        credit:  { name: 'ระบบจัดการวงเงินสินเชื่อ',         desc: 'วงเงินสินเชื่อ การเบิกถอน คำขอ และการอนุมัติ',
+                   preview: 'บริหารจัดการวงเงินสินเชื่อของบริษัทกับธนาคารครบวงจร ตั้งแต่วงเงิน การเบิกถอน คำขอ ไปจนถึงการอนุมัติ ให้ทีมการเงินเห็นสถานะวงเงินสินเชื่อกับแต่ละธนาคารได้ชัดเจนและตรวจสอบย้อนกลับได้' }
+      }
+    }
+  };
+
+  function getLang() {
+    try {
+      var v = localStorage.getItem(LANG_STORE_KEY);
+      return (v === 'th' || v === 'en') ? v : 'en';
+    } catch (e) { return 'en'; }
+  }
+  function setLang(lang) {
+    try { localStorage.setItem(LANG_STORE_KEY, lang); } catch (e) {}
+  }
+
+  function greetingKeyForHour(h) {
+    if (h < 12) return 'good_morning';
+    if (h < 18) return 'good_afternoon';
+    return 'good_evening';
+  }
+
+  function applyLang(lang) {
+    var dict = I18N[lang] || I18N.en;
+    document.documentElement.setAttribute('lang', lang);
+
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute('data-i18n');
+      if (dict[key] != null) nodes[i].textContent = dict[key];
+    }
+    var phNodes = document.querySelectorAll('[data-i18n-placeholder]');
+    for (var p = 0; p < phNodes.length; p++) {
+      var pk = phNodes[p].getAttribute('data-i18n-placeholder');
+      if (dict[pk] != null) phNodes[p].placeholder = dict[pk];
+    }
+
+    // app cards (name + description) keyed by their stable app key
+    var cards = document.querySelectorAll('.app-card[data-key]');
+    for (var j = 0; j < cards.length; j++) {
+      var k = cards[j].getAttribute('data-key');
+      var entry = dict.apps && dict.apps[k];
+      if (!entry) continue;
+      var nameEl = cards[j].querySelector('.app-name');
+      var descEl = cards[j].querySelector('.app-desc');
+      if (nameEl && entry.name) nameEl.textContent = entry.name;
+      if (descEl && entry.desc) descEl.textContent = entry.desc;
+    }
+    // sidebar nav app labels
+    var navItems = document.querySelectorAll('.nav-item[data-key]');
+    for (var n = 0; n < navItems.length; n++) {
+      var nk = navItems[n].getAttribute('data-key');
+      var nEntry = dict.apps && dict.apps[nk];
+      if (!nEntry) continue;
+      var navNameEl = navItems[n].querySelector('.nav-app-name');
+      if (navNameEl && nEntry.name) navNameEl.textContent = nEntry.name;
+    }
+
+    // language segmented control active state
+    var enBtn = document.getElementById('lang-en');
+    var thBtn = document.getElementById('lang-th');
+    if (enBtn) enBtn.classList.toggle('is-active', lang === 'en');
+    if (thBtn) thBtn.classList.toggle('is-active', lang === 'th');
+
+    // greeting word updates with language too
+    var gw = document.getElementById('welcome-greeting-word');
+    if (gw) gw.textContent = dict[greetingKeyForHour(new Date().getHours())];
+
+    // per-app hover tooltips, now on the app cards / nav items themselves
+    applyAppTooltips(dict);
+  }
+
+  // Stashes each app's name + preview text on the element (as data
+  // attributes) for the custom tooltip below to read on hover — no title
+  // attribute, so there's no native-tooltip delay.
+  function applyAppTooltips(dict) {
+    var targets = document.querySelectorAll('.app-card[data-key], .nav-item[data-key]');
+    for (var i = 0; i < targets.length; i++) {
+      var key = targets[i].getAttribute('data-key');
+      var entry = dict.apps && dict.apps[key];
+      if (!entry) continue;
+      targets[i].setAttribute('data-tt-name', entry.name || '');
+      targets[i].setAttribute('data-tt-desc', entry.preview || entry.desc || '');
+    }
+  }
+
+  // expose so other handlers can localize "Guest" on demand
+  function t(key) { return (I18N[getLang()] || I18N.en)[key]; }
+
+  applyLang(getLang());
+
+  // ----- custom hover tooltip for app cards + sidebar nav items -----
+  // Mimics typical intranet-portal tooltip behavior: a short pause before
+  // it appears (so it doesn't flash while the pointer is just passing
+  // through), a gentle fade in, and a slightly quicker fade out. Sidebar
+  // nav items get the tooltip to their right (narrow row, no room below);
+  // app cards get it above (cards sit in a tight grid, so "below" would
+  // usually land on the next row's card).
+  (function () {
+    var tip     = document.getElementById('app-tooltip');
+    var nameEl  = document.getElementById('app-tooltip-name');
+    var descEl  = document.getElementById('app-tooltip-desc');
+    if (!tip) return;
+    var isTouch = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    if (isTouch) return;
+
+    var SHOW_DELAY  = 220;   // pause before the first tooltip of a hover appears
+    var SWAP_DELAY  = 60;    // pause before showing a *new* target after the pointer moves directly between items — lets the fade-out actually play
+    var HIDE_DELAY  = 60;    // pause before starting the fade-out once the pointer truly leaves
+    var FADE_OUT_MS = 160;   // must match #app-tooltip[data-closing] transition-duration
+    var current = null;
+    var visible = false;     // whether the tooltip is currently faded in (vs. mid fade-out or hidden)
+    var hoverTarget = null;  // most recently hovered/focused element, updated synchronously
+    var showTimer = null;
+    var hideTimer = null;
+
+    function position(target) {
+      var r = target.getBoundingClientRect();
+      var gap = 10;
+      var tw = tip.offsetWidth, th = tip.offsetHeight;
+      var top, left;
+
+      if (target.classList.contains('nav-item')) {
+        left = r.right + gap;
+        top = r.top + (r.height - th) / 2;
+        if (left + tw > window.innerWidth - 12) { left = r.left - tw - gap; }
+      } else {
+        left = r.left + (r.width - tw) / 2;
+        top = r.top - th - gap;
+        if (top < 12) top = r.bottom + gap;
+      }
+      left = Math.min(Math.max(12, left), window.innerWidth - tw - 12);
+      top = Math.min(Math.max(12, top), window.innerHeight - th - 12);
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+
+    function reveal(target) {
+      if (!target || hoverTarget !== target) return; // stale — a newer hover has since taken over, or the pointer already left
+      var name = target.getAttribute('data-tt-name');
+      var desc = target.getAttribute('data-tt-desc');
+      if (!name && !desc) return;
+      current = target;
+      visible = true;
+      nameEl.textContent = name || '';
+      descEl.textContent = desc || '';
+      tip.removeAttribute('data-closing');
+      tip.style.left = '-9999px';
+      tip.style.visibility = 'hidden';
+      tip.setAttribute('data-open', '');
+      position(target);
+      tip.style.visibility = '';
+    }
+
+    // Fades the currently-visible tooltip out, then invokes `next` once the
+    // fade-out transition has actually finished — so switching targets
+    // always reads as out-then-in rather than an instant content swap.
+    function fadeOutThen(next) {
+      tip.setAttribute('data-closing', '');
+      tip.removeAttribute('data-open');
+      visible = false;
+      current = null;
+      setTimeout(next, FADE_OUT_MS);
+    }
+
+    function show(target) {
+      hoverTarget = target;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (current === target) return;
+      if (showTimer) clearTimeout(showTimer);
+
+      if (visible) {
+        // a tooltip is already on screen for a different target — fade it
+        // out first, then bring in the new one after a short beat.
+        fadeOutThen(function () {
+          showTimer = setTimeout(function () { reveal(hoverTarget); }, SWAP_DELAY);
+        });
+      } else {
+        showTimer = setTimeout(function () { reveal(target); }, SHOW_DELAY);
+      }
+    }
+    function hide(target) {
+      if (hoverTarget === target) hoverTarget = null;
+      if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+      if (current !== target) return;
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () {
+        tip.setAttribute('data-closing', '');
+        tip.removeAttribute('data-open');
+        visible = false;
+        current = null;
+        hideTimer = null;
+      }, HIDE_DELAY);
+    }
+
+    var targets = document.querySelectorAll('.app-card[data-key], .nav-item[data-key]');
+    for (var i = 0; i < targets.length; i++) {
+      (function (el) {
+        el.addEventListener('mouseenter', function () { show(el); });
+        el.addEventListener('mouseleave', function () { hide(el); });
+        el.addEventListener('focus', function () { show(el); });
+        el.addEventListener('blur', function () { hide(el); });
+      })(targets[i]);
+    }
+    window.addEventListener('scroll', function () {
+      if (current) { tip.removeAttribute('data-open'); current = null; }
+    }, true);
+  })();
+
+  // ----- settings dropdown wiring -----
+  (function () {
+    var btn  = document.getElementById('settings-btn');
+    var menu = document.getElementById('settings-menu');
+    if (!btn || !menu) return;
+
+    function open() {
+      menu.setAttribute('data-open', '');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function close() {
+      menu.removeAttribute('data-open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hasAttribute('data-open')) close(); else open();
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.contains(e.target) && e.target !== btn) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+
+    document.getElementById('lang-en').addEventListener('click', function () { setLang('en'); applyLang('en'); });
+    document.getElementById('lang-th').addEventListener('click', function () { setLang('th'); applyLang('th'); });
+    document.getElementById('theme-light').addEventListener('click', function () { setTheme('light'); applyTheme('light'); });
+    document.getElementById('theme-dark').addEventListener('click', function () { setTheme('dark'); applyTheme('dark'); });
+  })();
+
+  // ----- mobile sidebar toggle -----
+  (function () {
+    var menuBtn = document.getElementById('menu-btn');
+    var sidebar = document.getElementById('sidebar');
+    var scrim   = document.getElementById('sidebar-scrim');
+    if (!menuBtn || !sidebar) return;
+    function openSidebar()  { sidebar.classList.add('is-open'); }
+    function closeSidebar() { sidebar.classList.remove('is-open'); }
+    menuBtn.addEventListener('click', openSidebar);
+    if (scrim) scrim.addEventListener('click', closeSidebar);
+  })();
+
+  // ----- app search -----
+  (function () {
+    var input = document.getElementById('app-search');
+    var grid  = document.getElementById('apps-grid');
+    var empty = document.getElementById('apps-empty');
+    if (!input || !grid) return;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      var cards = grid.querySelectorAll('.app-card');
+      var visible = 0;
+      for (var i = 0; i < cards.length; i++) {
+        var hay = (cards[i].getAttribute('data-search') || '').toLowerCase();
+        var match = !q || hay.indexOf(q) !== -1;
+        cards[i].style.display = match ? '' : 'none';
+        if (match) visible++;
+      }
+      if (empty) empty.hidden = visible !== 0;
+    });
+  })();
+
+  // Admin gear is hidden by default; reveal it only when the URL has ?admin=1.
+  if (/(\?|&)admin=1(\b|&)/.test(location.search)) {
+    document.getElementById('admin-btn').hidden = false;
+  }
+
+  // ----- header greeting + avatar initials -----
+  function initialsFromName(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    var first = parts[0].charAt(0);
+    var last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+    return (first + last).toUpperCase();
+  }
+  function setAvatars(name) {
+    var initials = initialsFromName(name);
+    var a1 = document.getElementById('sidebar-avatar');
+    var a2 = document.getElementById('chip-avatar');
+    if (a1) a1.textContent = initials;
+    if (a2) a2.textContent = initials;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (email) {
+      var elTop = document.getElementById('user-name');
+      var elSide = document.getElementById('sidebar-user-name');
+      var elWelcome = document.getElementById('welcome-name');
+      if (!email) {
+        var guest = t('guest');
+        elTop.setAttribute('data-i18n', 'guest'); elTop.textContent = guest;
+        elSide.setAttribute('data-i18n', 'guest'); elSide.textContent = guest;
+        elWelcome.textContent = guest;
+        setAvatars(guest);
+        return;
+      }
+      var name = (email.split('@')[0] || '')
+        .replace(/[._-]+/g, ' ')
+        .replace(/\b([a-z])/g, function (m, c) { return c.toUpperCase(); });
+      var display = name || email;
+      elTop.removeAttribute('data-i18n'); elTop.textContent = display;
+      elSide.removeAttribute('data-i18n'); elSide.textContent = display;
+      elWelcome.textContent = display;
+      elTop.title = email; elSide.title = email;
+      setAvatars(display);
+    })
+    .withFailureHandler(function () {
+      var guest = t('guest');
+      var elTop = document.getElementById('user-name');
+      var elSide = document.getElementById('sidebar-user-name');
+      var elWelcome = document.getElementById('welcome-name');
+      elTop.setAttribute('data-i18n', 'guest'); elTop.textContent = guest;
+      elSide.setAttribute('data-i18n', 'guest'); elSide.textContent = guest;
+      elWelcome.textContent = guest;
+      setAvatars(guest);
+    })
+    .getActiveUserEmail();
+
+  // ----- welcome clock + greeting word -----
+  (function () {
+    function tick() {
+      var now = new Date();
+      var gw = document.getElementById('welcome-greeting-word');
+      if (gw) gw.textContent = t(greetingKeyForHour(now.getHours()));
+      var clock = document.getElementById('welcome-clock');
+      if (clock) {
+        clock.textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
+          + ' · ' + now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    tick();
+    setInterval(tick, 30000);
+  })();
+
+  // ----- upcoming birthdays (sample data placeholder) -----
+  (function () {
+    var list = document.getElementById('birthdays-list');
+    if (!list) return;
+    var SAMPLE_BIRTHDAYS = [
+      { name: 'Mimiese Abubakar', when: 'Today' },
+      { name: 'Kenny Avwerose',   when: 'Tomorrow' },
+      { name: 'Omo Jefe',         when: 'Wed, 25 July' }
+    ];
+    SAMPLE_BIRTHDAYS.forEach(function (b) {
+      var row = document.createElement('div');
+      row.className = 'bday-row';
+      row.innerHTML =
+        '<div class="bday-avatar">' + initialsFromName(b.name) + '</div>' +
+        '<div><div class="bday-name"></div><div class="bday-when"></div></div>';
+      row.querySelector('.bday-name').textContent = b.name;
+      row.querySelector('.bday-when').textContent = b.when;
+      list.appendChild(row);
+    });
+  })();
+
+  // ----- announcement banner: dismissal + dynamic render -----
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function wireDismiss() {
+    var banner = document.getElementById('announcement');
+    if (!banner) return;
+    var id = banner.getAttribute('data-id');
+    try {
+      if (localStorage.getItem('vcb_connect_ann_dismissed') === id) {
+        banner.hidden = true;
+      }
+    } catch (e) {}
+    var btn = document.getElementById('ann-dismiss');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      banner.hidden = true;
+      try { localStorage.setItem('vcb_connect_ann_dismissed', id); } catch (e) {}
+    });
+  }
+
+  function renderAnnouncementsPanel(ann) {
+    var panel = document.getElementById('announcements-list');
+    if (!panel) return;
+    if (ann && ann.show && (ann.title || ann.body)) {
+      panel.innerHTML =
+        '<div class="ann-item">' +
+        (ann.title ? '<div class="ann-item-title">' + escapeHtml(ann.title) + '</div>' : '') +
+        (ann.body  ? '<div class="ann-item-body">'  + escapeHtml(ann.body)  + '</div>' : '') +
+        '</div>';
+    } else {
+      panel.innerHTML = '<p class="ann-empty">' + escapeHtml(t('panel_announcements_empty')) + '</p>';
+    }
+  }
+
+  function renderBanner(ann) {
+    var existing = document.getElementById('announcement');
+    if (!ann || !ann.show) {
+      if (existing) existing.remove();
+      renderAnnouncementsPanel(ann);
+      return;
+    }
+    var html = ''
+      + '<div class="card" id="announcement" data-id="' + escapeHtml(ann.id) + '" style="display:flex;align-items:flex-start;gap:14px;padding:14px 18px;margin-bottom:16px;">'
+      +   '<div class="app-icon" style="flex:0 0 32px;width:32px;height:32px;">'
+      +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-4 16-5-5-5 2-4-6z"/></svg>'
+      +   '</div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     (ann.title ? '<div class="ann-item-title">' + escapeHtml(ann.title) + '</div>' : '')
+      +     (ann.body  ? '<div class="ann-item-body">'  + escapeHtml(ann.body)  + '</div>' : '')
+      +   '</div>'
+      +   '<button class="icon-btn" id="ann-dismiss" title="Dismiss" aria-label="Dismiss announcement" style="width:28px;height:28px;">×</button>'
+      + '</div>';
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      var pageHead = document.querySelector('.page-head');
+      pageHead.insertAdjacentHTML('beforebegin', html);
+    }
+    wireDismiss();
+    renderAnnouncementsPanel(ann);
+  }
+
+  wireDismiss();
+
+  // ----- admin modal -----
+  (function () {
+    var modal       = document.getElementById('admin-modal');
+    var stepUnlock  = document.getElementById('admin-unlock');
+    var stepEditor  = document.getElementById('admin-editor');
+    var unlockSub   = document.getElementById('unlock-sub');
+    var pwInput     = document.getElementById('admin-password');
+    var unlockMsg   = document.getElementById('unlock-msg');
+    var editMsg     = document.getElementById('edit-msg');
+    var titleEl     = document.getElementById('modal-title');
+
+    var f = {
+      title:    document.getElementById('f-title'),
+      body:     document.getElementById('f-body'),
+      show:     document.getElementById('f-show')
+    };
+
+    function openModal() {
+      var token = getCachedToken();
+      if (token) {
+        showEditorFromCache(token);
+        modal.setAttribute('open', '');
+        return;
+      }
+      showUnlockStep();
+      modal.setAttribute('open', '');
+      setTimeout(function () { pwInput.focus(); }, 50);
+    }
+    function closeModal() {
+      modal.removeAttribute('open');
+      unlockMsg.textContent = '';
+      editMsg.textContent = '';
+      pwInput.value = '';
+      hideClearConfirm();
+    }
+
+    function showClearConfirm() {
+      document.getElementById('edit-actions').hidden = true;
+      document.getElementById('edit-confirm').hidden = false;
+    }
+    function hideClearConfirm() {
+      var actions = document.getElementById('edit-actions');
+      var confirmRow = document.getElementById('edit-confirm');
+      if (actions) actions.hidden = false;
+      if (confirmRow) confirmRow.hidden = true;
+    }
+
+    function showUnlockStep() {
+      stepUnlock.hidden = false;
+      stepEditor.hidden = true;
+      if (ADMIN_INITIALIZED) {
+        titleEl.textContent = 'Admin · Unlock';
+        unlockSub.textContent = 'Enter the admin password to manage the announcement.';
+      } else {
+        titleEl.textContent = 'Admin · First-time setup';
+        unlockSub.textContent = 'No admin password is set yet. Choose one now (min 6 characters) — you\'ll use it every time you edit the announcement.';
+      }
+    }
+
+    function showEditorFromCache(token) {
+      stepUnlock.hidden = true;
+      stepEditor.hidden = false;
+      titleEl.textContent = 'Announcement';
+      editMsg.textContent = 'Loading current announcement…';
+      editMsg.className = 'msg';
+      google.script.run
+        .withSuccessHandler(function (ann) {
+          fillEditor(ann);
+          editMsg.textContent = '';
+        })
+        .withFailureHandler(function (err) {
+          setCachedToken(null);
+          editMsg.textContent = '';
+          showUnlockStep();
+          unlockMsg.textContent = (err && err.message) || 'Session expired.';
+          unlockMsg.className = 'msg err';
+          setTimeout(function () { pwInput.focus(); }, 50);
+        })
+        .getAnnouncementForEdit(token);
+    }
+
+    function fillEditor(ann) {
+      f.title.value  = ann && ann.title || '';
+      f.body.value   = ann && ann.body  || '';
+      f.show.checked = ann ? !!ann.show : true;
+    }
+
+    function getCachedToken() {
+      try { return localStorage.getItem(TOKEN_STORE_KEY) || null; } catch (e) { return null; }
+    }
+    function setCachedToken(tok) {
+      try {
+        if (tok) localStorage.setItem(TOKEN_STORE_KEY, tok);
+        else localStorage.removeItem(TOKEN_STORE_KEY);
+      } catch (e) {}
+    }
+
+    function submitUnlock() {
+      var pw = pwInput.value;
+      if (!pw || pw.length < 6) {
+        unlockMsg.textContent = 'Password must be at least 6 characters.';
+        unlockMsg.className = 'msg err';
+        return;
+      }
+      unlockMsg.textContent = 'Checking…';
+      unlockMsg.className = 'msg';
+      var btn = document.getElementById('unlock-submit');
+      btn.disabled = true;
+      google.script.run
+        .withSuccessHandler(function (token) {
+          btn.disabled = false;
+          ADMIN_INITIALIZED = true;
+          setCachedToken(token);
+          unlockMsg.textContent = '';
+          showEditorFromCache(token);
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          unlockMsg.textContent = (err && err.message) || 'Could not unlock.';
+          unlockMsg.className = 'msg err';
+        })
+        .unlockAdmin(pw);
+    }
+
+    function submitSave() {
+      var token = getCachedToken();
+      if (!token) { showUnlockStep(); return; }
+      var payload = {
+        title: f.title.value,
+        body:  f.body.value,
+        show:  !!f.show.checked
+      };
+      if (!payload.title.trim() && !payload.body.trim()) {
+        editMsg.textContent = 'Add at least a title or a message.';
+        editMsg.className = 'msg err';
+        return;
+      }
+      var btn = document.getElementById('edit-save');
+      btn.disabled = true;
+      editMsg.textContent = 'Saving…';
+      editMsg.className = 'msg';
+      google.script.run
+        .withSuccessHandler(function (saved) {
+          btn.disabled = false;
+          editMsg.textContent = 'Saved.';
+          editMsg.className = 'msg ok';
+          renderBanner(saved);
+          setTimeout(closeModal, 500);
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          var m = (err && err.message) || 'Could not save.';
+          editMsg.textContent = m;
+          editMsg.className = 'msg err';
+          if (/session expired/i.test(m)) {
+            setCachedToken(null);
+            setTimeout(showUnlockStep, 600);
+          }
+        })
+        .saveAnnouncement(token, payload);
+    }
+
+    function submitClear() {
+      showClearConfirm();
+    }
+    function performClear() {
+      var token = getCachedToken();
+      if (!token) { hideClearConfirm(); showUnlockStep(); return; }
+      var btn = document.getElementById('confirm-yes');
+      btn.disabled = true;
+      editMsg.textContent = 'Clearing…';
+      editMsg.className = 'msg';
+      google.script.run
+        .withSuccessHandler(function () {
+          btn.disabled = false;
+          editMsg.textContent = 'Cleared.';
+          editMsg.className = 'msg ok';
+          renderBanner(null);
+          fillEditor(null);
+          f.show.checked = false;
+          hideClearConfirm();
+          setTimeout(closeModal, 500);
+        })
+        .withFailureHandler(function (err) {
+          btn.disabled = false;
+          editMsg.textContent = (err && err.message) || 'Could not clear.';
+          editMsg.className = 'msg err';
+          hideClearConfirm();
+        })
+        .saveAnnouncement(token, null);
+    }
+
+    document.getElementById('admin-btn').addEventListener('click', openModal);
+    document.getElementById('unlock-cancel').addEventListener('click', closeModal);
+    document.getElementById('edit-cancel').addEventListener('click', closeModal);
+    document.getElementById('unlock-submit').addEventListener('click', submitUnlock);
+    document.getElementById('edit-save').addEventListener('click', submitSave);
+    document.getElementById('edit-clear').addEventListener('click', submitClear);
+    document.getElementById('confirm-no').addEventListener('click', hideClearConfirm);
+    document.getElementById('confirm-yes').addEventListener('click', performClear);
+
+    pwInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); submitUnlock(); }
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.hasAttribute('open')) closeModal();
+    });
+  })();
+</script>
+
+</body>
+</html>

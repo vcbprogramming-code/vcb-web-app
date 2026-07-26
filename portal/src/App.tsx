@@ -1,13 +1,33 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { APPS, I18N } from './data'
-import { GlobeIcon, GearIcon, AnnouncementIcon, AppIcon } from './icons'
+import {
+  GlobeIcon,
+  GearIcon,
+  AnnouncementIcon,
+  AppIcon,
+  SearchIcon,
+  MenuIcon,
+  HelpIcon,
+  DashboardIcon,
+  NavArrowIcon,
+  OnboardingIcon,
+  AiTavernIcon,
+} from './icons'
 import Globe from './Globe'
+import Tooltip, { useTooltip } from './Tooltip'
 import AdminModal from './AdminModal'
 import { getActiveUserEmail, getAnnouncement } from './mockBackend'
-import type { Announcement, CSSVarStyle, Dict, Lang } from './types'
+import type { Announcement, CSSVarStyle, Dict, Lang, Theme } from './types'
 
 const LANG_STORE_KEY = 'vcb_connect_lang'
+const THEME_STORE_KEY = 'vcb_connect_theme'
 const DISMISS_KEY = 'vcb_connect_ann_dismissed'
+
+const SAMPLE_BIRTHDAYS = [
+  { name: 'Mimiese Abubakar', when: 'Today' },
+  { name: 'Kenny Avwerose', when: 'Tomorrow' },
+  { name: 'Omo Jefe', when: 'Wed, 25 July' },
+]
 
 function getInitialLang(): Lang {
   try {
@@ -18,8 +38,35 @@ function getInitialLang(): Lang {
   }
 }
 
+function getInitialTheme(): Theme {
+  try {
+    const v = localStorage.getItem(THEME_STORE_KEY)
+    return v === 'dark' || v === 'light' ? v : 'light'
+  } catch {
+    return 'light'
+  }
+}
+
+function initialsFromName(name: string): string {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!parts.length) return '?'
+  const first = parts[0]?.charAt(0) ?? ''
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0) ?? '') : ''
+  return (first + last).toUpperCase()
+}
+
+function greetingKeyForHour(h: number): 'good_morning' | 'good_afternoon' | 'good_evening' {
+  if (h < 12) return 'good_morning'
+  if (h < 18) return 'good_afternoon'
+  return 'good_evening'
+}
+
 export default function App() {
   const [lang, setLang] = useState<Lang>(getInitialLang)
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const dict = I18N[lang]
   const t = useCallback(<K extends keyof Dict>(key: K): Dict[K] => I18N[lang][key], [lang])
 
@@ -30,30 +77,13 @@ export default function App() {
   const [dismissed, setDismissed] = useState(false)
   const [adminVisible, setAdminVisible] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [previewKey, setPreviewKey] = useState<string | null>(null)
-  const previewRestoreTimer = useRef<number | null>(null)
-
-  // Delays clearing the preview until after the globe panel's fade-out
-  // transition (260ms) finishes, so the mission text never flashes mid-fade.
-  function showPreview(key: string): void {
-    if (previewRestoreTimer.current !== null) {
-      window.clearTimeout(previewRestoreTimer.current)
-      previewRestoreTimer.current = null
-    }
-    setPreviewKey(key)
-  }
-  function hidePreview(): void {
-    if (previewRestoreTimer.current !== null) window.clearTimeout(previewRestoreTimer.current)
-    previewRestoreTimer.current = window.setTimeout(() => {
-      setPreviewKey(null)
-      previewRestoreTimer.current = null
-    }, 260)
-  }
-  useEffect(() => {
-    return () => {
-      if (previewRestoreTimer.current !== null) window.clearTimeout(previewRestoreTimer.current)
-    }
-  }, [])
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [now, setNow] = useState(() => new Date())
+  const settingsRef = useRef<HTMLDivElement>(null)
+  const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  const { state: tooltipState, bind: bindTooltip } = useTooltip()
 
   // reflect <html lang> + persist choice (mirrors applyLang + setLang)
   useEffect(() => {
@@ -64,6 +94,16 @@ export default function App() {
       /* ignore */
     }
   }, [lang])
+
+  // reflect <html data-theme> + persist choice (mirrors applyTheme + setTheme)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try {
+      localStorage.setItem(THEME_STORE_KEY, theme)
+    } catch {
+      /* ignore */
+    }
+  }, [theme])
 
   // reveal the admin gear only when ?admin=1 is in the URL
   useEffect(() => {
@@ -116,9 +156,30 @@ export default function App() {
     }
   }
 
-  function toggleLang(): void {
-    setLang((cur) => (cur === 'en' ? 'th' : 'en'))
-  }
+  // settings dropdown: close on outside click / Escape
+  useEffect(() => {
+    if (!settingsOpen) return
+    function onDocClick(e: MouseEvent): void {
+      const menu = settingsRef.current
+      const btn = settingsBtnRef.current
+      if (menu && !menu.contains(e.target as Node) && e.target !== btn) setSettingsOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setSettingsOpen(false)
+    }
+    document.addEventListener('click', onDocClick)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('click', onDocClick)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [settingsOpen])
+
+  // welcome clock + greeting word — ticks every 30s like index.html
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30000)
+    return () => window.clearInterval(id)
+  }, [])
 
   // page-load reveal choreography — ported from the IIFE in index.html
   useEffect(() => {
@@ -127,75 +188,143 @@ export default function App() {
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false
 
-    const late = document.querySelectorAll<HTMLElement>('.app-card.reveal, footer.reveal')
-    const early = document.querySelectorAll<HTMLElement>('.reveal:not(.app-card):not(footer)')
+    const els = document.querySelectorAll<HTMLElement>('.reveal')
     const timers: number[] = []
-
-    const run = (list: NodeListOf<HTMLElement>, start: number, step: number): void => {
-      list.forEach((el, idx) => {
-        const d = reduce ? 0 : start + idx * step
-        timers.push(window.setTimeout(() => el.classList.add('in'), d))
-        timers.push(window.setTimeout(() => el.classList.remove('reveal', 'in'), d + 1000))
-      })
-    }
-
-    const raf = requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        run(early, 0, 70) // quiet frame, up front
-        run(late, reduce ? 0 : 1200, 90) // panels ride the globe's energy pulse
-      }),
-    )
+    els.forEach((el, idx) => {
+      const d = reduce ? 0 : idx * 45
+      timers.push(window.setTimeout(() => el.classList.add('in'), d))
+      timers.push(window.setTimeout(() => el.classList.remove('reveal', 'in'), d + 800))
+    })
     return () => {
-      cancelAnimationFrame(raf)
       timers.forEach((id) => clearTimeout(id))
     }
   }, [])
 
   const showBanner = !!announcement && announcement.show && !dismissed
-  const year = new Date().getFullYear()
 
   // a real name is language-neutral and overrides the i18n "Guest"
   const greeting = userName === null ? t('connecting') : userName === '' ? t('guest') : userName
+  const initials = initialsFromName(greeting)
+  const greetingWord = t(greetingKeyForHour(now.getHours()))
+  const clockText = `${now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} · ${now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+
+  const q = query.trim().toLowerCase()
+  const filteredApps = useMemo(() => {
+    if (!q) return APPS
+    return APPS.filter((a) => {
+      const entry = dict.apps[a.key]
+      const hay = `${entry?.name ?? a.name} ${entry?.desc ?? a.desc}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [q, dict])
 
   return (
-    <>
-      <div className="stars"></div>
+    <div className="shell">
+      {/* ===== sidebar ===== */}
+      <aside className={`sidebar${sidebarOpen ? ' is-open' : ''}`} id="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-logo">
+            <GlobeIcon />
+          </div>
+          <div>
+            <div className="sidebar-brand-name">VCB CONNECT</div>
+            <div className="sidebar-brand-sub">{dict.brand_sub}</div>
+          </div>
+        </div>
 
-      <div className="wrap">
+        <div className="sidebar-user">
+          <div className="sidebar-avatar">{userName === null ? '?' : initials}</div>
+          <div>
+            <div className="sidebar-user-name" title={userTitle}>
+              {greeting}
+            </div>
+            <div className="sidebar-user-role">{dict.staff}</div>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div className="sidebar-label">{dict.nav_menu}</div>
+          <a className="nav-item active" href="#dashboard">
+            <DashboardIcon />
+            <span>{dict.nav_dashboard}</span>
+          </a>
+
+          <div className="sidebar-label">{dict.nav_applications}</div>
+          {APPS.map((a) => {
+            const entry = dict.apps[a.key]
+            return (
+              <a
+                key={a.key}
+                className="nav-item"
+                href={a.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-key={a.key}
+                {...bindTooltip({
+                  key: `nav-${a.key}`,
+                  name: entry?.name ?? a.name,
+                  desc: entry?.preview || entry?.desc || a.desc,
+                  kind: 'nav',
+                })}
+              >
+                <AppIcon icon={a.icon} />
+                <span className="nav-app-name">{entry?.name ?? a.name}</span>
+                <NavArrowIcon />
+              </a>
+            )
+          })}
+
+          <div className="sidebar-label">{dict.nav_more}</div>
+          <a className="nav-item" href="#onboarding">
+            <OnboardingIcon />
+            <span>{dict.nav_onboarding}</span>
+          </a>
+          <a className="nav-item" href="#ai-tavern">
+            <AiTavernIcon />
+            <span>{dict.nav_ai_tavern}</span>
+          </a>
+          <a className="nav-item" href="#help">
+            <HelpIcon />
+            <span>{dict.nav_help}</span>
+          </a>
+        </nav>
+
+        <div className="sidebar-foot">
+          <span>{dict.footer_left}</span>
+        </div>
+      </aside>
+      <div
+        className="sidebar-scrim"
+        id="sidebar-scrim"
+        onClick={() => setSidebarOpen(false)}
+        {...(!sidebarOpen ? { hidden: true } : {})}
+      ></div>
+
+      {/* ===== main column ===== */}
+      <div className="main">
         {/* ===== top bar ===== */}
         <header className="topbar reveal">
-          <div className="brand">
-            <div
-              className="brand-logo lang-toggle"
-              role="button"
-              tabIndex={0}
-              aria-label={dict.toggle_title}
-              title={dict.toggle_title}
-              onClick={toggleLang}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  toggleLang()
-                }
-              }}
-            >
-              <GlobeIcon />
-              <span className="lang-badge">{dict.badge}</span>
-            </div>
-            <div>
-              <div className="brand-name">
-                VCB <span>CONNECT</span>
-              </div>
-              <div className="brand-sub">{dict.brand_sub}</div>
-            </div>
+          <button
+            className="icon-btn menu-btn"
+            id="menu-btn"
+            aria-label="Open menu"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <MenuIcon />
+          </button>
+
+          <div className="topbar-search">
+            <SearchIcon />
+            <input
+              type="text"
+              id="app-search"
+              placeholder={dict.search_placeholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
           </div>
+
           <div className="topbar-right">
-            <div className="user-chip">
-              <span className="dot"></span>
-              <span id="user-name" title={userTitle}>
-                {greeting}
-              </span>
-            </div>
             {adminVisible && (
               <button
                 className="icon-btn"
@@ -206,110 +335,241 @@ export default function App() {
                 <GearIcon />
               </button>
             )}
+
+            <div className="settings-wrap">
+              <button
+                className="icon-btn"
+                id="settings-btn"
+                ref={settingsBtnRef}
+                aria-label="Settings"
+                aria-haspopup="true"
+                aria-expanded={settingsOpen}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSettingsOpen((o) => !o)
+                }}
+              >
+                <GearIcon />
+              </button>
+              <div
+                className="settings-menu"
+                id="settings-menu"
+                role="menu"
+                ref={settingsRef}
+                {...(settingsOpen ? { 'data-open': '' } : {})}
+              >
+                <div className="settings-section">{dict.settings_language}</div>
+                <div className="settings-row">
+                  <div className="seg" id="lang-seg" role="group" aria-label="Language">
+                    <button
+                      type="button"
+                      className={lang === 'en' ? 'is-active' : ''}
+                      onClick={() => setLang('en')}
+                    >
+                      EN
+                    </button>
+                    <button
+                      type="button"
+                      className={lang === 'th' ? 'is-active' : ''}
+                      onClick={() => setLang('th')}
+                    >
+                      ไทย
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">{dict.settings_theme}</div>
+                <div className="settings-row">
+                  <div className="seg" id="theme-seg" role="group" aria-label="Theme">
+                    <button
+                      type="button"
+                      className={theme === 'light' ? 'is-active' : ''}
+                      onClick={() => setTheme('light')}
+                    >
+                      {dict.theme_light}
+                    </button>
+                    <button
+                      type="button"
+                      className={theme === 'dark' ? 'is-active' : ''}
+                      onClick={() => setTheme('dark')}
+                    >
+                      {dict.theme_dark}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-divider"></div>
+                <button className="settings-link" id="settings-help">
+                  <HelpIcon />
+                  <span>{dict.nav_help}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="user-chip">
+              <span className="mini-avatar">{userName === null ? '?' : initials}</span>
+              <span id="user-name" title={userTitle}>
+                {greeting}
+              </span>
+            </div>
           </div>
         </header>
 
-        {/* ===== announcement banner ===== */}
-        {showBanner && announcement && (
-          <div className="announcement" data-id={announcement.id}>
-            <div className="ann-icon">
-              <AnnouncementIcon />
-            </div>
-            <div className="ann-body">
-              {announcement.title && <div className="ann-title">{announcement.title}</div>}
-              {announcement.body && <div className="ann-text">{announcement.body}</div>}
-            </div>
-            <button
-              className="ann-dismiss"
-              title="Dismiss"
-              aria-label="Dismiss announcement"
-              onClick={dismissBanner}
+        <div className="content">
+          {/* ===== announcement banner ===== */}
+          {showBanner && announcement && (
+            <div
+              className="card"
+              id="announcement"
+              data-id={announcement.id}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 14,
+                padding: '14px 18px',
+                marginBottom: 16,
+              }}
             >
-              ×
-            </button>
-          </div>
-        )}
+              <div className="app-icon" style={{ flex: '0 0 32px', width: 32, height: 32 }}>
+                <AnnouncementIcon />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {announcement.title && <div className="ann-item-title">{announcement.title}</div>}
+                {announcement.body && <div className="ann-item-body">{announcement.body}</div>}
+              </div>
+              <button
+                className="icon-btn"
+                id="ann-dismiss"
+                title="Dismiss"
+                aria-label="Dismiss announcement"
+                style={{ width: 28, height: 28 }}
+                onClick={dismissBanner}
+              >
+                ×
+              </button>
+            </div>
+          )}
 
-        {/* ===== hero ===== */}
-        <section className="hero">
-          <div className="hero-text">
-            <h1 className="reveal">
-              <span className="glow-text">VCB&nbsp;Connect</span>
-            </h1>
-            <p className="reveal">{dict.hero_desc}</p>
-            <div className="hero-meta reveal">
-              <span className="meta-pill">{dict.system_online}</span>
-              <span className="meta-pill">
-                {APPS.length} {dict.apps_word}
-              </span>
-              <span className="meta-pill">VCB-CON.COM</span>
+          <div className="page-head reveal">
+            <h1>{dict.nav_dashboard}</h1>
+            <p>{dict.dash_sub}</p>
+          </div>
+
+          <div className="dash-grid">
+            {/* ===== left: welcome + apps ===== */}
+            <div className="dash-main">
+              <div className="card welcome-card reveal">
+                <div className="welcome-text">
+                  <p className="welcome-greeting">
+                    <span id="welcome-greeting-word">{greetingWord}</span>,{' '}
+                    <span id="welcome-name">{greeting}</span>
+                  </p>
+                  <p className="welcome-sub">{dict.welcome_sub}</p>
+                </div>
+                <div className="welcome-status">
+                  <span className="status-pill">
+                    <span className="dot"></span>
+                    <span>{dict.system_online}</span>
+                  </span>
+                  <span className="welcome-clock" id="welcome-clock">
+                    {clockText}
+                  </span>
+                </div>
+              </div>
+
+              <div className="section-title reveal" id="apps-section">
+                <h2>{dict.applications}</h2>
+                <span className="count">
+                  {APPS.length} {dict.available}
+                </span>
+              </div>
+
+              <div className="apps-grid" id="apps-grid">
+                {filteredApps.map((a) => {
+                  const entry = dict.apps[a.key]
+                  const style: CSSVarStyle = { '--card-accent': a.accent }
+                  return (
+                    <a
+                      key={a.key}
+                      className="app-card reveal"
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-key={a.key}
+                      style={style}
+                      {...bindTooltip({
+                        key: `card-${a.key}`,
+                        name: entry?.name ?? a.name,
+                        desc: entry?.preview || entry?.desc || a.desc,
+                        kind: 'card',
+                      })}
+                    >
+                      <div className="app-row">
+                        <div className="app-icon">
+                          <AppIcon icon={a.icon} />
+                        </div>
+                        <div className="app-name">{entry?.name ?? a.name}</div>
+                      </div>
+                      <div className="app-desc">{entry?.desc ?? a.desc}</div>
+                      <div className="app-cta">
+                        <span>{dict.launch}</span> <span className="arrow">→</span>
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+              {filteredApps.length === 0 && (
+                <p className="ann-empty" id="apps-empty">
+                  {dict.search_empty}
+                </p>
+              )}
+            </div>
+
+            {/* ===== right: globe + announcements + birthdays ===== */}
+            <div className="side-col">
+              <div className="card globe-card reveal" aria-hidden="true">
+                <Globe />
+              </div>
+
+              <div className="card panel reveal">
+                <div className="panel-head">
+                  <h3>{dict.panel_announcements}</h3>
+                </div>
+                <div id="announcements-list">
+                  {announcement && announcement.show && (announcement.title || announcement.body) ? (
+                    <div className="ann-item">
+                      {announcement.title && (
+                        <div className="ann-item-title">{announcement.title}</div>
+                      )}
+                      {announcement.body && <div className="ann-item-body">{announcement.body}</div>}
+                    </div>
+                  ) : (
+                    <p className="ann-empty">{dict.panel_announcements_empty}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="card panel reveal">
+                <div className="panel-head">
+                  <h3>{dict.panel_birthdays}</h3>
+                </div>
+                <div id="birthdays-list">
+                  {SAMPLE_BIRTHDAYS.map((b) => (
+                    <div className="bday-row" key={b.name}>
+                      <div className="bday-avatar">{initialsFromName(b.name)}</div>
+                      <div>
+                        <div className="bday-name">{b.name}</div>
+                        <div className="bday-when">{b.when}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="panel-note">{dict.panel_birthdays_note}</p>
+              </div>
             </div>
           </div>
-
-          <Globe
-            label="Jump to applications"
-            mission={dict.mission}
-            missionLink={dict.mission_link}
-            previewApp={(() => {
-              if (!previewKey) return null
-              const entry = dict.apps[previewKey]
-              const app = APPS.find((a) => a.key === previewKey)
-              if (!entry || !app) return null
-              return { name: entry.name, preview: entry.preview, accent: app.accent }
-            })()}
-            onActivate={() =>
-              document.getElementById('apps-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
-          />
-        </section>
-
-        {/* ===== apps ===== */}
-        <div className="section-title reveal" id="apps-section">
-          <h2>{dict.applications}</h2>
-          <span className="count">
-            {APPS.length} {dict.available}
-          </span>
         </div>
-
-        <div className="apps-grid">
-          {APPS.map((a) => {
-            const entry = dict.apps[a.key]
-            const style: CSSVarStyle = { '--card-accent': a.accent }
-            return (
-              <a
-                key={a.key}
-                className="app-card reveal"
-                href={a.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-key={a.key}
-                style={style}
-                onMouseEnter={() => showPreview(a.key)}
-                onMouseLeave={hidePreview}
-                onFocus={() => showPreview(a.key)}
-                onBlur={hidePreview}
-              >
-                <div className="app-row">
-                  <div className="app-icon">
-                    <AppIcon icon={a.icon} />
-                  </div>
-                  <div className="app-name">{entry?.name ?? a.name}</div>
-                </div>
-                <div className="app-desc">{entry?.desc ?? a.desc}</div>
-                <div className="app-cta">
-                  <span>{dict.launch}</span> <span className="arrow">→</span>
-                </div>
-              </a>
-            )
-          })}
-        </div>
-
-        {/* ===== footer ===== */}
-        <footer className="reveal">
-          <span>{dict.footer_left}</span>
-          <span className="right">v1.1 · {year}</span>
-        </footer>
       </div>
+
+      <Tooltip state={tooltipState} />
 
       {/* ===== admin modal ===== */}
       <AdminModal
@@ -320,6 +580,6 @@ export default function App() {
           setDismissed(false)
         }}
       />
-    </>
+    </div>
   )
 }

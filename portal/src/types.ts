@@ -35,30 +35,50 @@ export interface AnnouncementInput {
 
 export type Lang = 'en' | 'th'
 
+/** Light is the default; dark is the historical VCB Connect look. */
+export type Theme = 'light' | 'dark'
+
 /** Per-app localized name + description, keyed by app key. */
 export interface AppI18n {
   name: string
   desc: string
-  /** Longer paragraph shown on the globe when hovering this app's card. */
+  /** Longer paragraph shown in the custom hover tooltip for this app's card/nav item. */
   preview: string
 }
 
 /** One language's dictionary — mirrors index.html I18N[lang]. */
 export interface Dict {
   brand_sub: string
-  hero_desc: string
+  staff: string
+  nav_menu: string
+  nav_dashboard: string
+  nav_applications: string
+  nav_more: string
+  nav_onboarding: string
+  nav_ai_tavern: string
+  nav_help: string
+  dash_sub: string
+  welcome_sub: string
+  good_morning: string
+  good_afternoon: string
+  good_evening: string
   system_online: string
-  apps_word: string
   applications: string
   available: string
   launch: string
   footer_left: string
   connecting: string
   guest: string
-  toggle_title: string
-  badge: string
-  mission_link: string
-  mission: string[]
+  settings_language: string
+  settings_theme: string
+  theme_light: string
+  theme_dark: string
+  search_placeholder: string
+  search_empty: string
+  panel_announcements: string
+  panel_announcements_empty: string
+  panel_birthdays: string
+  panel_birthdays_note: string
   apps: Record<string, AppI18n>
 }
 

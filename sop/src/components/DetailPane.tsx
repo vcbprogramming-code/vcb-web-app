@@ -110,12 +110,16 @@ function ScenarioDetail({ s, sc }: { s: Store; sc: Scenario }) {
         <div className="d-titles">
           <div className="d-th">{primaryTitle}</div>
           <div className="d-en">{secondaryTitle}</div>
+          {(sc.extraModules || []).length > 0 && (
+            <div className="d-tags">
+              {(sc.extraModules || []).map((m) => (
+                <span key={m} className={'d-badge m-' + m}>
+                  {m}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        {(sc.extraModules || []).map((m) => (
-          <span key={m} className={'d-badge m-' + m}>
-            {m}
-          </span>
-        ))}
         {s.isAdmin && (
           <button className="d-edit" onClick={() => s.openEditModal(sc.no)}>
             <Icon name="edit" />

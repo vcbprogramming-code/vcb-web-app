@@ -751,6 +751,20 @@
     font-weight: 700;
     color: var(--brand-2);
   }
+  /* Placeholder tiles shown before any meeting data has loaded — same size as
+     real .ml-item tiles (so nothing shifts when they're replaced) but inert
+     and visibly "loading" rather than tappable. */
+  html.is-mobile .ml-skeleton {
+    cursor: default;
+    border-left-color: var(--line);
+    background: linear-gradient(90deg, var(--line-soft) 25%, var(--panel, #f2f2f2) 37%, var(--line-soft) 63%);
+    background-size: 400% 100%;
+    animation: ml-skeleton-pulse 1.4s ease infinite;
+  }
+  @keyframes ml-skeleton-pulse {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+  }
 
   /* --- Sidebar (project) list — bigger touch targets --- */
   html.is-mobile .side-label { font-size: 12px; margin: 4px 4px 10px; }

@@ -103,7 +103,14 @@ export default function App() {
     Promise.all([api.getSessionState(getToken()), api.listMeetings(getToken())]).then(([s, m]) => {
       setSession(s); setMeetings(m); writeMeetingCache(m); setLoaded(true)
       if (pendingMeeting) setActiveId(pendingMeeting)
-      if (isMobile()) setMobilePane(pendingMeeting ? 'detail' : 'projects')
+      // If the user already tapped into a meeting from the cached "Latest" tiles
+      // while this boot fetch was still in flight, activeId is already set — don't
+      // clobber that navigation by forcing the pane back to 'projects'. Without this,
+      // a fast tap during load would flash into the meeting and snap right back.
+      setActiveId(current => {
+        if (isMobile()) setMobilePane(pendingMeeting || current ? 'detail' : 'projects')
+        return current
+      })
       setBootHidden(true)
       prefetchLatest(s.projects, m, () => setDetailVersion(v => v + 1))
     }).catch(() => { setLoaded(true); setBootHidden(true) })
@@ -219,7 +226,7 @@ export default function App() {
 
       <div className={'body' + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')}>
         <Sidebar
-          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin}
+          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin} loaded={loaded}
           active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
           onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId}
           onTimeline={openTimeline} tr={tr}

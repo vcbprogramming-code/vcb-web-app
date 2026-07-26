@@ -110,6 +110,10 @@ function ScenarioList({ s }: { s: Store }) {
         ) : (
           rows.map((sc) => {
             const title = s.lang === 'en' && sc.titleEN ? sc.titleEN : sc.titleTH;
+            // Showing here only via an extra-module tag (not its primary
+            // module) — mark with a lighter-toned badge instead of the solid
+            // module color, so it reads as related-but-not-native.
+            const isTag = nav.mod !== 'ALL' && sc.module !== nav.mod;
             return (
               <div
                 key={sc.no}
@@ -119,6 +123,7 @@ function ScenarioList({ s }: { s: Store }) {
               >
                 <div className="lc-top">
                   <span className="lc-no lc-no-mod">{sc.displayNo || sc.no}</span>
+                  {isTag && <span className={'lc-badge lc-badge-tag m-' + sc.module}>{sc.module}</span>}
                 </div>
                 <div className="lc-title">{title}</div>
                 <div className="lc-ex">{sc.when}</div>

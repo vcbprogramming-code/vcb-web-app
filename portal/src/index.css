@@ -1437,7 +1437,16 @@ a {
   }
 }
 @media (max-width: 860px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+  .shell {
+    display: block;
+  }
   .sidebar {
+    flex: none;
+    width: 274px;
     position: fixed;
     left: 0;
     top: 0;
@@ -1468,6 +1477,12 @@ a {
   .globe-card,
   #birthdays-panel {
     display: none;
+  }
+  .content {
+    max-width: 100%;
+  }
+  .apps-grid {
+    grid-template-columns: 1fr;
   }
 }
 @media (min-width: 861px) {

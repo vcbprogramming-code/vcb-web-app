@@ -1117,7 +1117,11 @@
     .dash-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 860px) {
+    html, body { overflow-x: hidden; }
+    .shell { display: block; }
     .sidebar {
+      flex: none;
+      width: 274px;
       position: fixed;
       left: 0; top: 0; bottom: 0;
       transform: translateX(-100%);
@@ -1135,6 +1139,8 @@
     .menu-btn { display: grid; }
     .topbar-search { display: none; }
     .globe-card, #birthdays-panel { display: none; }
+    .content { max-width: 100%; }
+    .apps-grid { grid-template-columns: 1fr; }
   }
   @media (min-width: 861px) {
     .menu-btn { display: none; }

@@ -86,6 +86,10 @@ export const I18N: I18nDict = {
     panel_announcements_empty: 'No announcements right now.',
     panel_birthdays: 'Upcoming Birthdays',
     panel_birthdays_note: 'Sample data — connect a real source to replace this.',
+    help_title: 'Help & Support',
+    help_sub: "Need help with VCB Connect or one of its apps? Reach out and we'll get back to you.",
+    help_close: 'Close',
+    help_send_email: 'Send Email',
     apps: {
       ememo: {
         name: 'E-Memo',
@@ -157,6 +161,10 @@ export const I18N: I18nDict = {
     panel_announcements_empty: 'ยังไม่มีประกาศในขณะนี้',
     panel_birthdays: 'วันเกิดที่กำลังจะถึง',
     panel_birthdays_note: 'ข้อมูลตัวอย่าง — เชื่อมต่อแหล่งข้อมูลจริงเพื่อแทนที่ส่วนนี้',
+    help_title: 'ช่วยเหลือ',
+    help_sub: 'ต้องการความช่วยเหลือเกี่ยวกับ VCB Connect หรือแอปพลิเคชันใด ๆ ติดต่อเราได้ทันที',
+    help_close: 'ปิด',
+    help_send_email: 'ส่งอีเมล',
     apps: {
       ememo: {
         name: 'อีเมโม',

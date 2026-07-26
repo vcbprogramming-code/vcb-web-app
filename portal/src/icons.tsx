@@ -11,6 +11,15 @@ const svgProps: SVGProps<SVGSVGElement> = {
   strokeLinejoin: 'round',
 }
 
+export function MailIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  )
+}
+
 export function GlobeIcon() {
   return (
     <svg {...svgProps}>

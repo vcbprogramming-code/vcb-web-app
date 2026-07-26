@@ -215,14 +215,19 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    width: 100%;
     padding: 10px 12px;
     border-radius: 10px;
     color: var(--sidebar-text);
     text-decoration: none;
     font-size: 13.5px;
     font-weight: 500;
+    font-family: inherit;
     transition: background .15s ease, color .15s ease;
+    background: none;
     border: 1px solid transparent;
+    cursor: pointer;
+    text-align: left;
   }
   .nav-item svg { width: 18px; height: 18px; flex: 0 0 18px; opacity: .9; }
   .nav-item:hover {
@@ -1089,6 +1094,22 @@
   .modal .msg.err { color: #dc2626; }
   .modal .msg.ok  { color: #16a34a; }
 
+  /* ---------- help & support modal ---------- */
+  .help-email-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+  .help-email-row svg { width: 17px; height: 17px; flex: 0 0 17px; color: var(--text-dim); }
+
   /* ---------- responsive ---------- */
   @media (max-width: 1080px) {
     .dash-grid { grid-template-columns: 1fr; }
@@ -1191,10 +1212,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.3L18 9l-4.2 1.7L12 15l-1.8-4.3L6 9l4.2-1.7z"/><path d="M19 15l.8 1.9L21.5 18l-1.7.9L19 21l-.8-2.1-1.7-.9 1.7-1.1z"/></svg>
         <span data-i18n="nav_ai_tavern">AI Tavern</span>
       </a>
-      <a class="nav-item" href="#help">
+      <button class="nav-item" id="nav-help" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4"/><path d="M12 17h.01"/></svg>
         <span data-i18n="nav_help">Help &amp; Support</span>
-      </a>
+      </button>
     </nav>
 
     <div class="sidebar-foot">
@@ -1429,6 +1450,24 @@
   <span class="tt-desc" id="app-tooltip-desc"></span>
 </div>
 
+<!-- ===== help & support modal ===== -->
+<div class="modal-backdrop" id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+  <div class="modal">
+    <h3 id="help-modal-title" data-i18n="help_title">Help &amp; Support</h3>
+    <p class="modal-sub" data-i18n="help_sub">Need help with VCB Connect or one of its apps? Reach out and we'll get back to you.</p>
+    <div class="help-email-row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+      <span id="help-email">c.chavananand@vcb-con.com</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="help-close" data-i18n="help_close">Close</button>
+      <a class="btn primary" id="help-mailto" href="mailto:c.chavananand@vcb-con.com">
+        <span data-i18n="help_send_email">Send Email</span>
+      </a>
+    </div>
+  </div>
+</div>
+
 <!-- ===== admin modal ===== -->
 <div class="modal-backdrop" id="admin-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
@@ -1555,6 +1594,10 @@
       panel_announcements_empty: 'No announcements right now.',
       panel_birthdays: 'Upcoming Birthdays',
       panel_birthdays_note: 'Sample data — connect a real source to replace this.',
+      help_title:    'Help & Support',
+      help_sub:      "Need help with VCB Connect or one of its apps? Reach out and we'll get back to you.",
+      help_close:    'Close',
+      help_send_email: 'Send Email',
       apps: {
         ememo:   { name: 'E-Memo',                          desc: 'Document control, memo issuance & approval workflow.',
                    preview: 'Centralizes company documents and memos in one place, with a structured issuance and approval workflow so every record is version-controlled, traceable, and easy to find later.' },
@@ -1602,6 +1645,10 @@
       panel_announcements_empty: 'ยังไม่มีประกาศในขณะนี้',
       panel_birthdays: 'วันเกิดที่กำลังจะถึง',
       panel_birthdays_note: 'ข้อมูลตัวอย่าง — เชื่อมต่อแหล่งข้อมูลจริงเพื่อแทนที่ส่วนนี้',
+      help_title:    'ช่วยเหลือ',
+      help_sub:      'ต้องการความช่วยเหลือเกี่ยวกับ VCB Connect หรือแอปพลิเคชันใด ๆ ติดต่อเราได้ทันที',
+      help_close:    'ปิด',
+      help_send_email: 'ส่งอีเมล',
       apps: {
         ememo:   { name: 'อีเมโม',                          desc: 'ควบคุมเอกสาร การออกบันทึกข้อความ และขั้นตอนการอนุมัติ ระหว่างโครงการและสำนักงานใหญ่',
                    preview: 'รวมเอกสารและบันทึกข้อความของบริษัทไว้ในที่เดียว พร้อมขั้นตอนการออกและอนุมัติที่เป็นระบบ ทำให้ทุกฉบับมีเวอร์ชันที่ตรวจสอบย้อนกลับได้และค้นหาได้ง่ายในภายหลัง' },
@@ -2048,6 +2095,32 @@
   }
 
   wireDismiss();
+
+  // ----- help & support modal -----
+  (function () {
+    var modal = document.getElementById('help-modal');
+    if (!modal) return;
+    var openBtns = [document.getElementById('nav-help'), document.getElementById('settings-help')];
+
+    function openModal(e) {
+      if (e) e.preventDefault();
+      modal.setAttribute('open', '');
+    }
+    function closeModal() {
+      modal.removeAttribute('open');
+    }
+
+    openBtns.forEach(function (btn) {
+      if (btn) btn.addEventListener('click', openModal);
+    });
+    document.getElementById('help-close').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.hasAttribute('open')) closeModal();
+    });
+  })();
 
   // ----- admin modal -----
   (function () {

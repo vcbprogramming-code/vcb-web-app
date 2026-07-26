@@ -79,6 +79,10 @@ export interface Dict {
   panel_announcements_empty: string
   panel_birthdays: string
   panel_birthdays_note: string
+  help_title: string
+  help_sub: string
+  help_close: string
+  help_send_email: string
   apps: Record<string, AppI18n>
 }
 

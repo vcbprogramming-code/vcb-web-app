@@ -16,6 +16,7 @@ import {
 import Globe from './Globe'
 import Tooltip, { useTooltip } from './Tooltip'
 import AdminModal from './AdminModal'
+import HelpModal from './HelpModal'
 import { getActiveUserEmail, getAnnouncement } from './mockBackend'
 import type { Announcement, CSSVarStyle, Dict, Lang, Theme } from './types'
 
@@ -77,6 +78,7 @@ export default function App() {
   const [dismissed, setDismissed] = useState(false)
   const [adminVisible, setAdminVisible] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -288,10 +290,10 @@ export default function App() {
             <AiTavernIcon />
             <span>{dict.nav_ai_tavern}</span>
           </a>
-          <a className="nav-item" href="#help">
+          <button className="nav-item" type="button" onClick={() => setHelpOpen(true)}>
             <HelpIcon />
             <span>{dict.nav_help}</span>
-          </a>
+          </button>
         </nav>
 
         <div className="sidebar-foot">
@@ -402,7 +404,14 @@ export default function App() {
                   </div>
                 </div>
                 <div className="settings-divider"></div>
-                <button className="settings-link" id="settings-help">
+                <button
+                  className="settings-link"
+                  id="settings-help"
+                  onClick={() => {
+                    setSettingsOpen(false)
+                    setHelpOpen(true)
+                  }}
+                >
                   <HelpIcon />
                   <span>{dict.nav_help}</span>
                 </button>
@@ -585,6 +594,7 @@ export default function App() {
           setDismissed(false)
         }}
       />
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} dict={dict} />
     </div>
   )
 }

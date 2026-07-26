@@ -319,7 +319,7 @@
 
   .d-wrap{padding:22px 26px;max-width:900px}
   .d-head{display:flex;align-items:center;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
-  .d-num{flex:0 0 auto;min-width:36px;height:36px;padding:0 11px;border-radius:9px;background:var(--mc,var(--brand));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem}
+  .d-num{flex:0 0 auto;min-width:36px;height:36px;padding:0 11px;border-radius:9px;background:var(--mc,var(--brand));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem;white-space:nowrap}
   .d-titles{flex:1 1 auto;min-width:0}
   .d-th{font-weight:700;font-size:1.18rem;line-height:1.35}
   .d-en{font-size:.85rem;color:var(--muted);margin-top:2px}
@@ -483,7 +483,7 @@
   /* Detail / welcome */
   html.is-mobile .d-wrap{padding:18px 16px;max-width:none}
   html.is-mobile .d-head{gap:10px;padding-bottom:12px;margin-bottom:14px}
-  html.is-mobile .d-num{width:32px;height:32px;font-size:.95rem}
+  html.is-mobile .d-num{min-width:32px;height:32px;font-size:.95rem}
   html.is-mobile .d-th{font-size:1.05rem}
   html.is-mobile .welcome{padding:18px 16px;max-width:none}
   html.is-mobile .w-title{font-size:1.25rem}

@@ -1134,6 +1134,7 @@
     .sidebar.is-open ~ .sidebar-scrim { display: block; }
     .menu-btn { display: grid; }
     .topbar-search { display: none; }
+    .globe-card, #birthdays-panel { display: none; }
   }
   @media (min-width: 861px) {
     .menu-btn { display: none; }
@@ -1432,7 +1433,7 @@
             </div>
           </div>
 
-          <div class="card panel reveal">
+          <div class="card panel reveal" id="birthdays-panel">
             <div class="panel-head">
               <h3 data-i18n="panel_birthdays">Upcoming Birthdays</h3>
             </div>

@@ -1465,6 +1465,10 @@ a {
   .topbar-search {
     display: none;
   }
+  .globe-card,
+  #birthdays-panel {
+    display: none;
+  }
 }
 @media (min-width: 861px) {
   .menu-btn {

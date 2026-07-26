@@ -577,7 +577,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="card panel reveal">
+              <div className="card panel reveal" id="birthdays-panel">
                 <div className="panel-head">
                   <h3>{dict.panel_birthdays}</h3>
                 </div>

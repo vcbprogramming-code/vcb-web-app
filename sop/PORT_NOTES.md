@@ -4,8 +4,8 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 `../index.html` (UI) + `../apps-script/Code.gs` (server contract) + `../data/sop.json`
 (seed data). After **any** change to those, re-sync the affected piece here.
 
-- **Last synced from:** the live `script.google.com` deployment **@66** (2026-07-26).
-  Hand-synced this session with everything shipped since build 26: **createScenario()**
+- **Last synced from:** the live `script.google.com` deployment **@69** (2026-07-26).
+  Hand-synced with everything shipped since build 26: **createScenario()**
   ("+ เพิ่มกรณีใหม่" button + modal, admin-only, server assigns `no`), **dateAdded**
   field on `Scenario` (Thai-formatted, stamped on create, shown under the ref footer),
   the edit-modal backdrop-click fix, **per-module running numbers** (`displayNo`,
@@ -18,11 +18,22 @@ This folder is a **live mirror** of the canonical app. Source of truth =
   native `confirm()`), and the case-detail header layout redesign (top-aligned
   badge/title/Edit button regardless of title wrapping).
 - **Architecture note:** the canonical app is now **one-way** — Doc is a backup
-  copy, never read back into the app (no more `syncFromDoc` trigger/button). This
-  React mock never talked to the real Doc anyway (its `editScenario` etc. only
-  mutate the in-memory `store`), so no code change was needed here, but don't
-  reintroduce a "Sync from Doc" affordance if extending this port — it would be
-  porting a feature that no longer exists in the canonical app.
+  copy, never read back into the app (no `syncFromDoc` trigger, and as of `@69`
+  no `syncFromDoc()` function at all — it was deleted, not just disconnected).
+  **This port DID need a real code change for this**, contrary to what an earlier
+  note here claimed: this mock's Settings modal had an actual live "Sync from Doc"
+  button wired to a working `doSync()` → mock `syncFromDoc()` in `src/lib/api.ts`.
+  It went unnoticed through one docs-sync pass because a docs-only pass doesn't
+  necessarily re-audit every component for dead affordances. Removed end-to-end
+  (2026-07-26, pushed to `VCB-dev`): the button in `SettingsModal.tsx`, `doSync()`/
+  `syncing` state in `store.tsx`, `syncFromDoc()` in `lib/api.ts`, the `menuSync`
+  i18n keys in `data/config.ts`, and the orphaned `gear-spin` CSS animation.
+  **Lesson for future syncs:** when the canonical app removes a feature, grep this
+  port's `src/` for the feature's name/handler — don't assume "the mock never
+  talked to the Doc so there's nothing to remove." A UI affordance can still be
+  live and clickable even if its backing call was always fake.
+  There is still no real database anywhere in this stack — the mock's in-memory
+  `store` is the only persistence, same as before.
 - **Stack:** Vite + React 18 + TypeScript (strict). No UI library (original has none).
 - **Data layer:** typed **mock** mirroring the REST contract (see `src/lib/api.ts`),
   seeded from `src/data/sop.json` (copy of `../data/sop.json`) + the 33 bundled flows.

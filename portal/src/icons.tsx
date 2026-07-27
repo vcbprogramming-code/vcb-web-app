@@ -88,6 +88,26 @@ export function OnboardingIcon() {
   )
 }
 
+export function ErpIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h4" />
+    </svg>
+  )
+}
+
+export function ZoomIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="6" width="12" height="12" rx="2" />
+      <path d="m15 10 6-3v10l-6-3" />
+    </svg>
+  )
+}
+
 export function AiTavernIcon() {
   return (
     <svg {...svgProps}>

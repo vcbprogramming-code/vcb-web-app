@@ -11,6 +11,8 @@ import {
   DashboardIcon,
   NavArrowIcon,
   OnboardingIcon,
+  ErpIcon,
+  ZoomIcon,
   AiTavernIcon,
 } from './icons'
 import Globe from './Globe'
@@ -301,6 +303,19 @@ export default function App() {
           >
             <OnboardingIcon />
             <span>{dict.nav_onboarding}</span>
+          </a>
+          <a
+            className="nav-item"
+            href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ErpIcon />
+            <span>{dict.nav_erp}</span>
+          </a>
+          <a className="nav-item" href="https://zoom.us" target="_blank" rel="noopener noreferrer">
+            <ZoomIcon />
+            <span>{dict.nav_zoom}</span>
           </a>
           <button className="nav-item" type="button" title="Coming soon" disabled>
             <AiTavernIcon />

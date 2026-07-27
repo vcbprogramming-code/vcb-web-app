@@ -53,6 +53,7 @@ export interface Dict {
   nav_menu: string
   nav_dashboard: string
   nav_applications: string
+  nav_shortcuts: string
   nav_more: string
   nav_onboarding: string
   nav_erp: string

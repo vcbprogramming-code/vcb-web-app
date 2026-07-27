@@ -294,7 +294,7 @@ export default function App() {
             )
           })}
 
-          <div className="sidebar-label">{dict.nav_more}</div>
+          <div className="sidebar-label">{dict.nav_shortcuts}</div>
           <a
             className="nav-item"
             href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec"
@@ -313,10 +313,12 @@ export default function App() {
             <ErpIcon />
             <span>{dict.nav_erp}</span>
           </a>
-          <a className="nav-item" href="https://zoom.us" target="_blank" rel="noopener noreferrer">
+          <a className="nav-item" href="https://zoom.us/join" target="_blank" rel="noopener noreferrer">
             <ZoomIcon />
             <span>{dict.nav_zoom}</span>
           </a>
+
+          <div className="sidebar-label">{dict.nav_more}</div>
           <button className="nav-item" type="button" title="Coming soon" disabled>
             <AiTavernIcon />
             <span>{dict.nav_ai_tavern}</span>

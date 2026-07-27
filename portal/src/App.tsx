@@ -297,15 +297,6 @@ export default function App() {
           <div className="sidebar-label">{dict.nav_shortcuts}</div>
           <a
             className="nav-item"
-            href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <OnboardingIcon />
-            <span>{dict.nav_onboarding}</span>
-          </a>
-          <a
-            className="nav-item"
             href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/"
             target="_blank"
             rel="noopener noreferrer"
@@ -319,6 +310,15 @@ export default function App() {
           </a>
 
           <div className="sidebar-label">{dict.nav_more}</div>
+          <a
+            className="nav-item"
+            href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <OnboardingIcon />
+            <span>{dict.nav_onboarding}</span>
+          </a>
           <button className="nav-item" type="button" title="Coming soon" disabled>
             <AiTavernIcon />
             <span>{dict.nav_ai_tavern}</span>

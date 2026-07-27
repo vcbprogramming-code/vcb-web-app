@@ -1,13 +1,16 @@
 /**
- * Typed MOCK API layer — mirrors the GAS / Express REST contract so the React
- * UI needs no changes to its data model. Backed by an in-memory clone of
- * data/sop.json (seeded below). Swap these three functions for real `fetch`
- * calls against src/server.ts to wire the standalone backend instead.
+ * Typed MOCK API layer — mirrors the canonical app's write contract so the
+ * React UI needs no changes to its data model. Backed by an in-memory clone
+ * of data/sop.json (seeded below). Swap these functions for real `fetch`
+ * calls to wire a real backend instead.
  *
- * Contract mirrored:
- *   getSopDataForClient()  ← GET  /api/data
- *   syncFromDoc()          ← POST /api/sync
- *   editScenario(payload)  ← POST /api/scenario  (admin-gated)
+ * Contract mirrored (all write paths — the canonical app is one-way, app →
+ * Doc backup only; there is no sync-from-Doc endpoint to mirror):
+ *   getSopDataForClient()          ← current data, refreshed after any write
+ *   editScenario(payload)          ← admin-gated
+ *   createScenario(payload)        ← admin-gated
+ *   swapScenarioPositions(payload) ← admin-gated
+ *   deleteScenario(payload)        ← admin-gated
  */
 import seed from '../data/sop.json';
 import type { SopData, ScenarioEdit, ScenarioCreate, ScenarioSwap, ScenarioDelete, Scenario } from '../data/types';
@@ -71,18 +74,7 @@ export function getSopDataForClient(): Promise<SopData> {
   return defer(withSession());
 }
 
-/** POST /api/sync — re-read the store (no Doc here, so just stamp + return counts). */
-export function syncFromDoc(): Promise<{ ok: true; scenarios: number; reports: number; syncedAt: string }> {
-  store.meta.updatedAt = new Date().toISOString();
-  return defer({
-    ok: true as const,
-    scenarios: store.scenarios.length,
-    reports: store.reports.length,
-    syncedAt: store.meta.updatedAt,
-  });
-}
-
-/** POST /api/scenario — edit one scenario in place (admin only). */
+/** Edit one scenario in place (admin only). */
 export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: number; scenarios: number }> {
   if (!session.isAdmin) {
     return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));

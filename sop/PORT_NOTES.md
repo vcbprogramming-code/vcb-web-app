@@ -4,20 +4,35 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 `../index.html` (UI) + `../apps-script/Code.gs` (server contract) + `../data/sop.json`
 (seed data). After **any** change to those, re-sync the affected piece here.
 
-- **Last synced from:** `index.html` @ `APP_VERSION = 'build 26 · 2026-06-03'`
-  (`../apps-script/Code.gs` server contract: getSopDataForClient / syncFromDoc / editScenario).
-  Additionally hand-synced 2026-07-24 with the live `apps-script/Code.js`/`index.html`
-  changes made directly on `script.google.com` (not yet reflected in this repo's own
-  `apps-script/` mirror): **createScenario()** ("+ เพิ่มกรณีใหม่" button + modal, admin-only,
-  server assigns `no`), **dateAdded** field on `Scenario` (Thai-formatted, stamped on
-  create, shown under the ref footer), and the **edit-modal backdrop-click fix**
-  (clicking outside `#editBg`/`#newScenarioBg` no longer discards unsaved input).
+- **Last synced from:** the live `script.google.com` deployment **@66** (2026-07-26).
+  Hand-synced this session with everything shipped since build 26: **createScenario()**
+  ("+ เพิ่มกรณีใหม่" button + modal, admin-only, server assigns `no`), **dateAdded**
+  field on `Scenario` (Thai-formatted, stamped on create, shown under the ref footer),
+  the edit-modal backdrop-click fix, **per-module running numbers** (`displayNo`,
+  computed fresh from row order, never stored), **multi-module tagging**
+  (`extraModules`) with a stable primary-first sort in filtered lists and a
+  lighter-toned `.lc-badge-tag` on list cards (not a detail-header chip — that was
+  tried and reverted for cluttering/misaligning the header), **swap** two cases'
+  content/position (`swapScenarioPositions`), **delete** a case (`deleteScenario`,
+  admin-only, lives inside the Edit modal footer, custom confirm dialog rather than
+  native `confirm()`), and the case-detail header layout redesign (top-aligned
+  badge/title/Edit button regardless of title wrapping).
+- **Architecture note:** the canonical app is now **one-way** — Doc is a backup
+  copy, never read back into the app (no more `syncFromDoc` trigger/button). This
+  React mock never talked to the real Doc anyway (its `editScenario` etc. only
+  mutate the in-memory `store`), so no code change was needed here, but don't
+  reintroduce a "Sync from Doc" affordance if extending this port — it would be
+  porting a feature that no longer exists in the canonical app.
 - **Stack:** Vite + React 18 + TypeScript (strict). No UI library (original has none).
 - **Data layer:** typed **mock** mirroring the REST contract (see `src/lib/api.ts`),
   seeded from `src/data/sop.json` (copy of `../data/sop.json`) + the 33 bundled flows.
-  To wire the real Express backend (`../src/server.ts`) instead, replace the three
-  functions in `src/lib/api.ts` with `fetch('/api/data')`, `fetch('/api/sync',{method:'POST'})`,
-  `fetch('/api/scenario',{method:'POST',…})` and add a Vite dev proxy to `:3000`.
+  To wire a real backend instead, replace the functions in `src/lib/api.ts` with
+  calls to whatever server ends up fronting the data (see the canonical app's
+  `Code.js` for the write-path contract: `createScenario`/`editScenario`/
+  `swapScenarioPositions`/`deleteScenario`). A PostgreSQL schema + full data export
+  of the canonical app's content exists at the repo root of the SOP Web App project
+  (`DATABASE_SCHEMA.sql` / `DATABASE_DATA.sql`) if a Postgres-backed rewrite is the
+  direction chosen.
 
 ## File mapping (canonical → React)
 
@@ -35,9 +50,10 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 | `renderList()` + `renderFlowList()`                  | `src/components/ListPane.tsx`       |
 | `renderDetail()` + `placeholder()` + `stepsHtml()`   | `src/components/DetailPane.tsx`     |
 | `diagramHtml/flowLegendHtml/narrativeHtml/layoutFlowEdges` | `src/components/FlowDiagram.tsx` |
-| `#editBg` + `openEditModal()` + `doSave()`           | `src/components/EditModal.tsx`      |
+| `#editBg` + `openEditModal()` + `doSave()`/`doSwap()`/`doDelete()`/`showConfirm()` | `src/components/EditModal.tsx` (module select, swap-with field, delete button + confirm dialog all live here) |
 | `#editBg` (create mode) + `openNewScenarioModal()`   | `src/components/NewScenarioModal.tsx` |
-| `#settingsBg` + `updateSettingsModal()` + `copyEmail()` | `src/components/SettingsModal.tsx` |
+| `renderExtraModuleChecks(primaryMod, checked)`        | `src/components/ExtraModuleChecks.tsx` (shared by Edit + New-case modals) |
+| `#settingsBg` + `updateSettingsModal()` + `copyEmail()` | `src/components/SettingsModal.tsx` (no Sync action — removed from the canonical app, see architecture note above) |
 | `<head>` mobile-detection / pref IIFE                | `index.html` head + `src/store.tsx` effects |
 
 ## Behaviour parity notes
@@ -54,12 +70,16 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 - **`<style>` is verbatim** — never hand-edit `src/styles.css`; re-extract lines
   33–692 of `index.html` if the source CSS changes.
 
-## Verified (headless Edge, this port)
+## Verified (headless Chromium via Playwright, this port)
 
 build ✓ · typecheck ✓ · welcome/home ✓ · Case Studies 31 cards + detail/steps/ref ✓ ·
 Reports 21-row table ✓ · Process Flows list (33 flows / 8 module groups) ✓ ·
 flow diagram nodes+lanes+**SVG edges**+legend+narrative ✓ · dark theme ✓ ·
-EN language ✓ · mobile single-pane (`is-mobile` ≤768px) ✓.
+EN language ✓ · mobile single-pane (`is-mobile` ≤768px) ✓ · New case create ✓ ·
+per-module displayNo recompute after edit/swap/delete ✓ · multi-module tag +
+stable sort in filtered lists ✓ · tag badge in list cards (all views) ✓ · swap
+two cases ✓ · delete with custom confirm dialog (no native `confirm()`) ✓ ·
+case-detail header alignment at mobile viewport (390×844) ✓.
 
 ## Re-sync checklist
 

@@ -1,6 +1,6 @@
 /**
  * Central app store — mirrors the imperative `state` object and handler
- * functions in index.html (selectModule, selectFlows, doSync, setTheme, …),
+ * functions in index.html (selectModule, selectFlows, setTheme, …),
  * re-expressed as a single React hook. One <App/> calls useStore() and threads
  * the returned object down to the panes/modals.
  */
@@ -10,7 +10,6 @@ import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
 import {
   bootstrap,
   getSopDataForClient,
-  syncFromDoc,
   editScenario,
   createScenario,
   swapScenarioPositions,
@@ -94,7 +93,6 @@ export interface Store {
   settingsOpen: boolean;
   editNo: number | null;
   newScenarioOpen: boolean;
-  syncing: boolean;
   // helpers
   t: (key: string) => any;
   labels: Record<string, string>;
@@ -110,7 +108,6 @@ export interface Store {
   onSearch: (value: string) => void;
   setMobileView: (v: MobileView) => void;
   mobileBack: () => void;
-  doSync: () => void;
   openEditModal: (no: number) => void;
   closeEdit: () => void;
   saveScenario: (payload: ScenarioEdit) => Promise<void>;
@@ -145,7 +142,6 @@ export function useStore(): Store {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editNo, setEditNo] = useState<number | null>(null);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   const t = useCallback((key: string) => tr(lang, key), [lang]);
   const labels = (lang === 'en' ? MODULES_EN : MODULES) as Record<string, string>;
@@ -269,19 +265,6 @@ export function useStore(): Store {
     const newData = await getSopDataForClient();
     setData(newData);
   }, []);
-
-  const doSync = useCallback(async () => {
-    setSettingsOpen(false);
-    setSyncing(true);
-    try {
-      await syncFromDoc();
-      await refreshClientData();
-    } catch (e: any) {
-      alert('Sync ล้มเหลว / Sync failed:\n' + (e && e.message ? e.message : e));
-    } finally {
-      setSyncing(false);
-    }
-  }, [refreshClientData]);
 
   const openEditModal = useCallback(
     (no: number) => {
@@ -413,7 +396,6 @@ export function useStore(): Store {
       settingsOpen,
       editNo,
       newScenarioOpen,
-      syncing,
       t,
       labels,
       getDefaultView,
@@ -427,7 +409,6 @@ export function useStore(): Store {
       onSearch,
       setMobileView,
       mobileBack,
-      doSync,
       openEditModal,
       closeEdit,
       saveScenario,
@@ -453,7 +434,6 @@ export function useStore(): Store {
       settingsOpen,
       editNo,
       newScenarioOpen,
-      syncing,
       t,
       labels,
       selectModule,
@@ -466,7 +446,6 @@ export function useStore(): Store {
       onSearch,
       setMobileView,
       mobileBack,
-      doSync,
       openEditModal,
       closeEdit,
       saveScenario,

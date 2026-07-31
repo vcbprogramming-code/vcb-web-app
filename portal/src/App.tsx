@@ -8,7 +8,6 @@ import {
   SearchIcon,
   MenuIcon,
   HelpIcon,
-  DashboardIcon,
   NavArrowIcon,
   OnboardingIcon,
   ErpIcon,
@@ -16,6 +15,7 @@ import {
   AiTavernIcon,
 } from './icons'
 import Globe from './Globe'
+import HolidayCalendar from './HolidayCalendar'
 import Tooltip, { useTooltip } from './Tooltip'
 import AdminModal from './AdminModal'
 import HelpModal from './HelpModal'
@@ -27,10 +27,14 @@ const THEME_STORE_KEY = 'vcb_connect_theme'
 const DISMISS_KEY = 'vcb_connect_ann_dismissed'
 
 const SAMPLE_BIRTHDAYS = [
-  { name: 'Mimiese Abubakar', when: 'Today' },
-  { name: 'Kenny Avwerose', when: 'Tomorrow' },
-  { name: 'Omo Jefe', when: 'Wed, 25 July' },
+  { name: 'กรกวรรษ จันทนาม', dept: 'DRIVER', when: 'Tue, Sep 8' },
+  { name: 'ชาญ กรุณจินตดิฏฐ์', dept: 'ENG', when: 'Tue, Sep 8' },
+  { name: 'จิราพร ศรีแก้ว', dept: 'ACCT', when: 'Wed, Sep 16' },
 ]
+
+// No sample data on this side yet — real leave-tracking isn't wired up
+// (matches the GAS portal's default "no one on leave" empty state).
+const SAMPLE_LEAVE: { name: string; when: string }[] = []
 
 function getInitialLang(): Lang {
   try {
@@ -85,7 +89,7 @@ export default function App() {
     window.setTimeout(() => {
       setLang(next)
       requestAnimationFrame(() => setLangSwapping(false))
-    }, 100)
+    }, 220)
   }, [])
   const t = useCallback(<K extends keyof Dict>(key: K): Dict[K] => I18N[lang][key], [lang])
 
@@ -263,12 +267,6 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="sidebar-label">{dict.nav_menu}</div>
-          <button className="nav-item active" type="button">
-            <DashboardIcon />
-            <span>{dict.nav_dashboard}</span>
-          </button>
-
           <div className="sidebar-label">{dict.nav_applications}</div>
           {APPS.map((a) => {
             const entry = dict.apps[a.key]
@@ -300,11 +298,18 @@ export default function App() {
             href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/"
             target="_blank"
             rel="noopener noreferrer"
+            {...bindTooltip({ key: 'nav-erp', name: dict.nav_erp, desc: dict.tt_erp_desc, kind: 'nav' })}
           >
             <ErpIcon />
             <span>{dict.nav_erp}</span>
           </a>
-          <a className="nav-item" href="https://zoom.us/join" target="_blank" rel="noopener noreferrer">
+          <a
+            className="nav-item"
+            href="https://zoom.us/join"
+            target="_blank"
+            rel="noopener noreferrer"
+            {...bindTooltip({ key: 'nav-zoom', name: dict.nav_zoom, desc: dict.tt_zoom_desc, kind: 'nav' })}
+          >
             <ZoomIcon />
             <span>{dict.nav_zoom}</span>
           </a>
@@ -315,6 +320,7 @@ export default function App() {
             href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec"
             target="_blank"
             rel="noopener noreferrer"
+            {...bindTooltip({ key: 'nav-onboarding', name: dict.nav_onboarding, desc: dict.tt_onboarding_desc, kind: 'nav' })}
           >
             <OnboardingIcon />
             <span>{dict.nav_onboarding}</span>
@@ -495,14 +501,25 @@ export default function App() {
             </div>
           )}
 
-          <div className="page-head reveal">
-            <h1>{dict.nav_dashboard}</h1>
-            <p>{dict.dash_sub}</p>
-          </div>
-
           <div className="dash-grid">
-            {/* ===== left: welcome + apps ===== */}
+            {/* ===== left: announcements + welcome + apps ===== */}
             <div className="dash-main">
+              <div className="card panel reveal" id="announcements-top-panel">
+                <div className="panel-head">
+                  <h3>{dict.panel_announcements}</h3>
+                </div>
+                <div id="announcements-list">
+                  {announcement && announcement.show && (announcement.title || announcement.body) ? (
+                    <div className="ann-item">
+                      {announcement.title && <div className="ann-item-title">{announcement.title}</div>}
+                      {announcement.body && <div className="ann-item-body">{announcement.body}</div>}
+                    </div>
+                  ) : (
+                    <p className="ann-empty">{dict.panel_announcements_empty}</p>
+                  )}
+                </div>
+              </div>
+
               <div className="card welcome-card reveal">
                 <div className="welcome-text">
                   <p className="welcome-greeting">
@@ -570,46 +587,55 @@ export default function App() {
               )}
             </div>
 
-            {/* ===== right: globe + announcements + birthdays ===== */}
+            {/* ===== right: globe + calendar + birthdays/leave ===== */}
             <div className="side-col">
               <div className="card globe-card reveal" aria-hidden="true">
                 <Globe />
               </div>
 
-              <div className="card panel reveal">
-                <div className="panel-head">
-                  <h3>{dict.panel_announcements}</h3>
-                </div>
-                <div id="announcements-list">
-                  {announcement && announcement.show && (announcement.title || announcement.body) ? (
-                    <div className="ann-item">
-                      {announcement.title && (
-                        <div className="ann-item-title">{announcement.title}</div>
-                      )}
-                      {announcement.body && <div className="ann-item-body">{announcement.body}</div>}
-                    </div>
-                  ) : (
-                    <p className="ann-empty">{dict.panel_announcements_empty}</p>
-                  )}
-                </div>
-              </div>
+              <HolidayCalendar dict={dict} lang={lang} />
 
-              <div className="card panel reveal" id="birthdays-panel">
-                <div className="panel-head">
-                  <h3>{dict.panel_birthdays}</h3>
-                </div>
-                <div id="birthdays-list">
-                  {SAMPLE_BIRTHDAYS.map((b) => (
-                    <div className="bday-row" key={b.name}>
-                      <div className="bday-avatar">{initialsFromName(b.name)}</div>
-                      <div>
-                        <div className="bday-name">{b.name}</div>
-                        <div className="bday-when">{b.when}</div>
+              <div className="card panel reveal side-row">
+                <div id="birthdays-panel">
+                  <div className="panel-head">
+                    <h3>{dict.panel_birthdays}</h3>
+                  </div>
+                  <div id="birthdays-list">
+                    {SAMPLE_BIRTHDAYS.map((b) => (
+                      <div className="bday-row" key={b.name}>
+                        <div className="bday-avatar">{initialsFromName(b.name)}</div>
+                        <div>
+                          <div className="bday-name">
+                            {b.name} <span className="bday-dept">{b.dept}</span>
+                          </div>
+                          <div className="bday-when">{b.when}</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <p className="panel-note">{dict.panel_birthdays_note}</p>
                 </div>
-                <p className="panel-note">{dict.panel_birthdays_note}</p>
+
+                <div id="leave-panel">
+                  <div className="panel-head">
+                    <h3>{dict.panel_leave}</h3>
+                  </div>
+                  <div id="leave-list">
+                    {SAMPLE_LEAVE.length === 0 ? (
+                      <p className="ann-empty">{dict.panel_leave_empty}</p>
+                    ) : (
+                      SAMPLE_LEAVE.map((l) => (
+                        <div className="bday-row" key={l.name}>
+                          <div className="bday-avatar">{initialsFromName(l.name)}</div>
+                          <div>
+                            <div className="bday-name">{l.name}</div>
+                            <div className="bday-when">{l.when}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

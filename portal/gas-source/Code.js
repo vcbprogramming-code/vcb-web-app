@@ -81,6 +81,131 @@ function getActiveUserEmail() {
   }
 }
 
+/* ---------- upcoming birthdays ---------- */
+//
+// Sourced from HR's employee roster (name, nickname, birthdate). Only name +
+// birth month/day are kept here — no ID numbers, ages, or hire dates, since
+// the dashboard only needs enough to greet people on their birthday.
+// To add/remove someone, edit BIRTHDAY_ROSTER below.
+//
+// Department codes are HR's actual department abbreviations, matched 1:1
+// against the employee roster the user supplied.
+
+var BIRTHDAY_ROSTER = [
+  { name: 'ธนกร สมมาตร',        nickname: 'อาร์ม',   month: 1,  day: 26, dept: 'ADMIN' },
+  { name: 'ธนวรรณ หัสดง',       nickname: 'ฟิวส์',   month: 7,  day: 22, dept: 'FIN' },
+  { name: 'เปรมกมล ขวัญเจริญศรี', nickname: 'ไอซ์',    month: 1,  day: 24, dept: 'IC' },
+  { name: 'ณิชชา วัฒนการุณวงค์', nickname: 'กีฟ',     month: 1,  day: 14, dept: 'FIN' },
+  { name: 'อรุณกมล หนูพุ่ม',     nickname: 'บิว',     month: 11, day: 20, dept: 'HR' },
+  { name: 'ชินวิวัฒน์ นาวาทอง',  nickname: 'ชิน',     month: 5,  day: 14, dept: 'IT' },
+  { name: 'สิริรัตน์ เพชรไพฑูรย์', nickname: 'บุ๋ม',    month: 10, day: 19, dept: 'FIN' },
+  { name: 'เบญจมาศ ฉิมพาลี',    nickname: 'ชมพู',    month: 9,  day: 20, dept: 'FIN' },
+  { name: 'นัชลิกา เนียมสอาด',  nickname: 'แอม',     month: 1,  day: 1,  dept: 'PUR' },
+  { name: 'ชยันตร์ ธูปประดิษฐ์', nickname: 'ท้อป',    month: 3,  day: 1,  dept: 'ADMIN' },
+  { name: 'สุธาสินี เลาหะนันท์', nickname: 'เกด',     month: 3,  day: 3,  dept: 'ACCT' },
+  { name: 'นิชาภา ทำนา',        nickname: 'นา',      month: 9,  day: 17, dept: 'PUR' },
+  { name: 'สุพรรณี ไชยสาร',     nickname: 'แจง',     month: 3,  day: 3,  dept: 'ACCT' },
+  { name: 'สิทธิชัย ยิ้มแย้ม',   nickname: 'เอส',     month: 7,  day: 18, dept: 'ADMIN' },
+  { name: 'กรกวรรษ จันทนาม',    nickname: 'วี',      month: 9,  day: 8,  dept: 'SUPPORT' },
+  { name: 'รมณีย์ กรุณจินตดิฏฐ์', nickname: 'หน่อง',   month: 12, day: 6,  dept: 'ENG' },
+  { name: 'วาริศา แก้วกาม',     nickname: 'ปู',      month: 3,  day: 3,  dept: 'ENG' },
+  { name: 'บุญชัย บุญน้อม',     nickname: 'เก่ง',     month: 2,  day: 3,  dept: 'ADMIN' },
+  { name: 'กรรณิการ์ กฤษแก้ว',  nickname: 'หญิง',    month: 6,  day: 14, dept: 'ADMIN' },
+  { name: 'ปรางค์ทิพย์ หาสิน',  nickname: 'ปู',      month: 6,  day: 25, dept: 'ACCT' },
+  { name: 'สหวุฒิ วรพันธ์',     nickname: 'เท่ง',     month: 9,  day: 21, dept: 'ENG' },
+  { name: 'ปานทิป กองสุข',      nickname: 'ต่าย',    month: 1,  day: 24, dept: 'ADMIN' },
+  { name: 'อภิชา ชมชื่น',       nickname: 'เพ็ญ',    month: 12, day: 20, dept: 'HR' },
+  { name: 'เฉลิมพล เพ็ชรสวัสดิ์', nickname: 'โอม',    month: 12, day: 12, dept: 'ENG' },
+  { name: 'กฤษณ์พรรณ เอี่ยมวัฒนกิจ', nickname: 'พริ้ง', month: 12, day: 1,  dept: 'ACCT' },
+  { name: 'พลอยพรรณ เรนภักดี',  nickname: 'ใจ',      month: 2,  day: 23, dept: 'ACCT' },
+  { name: 'เอกสิทธิ์ แต้ภักดี',  nickname: 'เล็ก',     month: 10, day: 10, dept: 'ENG' },
+  { name: 'พิทักษ์พงศ์ พลาศรี', nickname: 'เพด',     month: 10, day: 16, dept: 'ADMIN' },
+  { name: 'วันเพ็ญ อภิปัญญาธนสุข', nickname: 'เพ็ญ',   month: 10, day: 2,  dept: 'ACCT' },
+  { name: 'สายชล ทรัพย์บุญโต',  nickname: 'ป๋อง',    month: 6,  day: 10, dept: 'ADMIN' },
+  { name: 'จิราพร ศรีแก้ว',     nickname: 'จิ',      month: 9,  day: 16, dept: 'ACCT' },
+  { name: 'จักรสกล ภู่อร่าม',   nickname: 'จักร',    month: 12, day: 12, dept: 'ADMIN' },
+  { name: 'ชญาภา วจนรจนา',     nickname: 'เปี๊ยก',   month: 5,  day: 17, dept: 'ADMIN' },
+  { name: 'ภาลีนา บุญอำนวยสมบัติ', nickname: 'อ้วน',   month: 11, day: 17, dept: 'FIN' },
+  { name: 'ชาญ กรุณจินตดิฏฐ์',  nickname: 'ชาญ',     month: 9,  day: 8,  dept: 'ENG' }
+];
+
+/**
+ * Returns the `count` (default 3) employees whose birthday is soonest from
+ * today, wrapping to next year for anyone whose birthday already passed this
+ * year. Someone whose birthday is today counts as "0 days away" (soonest).
+ */
+function getUpcomingBirthdays(count) {
+  count = count || 3;
+  var tz = Session.getScriptTimeZone() || 'Asia/Bangkok';
+  var todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var today = new Date(todayStr + 'T00:00:00');
+  var thisYear = today.getFullYear();
+
+  var withDates = BIRTHDAY_ROSTER.map(function (p) {
+    var next = new Date(thisYear, p.month - 1, p.day);
+    if (next < today) next = new Date(thisYear + 1, p.month - 1, p.day);
+    var daysAway = Math.round((next - today) / 86400000);
+    return {
+      name: p.name,
+      nickname: p.nickname,
+      dept: p.dept,
+      month: p.month,
+      day: p.day,
+      daysAway: daysAway
+    };
+  });
+
+  withDates.sort(function (a, b) { return a.daysAway - b.daysAway; });
+  return withDates.slice(0, count);
+}
+
+/* ---------- holiday calendar ---------- */
+//
+// Fixed-date Thai public holidays only — month/day repeats every year, so no
+// per-year table to maintain. Deliberately excludes lunar/Buddhist holidays
+// (Makha Bucha, Visakha Bucha, Asalha Bucha, Buddhist Lent) and government
+// "compensation day" (วันหยุดชดเชย) substitutions, since both shift yearly
+// and are announced by cabinet resolution — add them here once confirmed
+// for the year in question, keyed as 'YYYY-MM-DD' in THAI_HOLIDAYS_DATED.
+
+var THAI_HOLIDAYS_FIXED = [
+  { month: 1,  day: 1,  name_en: "New Year's Day",       name_th: 'วันขึ้นปีใหม่' },
+  { month: 4,  day: 6,  name_en: 'Chakri Day',            name_th: 'วันจักรี' },
+  { month: 4,  day: 13, name_en: 'Songkran Festival',     name_th: 'วันสงกรานต์' },
+  { month: 4,  day: 14, name_en: 'Songkran Festival',     name_th: 'วันสงกรานต์' },
+  { month: 4,  day: 15, name_en: 'Songkran Festival',     name_th: 'วันสงกรานต์' },
+  { month: 5,  day: 1,  name_en: 'National Labor Day',    name_th: 'วันแรงงานแห่งชาติ' },
+  { month: 5,  day: 4,  name_en: 'Coronation Day',        name_th: 'วันฉัตรมงคล' },
+  { month: 7,  day: 28, name_en: "King's Birthday",       name_th: 'วันเฉลิมพระชนมพรรษา ร.10' },
+  { month: 8,  day: 12, name_en: "Mother's Day",          name_th: 'วันแม่แห่งชาติ' },
+  { month: 10, day: 13, name_en: 'King Bhumibol Memorial Day', name_th: 'วันคล้ายวันสวรรคต ร.9' },
+  { month: 10, day: 23, name_en: 'Chulalongkorn Day',     name_th: 'วันปิยมหาราช' },
+  { month: 12, day: 5,  name_en: "Father's Day",          name_th: 'วันพ่อแห่งชาติ' },
+  { month: 12, day: 10, name_en: 'Constitution Day',      name_th: 'วันรัฐธรรมนูญ' },
+  { month: 12, day: 31, name_en: "New Year's Eve",        name_th: 'วันสิ้นปี' }
+];
+
+// Year-specific holidays confirmed by cabinet resolution (lunar-calendar
+// observances, compensation days). Empty until confirmed dates are supplied.
+var THAI_HOLIDAYS_DATED = {};
+
+/**
+ * Returns holidays for the given year as { 'YYYY-MM-DD': { name_en, name_th } },
+ * merging the fixed-date list with any confirmed dated entries for that year.
+ */
+function getHolidays(year) {
+  year = year || new Date().getFullYear();
+  var out = {};
+  THAI_HOLIDAYS_FIXED.forEach(function (h) {
+    var key = year + '-' + ('0' + h.month).slice(-2) + '-' + ('0' + h.day).slice(-2);
+    out[key] = { name_en: h.name_en, name_th: h.name_th };
+  });
+  Object.keys(THAI_HOLIDAYS_DATED).forEach(function (key) {
+    if (key.indexOf(String(year) + '-') === 0) out[key] = THAI_HOLIDAYS_DATED[key];
+  });
+  return out;
+}
+
 /* ---------- announcement banner ---------- */
 //
 // Stored as a single JSON blob in ScriptProperties under ANNOUNCEMENT_JSON.

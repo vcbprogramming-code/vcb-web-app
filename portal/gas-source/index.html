@@ -49,6 +49,9 @@
     --globe-line-strong: rgba(58, 91, 255, .68);
     --globe-glow-bg: rgba(58, 91, 255, .14);
     --globe-accent-2: #7c5cff;
+    --holiday-bg: rgba(239, 68, 68, 0.10);
+    --holiday-text: #dc2626;
+    --weekend-bg: rgba(102, 111, 156, 0.06);
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -85,6 +88,9 @@
     --globe-line-strong: rgba(126, 232, 255, .75);
     --globe-glow-bg: rgba(79, 209, 255, .22);
     --globe-accent-2: #a78bfa;
+    --holiday-bg: rgba(248, 113, 113, 0.12);
+    --holiday-text: #f87171;
+    --weekend-bg: rgba(147, 172, 206, 0.06);
     color-scheme: dark;
   }
 
@@ -453,11 +459,11 @@
   /* ---------- language-switch crossfade ---------- */
   /* EN and TH strings differ enough in length/font metrics that swapping
      text in place visibly reflows the layout (cards resize, nav wraps,
-     etc.). Rather than fight every element's sizing, we briefly fade the
-     whole shell to (near-)transparent, swap all the text while invisible,
-     then fade back in — so the reflow itself is never seen, just a quick
-     flicker. */
-  .shell { transition: opacity .1s ease; }
+     etc.). Rather than fight every element's sizing, we fade the whole
+     shell out, swap all the text while invisible, then fade back in — a
+     real crossfade rather than an instant swap, so the reflow is masked
+     by motion instead of just hidden behind a flicker. */
+  .shell { transition: opacity .22s ease; }
   .shell.lang-swapping { opacity: 0; }
 
   .page-head {
@@ -672,13 +678,11 @@
   }
 
   /* ---------- globe panel (decorative, both themes) ---------- */
-  /* The globe visually floats up next to the "Dashboard" heading, well
-     above the top of the dash-grid row it's laid out in — so the box
-     used for layout/height (to keep Announcements level with the
-     Applications section) is deliberately short, while the globe itself
-     is pulled up out of it with a negative margin and allowed to overflow
-     that box freely in every direction (no clipping) so the orbit rings,
-     scan sweep and pulse rings can extend past its bounds uncropped.  */
+  /* Sits in normal document flow like any other side-col panel — no
+     fixed height, no negative margin pulling it out of position. It's
+     pushed down by whatever renders above it in the right column, same
+     as every other panel, so its position never needs re-tuning when
+     content above/beside it changes. */
   .globe-card {
     padding: 0;
     overflow: visible;
@@ -687,17 +691,14 @@
     border: none;
     box-shadow: none;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    /* matches the left column's welcome-card + section-title height, so
-       Announcements (right below) lines up with the Applications grid. */
-    height: 162px;
+    height: 220px;
   }
   .globe-stage {
     position: relative;
     height: 280px;
     width: 280px;
-    margin-top: -108px;
     perspective: 1100px;
     display: grid; place-items: center;
     outline: none;
@@ -892,6 +893,14 @@
     flex-direction: column;
     gap: 18px;
   }
+  .side-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+  .side-row > div { min-width: 0; padding-right: 14px; }
+  .side-row > div:last-child { padding-right: 0; padding-left: 14px; border-left: 1px solid var(--card-border); }
+  .side-row .panel-head h3 { font-size: 12px; }
   .panel {
     padding: 18px 18px 14px;
   }
@@ -919,29 +928,55 @@
 
   /* birthdays */
   .bday-row {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
     padding: 8px 0;
     border-bottom: 1px solid var(--card-border);
+    min-width: 0;
   }
   .bday-row:last-child { border-bottom: none; }
   .bday-avatar {
-    width: 34px; height: 34px;
+    width: 30px; height: 30px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: #fff;
     display: grid; place-items: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    flex: 0 0 34px;
+    flex: 0 0 30px;
   }
+  .bday-row > div:last-child { min-width: 0; flex: 1; }
   .bday-name {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .bday-when {
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bday-meta {
+    display: flex; align-items: center; gap: 6px;
+    min-width: 0;
+  }
+  .bday-dept {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--card-border);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    text-transform: lowercase;
+  }
+  .bday-dept::first-letter {
+    text-transform: uppercase;
   }
   .panel-note {
     font-size: 11px;
@@ -949,6 +984,62 @@
     margin-top: 10px;
     line-height: 1.5;
   }
+
+  /* holiday calendar panel */
+  #calendar-panel { padding: 12px 14px 10px; }
+  #calendar-panel .panel-head { margin-bottom: 8px; }
+  #calendar-panel .panel-head .month-nav { display: flex; align-items: center; gap: 2px; }
+  #calendar-panel .panel-head .month-nav button {
+    width: 16px; height: 16px; display: grid; place-items: center;
+    border-radius: 5px; border: 1px solid var(--card-border); background: transparent;
+    color: var(--text-dim); cursor: pointer; font-size: 10px; line-height: 1;
+    font-family: inherit;
+  }
+  #calendar-panel .panel-head .month-nav button:hover { background: var(--pill-bg); color: var(--text); }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 22px;
+    gap: 2px;
+  }
+  .cal-dow {
+    font-size: 8.5px; font-weight: 700; text-align: center;
+    color: var(--text-dim); padding-bottom: 2px; letter-spacing: .02em;
+  }
+  .cal-day {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 500;
+    color: var(--text);
+    border-radius: 5px;
+  }
+  .cal-day.is-outside { color: var(--text-dim); opacity: .35; }
+  .cal-day.is-weekend { background: var(--weekend-bg); color: var(--text-dim); }
+  .cal-day.is-holiday { background: var(--holiday-bg); color: var(--holiday-text); font-weight: 700; }
+  .cal-day.is-today { box-shadow: inset 0 0 0 1.3px var(--accent); font-weight: 700; color: var(--accent); }
+  .cal-day.is-today.is-holiday { color: var(--holiday-text); }
+  .cal-day .dot {
+    position: absolute; bottom: 1.5px; left: 50%; transform: translateX(-50%);
+    width: 2.5px; height: 2.5px; border-radius: 50%; background: var(--holiday-text);
+  }
+  .cal-legend {
+    display: flex; flex-wrap: wrap; gap: 4px 10px;
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--card-border);
+  }
+  .cal-legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--text-dim); }
+  .cal-legend-swatch { width: 7px; height: 7px; border-radius: 2px; flex: 0 0 7px; }
+  .cal-legend-swatch.holiday { background: var(--holiday-text); }
+  .cal-legend-swatch.weekend { background: var(--weekend-bg); border: 1px solid var(--card-border); }
+  .cal-legend-swatch.today { background: transparent; box-shadow: inset 0 0 0 1.3px var(--accent); }
+  .cal-next-holiday {
+    margin-top: 6px; padding: 6px 8px;
+    background: var(--holiday-bg); border-radius: 8px;
+    font-size: 9.5px; color: var(--holiday-text); font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .cal-next-holiday span.days { font-weight: 700; white-space: nowrap; }
 
   /* announcements panel */
   .ann-item {
@@ -1113,9 +1204,10 @@
 
   /* ---------- help & support modal ---------- */
   /* ---------- responsive ---------- */
-  @media (max-width: 1080px) {
-    .dash-grid { grid-template-columns: 1fr; }
-  }
+  /* The 2-column dashboard grid (app cards + right rail) now holds at every
+     desktop/laptop width, all the way down to the mobile breakpoint below —
+     no separate "narrow window" reflow step. Only true phone-width layouts
+     (≤860px) get a different view. */
   @media (max-width: 860px) {
     html, body { overflow-x: hidden; }
     .shell { display: block; }
@@ -1138,7 +1230,14 @@
     .sidebar.is-open ~ .sidebar-scrim { display: block; }
     .menu-btn { display: grid; }
     .topbar-search { display: none; }
-    .globe-card, #birthdays-panel { display: none; }
+    .globe-card { display: none; }
+    /* Birthdays panel stays visible on phones too, but the 2-column
+       side-by-side layout with Leave is too tight at this width — stack
+       them instead. */
+    .side-row { grid-template-columns: 1fr; }
+    .side-row > div,
+    .side-row > div:last-child { padding: 0; border-left: none; }
+    .side-row > div:first-child { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--card-border); }
     .content { max-width: 100%; }
     .apps-grid { grid-template-columns: 1fr; }
   }
@@ -1183,12 +1282,6 @@
     </div>
 
     <nav class="sidebar-nav">
-      <div class="sidebar-label" data-i18n="nav_menu">Menu</div>
-      <button class="nav-item active" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        <span data-i18n="nav_dashboard">Dashboard</span>
-      </button>
-
       <div class="sidebar-label" data-i18n="nav_applications">Applications</div>
       <? apps.forEach(function(a){ ?>
         <a class="nav-item" href="<?= a.url ?>" target="_blank" rel="noopener" data-key="<?= a.key ?>">
@@ -1213,17 +1306,17 @@
       <? }); ?>
 
       <div class="sidebar-label" data-i18n="nav_shortcuts">Shortcuts</div>
-      <a class="nav-item" href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/" target="_blank" rel="noopener">
+      <a class="nav-item nav-tt" href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/" target="_blank" rel="noopener" data-tt-key="erp">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
         <span data-i18n="nav_erp">ERP</span>
       </a>
-      <a class="nav-item" href="https://zoom.us/join" target="_blank" rel="noopener">
+      <a class="nav-item nav-tt" href="https://zoom.us/join" target="_blank" rel="noopener" data-tt-key="zoom">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3"/></svg>
         <span data-i18n="nav_zoom">Zoom</span>
       </a>
 
       <div class="sidebar-label" data-i18n="nav_more">More</div>
-      <a class="nav-item" href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec" target="_blank" rel="noopener">
+      <a class="nav-item nav-tt" href="https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec" target="_blank" rel="noopener" data-tt-key="onboarding">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.5"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
         <span data-i18n="nav_onboarding">Onboarding Portal</span>
       </a>
@@ -1258,13 +1351,6 @@
       </div>
 
       <div class="topbar-right">
-        <button class="icon-btn" id="admin-btn" title="Manage announcement" aria-label="Manage announcement" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.86l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.86-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.86.34l-.06.06A2 2 0 1 1 4.2 16.93l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.86l-.06-.06A2 2 0 1 1 7.03 4.2l.06.06a1.7 1.7 0 0 0 1.86.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.86-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.86V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>
-          </svg>
-        </button>
-
         <div class="settings-wrap">
           <button class="icon-btn" id="settings-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1288,6 +1374,10 @@
               </div>
             </div>
             <div class="settings-divider"></div>
+            <button class="settings-link" id="settings-announcements" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-4 16-5-5-5 2-4-6z"/></svg>
+              <span data-i18n="settings_announcements">Announcements</span>
+            </button>
             <button class="settings-link" id="settings-help">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4"/><path d="M12 17h.01"/></svg>
               <span data-i18n="nav_help">Help &amp; Support</span>
@@ -1318,13 +1408,8 @@
         </div>
       <? } ?>
 
-      <div class="page-head reveal">
-        <h1 data-i18n="nav_dashboard">Dashboard</h1>
-        <p data-i18n="dash_sub">One place for every internal VCB Group application.</p>
-      </div>
-
       <div class="dash-grid">
-        <!-- ===== left: welcome + apps ===== -->
+        <!-- ===== left: welcome + announcements + apps ===== -->
         <div class="dash-main">
 
           <div class="card welcome-card reveal">
@@ -1335,6 +1420,22 @@
             <div class="welcome-status">
               <span class="status-pill"><span class="dot"></span><span data-i18n="system_online">System Online</span></span>
               <span class="welcome-clock" id="welcome-clock"></span>
+            </div>
+          </div>
+
+          <div class="card panel reveal" id="announcements-top-panel" style="margin:18px 0;">
+            <div class="panel-head">
+              <h3 data-i18n="panel_announcements">Announcements</h3>
+            </div>
+            <div id="announcements-list">
+              <? if (announcement && (announcement.title || announcement.body)) { ?>
+                <div class="ann-item">
+                  <? if (announcement.title) { ?><div class="ann-item-title"><?= announcement.title ?></div><? } ?>
+                  <? if (announcement.body)  { ?><div class="ann-item-body"><?= announcement.body ?></div><? } ?>
+                </div>
+              <? } else { ?>
+                <p class="ann-empty" data-i18n="panel_announcements_empty">No announcements right now.</p>
+              <? } ?>
             </div>
           </div>
 
@@ -1433,28 +1534,24 @@
             </div>
           </div>
 
-          <div class="card panel reveal">
-            <div class="panel-head">
-              <h3 data-i18n="panel_announcements">Announcements</h3>
-            </div>
-            <div id="announcements-list">
-              <? if (announcement && (announcement.title || announcement.body)) { ?>
-                <div class="ann-item">
-                  <? if (announcement.title) { ?><div class="ann-item-title"><?= announcement.title ?></div><? } ?>
-                  <? if (announcement.body)  { ?><div class="ann-item-body"><?= announcement.body ?></div><? } ?>
-                </div>
-              <? } else { ?>
-                <p class="ann-empty" data-i18n="panel_announcements_empty">No announcements right now.</p>
-              <? } ?>
-            </div>
-          </div>
+          <div class="card panel reveal" id="calendar-panel"></div>
 
-          <div class="card panel reveal" id="birthdays-panel">
-            <div class="panel-head">
-              <h3 data-i18n="panel_birthdays">Upcoming Birthdays</h3>
+          <div class="card panel reveal side-row">
+            <div id="birthdays-panel">
+              <div class="panel-head">
+                <h3 data-i18n="panel_birthdays">Upcoming Birthdays</h3>
+              </div>
+              <div id="birthdays-list"></div>
             </div>
-            <div id="birthdays-list"></div>
-            <p class="panel-note" data-i18n="panel_birthdays_note">Sample data — connect a real source to replace this.</p>
+
+            <div id="leave-panel">
+              <div class="panel-head">
+                <h3 data-i18n="panel_leave">On Leave Today</h3>
+              </div>
+              <div id="leave-list">
+                <p class="ann-empty" data-i18n="panel_leave_empty">No one is on leave today.</p>
+              </div>
+            </div>
           </div>
 
         </div>
@@ -1474,6 +1571,7 @@
   <div class="modal">
     <h3 id="help-modal-title" data-i18n="help_title">Report an issue</h3>
     <p class="modal-sub" data-i18n="help_sub">Tell us what happened — this goes straight to the VCB Connect team.</p>
+    <p class="modal-sub" id="help-email-info" style="font-size:12px;"></p>
 
     <label for="help-area" data-i18n="help_area_label">When you noticed this, what were you trying to do?</label>
     <select id="help-area">
@@ -1606,6 +1704,9 @@
       nav_zoom:      'Zoom',
       nav_ai_tavern: 'AI Tavern',
       nav_help:      'Help & Support',
+      tt_erp_desc:   'Navigate to Mango ERP — for purchase requests, cash requests & other numerical transactions',
+      tt_zoom_desc:  'Join a Zoom meeting',
+      tt_onboarding_desc: 'New hire onboarding & orientation',
       dash_sub:      'One place for every internal VCB Group application.',
       welcome_sub:   'Here’s what’s happening across VCB Connect today.',
       good_morning:  'Good morning',
@@ -1626,12 +1727,32 @@
       search_empty:  'No applications match your search.',
       panel_announcements: 'Announcements',
       panel_announcements_empty: 'No announcements right now.',
+      panel_calendar: 'Holiday Calendar',
+      cal_dow:       'Su,Mo,Tu,We,Th,Fr,Sa',
+      cal_legend_holiday: 'Holiday',
+      cal_legend_weekend: 'Weekend',
+      cal_legend_today:   'Today',
+      cal_next_holiday:   'Next holiday: {name} ({date})',
+      cal_days_away:      '{n} days',
+      cal_today:          'Today',
       panel_birthdays: 'Upcoming Birthdays',
-      panel_birthdays_note: 'Sample data — connect a real source to replace this.',
+      bday_today:    'Today',
+      bday_tomorrow: 'Tomorrow',
+      bday_empty:    'No upcoming birthdays.',
+      panel_leave:   'On Leave Today',
+      panel_leave_empty: 'No one is on leave today.',
       help_title:    'Help & Support',
       help_sub:      "Need help with VCB Connect or one of its apps? Reach out and we'll get back to you.",
       help_close:    'Close',
       help_send_email: 'Send Email',
+      help_from_email: 'From',
+      help_to_email: 'To',
+      help_sending:  'Sending…',
+      help_sent:     'Sent — thanks, we’ll follow up by email.',
+      help_error_area: 'Choose what you were trying to do.',
+      help_error_message: 'Describe the issue before sending.',
+      help_error_generic: 'Could not send. Please try again.',
+      settings_announcements: 'Announcements',
       apps: {
         ememo:   { name: 'E-Memo',                          desc: 'Document control, memo issuance & approval workflow.',
                    preview: 'Centralizes company documents and memos in one place, with a structured issuance and approval workflow so every record is version-controlled, traceable, and easy to find later.' },
@@ -1661,6 +1782,9 @@
       nav_zoom:      'Zoom',
       nav_ai_tavern: 'AI Tavern',
       nav_help:      'ช่วยเหลือ',
+      tt_erp_desc:   'ไปที่ระบบ Mango ERP — สำหรับคำขอซื้อ คำขอเบิกเงินสด และธุรกรรมเชิงตัวเลขอื่น ๆ',
+      tt_zoom_desc:  'เข้าร่วมประชุมผ่าน Zoom',
+      tt_onboarding_desc: 'การปฐมนิเทศและต้อนรับพนักงานใหม่',
       dash_sub:      'ศูนย์รวมแอปพลิเคชันภายในของ VCB Group ไว้ในที่เดียว',
       welcome_sub:   'ความเคลื่อนไหวของ VCB Connect ในวันนี้',
       good_morning:  'สวัสดีตอนเช้า',
@@ -1681,12 +1805,32 @@
       search_empty:  'ไม่พบแอปพลิเคชันที่ค้นหา',
       panel_announcements: 'ประกาศ',
       panel_announcements_empty: 'ยังไม่มีประกาศในขณะนี้',
+      panel_calendar: 'ปฏิทินวันหยุด',
+      cal_dow:       'อา,จ,อ,พ,พฤ,ศ,ส',
+      cal_legend_holiday: 'วันหยุด',
+      cal_legend_weekend: 'เสาร์-อาทิตย์',
+      cal_legend_today:   'วันนี้',
+      cal_next_holiday:   'วันหยุดถัดไป: {name} ({date})',
+      cal_days_away:      'อีก {n} วัน',
+      cal_today:          'วันนี้',
       panel_birthdays: 'วันเกิดที่กำลังจะถึง',
-      panel_birthdays_note: 'ข้อมูลตัวอย่าง — เชื่อมต่อแหล่งข้อมูลจริงเพื่อแทนที่ส่วนนี้',
+      bday_today:    'วันนี้',
+      bday_tomorrow: 'พรุ่งนี้',
+      bday_empty:    'ยังไม่มีวันเกิดที่กำลังจะถึง',
+      panel_leave:   'ลาวันนี้',
+      panel_leave_empty: 'วันนี้ไม่มีพนักงานลา',
       help_title:    'ช่วยเหลือ',
       help_sub:      'ต้องการความช่วยเหลือเกี่ยวกับ VCB Connect หรือแอปพลิเคชันใด ๆ ติดต่อเราได้ทันที',
       help_close:    'ปิด',
       help_send_email: 'ส่งอีเมล',
+      help_from_email: 'จาก',
+      help_to_email: 'ถึง',
+      help_sending:  'กำลังส่ง…',
+      help_sent:     'ส่งแล้ว — ขอบคุณครับ/ค่ะ เราจะติดต่อกลับทางอีเมล',
+      help_error_area: 'กรุณาเลือกสิ่งที่คุณกำลังทำอยู่',
+      help_error_message: 'กรุณาอธิบายปัญหาก่อนส่ง',
+      help_error_generic: 'ไม่สามารถส่งได้ กรุณาลองอีกครั้ง',
+      settings_announcements: 'ประกาศ',
       apps: {
         ememo:   { name: 'อีเมโม',                          desc: 'ควบคุมเอกสาร การออกบันทึกข้อความ และขั้นตอนการอนุมัติ ระหว่างโครงการและสำนักงานใหญ่',
                    preview: 'รวมเอกสารและบันทึกข้อความของบริษัทไว้ในที่เดียว พร้อมขั้นตอนการออกและอนุมัติที่เป็นระบบ ทำให้ทุกฉบับมีเวอร์ชันที่ตรวจสอบย้อนกลับได้และค้นหาได้ง่ายในภายหลัง' },
@@ -1789,7 +1933,7 @@
         shell.classList.remove('lang-swapping');
         langFadeTimer = null;
       });
-    }, 100);
+    }, 220);
   }
 
   // Stashes each app's name + preview text on the element (as data
@@ -1803,6 +1947,15 @@
       if (!entry) continue;
       targets[i].setAttribute('data-tt-name', entry.name || '');
       targets[i].setAttribute('data-tt-desc', entry.preview || entry.desc || '');
+    }
+
+    // static shortcut links (ERP / Zoom / Onboarding) — name + desc both
+    // come straight from the dictionary via a fixed key, not the apps list.
+    var ttTargets = document.querySelectorAll('.nav-tt[data-tt-key]');
+    for (var j = 0; j < ttTargets.length; j++) {
+      var ttKey = ttTargets[j].getAttribute('data-tt-key');
+      ttTargets[j].setAttribute('data-tt-name', dict['nav_' + ttKey] || '');
+      ttTargets[j].setAttribute('data-tt-desc', dict['tt_' + ttKey + '_desc'] || '');
     }
   }
 
@@ -1915,7 +2068,7 @@
       }, HIDE_DELAY);
     }
 
-    var targets = document.querySelectorAll('.app-card[data-key], .nav-item[data-key]');
+    var targets = document.querySelectorAll('.app-card[data-key], .nav-item[data-key], .nav-tt');
     for (var i = 0; i < targets.length; i++) {
       (function (el) {
         el.addEventListener('mouseenter', function () { show(el); });
@@ -1992,11 +2145,6 @@
     });
   })();
 
-  // Admin gear is hidden by default; reveal it only when the URL has ?admin=1.
-  if (/(\?|&)admin=1(\b|&)/.test(location.search)) {
-    document.getElementById('admin-btn').hidden = false;
-  }
-
   // ----- header greeting + avatar initials -----
   function initialsFromName(name) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -2014,15 +2162,21 @@
   }
 
   // Emails that see "Admin" instead of "Staff" under their name in the
-  // sidebar. Purely a display label — unrelated to the announcement-editor
-  // password gate (admin-btn/?admin=1), which is a separate mechanism.
+  // sidebar, and that get access to the announcement editor from Settings.
   var ADMIN_EMAILS = ['c.chavananand@vcb-con.com'];
+  var CURRENT_USER_EMAIL = '';
+  var SUPPORT_EMAIL_ADDR = 'c.chavananand@vcb-con.com';
   function applyRoleLabel(email) {
     var roleEl = document.querySelector('.sidebar-user-role');
     if (!roleEl) return;
     var isAdmin = email && ADMIN_EMAILS.indexOf(email.toLowerCase()) !== -1;
     roleEl.setAttribute('data-i18n', isAdmin ? 'admin_role' : 'staff');
     roleEl.textContent = t(isAdmin ? 'admin_role' : 'staff');
+  }
+  function applyAdminAccess(email) {
+    var isAdmin = email && ADMIN_EMAILS.indexOf(email.toLowerCase()) !== -1;
+    var settingsBtn = document.getElementById('settings-announcements');
+    if (settingsBtn) settingsBtn.hidden = !isAdmin;
   }
 
   google.script.run
@@ -2038,6 +2192,7 @@
         setAvatars(guest);
         return;
       }
+      CURRENT_USER_EMAIL = email;
       var name = (email.split('@')[0] || '')
         .replace(/[._-]+/g, ' ')
         .replace(/\b([a-z])/g, function (m, c) { return c.toUpperCase(); });
@@ -2048,6 +2203,7 @@
       elTop.title = email; elSide.title = email;
       setAvatars(display);
       applyRoleLabel(email);
+      applyAdminAccess(email);
     })
     .withFailureHandler(function () {
       var guest = t('guest');
@@ -2077,25 +2233,159 @@
     setInterval(tick, 30000);
   })();
 
-  // ----- upcoming birthdays (sample data placeholder) -----
+  // ----- holiday calendar -----
+  (function () {
+    var panel = document.getElementById('calendar-panel');
+    if (!panel) return;
+
+    var viewDate = new Date();
+    viewDate.setDate(1);
+    var holidayCache = {}; // year -> { 'YYYY-MM-DD': { name_en, name_th } }
+
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function dateKey(y, m, d) { return y + '-' + pad(m + 1) + '-' + pad(d); }
+    function holidayName(h) { return getLang() === 'th' ? h.name_th : h.name_en; }
+
+    function render() {
+      var y = viewDate.getFullYear(), m = viewDate.getMonth();
+      var holidays = holidayCache[y];
+      if (!holidays) {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            holidayCache[y] = result || {};
+            render();
+          })
+          .withFailureHandler(function () {
+            holidayCache[y] = {};
+            render();
+          })
+          .getHolidays(y);
+        panel.innerHTML = '<div class="panel-head"><h3 data-i18n="panel_calendar">' + escapeHtml(t('panel_calendar')) + '</h3></div>';
+        return;
+      }
+
+      var today = new Date();
+      var firstDow = new Date(y, m, 1).getDay();
+      var daysInMonth = new Date(y, m + 1, 0).getDate();
+      var daysInPrevMonth = new Date(y, m, 0).getDate();
+      var locale = getLang() === 'th' ? 'th-TH' : 'en-US';
+      var monthLabel = viewDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+      var dowNames = t('cal_dow').split(',');
+
+      var html = '';
+      html += '<div class="panel-head"><h3>' + escapeHtml(t('panel_calendar')) + '</h3>'
+        + '<div class="month-nav">'
+        +   '<button type="button" class="cal-prev" aria-label="Previous month">&#8249;</button>'
+        +   '<span style="font-size:9.5px;color:var(--text-dim);min-width:58px;text-align:center;display:inline-block;">' + escapeHtml(monthLabel) + '</span>'
+        +   '<button type="button" class="cal-next" aria-label="Next month">&#8250;</button>'
+        + '</div></div>';
+      html += '<div class="cal-grid">';
+      dowNames.forEach(function (d) { html += '<div class="cal-dow">' + escapeHtml(d) + '</div>'; });
+
+      var cells = [];
+      for (var i = 0; i < firstDow; i++) cells.push({ day: daysInPrevMonth - firstDow + 1 + i, outside: true });
+      for (var d = 1; d <= daysInMonth; d++) cells.push({ day: d, outside: false });
+      while (cells.length % 7 !== 0) cells.push({ day: cells.length - (firstDow + daysInMonth) + 1, outside: true });
+
+      cells.forEach(function (c) {
+        if (c.outside) { html += '<div class="cal-day is-outside">' + c.day + '</div>'; return; }
+        var dow = new Date(y, m, c.day).getDay();
+        var key = dateKey(y, m, c.day);
+        var h = holidays[key];
+        var isWeekend = dow === 0 || dow === 6;
+        var isToday = y === today.getFullYear() && m === today.getMonth() && c.day === today.getDate();
+        var cls = 'cal-day';
+        if (isWeekend) cls += ' is-weekend';
+        if (h) cls += ' is-holiday';
+        if (isToday) cls += ' is-today';
+        html += '<div class="' + cls + '"' + (h ? ' title="' + escapeHtml(holidayName(h)) + '"' : '') + '>' + c.day + (h ? '<span class="dot"></span>' : '') + '</div>';
+      });
+      html += '</div>';
+
+      html += '<div class="cal-legend">'
+        + '<div class="cal-legend-item"><span class="cal-legend-swatch holiday"></span>' + escapeHtml(t('cal_legend_holiday')) + '</div>'
+        + '<div class="cal-legend-item"><span class="cal-legend-swatch weekend"></span>' + escapeHtml(t('cal_legend_weekend')) + '</div>'
+        + '<div class="cal-legend-item"><span class="cal-legend-swatch today"></span>' + escapeHtml(t('cal_legend_today')) + '</div>'
+        + '</div>';
+
+      // next upcoming holiday from real today (not the viewed month)
+      var next = null;
+      var probe = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      for (var i2 = 0; i2 < 366 && !next; i2++) {
+        var probeYear = probe.getFullYear();
+        var probeHolidays = holidayCache[probeYear] || (probeYear === y ? holidays : null);
+        if (probeHolidays) {
+          var k2 = dateKey(probeYear, probe.getMonth(), probe.getDate());
+          if (probeHolidays[k2]) {
+            var daysAway = Math.round((probe - today) / 86400000);
+            next = { name: holidayName(probeHolidays[k2]), daysAway: daysAway, date: probe.getDate() + '/' + (probe.getMonth() + 1) };
+          }
+        }
+        probe.setDate(probe.getDate() + 1);
+      }
+      if (next) {
+        var daysLabel = next.daysAway === 0 ? t('cal_today') : t('cal_days_away').replace('{n}', next.daysAway);
+        html += '<div class="cal-next-holiday"><span>' + escapeHtml(t('cal_next_holiday').replace('{name}', next.name).replace('{date}', next.date)) + '</span>'
+          + '<span class="days">' + escapeHtml(daysLabel) + '</span></div>';
+      }
+
+      panel.innerHTML = html;
+      panel.querySelector('.cal-prev').addEventListener('click', function () {
+        viewDate.setMonth(viewDate.getMonth() - 1);
+        render();
+      });
+      panel.querySelector('.cal-next').addEventListener('click', function () {
+        viewDate.setMonth(viewDate.getMonth() + 1);
+        render();
+      });
+    }
+
+    render();
+  })();
+
+  // ----- upcoming birthdays (always the 3 soonest, from the HR roster) -----
   (function () {
     var list = document.getElementById('birthdays-list');
     if (!list) return;
-    var SAMPLE_BIRTHDAYS = [
-      { name: 'Mimiese Abubakar', when: 'Today' },
-      { name: 'Kenny Avwerose',   when: 'Tomorrow' },
-      { name: 'Omo Jefe',         when: 'Wed, 25 July' }
-    ];
-    SAMPLE_BIRTHDAYS.forEach(function (b) {
-      var row = document.createElement('div');
-      row.className = 'bday-row';
-      row.innerHTML =
-        '<div class="bday-avatar">' + initialsFromName(b.name) + '</div>' +
-        '<div><div class="bday-name"></div><div class="bday-when"></div></div>';
-      row.querySelector('.bday-name').textContent = b.name;
-      row.querySelector('.bday-when').textContent = b.when;
-      list.appendChild(row);
-    });
+
+    function whenLabel(b) {
+      if (b.daysAway === 0) return t('bday_today');
+      if (b.daysAway === 1) return t('bday_tomorrow');
+      var d = new Date();
+      d.setDate(d.getDate() + b.daysAway);
+      var locale = getLang() === 'th' ? 'th-TH' : 'en-US';
+      return d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
+    }
+
+    function render(birthdays) {
+      list.innerHTML = '';
+      if (!birthdays || !birthdays.length) {
+        var empty = document.createElement('p');
+        empty.className = 'ann-empty';
+        empty.textContent = t('bday_empty');
+        list.appendChild(empty);
+        return;
+      }
+      birthdays.forEach(function (b) {
+        var row = document.createElement('div');
+        row.className = 'bday-row';
+        row.innerHTML =
+          '<div class="bday-avatar">' + initialsFromName(b.name) + '</div>' +
+          '<div>' +
+            '<div class="bday-meta"><div class="bday-name"></div><div class="bday-dept"></div></div>' +
+            '<div class="bday-when"></div>' +
+          '</div>';
+        row.querySelector('.bday-name').textContent = b.name;
+        row.querySelector('.bday-dept').textContent = b.dept || '';
+        row.querySelector('.bday-when').textContent = whenLabel(b);
+        list.appendChild(row);
+      });
+    }
+
+    google.script.run
+      .withSuccessHandler(render)
+      .withFailureHandler(function () { render([]); })
+      .getUpcomingBirthdays(3);
   })();
 
   // ----- announcement banner: dismissal + dynamic render -----
@@ -2160,8 +2450,8 @@
     if (existing) {
       existing.outerHTML = html;
     } else {
-      var pageHead = document.querySelector('.page-head');
-      pageHead.insertAdjacentHTML('beforebegin', html);
+      var dashGrid = document.querySelector('.dash-grid');
+      dashGrid.insertAdjacentHTML('beforebegin', html);
     }
     wireDismiss();
     renderAnnouncementsPanel(ann);
@@ -2174,9 +2464,21 @@
     var modal = document.getElementById('help-modal');
     if (!modal) return;
     var openBtns = [document.getElementById('nav-help'), document.getElementById('settings-help')];
+    var areaSel = document.getElementById('help-area');
+    var msgBox = document.getElementById('help-message');
+    var statusEl = document.getElementById('help-msg');
+    var sendBtn = document.getElementById('help-send');
+    var emailInfo = document.getElementById('help-email-info');
 
     function openModal(e) {
       if (e) e.preventDefault();
+      statusEl.textContent = '';
+      statusEl.className = 'msg';
+      if (emailInfo) {
+        emailInfo.textContent = CURRENT_USER_EMAIL
+          ? (t('help_from_email') + ': ' + CURRENT_USER_EMAIL + ' · ' + t('help_to_email') + ': ' + SUPPORT_EMAIL_ADDR)
+          : (t('help_to_email') + ': ' + SUPPORT_EMAIL_ADDR);
+      }
       modal.setAttribute('open', '');
     }
     function closeModal() {
@@ -2193,6 +2495,41 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && modal.hasAttribute('open')) closeModal();
     });
+
+    if (sendBtn) {
+      sendBtn.addEventListener('click', function () {
+        var area = areaSel ? areaSel.value : '';
+        var message = msgBox ? msgBox.value.trim() : '';
+        if (!area) {
+          statusEl.textContent = t('help_error_area');
+          statusEl.className = 'msg err';
+          return;
+        }
+        if (!message) {
+          statusEl.textContent = t('help_error_message');
+          statusEl.className = 'msg err';
+          return;
+        }
+        sendBtn.disabled = true;
+        statusEl.textContent = t('help_sending');
+        statusEl.className = 'msg';
+        google.script.run
+          .withSuccessHandler(function () {
+            sendBtn.disabled = false;
+            statusEl.textContent = t('help_sent');
+            statusEl.className = 'msg ok';
+            if (msgBox) msgBox.value = '';
+            if (areaSel) areaSel.value = '';
+            setTimeout(closeModal, 1200);
+          })
+          .withFailureHandler(function (err) {
+            sendBtn.disabled = false;
+            statusEl.textContent = (err && err.message) ? err.message : t('help_error_generic');
+            statusEl.className = 'msg err';
+          })
+          .sendIssueReport({ area: area, message: message });
+      });
+    }
   })();
 
   // ----- admin modal -----
@@ -2387,7 +2724,8 @@
         .saveAnnouncement(token, null);
     }
 
-    document.getElementById('admin-btn').addEventListener('click', openModal);
+    var settingsAnnBtn = document.getElementById('settings-announcements');
+    if (settingsAnnBtn) settingsAnnBtn.addEventListener('click', openModal);
     document.getElementById('unlock-cancel').addEventListener('click', closeModal);
     document.getElementById('edit-cancel').addEventListener('click', closeModal);
     document.getElementById('unlock-submit').addEventListener('click', submitUnlock);

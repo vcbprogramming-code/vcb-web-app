@@ -1,5 +1,28 @@
 import type { AppEntry, I18nDict } from './types'
 
+// Fixed-date Thai public holidays — ported verbatim from Code.js
+// THAI_HOLIDAYS_FIXED. Month/day repeats every year, so no per-year table.
+// Deliberately excludes lunar/Buddhist holidays (Makha Bucha, Visakha Bucha,
+// Asalha Bucha, Buddhist Lent) and government "compensation day"
+// (วันหยุดชดเชย) substitutions, since both shift yearly and are announced
+// by cabinet resolution.
+export const THAI_HOLIDAYS_FIXED: { month: number; day: number; name_en: string; name_th: string }[] = [
+  { month: 1, day: 1, name_en: "New Year's Day", name_th: 'วันขึ้นปีใหม่' },
+  { month: 4, day: 6, name_en: 'Chakri Day', name_th: 'วันจักรี' },
+  { month: 4, day: 13, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 4, day: 14, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 4, day: 15, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 5, day: 1, name_en: 'National Labor Day', name_th: 'วันแรงงานแห่งชาติ' },
+  { month: 5, day: 4, name_en: 'Coronation Day', name_th: 'วันฉัตรมงคล' },
+  { month: 7, day: 28, name_en: "King's Birthday", name_th: 'วันเฉลิมพระชนมพรรษา ร.10' },
+  { month: 8, day: 12, name_en: "Mother's Day", name_th: 'วันแม่แห่งชาติ' },
+  { month: 10, day: 13, name_en: 'King Bhumibol Memorial Day', name_th: 'วันคล้ายวันสวรรคต ร.9' },
+  { month: 10, day: 23, name_en: 'Chulalongkorn Day', name_th: 'วันปิยมหาราช' },
+  { month: 12, day: 5, name_en: "Father's Day", name_th: 'วันพ่อแห่งชาติ' },
+  { month: 12, day: 10, name_en: 'Constitution Day', name_th: 'วันรัฐธรรมนูญ' },
+  { month: 12, day: 31, name_en: "New Year's Eve", name_th: 'วันสิ้นปี' },
+]
+
 // Single source of truth for the app cards — ported verbatim from Code.js (APPS).
 export const APPS: AppEntry[] = [
   {
@@ -87,8 +110,21 @@ export const I18N: I18nDict = {
     search_empty: 'No applications match your search.',
     panel_announcements: 'Announcements',
     panel_announcements_empty: 'No announcements right now.',
+    panel_calendar: 'Holiday Calendar',
+    cal_dow: 'Su,Mo,Tu,We,Th,Fr,Sa',
+    cal_legend_holiday: 'Holiday',
+    cal_legend_weekend: 'Weekend',
+    cal_legend_today: 'Today',
+    cal_next_holiday: 'Next holiday: {name} ({date})',
+    cal_days_away: '{n} days',
+    cal_today: 'Today',
     panel_birthdays: 'Upcoming Birthdays',
     panel_birthdays_note: 'Sample data — connect a real source to replace this.',
+    panel_leave: 'On Leave Today',
+    panel_leave_empty: 'No one is on leave today.',
+    tt_erp_desc: 'Navigate to Mango ERP — for purchase requests, cash requests & other numerical transactions',
+    tt_zoom_desc: 'Join a Zoom meeting',
+    tt_onboarding_desc: 'New hire onboarding & orientation',
     help_title: 'Report an issue',
     help_sub: "Tell us what happened — this goes straight to the VCB Connect team.",
     help_area_label: 'When you noticed this, what were you trying to do?',
@@ -171,8 +207,21 @@ export const I18N: I18nDict = {
     search_empty: 'ไม่พบแอปพลิเคชันที่ค้นหา',
     panel_announcements: 'ประกาศ',
     panel_announcements_empty: 'ยังไม่มีประกาศในขณะนี้',
+    panel_calendar: 'ปฏิทินวันหยุด',
+    cal_dow: 'อา,จ,อ,พ,พฤ,ศ,ส',
+    cal_legend_holiday: 'วันหยุด',
+    cal_legend_weekend: 'เสาร์-อาทิตย์',
+    cal_legend_today: 'วันนี้',
+    cal_next_holiday: 'วันหยุดถัดไป: {name} ({date})',
+    cal_days_away: 'อีก {n} วัน',
+    cal_today: 'วันนี้',
     panel_birthdays: 'วันเกิดที่กำลังจะถึง',
     panel_birthdays_note: 'ข้อมูลตัวอย่าง — เชื่อมต่อแหล่งข้อมูลจริงเพื่อแทนที่ส่วนนี้',
+    panel_leave: 'ลาวันนี้',
+    panel_leave_empty: 'วันนี้ไม่มีพนักงานลา',
+    tt_erp_desc: 'ไปที่ระบบ Mango ERP — สำหรับคำขอซื้อ คำขอเบิกเงินสด และธุรกรรมเชิงตัวเลขอื่น ๆ',
+    tt_zoom_desc: 'เข้าร่วมประชุมผ่าน Zoom',
+    tt_onboarding_desc: 'การปฐมนิเทศและต้อนรับพนักงานใหม่',
     help_title: 'แจ้งปัญหา',
     help_sub: 'บอกเราว่าเกิดอะไรขึ้น — ข้อความจะถูกส่งตรงถึงทีม VCB Connect',
     help_area_label: 'ขณะที่พบปัญหา คุณกำลังทำอะไรอยู่',

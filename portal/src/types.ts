@@ -80,8 +80,21 @@ export interface Dict {
   search_empty: string
   panel_announcements: string
   panel_announcements_empty: string
+  panel_calendar: string
+  cal_dow: string
+  cal_legend_holiday: string
+  cal_legend_weekend: string
+  cal_legend_today: string
+  cal_next_holiday: string
+  cal_days_away: string
+  cal_today: string
   panel_birthdays: string
   panel_birthdays_note: string
+  panel_leave: string
+  panel_leave_empty: string
+  tt_erp_desc: string
+  tt_zoom_desc: string
+  tt_onboarding_desc: string
   help_title: string
   help_sub: string
   help_area_label: string
@@ -96,6 +109,15 @@ export interface Dict {
 }
 
 export type I18nDict = Record<Lang, Dict>
+
+/** One fixed-date Thai public holiday, mirrors an entry of Code.js THAI_HOLIDAYS_FIXED. */
+export interface HolidayEntry {
+  name_en: string
+  name_th: string
+}
+
+/** Holidays for one year, keyed 'YYYY-MM-DD' — mirrors Code.js getHolidays() return shape. */
+export type HolidaysByDate = Record<string, HolidayEntry>
 
 /**
  * Allow CSS custom properties (e.g. `--card-accent`, `--i`) in inline styles.

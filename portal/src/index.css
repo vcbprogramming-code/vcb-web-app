@@ -37,6 +37,9 @@
   --globe-line-strong: rgba(58, 91, 255, 0.68);
   --globe-glow-bg: rgba(58, 91, 255, 0.14);
   --globe-accent-2: #7c5cff;
+  --holiday-bg: rgba(239, 68, 68, 0.1);
+  --holiday-text: #dc2626;
+  --weekend-bg: rgba(102, 111, 156, 0.06);
   color-scheme: light;
 }
 :root[data-theme='dark'] {
@@ -73,6 +76,9 @@
   --globe-line-strong: rgba(126, 232, 255, 0.75);
   --globe-glow-bg: rgba(79, 209, 255, 0.22);
   --globe-accent-2: #a78bfa;
+  --holiday-bg: rgba(248, 113, 113, 0.12);
+  --holiday-text: #f87171;
+  --weekend-bg: rgba(147, 172, 206, 0.06);
   color-scheme: dark;
 }
 
@@ -517,7 +523,7 @@ a {
 
 /* ---------- language-switch crossfade ---------- */
 .shell {
-  transition: opacity 0.1s ease;
+  transition: opacity 0.22s ease;
 }
 .shell.lang-swapping {
   opacity: 0;
@@ -829,116 +835,16 @@ a {
   filter: blur(20px);
   z-index: -1;
 }
-.globe {
+.globe-canvas {
   position: absolute;
   inset: 0;
-  transform-style: preserve-3d;
-  animation: globeSpin 26s linear infinite;
+  filter: drop-shadow(0 10px 34px var(--globe-drop-shadow));
 }
-@keyframes globeSpin {
-  from {
-    transform: rotateX(-16deg) rotateY(0deg);
-  }
-  to {
-    transform: rotateX(-16deg) rotateY(360deg);
-  }
+.js .globe-canvas {
+  opacity: 0;
+  animation: coreOn 0.6s ease 0.15s both;
 }
 
-/* shaded sphere body: layered radial gradients fake a lit, glassy globe
-   instead of a flat wireframe circle — a soft specular highlight up-left,
-   a mid-tone body, and a darker limb toward the edges for real volume. */
-.globe-core {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 26%, var(--globe-spec), transparent 32%),
-    radial-gradient(
-      circle at 34% 32%,
-      var(--globe-core-a),
-      var(--globe-core-b) 48%,
-      var(--globe-core-c) 78%,
-      var(--globe-core-d) 100%
-    );
-  box-shadow: inset -18px -14px 40px var(--globe-shade), inset 0 0 50px var(--globe-glow-bg),
-    0 10px 34px var(--globe-drop-shadow);
-}
-/* thin crisp rim-light on the sphere's edge, like light wrapping the limb */
-.globe-core::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px var(--globe-rim);
-  pointer-events: none;
-}
-
-.meridian,
-.parallel {
-  position: absolute;
-  border: 1px solid var(--globe-line);
-  border-radius: 50%;
-  box-shadow: 0 0 8px var(--globe-glow-bg);
-}
-.meridian {
-  inset: 0;
-}
-.m1 {
-  transform: rotateY(0deg);
-}
-.m2 {
-  transform: rotateY(30deg);
-}
-.m3 {
-  transform: rotateY(60deg);
-}
-.m4 {
-  transform: rotateY(90deg);
-  border-color: var(--globe-line-strong);
-  box-shadow: 0 0 12px var(--globe-glow-bg);
-}
-.m5 {
-  transform: rotateY(120deg);
-}
-.m6 {
-  transform: rotateY(150deg);
-}
-
-.parallel {
-  left: 50%;
-  top: 50%;
-}
-.p-eq {
-  width: 190px;
-  height: 190px;
-  margin: -95px 0 0 -95px;
-  transform: rotateX(90deg);
-  border-color: var(--globe-line-strong);
-  box-shadow: 0 0 12px var(--globe-glow-bg);
-}
-.p-n30 {
-  width: 164px;
-  height: 164px;
-  margin: -82px 0 0 -82px;
-  transform: translateY(-48px) rotateX(90deg);
-}
-.p-s30 {
-  width: 164px;
-  height: 164px;
-  margin: -82px 0 0 -82px;
-  transform: translateY(48px) rotateX(90deg);
-}
-.p-n60 {
-  width: 95px;
-  height: 95px;
-  margin: -48px 0 0 -48px;
-  transform: translateY(-82px) rotateX(90deg);
-}
-.p-s60 {
-  width: 95px;
-  height: 95px;
-  margin: -48px 0 0 -48px;
-  transform: translateY(82px) rotateX(90deg);
-}
 
 .orbit {
   position: absolute;
@@ -1126,9 +1032,7 @@ a {
     opacity: 1;
     animation: none;
   }
-  .js .globe-core,
-  .js .globe .meridian,
-  .js .globe .parallel {
+  .js .globe-canvas {
     opacity: 1;
     animation: none;
   }
@@ -1142,6 +1046,23 @@ a {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+.side-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+.side-row > div {
+  min-width: 0;
+  padding-right: 14px;
+}
+.side-row > div:last-child {
+  padding-right: 0;
+  padding-left: 14px;
+  border-left: 1px solid var(--card-border);
+}
+.side-row .panel-head h3 {
+  font-size: 12px;
 }
 .panel {
   padding: 18px 18px 14px;
@@ -1176,39 +1097,197 @@ a {
 .bday-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid var(--card-border);
+  min-width: 0;
 }
 .bday-row:last-child {
   border-bottom: none;
 }
 .bday-avatar {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  flex: 0 0 34px;
+  flex: 0 0 30px;
+}
+.bday-row > div:last-child {
+  min-width: 0;
+  flex: 1;
 }
 .bday-name {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bday-dept {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
 }
 .bday-when {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .panel-note {
   font-size: 11px;
   color: var(--text-dim);
   margin-top: 10px;
   line-height: 1.5;
+}
+
+/* holiday calendar panel */
+#calendar-panel {
+  padding: 12px 14px 10px;
+}
+#calendar-panel .panel-head {
+  margin-bottom: 8px;
+}
+#calendar-panel .panel-head .month-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+#calendar-panel .panel-head .month-nav button {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  font-family: inherit;
+}
+#calendar-panel .panel-head .month-nav button:hover {
+  background: var(--pill-bg);
+  color: var(--text);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 22px;
+  gap: 2px;
+}
+.cal-dow {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+  padding-bottom: 2px;
+  letter-spacing: 0.02em;
+}
+.cal-day {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text);
+  border-radius: 5px;
+}
+.cal-day.is-outside {
+  color: var(--text-dim);
+  opacity: 0.35;
+}
+.cal-day.is-weekend {
+  background: var(--weekend-bg);
+  color: var(--text-dim);
+}
+.cal-day.is-holiday {
+  background: var(--holiday-bg);
+  color: var(--holiday-text);
+  font-weight: 700;
+}
+.cal-day.is-today {
+  box-shadow: inset 0 0 0 1.3px var(--accent);
+  font-weight: 700;
+  color: var(--accent);
+}
+.cal-day.is-today.is-holiday {
+  color: var(--holiday-text);
+}
+.cal-day .dot {
+  position: absolute;
+  bottom: 1.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: var(--holiday-text);
+}
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--card-border);
+}
+.cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.cal-legend-swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: 0 0 7px;
+}
+.cal-legend-swatch.holiday {
+  background: var(--holiday-text);
+}
+.cal-legend-swatch.weekend {
+  background: var(--weekend-bg);
+  border: 1px solid var(--card-border);
+}
+.cal-legend-swatch.today {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.3px var(--accent);
+}
+.cal-next-holiday {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--holiday-bg);
+  border-radius: 8px;
+  font-size: 9.5px;
+  color: var(--holiday-text);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.cal-next-holiday span.days {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 /* announcements panel */
@@ -1431,11 +1510,10 @@ a {
 }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1080px) {
-  .dash-grid {
-    grid-template-columns: 1fr;
-  }
-}
+/* The 2-column dashboard grid (app cards + right rail) now holds at every
+   desktop/laptop width, all the way down to the mobile breakpoint below —
+   no separate "narrow window" reflow step. Only true phone-width layouts
+   (≤860px) get a different view. */
 @media (max-width: 860px) {
   html,
   body {
@@ -1474,9 +1552,24 @@ a {
   .topbar-search {
     display: none;
   }
-  .globe-card,
-  #birthdays-panel {
+  .globe-card {
     display: none;
+  }
+  /* Birthdays panel stays visible on phones too, but the 2-column
+     side-by-side layout with Leave is too tight at this width — stack them
+     instead. */
+  .side-row {
+    grid-template-columns: 1fr;
+  }
+  .side-row > div,
+  .side-row > div:last-child {
+    padding: 0;
+    border-left: none;
+  }
+  .side-row > div:first-child {
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--card-border);
   }
   .content {
     max-width: 100%;

@@ -8,7 +8,8 @@
 // To wire to a real backend later, swap this module's implementations — the
 // signatures are the contract.
 
-import type { Announcement, AnnouncementInput } from './types'
+import type { Announcement, AnnouncementInput, HolidaysByDate } from './types'
+import { THAI_HOLIDAYS_FIXED } from './data'
 
 const PROP_ANNOUNCEMENT = 'vcb_mock_announcement'
 const PROP_ADMIN_HASH = 'vcb_mock_admin_hash'
@@ -147,6 +148,20 @@ export async function getAnnouncementForEdit(token: string | null): Promise<Anno
   } catch {
     return null
   }
+}
+
+/* ---------- holiday calendar ---------- */
+// Mirrors getHolidays(year) in Code.js: fixed-date Thai public holidays,
+// keyed 'YYYY-MM-DD'. Lunar/Buddhist holidays and government compensation
+// days are intentionally excluded — see THAI_HOLIDAYS_FIXED in data.ts.
+
+export function getHolidays(year: number): HolidaysByDate {
+  const out: HolidaysByDate = {}
+  THAI_HOLIDAYS_FIXED.forEach((h) => {
+    const key = `${year}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`
+    out[key] = { name_en: h.name_en, name_th: h.name_th }
+  })
+  return out
 }
 
 /* ---------- help & support: issue reports ---------- */

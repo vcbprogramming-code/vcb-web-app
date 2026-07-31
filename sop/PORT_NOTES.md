@@ -4,7 +4,26 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 `../index.html` (UI) + `../apps-script/Code.gs` (server contract) + `../data/sop.json`
 (seed data). After **any** change to those, re-sync the affected piece here.
 
-- **Last synced from:** the live `script.google.com` deployment **@69** (2026-07-26).
+- **Last synced from:** the live `script.google.com` deployment **@76** (2026-07-31).
+  Brought in everything shipped since `@69`: **report-row creation**
+  (`createReport()` — "+ เพิ่มรายงานใหม่" button + `NewReportModal.tsx`, admin-only,
+  appended to `reports[]`, no server-assigned id — the `case` number is caller-
+  supplied), the **NotebookLM link button** in the Reports detail header
+  (`notebookLM` i18n key, `externalLink` icon — both were missing from this port
+  entirely, predating its last sync), and a rewrite of the **steps authoring
+  model** shared by `EditModal.tsx`/`NewScenarioModal.tsx`/`DetailPane.tsx` via
+  the new `src/lib/steps.ts`: steps are now one of **numbered** ("N. text" —
+  typed digit is only a signal, the CSS counter still drives the displayed
+  number), **sub-bullet** ("» text" / "» » text", depth = repeat count, now
+  supports a 3rd tier beyond the original 2), or **caption** ("· text", no
+  number, no bullet — new). The textarea itself uses plain-keyboard syntax
+  (a number, `>`, or `>>` at line start) converted to/from storage at the
+  component boundary, so nobody needs to type or paste `»` by hand.
+  `src/data/sop.json`'s existing top-level steps were migrated (literal "N. "
+  prepended by position) so this rewrite doesn't silently un-number 31
+  scenarios' worth of existing mock content — mirrors the same one-time
+  migration run against the live Doc (`renumberAllSteps_()` in `Code.js`).
+- **Earlier sync (@69, 2026-07-26):** **createScenario()**
   Hand-synced with everything shipped since build 26: **createScenario()**
   ("+ เพิ่มกรณีใหม่" button + modal, admin-only, server assigns `no`), **dateAdded**
   field on `Scenario` (Thai-formatted, stamped on create, shown under the ref footer),
@@ -63,8 +82,10 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 | `diagramHtml/flowLegendHtml/narrativeHtml/layoutFlowEdges` | `src/components/FlowDiagram.tsx` |
 | `#editBg` + `openEditModal()` + `doSave()`/`doSwap()`/`doDelete()`/`showConfirm()` | `src/components/EditModal.tsx` (module select, swap-with field, delete button + confirm dialog all live here) |
 | `#editBg` (create mode) + `openNewScenarioModal()`   | `src/components/NewScenarioModal.tsx` |
+| `#reportBg` + `openNewReportModal()` + `doSaveReport()` | `src/components/NewReportModal.tsx` |
 | `renderExtraModuleChecks(primaryMod, checked)`        | `src/components/ExtraModuleChecks.tsx` (shared by Edit + New-case modals) |
 | `#settingsBg` + `updateSettingsModal()` + `copyEmail()` | `src/components/SettingsModal.tsx` (no Sync action — removed from the canonical app, see architecture note above) |
+| `stepsToStorage()`/`stepsFromStorage()`/`stepDepth()` (textarea ⇄ storage conversion) | `src/lib/steps.ts` (shared by EditModal/NewScenarioModal/DetailPane) |
 | `<head>` mobile-detection / pref IIFE                | `index.html` head + `src/store.tsx` effects |
 
 ## Behaviour parity notes

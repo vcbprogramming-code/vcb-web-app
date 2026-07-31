@@ -29,6 +29,7 @@ export const ICONS: Record<string, string> = {
   check:'<path d="M20 6 9 17l-5-5"/>',
   plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
   calendar:'<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  externalLink:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
 };
 /* eslint-enable */
 

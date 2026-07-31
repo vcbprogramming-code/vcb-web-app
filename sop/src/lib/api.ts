@@ -13,7 +13,7 @@
  *   deleteScenario(payload)        ← admin-gated
  */
 import seed from '../data/sop.json';
-import type { SopData, ScenarioEdit, ScenarioCreate, ScenarioSwap, ScenarioDelete, Scenario } from '../data/types';
+import type { SopData, ScenarioEdit, ScenarioCreate, ScenarioSwap, ScenarioDelete, Scenario, ReportCreate } from '../data/types';
 
 /* ----- Admin / session simulation -----
  * The real backend marks the request admin via a signed cookie / allow-listed
@@ -235,6 +235,25 @@ export function deleteScenario(payload: ScenarioDelete): Promise<{ ok: true; sce
   assignDisplayNo(store.scenarios);
   store.meta.updatedAt = new Date().toISOString();
   return defer({ ok: true as const, scenarios: store.scenarios.length });
+}
+
+/** POST /api/report/new — create a new report row (admin only). Mirrors
+ * createReport() in Code.js: appends to the reports table, no server-assigned
+ * id (the `case` number is just a label the caller supplies). */
+export function createReport(payload: ReportCreate): Promise<{ ok: true; reports: number }> {
+  if (!session.isAdmin) {
+    return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));
+  }
+  if (!payload || !payload.scenario || !payload.scenario.trim()) {
+    return Promise.reject(new Error('Missing scenario description.'));
+  }
+  if (!payload.path || !payload.path.trim()) {
+    return Promise.reject(new Error('Missing menu path.'));
+  }
+  const caseNo = Number.isFinite(payload.case) ? payload.case : store.reports.length + 1;
+  store.reports = [...store.reports, { case: caseNo, scenario: payload.scenario.trim(), path: payload.path.trim() }];
+  store.meta.updatedAt = new Date().toISOString();
+  return defer({ ok: true as const, reports: store.reports.length });
 }
 
 /** The bootstrap payload the page boots with (mirrors doGet's BOOTSTRAP). */

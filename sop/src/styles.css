@@ -340,6 +340,18 @@
   li.sub::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
   li.sub .stxt{position:relative;padding-left:17px;display:block}
   li.sub .stxt::before{content:'';position:absolute;left:3px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  /* depth 2 (» » ) — one more indent level, square marker so it reads as
+     distinct from depth 1's dot rather than just "further right". */
+  li.sub-2{padding-left:56px !important}
+  li.sub-2 .stxt{padding-left:17px}
+  li.sub-2 .stxt::before{border-radius:2px;width:6px;height:6px;background:var(--muted)}
+  /* depth 3 (» » » ) clamp — same marker as depth 2, one indent further. */
+  li.sub-3{padding-left:78px !important}
+  /* '· ' captions — plain body text under the previous step, no number, no
+     bullet glyph at all (contrast li.sub, which still shows a dot marker). */
+  li.cap{padding:2px 0 2px 34px !important;counter-increment:none !important;color:#3c4a44}
+  li.cap::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
+  html.dark li.cap{color:#b9c2cc}
 
   .note{margin-top:14px;background:#fdeceb;border:1px solid #f6c9c5;border-radius:9px;padding:10px 13px;font-size:.88rem;color:#8d2820}
   .note b{color:#b5302a}

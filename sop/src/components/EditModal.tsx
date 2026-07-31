@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Store } from '../store';
 import { MODULES, MODULES_EN } from '../data/config';
 import ExtraModuleChecks from './ExtraModuleChecks';
+import { stepsToStorage, stepsFromStorage } from '../lib/steps';
 
 export default function EditModal({ s }: { s: Store }) {
   const sc = s.scenarios.find((x) => x.no === s.editNo);
@@ -35,7 +36,7 @@ function EditForm({
   const [titleTH, setTitleTH] = useState(initial.titleTH);
   const [titleEN, setTitleEN] = useState(initial.titleEN);
   const [when, setWhen] = useState(initial.when);
-  const [steps, setSteps] = useState((initial.steps || []).join('\n'));
+  const [steps, setSteps] = useState(stepsFromStorage(initial.steps));
   const [note, setNote] = useState(initial.note || '');
   const [ref, setRef] = useState(initial.ref || '');
   const [extraModules, setExtraModules] = useState<Set<string>>(new Set(initial.extraModules || []));
@@ -68,10 +69,7 @@ function EditForm({
         titleTH: titleTH.trim(),
         titleEN: titleEN.trim(),
         when: when.trim(),
-        steps: steps
-          .split(/\r?\n/)
-          .map((x) => x.trim())
-          .filter(Boolean),
+        steps: stepsToStorage(steps),
         note: note.trim(),
         ref: ref.trim(),
         extraModules: Array.from(extraModules),
@@ -173,7 +171,8 @@ function EditForm({
           <div>
             <textarea id="ed_steps" rows={10} value={steps} onChange={(e) => setSteps(e.target.value)} />
             <div className="hint">
-              1 ขั้นตอน = 1 บรรทัด · ขึ้นต้นบรรทัดด้วย <code>» </code> เพื่อให้เป็นหัวข้อย่อยใต้ขั้นตอนก่อนหน้า
+              ขึ้นต้นด้วยตัวเลข (เช่น <code>1.</code>) &nbsp; ขึ้นต้นด้วย <code>&gt;</code> เพื่อให้เป็นหัวข้อย่อย ·{' '}
+              <code>&gt;&gt;</code> เพื่อให้เป็นหัวข้อย่อยชั้นที่ 3
             </div>
           </div>
         </div>

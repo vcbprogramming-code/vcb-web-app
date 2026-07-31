@@ -6,6 +6,7 @@ import { useState } from 'react';
 import type { Store } from '../store';
 import { MODULES, MODULES_EN } from '../data/config';
 import ExtraModuleChecks from './ExtraModuleChecks';
+import { stepsToStorage } from '../lib/steps';
 
 export default function NewScenarioModal({ s }: { s: Store }) {
   const labels = s.lang === 'en' ? MODULES_EN : MODULES;
@@ -46,10 +47,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
         titleTH: th,
         titleEN: titleEN.trim(),
         when: when.trim(),
-        steps: steps
-          .split(/\r?\n/)
-          .map((x) => x.trim())
-          .filter(Boolean),
+        steps: stepsToStorage(steps),
         note: note.trim(),
         ref: ref.trim(),
         extraModules: Array.from(extraModules),
@@ -96,7 +94,8 @@ export default function NewScenarioModal({ s }: { s: Store }) {
           <div>
             <textarea id="ed_steps" rows={10} value={steps} onChange={(e) => setSteps(e.target.value)} />
             <div className="hint">
-              1 ขั้นตอน = 1 บรรทัด · ขึ้นต้นบรรทัดด้วย <code>» </code> เพื่อให้เป็นหัวข้อย่อยใต้ขั้นตอนก่อนหน้า
+              ขึ้นต้นด้วยตัวเลข (เช่น <code>1.</code>) &nbsp; ขึ้นต้นด้วย <code>&gt;</code> เพื่อให้เป็นหัวข้อย่อย ·{' '}
+              <code>&gt;&gt;</code> เพื่อให้เป็นหัวข้อย่อยชั้นที่ 3
             </div>
           </div>
         </div>

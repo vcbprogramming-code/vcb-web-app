@@ -7,6 +7,7 @@ import type { Scenario } from '../data/types';
 import { Icon } from '../lib/icons';
 import FlowDiagram from './FlowDiagram';
 import { SOP_FLOWS } from '../data/flows';
+import { classifyStep } from '../lib/steps';
 
 function MBackDetail({ s }: { s: Store }) {
   const label = s.nav.view === 'reports' ? s.t('backModules') : s.t('backList');
@@ -83,19 +84,23 @@ function Welcome({ s }: { s: Store }) {
   );
 }
 
-/** Ordered steps; a leading "» " marks a sub-step (mirrors stepsHtml). */
+/** Ordered steps: numbered (auto-numbered by the CSS counter), '» '-depth
+ *  sub-bullets, or '· ' plain captions with no marker (mirrors stepsHtml). */
 function Steps({ steps }: { steps: string[] }) {
   return (
     <ol className="steps">
-      {steps.map((line, i) =>
-        line.indexOf('» ') === 0 ? (
-          <li key={i} className="sub">
-            <span className="stxt">{line.slice(2)}</span>
-          </li>
-        ) : (
-          <li key={i}>{line}</li>
-        ),
-      )}
+      {steps.map((line, i) => {
+        const st = classifyStep(line);
+        if (st.kind === 'caption') return <li key={i} className="cap">{st.text}</li>;
+        if (st.kind === 'sub') {
+          return (
+            <li key={i} className={'sub sub-' + Math.min(st.depth, 3)}>
+              <span className="stxt">{st.text}</span>
+            </li>
+          );
+        }
+        return <li key={i}>{st.text}</li>;
+      })}
     </ol>
   );
 }
@@ -172,6 +177,27 @@ function ReportsDetail({ s }: { s: Store }) {
           <div className="d-th">{s.t('reportsHeader')}</div>
           <div className="d-en">{s.t('reportsSubFmt')(rows.length, s.reports.length)}</div>
         </div>
+        {s.isAdmin && (
+          <button
+            type="button"
+            className="d-edit"
+            style={{ marginLeft: 'auto' }}
+            onClick={s.openNewReportModal}
+          >
+            <Icon name="plus" />
+            <span>{s.t('newReportBtn')}</span>
+          </button>
+        )}
+        <a
+          className="d-edit"
+          style={{ marginLeft: s.isAdmin ? '8px' : 'auto' }}
+          href="https://notebooklm.google.com/notebook/17c8699a-9e2d-4d3b-8a74-51a3cf8ba64c"
+          target="_blank"
+          rel="noopener"
+        >
+          <Icon name="externalLink" />
+          <span>{s.t('notebookLM')}</span>
+        </a>
       </div>
       {rows.length === 0 ? (
         <div className="empty">{s.t('noResultsRep')}</div>

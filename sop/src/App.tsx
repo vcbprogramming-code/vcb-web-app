@@ -12,6 +12,7 @@ import ListPane from './components/ListPane';
 import DetailPane from './components/DetailPane';
 import EditModal from './components/EditModal';
 import NewScenarioModal from './components/NewScenarioModal';
+import NewReportModal from './components/NewReportModal';
 import SettingsModal from './components/SettingsModal';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
 
       {s.editNo != null && <EditModal s={s} />}
       {s.newScenarioOpen && <NewScenarioModal s={s} />}
+      {s.newReportOpen && <NewReportModal s={s} />}
       <SettingsModal s={s} />
     </>
   );

@@ -5,7 +5,7 @@
  * the returned object down to the panes/modals.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SopData, Scenario, ScenarioEdit, ScenarioCreate, ScenarioSwap } from './data/types';
+import type { SopData, Scenario, ScenarioEdit, ScenarioCreate, ScenarioSwap, ReportCreate } from './data/types';
 import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
 import {
   bootstrap,
@@ -14,6 +14,7 @@ import {
   createScenario,
   swapScenarioPositions,
   deleteScenario,
+  createReport,
 } from './lib/api';
 
 export type View = 'sop' | 'flows' | 'reports';
@@ -93,6 +94,7 @@ export interface Store {
   settingsOpen: boolean;
   editNo: number | null;
   newScenarioOpen: boolean;
+  newReportOpen: boolean;
   // helpers
   t: (key: string) => any;
   labels: Record<string, string>;
@@ -116,6 +118,9 @@ export interface Store {
   openNewScenarioModal: () => void;
   closeNewScenario: () => void;
   createNewScenario: (payload: ScenarioCreate) => Promise<number>;
+  openNewReportModal: () => void;
+  closeNewReport: () => void;
+  createNewReport: (payload: ReportCreate) => Promise<void>;
   openSettings: () => void;
   closeSettings: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
@@ -142,6 +147,7 @@ export function useStore(): Store {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editNo, setEditNo] = useState<number | null>(null);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [newReportOpen, setNewReportOpen] = useState(false);
 
   const t = useCallback((key: string) => tr(lang, key), [lang]);
   const labels = (lang === 'en' ? MODULES_EN : MODULES) as Record<string, string>;
@@ -319,6 +325,21 @@ export function useStore(): Store {
     [refreshClientData],
   );
 
+  const openNewReportModal = useCallback(() => {
+    if (!data.meta.isAdmin) return;
+    setNewReportOpen(true);
+  }, [data.meta.isAdmin]);
+  const closeNewReport = useCallback(() => setNewReportOpen(false), []);
+
+  const createNewReport = useCallback(
+    async (payload: ReportCreate) => {
+      await createReport(payload);
+      setNewReportOpen(false);
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
@@ -396,6 +417,7 @@ export function useStore(): Store {
       settingsOpen,
       editNo,
       newScenarioOpen,
+      newReportOpen,
       t,
       labels,
       getDefaultView,
@@ -417,6 +439,9 @@ export function useStore(): Store {
       openNewScenarioModal,
       closeNewScenario,
       createNewScenario,
+      openNewReportModal,
+      closeNewReport,
+      createNewReport,
       openSettings,
       closeSettings,
       setTheme,
@@ -434,6 +459,7 @@ export function useStore(): Store {
       settingsOpen,
       editNo,
       newScenarioOpen,
+      newReportOpen,
       t,
       labels,
       selectModule,
@@ -454,6 +480,9 @@ export function useStore(): Store {
       openNewScenarioModal,
       closeNewScenario,
       createNewScenario,
+      openNewReportModal,
+      closeNewReport,
+      createNewReport,
       openSettings,
       closeSettings,
       setTheme,

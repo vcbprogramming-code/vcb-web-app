@@ -36,7 +36,10 @@ export interface Scenario {
   titleEN: string;
   /** The triggering situation ("when this happens…"). */
   when: string;
-  /** Ordered steps. A leading "» " marks a sub-step. */
+  /** Ordered steps. Each entry is one of: "N. text" (numbered top-level step,
+   * displayed number always follows array position, not the literal N),
+   * "» text" / "» » text" (sub-bullet, depth = '» ' repeat count), or
+   * "· text" (plain caption, no number, no bullet). See src/lib/steps.ts. */
   steps: string[];
   /** Reference into the manual, e.g. "บทที่ 2 …". */
   ref: string;
@@ -60,6 +63,13 @@ export interface Report {
   case: number;
   scenario: string;
   /** Navigation path, e.g. "Sales > Reports > …". */
+  path: string;
+}
+
+/** Payload accepted by createReport() / POST /api/report/new. */
+export interface ReportCreate {
+  case: number;
+  scenario: string;
   path: string;
 }
 

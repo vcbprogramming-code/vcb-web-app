@@ -48,6 +48,17 @@ export const apps = [
     roles: ['admin'],
     enabled: true,
   },
+  {
+    // shown on the Portal as a disabled "coming soon" card (not yet a route).
+    // `comingSoon` cards render greyed-out and non-clickable.
+    to: '/system-map',
+    title: 'แผนผังระบบ (System Map)',
+    desc: 'แผนผังกระบวนการทำงานและการเชื่อมโยงระบบของกลุ่ม VCB',
+    icon: 'sysmap',
+    color: 'bg-pink-50 text-pink-600',
+    enabled: false,
+    comingSoon: true,
+  },
 ];
 
 /** Paths of modules that are turned off (for route guards). */

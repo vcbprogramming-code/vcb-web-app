@@ -8,6 +8,8 @@ import adminRoutes from './admin.routes.js';
 import performanceRoutes from './performance.routes.js';
 import creditRoutes from './credit.routes.js';
 import onboardingRoutes from './onboarding.routes.js';
+import announcementRoutes from './announcements.routes.js';
+import supportRoutes from './support.routes.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 
@@ -35,6 +37,8 @@ router.use('/documents', documentRoutes);
 // via the in-app POST /documents/:id/approve. (approvals.routes.js kept for history.)
 router.use('/verify', verifyRoutes); // public (token-based) document authenticity check
 router.use('/admin', adminRoutes); // admin-only: users + config
+router.use('/announcements', announcementRoutes); // portal notices (read: all, write: admin)
+router.use('/support', supportRoutes); // portal "report an issue" → emails admins
 
 // Modules 2–4 are soft-disabled at launch (E-Memo + Admin only). The gate
 // returns 404 for their APIs so a disabled module can't be driven directly.

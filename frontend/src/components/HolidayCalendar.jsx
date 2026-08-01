@@ -1,0 +1,112 @@
+import { useMemo, useState } from 'react';
+import { holidaysForYear } from '../lib/portal.js';
+import Icon from './Icon.jsx';
+
+// Thai public-holiday month calendar (ported from the client's portal): month
+// grid with prev/next nav, weekend/holiday/today highlighting, a legend, and a
+// "next upcoming holiday" callout computed from the real today (not the viewed
+// month). Fixed-date holidays only — see lib/portal.js.
+
+const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+const keyOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+function buildCells(year, month) {
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push({ day: null });
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d });
+  while (cells.length % 7 !== 0) cells.push({ day: null });
+  return cells;
+}
+
+export default function HolidayCalendar() {
+  const [view, setView] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const holidays = useMemo(() => holidaysForYear(year), [year]);
+
+  const monthLabel = useMemo(
+    () => view.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }),
+    [view]
+  );
+
+  const nextHoliday = useMemo(() => {
+    const today = new Date();
+    const probe = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    for (let i = 0; i < 366; i++) {
+      const hs = holidaysForYear(probe.getFullYear());
+      const name = hs[keyOf(probe.getFullYear(), probe.getMonth(), probe.getDate())];
+      if (name) {
+        const daysAway = Math.round((probe - today) / 86400000);
+        return { name, daysAway, date: `${probe.getDate()}/${probe.getMonth() + 1}` };
+      }
+      probe.setDate(probe.getDate() + 1);
+    }
+    return null;
+  }, []);
+
+  const today = new Date();
+  const cells = buildCells(year, month);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+          <Icon name="calendar" className="h-4 w-4 text-brand" /> ปฏิทินวันหยุด
+        </h3>
+        <div className="flex items-center gap-1">
+          <button type="button" aria-label="เดือนก่อนหน้า" onClick={() => setView(new Date(year, month - 1, 1))}
+            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200">
+            <Icon name="arrowLeft" className="h-4 w-4" />
+          </button>
+          <span className="min-w-[92px] text-center text-xs font-medium text-slate-500 dark:text-slate-400">{monthLabel}</span>
+          <button type="button" aria-label="เดือนถัดไป" onClick={() => setView(new Date(year, month + 1, 1))}
+            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200">
+            <Icon name="arrowRight" className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[11px]">
+        {DOW.map((d, i) => (
+          <div key={i} className={`py-1 font-semibold ${i === 0 || i === 6 ? 'text-rose-400' : 'text-slate-400'}`}>{d}</div>
+        ))}
+        {cells.map((c, i) => {
+          if (c.day == null) return <div key={i} />;
+          const dow = new Date(year, month, c.day).getDay();
+          const name = holidays[keyOf(year, month, c.day)];
+          const isWeekend = dow === 0 || dow === 6;
+          const isToday = year === today.getFullYear() && month === today.getMonth() && c.day === today.getDate();
+          let cls = 'relative mx-auto flex h-7 w-7 items-center justify-center rounded-lg ';
+          if (isToday) cls += 'bg-brand text-white font-bold';
+          else if (name) cls += 'bg-rose-50 font-semibold text-rose-600 dark:bg-rose-500/15 dark:text-rose-300';
+          else if (isWeekend) cls += 'text-rose-400/80';
+          else cls += 'text-slate-600 dark:text-slate-300';
+          return (
+            <div key={i} className="py-0.5" title={name || undefined}>
+              <div className={cls}>
+                {c.day}
+                {name && !isToday && <span className="absolute -bottom-0 h-1 w-1 rounded-full bg-rose-500" />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-400">
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> วันหยุด</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-300" /> เสาร์-อาทิตย์</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-brand" /> วันนี้</span>
+      </div>
+
+      {nextHoliday && (
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs dark:bg-slate-700/40">
+          <span className="text-slate-600 dark:text-slate-300">วันหยุดถัดไป: <b>{nextHoliday.name}</b> ({nextHoliday.date})</span>
+          <span className="font-semibold text-brand">{nextHoliday.daysAway === 0 ? 'วันนี้' : `อีก ${nextHoliday.daysAway} วัน`}</span>
+        </div>
+      )}
+    </div>
+  );
+}

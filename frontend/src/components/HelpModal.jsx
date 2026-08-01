@@ -1,0 +1,58 @@
+import { useState } from 'react';
+import { Modal } from './ui/index.js';
+import { useToast } from './Toast.jsx';
+import { BusyLabel } from './Spinner.jsx';
+import { portalApi } from '../lib/portal.js';
+import { apps } from '../config/nav.js';
+
+/** "Help / report an issue" — a short message emailed to the admins. */
+export default function HelpModal({ onClose }) {
+  const toast = useToast();
+  const [area, setArea] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const field = 'field';
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!message.trim()) { toast.error('กรุณากรอกข้อความ'); return; }
+    setBusy(true);
+    try {
+      await portalApi.sendSupport({ area: area || 'ทั่วไป', message: message.trim() });
+      toast.success('ส่งเรื่องถึงผู้ดูแลระบบแล้ว ขอบคุณครับ');
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'ส่งไม่สำเร็จ');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Modal title="ช่วยเหลือ / แจ้งปัญหา" onClose={onClose} size="md"
+      footer={
+        <>
+          <button onClick={onClose} className="btn-outline">ปิด</button>
+          <button onClick={submit} disabled={busy} className="btn-primary">
+            <BusyLabel busy={busy} busyText="กำลังส่ง…">ส่งเรื่อง</BusyLabel>
+          </button>
+        </>
+      }>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-sm text-slate-500 dark:text-slate-400">พบปัญหาการใช้งานหรือมีข้อสงสัย ส่งข้อความถึงผู้ดูแลระบบได้ที่นี่</p>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">ส่วนที่เกี่ยวข้อง</label>
+          <select value={area} onChange={(e) => setArea(e.target.value)} className={field}>
+            <option value="">— เลือกส่วนที่เกี่ยวข้อง —</option>
+            {apps.map((a) => <option key={a.to} value={a.title}>{a.title}</option>)}
+            <option value="อื่น ๆ">อื่น ๆ</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">รายละเอียด</label>
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} maxLength={2000}
+            placeholder="อธิบายปัญหาหรือข้อสงสัย…" className={`${field} resize-none`} />
+          <div className="mt-1 text-right text-[11px] text-slate-400">{message.length}/2000</div>
+        </div>
+      </form>
+    </Modal>
+  );
+}

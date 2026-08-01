@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UsersTab from './UsersTab.jsx';
 import PermissionsTab from './PermissionsTab.jsx';
+import AnnouncementsTab from './AnnouncementsTab.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 
@@ -12,6 +13,7 @@ import Icon from '../../components/Icon.jsx';
 const TABS = [
   { key: 'users', label: 'จัดการผู้ใช้', Comp: UsersTab },
   { key: 'permissions', label: 'สิทธิ์การใช้งาน', Comp: PermissionsTab },
+  { key: 'announcements', label: 'ประกาศ', Comp: AnnouncementsTab },
 ];
 
 export default function Settings() {

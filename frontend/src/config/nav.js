@@ -49,6 +49,15 @@ export const apps = [
     enabled: true,
   },
   {
+    to: '/sop',
+    title: 'คู่มือปฏิบัติงาน (SOP)',
+    desc: 'ระเบียบปฏิบัติมาตรฐาน ERP — กรณีศึกษา ผังกระบวนการ และเมนูรายงาน',
+    icon: 'book',
+    color: 'bg-indigo-50 text-indigo-600',
+    perm: ['sop', 'view'],
+    enabled: true,
+  },
+  {
     // shown on the Portal as a disabled "coming soon" card (not yet a route).
     // `comingSoon` cards render greyed-out and non-clickable.
     to: '/system-map',
@@ -72,6 +81,7 @@ export const moduleTitles = {
   '/onboarding': 'แนะแนวพนักงานใหม่',
   '/memos-settings': 'ตั้งค่า E-Memo',
   '/admin': 'ผู้ใช้และสิทธิ์',
+  '/sop': 'คู่มือปฏิบัติงาน (SOP)',
   '/dashboard': 'ภาพรวม E-Memo',
   '/profile': 'โปรไฟล์ของฉัน',
 };

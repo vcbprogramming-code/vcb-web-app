@@ -13,6 +13,7 @@ import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
+import Sop from './pages/sop/Sop.jsx';
 import MyProfile from './pages/MyProfile.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { disabledPaths } from './config/nav.js';
@@ -74,6 +75,8 @@ export default function App() {
           />
 
           <Route path="onboarding" element={<Feature path="/onboarding"><Onboarding /></Feature>} />
+
+          <Route path="sop" element={<Feature path="/sop"><Sop /></Feature>} />
 
           <Route
             path="admin"

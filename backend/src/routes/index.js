@@ -10,6 +10,7 @@ import creditRoutes from './credit.routes.js';
 import onboardingRoutes from './onboarding.routes.js';
 import announcementRoutes from './announcements.routes.js';
 import supportRoutes from './support.routes.js';
+import sopRoutes from './sop.routes.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 
@@ -48,5 +49,7 @@ router.use('/performance', moduleGate('performance'), performanceRoutes);
 router.use('/credit', moduleGate('credit'), creditRoutes);
 // Module 4: Onboarding 90 days
 router.use('/onboarding', moduleGate('onboarding'), onboardingRoutes);
+// Module 5: SOP (คู่มือปฏิบัติงาน) — reference content, gated like the rest
+router.use('/sop', moduleGate('sop'), sopRoutes);
 
 export default router;

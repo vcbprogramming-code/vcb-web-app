@@ -199,6 +199,21 @@ const PATHS = {
       <path d="M13.7 21a2 2 0 0 1-3.4 0" />
     </>
   ),
+  book: (
+    <>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <path d="M9 7h7M9 11h5" />
+    </>
+  ),
+  flow: (
+    <>
+      <rect x="3" y="3" width="6" height="5" rx="1" />
+      <rect x="15" y="16" width="6" height="5" rx="1" />
+      <rect x="3" y="16" width="6" height="5" rx="1" />
+      <path d="M6 8v8M9 18.5h6M18 16v-3a2 2 0 0 0-2-2H6" />
+    </>
+  ),
   pin: (
     <>
       <path d="M12 17v5" />

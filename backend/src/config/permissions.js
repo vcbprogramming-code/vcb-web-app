@@ -48,6 +48,14 @@ export const PERMISSION_CATALOG = [
       { key: 'edit', label: 'บันทึก/แก้ไข' },
     ],
   },
+  {
+    module: 'sop',
+    label: 'คู่มือปฏิบัติงาน (SOP)',
+    actions: [
+      { key: 'view', label: 'ดูคู่มือ' },
+      { key: 'edit', label: 'แก้ไขเนื้อหา' },
+    ],
+  },
 ];
 
 /**
@@ -61,12 +69,14 @@ const ROLE_DEFAULTS = {
     performance: { view: true, edit: false },
     credit: { view: true, edit: true },
     onboarding: { view: true, edit: false },
+    sop: { view: true, edit: false },
   },
   hr: {
     ememo: { view: true, create: true, submit: true, settings: false },
     performance: { view: true, edit: true },
     credit: { view: false, edit: false },
     onboarding: { view: true, edit: true },
+    sop: { view: true, edit: false },
   },
 };
 

@@ -47,7 +47,7 @@ export default function Performance() {
 
   const tabs = [
     { key: 'dashboard', label: 'ภาพรวม', show: true },
-    { key: 'entry', label: 'บันทึกงาน', show: boot.canEntry },
+    { key: 'entry', label: 'ลงบันทึกรายวัน', show: boot.canEntry },
     { key: 'index', label: 'ทะเบียนงาน', show: boot.isAdmin },
     { key: 'settings', label: 'ตั้งค่า', show: boot.isAdmin },
   ].filter((t) => t.show);
@@ -55,8 +55,8 @@ export default function Performance() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="รายงานการปฏิบัติงาน"
-        subtitle="บันทึกกิจกรรมงานรายวันของพนักงานแต่ละไซต์ พร้อมภาพรวมความครบถ้วน"
+        title="บันทึกงานฝ่ายบุคคล"
+        subtitle="การลงเวลา บันทึกงาน และตารางเวลาทำงานสำหรับทีม HR"
         right={
           <div className="flex items-center gap-2">
             <button onClick={() => setCur(shift(cur, -1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>

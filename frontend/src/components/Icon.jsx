@@ -214,6 +214,15 @@ const PATHS = {
       <path d="M6 8v8M9 18.5h6M18 16v-3a2 2 0 0 0-2-2H6" />
     </>
   ),
+  // person with a clock badge — the HR work-log module
+  userClock: (
+    <>
+      <circle cx="10" cy="7" r="3.5" />
+      <path d="M3.5 20a6.5 6.5 0 0 1 10.2-5.3" />
+      <circle cx="17" cy="17" r="4.5" />
+      <path d="M17 15v2l1.4 1.4" />
+    </>
+  ),
   pin: (
     <>
       <path d="M12 17v5" />

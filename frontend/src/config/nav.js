@@ -13,10 +13,12 @@ export const apps = [
     enabled: true,
   },
   {
+    // the path stays /performance: it's an internal name, and changing it would
+    // break saved links and every stored permission key for no user benefit.
     to: '/performance',
-    title: 'รายงานการปฏิบัติงาน',
-    desc: 'บันทึกกิจกรรมงานรายวันของพนักงานแต่ละไซต์ พร้อมแดชบอร์ดความครบถ้วน',
-    icon: 'chart',
+    title: 'บันทึกงานฝ่ายบุคคล',
+    desc: 'การลงเวลา บันทึกงาน และตารางเวลาทำงานสำหรับทีม HR',
+    icon: 'userClock',
     color: 'bg-emerald-50 text-emerald-600',
     enabled: true, // live (Module 2 — hr-worklog)
   },
@@ -76,7 +78,7 @@ export const disabledPaths = apps.filter((a) => a.enabled === false).map((a) => 
 // path → module title, for the ModuleShell header.
 export const moduleTitles = {
   '/memos': 'บันทึก & อนุมัติ (E-Memo)',
-  '/performance': 'รายงานการปฏิบัติงาน',
+  '/performance': 'บันทึกงานฝ่ายบุคคล',
   '/credit': 'วงเงินสินเชื่อโครงการ',
   '/onboarding': 'แนะแนวพนักงานใหม่',
   '/memos-settings': 'ตั้งค่า E-Memo',

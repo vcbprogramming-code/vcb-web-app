@@ -223,6 +223,8 @@ const PATHS = {
       <path d="M17 15v2l1.4 1.4" />
     </>
   ),
+  // "opens an application" affordance in the sidebar
+  arrowUpRight: <path d="M7 17 17 7M9 7h8v8" />,
   pin: (
     <>
       <path d="M12 17v5" />

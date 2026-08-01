@@ -20,19 +20,23 @@ function WelcomeCard({ name }) {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  // A wall-clock the size of the greeting competed with it for attention and made
+  // the card read like a screensaver. The status pill carries the "system is up"
+  // message; the time rides quietly alongside the date.
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-brand to-blue-600 p-6 text-white shadow-sm dark:border-slate-700">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> ระบบพร้อมใช้งาน
-          </div>
-          <h1 className="mt-3 text-2xl font-extrabold leading-tight">{greeting(now.getHours())}, {name}</h1>
-          <p className="mt-1 text-sm text-white/80">ยินดีต้อนรับสู่ศูนย์รวมแอปพลิเคชันภายในกลุ่มวิจิตรภัณฑ์ก่อสร้าง</p>
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#132a54] to-[#0d1b36] p-6 text-white shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold leading-tight">{greeting(now.getHours())}, {name}</h1>
+          <p className="mt-1 text-sm text-white/70">ความเคลื่อนไหวของ VCB Connect ในวันนี้</p>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-3xl font-bold tabular-nums tracking-tight">{now.toLocaleTimeString('th-TH', { hour12: false })}</div>
-          <div className="mt-0.5 text-xs text-white/80">{formatThaiLongDate(now)}</div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-400/30">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> ระบบออนไลน์
+          </span>
+          <div className="text-xs text-white/70">
+            {formatThaiLongDate(now)} · <span className="tabular-nums">{now.toLocaleTimeString('th-TH', { hour12: false })}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -77,14 +81,19 @@ function AppCard({ app, soon, awaiting, onOpen }) {
   );
 }
 
-/** Sidebar nav row (module scope — same remount reason as AppCard). */
-function NavRow({ icon, label, onClick, badge = 0 }) {
+/** Sidebar nav row (module scope — same remount reason as AppCard).
+ *  `opens` marks a row that launches an application, which gets the ↗ affordance;
+ *  plain rows (help, sign out) don't. */
+function NavRow({ icon, label, onClick, badge = 0, opens = false }) {
   return (
     <button onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
-      <Icon name={icon} className="h-[18px] w-[18px] shrink-0" />
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
+      <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-slate-400 transition group-hover:text-white" />
       <span className="flex-1 truncate text-left">{label}</span>
       {badge > 0 && <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-[#0f172a]">{badge}</span>}
+      {opens && badge === 0 && (
+        <Icon name="arrowUpRight" className="h-3.5 w-3.5 shrink-0 text-slate-500 opacity-0 transition group-hover:opacity-100" />
+      )}
     </button>
   );
 }
@@ -154,38 +163,44 @@ export default function Portal() {
       <div className="flex min-h-screen">
         {/* ── Sidebar ── */}
         {navOpen && <div className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden="true" />}
+        {/* The sidebar is navy in BOTH themes — it's the app's spine, and a white
+            rail against a white page gave the launcher no shape. Fixed colours,
+            not `dark:` variants, so it looks the same either way. */}
         <aside id="portal-sidebar" aria-label="เมนูหลัก"
-          className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:static lg:z-auto lg:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0d1b36] transition-transform lg:static lg:z-auto lg:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="flex items-center gap-3 px-5 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 ring-1 ring-brand/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
               <GlobeMark className="h-6 w-6" />
             </div>
             <div className="leading-tight">
-              <div className="text-sm font-extrabold tracking-tight text-slate-800">VCB CONNECT</div>
-              <div className="text-[10px] text-slate-500">ระบบงานภายใน</div>
+              <div className="text-sm font-extrabold tracking-tight text-white">VCB CONNECT</div>
+              <div className="text-[10px] text-slate-400">ระบบงานภายใน</div>
             </div>
           </div>
 
-          <div className="mx-3 mb-2 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand/15 text-sm font-bold text-brand">{initial}</div>
+          <div className="mx-3 mb-2 flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{initial}</div>
             <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-semibold text-slate-800">{displayName}</div>
-              <div className="text-[11px] text-slate-500">{roleLabels[role] || role}</div>
+              <div className="truncate text-sm font-semibold text-white">{displayName}</div>
+              <div className="text-[11px] text-slate-400">{roleLabels[role] || role}</div>
             </div>
           </div>
 
           <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="แอปพลิเคชัน">
             <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">แอปพลิเคชัน</div>
-            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={a.title} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} />)}
+            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={a.title} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
             <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">ช่วยเหลือ</div>
             <NavRow icon="help" label="ช่วยเหลือ / แจ้งปัญหา" onClick={() => { setNavOpen(false); setHelp(true); }} />
           </nav>
 
-          <div className="px-3 py-3">
+          <div className="border-t border-white/10 px-3 py-3">
             <button onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300">
               <Icon name="logout" className="h-[18px] w-[18px]" /> ออกจากระบบ
             </button>
+          </div>
+          <div className="px-5 pb-4 text-[10px] leading-tight text-slate-500">
+            VCB Group · สำหรับใช้งานภายในเท่านั้น
           </div>
         </aside>
 

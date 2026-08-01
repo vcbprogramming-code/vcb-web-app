@@ -18,9 +18,13 @@
   <div class="cards" id="cards"></div>
 
   <div class="tabs">
-    <button class="tab on" data-v="fac" onclick="setView('fac')">วงเงิน<span class="tab-x">สินเชื่อ (Facilities)</span></button>
-    <button class="tab" data-v="txn" onclick="setView('txn')">รายการ<span class="tab-x">สินเชื่อ (Credit Ledger)</span></button>
-    <button class="tab" data-v="plan" onclick="setView('plan')">วางแผน<span class="tab-x">สินเชื่อ (T-bar)</span></button>
+    <button class="tab on" data-v="fac" onclick="setView('fac')">วงเงินสินเชื่อ<span class="tab-x"> (Facilities)</span></button>
+    <button class="tab" data-v="txn" onclick="setView('txn')">รายการสินเชื่อ<span class="tab-x"> (Credit Ledger)</span></button>
+    <button class="tab" data-v="cost" onclick="setView('cost')">สรุปค่าใช้จ่าย<span class="tab-x"> (Cost summary)</span></button>
+    <span class="tab-div" aria-hidden="true"></span>
+    <button class="tab" data-v="plan" onclick="setView('plan')">แผนการเงิน<span class="tab-tb"> (T-bar)</span></button>
+    <button class="tab" data-v="actual" onclick="setView('actual')">หักค่างานตามจริง</button>
+    <button class="tab" data-v="variance" onclick="setView('variance')">ผลต่าง<span class="tab-x"> (Variance)</span></button>
   </div>
 
   <div class="bar" id="bar">
@@ -153,7 +157,7 @@
 <!-- Settings modal: dark/light toggle, chart mode, language, and a visual
      cost-category list editor (pills + reorder/delete + inline add). -->
 <div class="ovl" id="ovlSettings">
-  <div class="modal" style="max-width:680px">
+  <div class="modal">
     <h3>ตั้งค่า / Settings<span class="modalX" onclick="close_('ovlSettings')">✕</span></h3>
     <div class="modal-body">
       <div class="secttl">การแสดงผล / Display</div>
@@ -195,8 +199,8 @@
         </div>
       </div>
       <div class="secttl">หมวดค่าใช้จ่าย / Cost categories</div>
-      <div class="muted" style="font-size:11px;margin:-4px 0 4px">ลำดับในรายการ = ลำดับที่แสดงในเมนู · กด ▲▼ เพื่อย้าย · กด × เพื่อลบ</div>
-      <div id="setCatList" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;max-height:34vh;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:6px 12px;background:#fafbfd"></div>
+      <div class="muted" style="font-size:12px;margin:-2px 0 4px">ลำดับในรายการ = ลำดับที่แสดงในเมนู · กด ▲▼ เพื่อย้าย · กด × เพื่อลบ</div>
+      <div id="setCatList" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;max-height:56vh;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:6px 12px;background:#fafbfd"></div>
       <div class="row" style="margin-top:6px">
         <input id="setCatNew" class="grow" placeholder="พิมพ์ชื่อหมวดใหม่…" onkeydown="if(event.key==='Enter'){event.preventDefault();catAdd();}" style="flex:1">
         <button type="button" class="btn add" onclick="catAdd()" style="white-space:nowrap">＋ เพิ่มหมวด</button>

@@ -141,6 +141,12 @@ export interface DeductionRow {
   amount: number;
 }
 
+// Free-form extra-income row (any section can add one via "+ เพิ่มรายรับจากแหล่งอื่น").
+export interface ExtraIncomeRow {
+  label: string;
+  amount: number;
+}
+
 export interface CashPlanPeriod {
   id: string;
   project: string;
@@ -159,6 +165,10 @@ export interface CashPlanPeriod {
   newPNNote: string;
   note: string;
   showAllDue: boolean;
+  // 'plan' = forecast Cash Plan (default/blank), 'actual' = recorded real T-bar.
+  variant: string;
+  // Free-form extra-income rows (new in @159-172, ExtraRows sheet column).
+  extraRows: ExtraIncomeRow[];
   updated: string;
 }
 
@@ -180,7 +190,7 @@ export interface ExportResult {
 export interface GasApi {
   getData(): AppData;
   whoAmI(): Me;
-  getCashPlan(project: string, month: string): CashPlanPeriod[];
+  getCashPlan(project: string, month: string, variant?: string): CashPlanPeriod[];
   saveCashPlanPeriod(p: Partial<CashPlanPeriod>): WriteResult;
   deleteCashPlanPeriod(p: { id: string }): WriteResult;
   addRequest(p: Record<string, unknown>): WriteResult;

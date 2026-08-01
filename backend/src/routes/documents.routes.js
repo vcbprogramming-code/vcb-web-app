@@ -485,7 +485,9 @@ router.get(
     // enforce ememo.view + per-user visibility, but never lock out an assigned approver
     await assertCanView(req.profile, doc);
     const { rows: attachments } = await query(
-      `select id, kind, version, file_name, content_type, size_bytes, created_at
+      // storage_key is surfaced so the UI can show WHERE each file is kept —
+      // required by the acceptance criteria ("แสดงตำแหน่งการจัดเก็บไฟล์อย่างชัดเจน").
+      `select id, kind, version, file_name, content_type, size_bytes, created_at, storage_key
          from document_attachments where document_id = $1 order by created_at`, [req.params.id]);
     const { rows: steps } = await query(
       `select id, step_no, approver_name, approver_email, action, comment, acted_at,

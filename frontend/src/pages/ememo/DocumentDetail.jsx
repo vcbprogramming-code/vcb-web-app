@@ -505,6 +505,19 @@ export default function DocumentDetail() {
                         </>}
                   </button>
                 ))}
+                {/* Where the files actually live. The acceptance criteria require the
+                    storage location to be stated plainly, not just implied. */}
+                <details className="px-1 pt-1">
+                  <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600">ตำแหน่งจัดเก็บไฟล์</summary>
+                  <div className="mt-1 space-y-1 rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-500">
+                    <div>ระบบจัดเก็บ: <b className="text-slate-700">Supabase Storage</b> (สำรองข้อมูลอัตโนมัติ)</div>
+                    {otherFiles.filter((a) => a.storage_key).map((a) => (
+                      <div key={a.id} className="break-all">
+                        <span className="text-slate-600">{a.file_name}</span> → <code className="text-slate-500">{a.storage_key}</code>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             )}
             {previewUrl ? (

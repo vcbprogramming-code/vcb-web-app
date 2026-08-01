@@ -3,9 +3,16 @@ import { queryOne } from '../config/db.js';
 /**
  * Look up the department label for a document code (e.g. '02B' → 'วิศวะ').
  * Falls back to 'วิศวะ' when the code isn't mapped, per the client's rule.
+ *
+ * `client` MUST be passed when this runs inside an open transaction. Reaching for
+ * a fresh pool connection mid-transaction is what deadlocked the whole API once
+ * `pool.max` documents were being created at the same moment: every in-flight
+ * create held a connection, and each then waited for one more that could never
+ * be freed. The DB showed `pool.max` sessions stuck "idle in transaction".
  */
-export async function departmentForDocCode(docCode) {
-  const row = await queryOne(
+export async function departmentForDocCode(docCode, client = null) {
+  const run = client ? (t, p) => client.query(t, p).then((r) => r.rows[0] ?? null) : queryOne;
+  const row = await run(
     `select department from doc_code_departments where code = $1`,
     [docCode]
   );
@@ -53,7 +60,8 @@ export function formatDocNumber({ prefix, department, docCode, runNo }) {
  * Returns { runNo, docNumber, department }.
  */
 export async function allocateDocNumber(client, { project, docCode }) {
-  const department = await departmentForDocCode(docCode);
+  // same connection as the surrounding transaction — see departmentForDocCode
+  const department = await departmentForDocCode(docCode, client);
 
   // Serialize allocation per project: lock the project row.
   await client.query('select id from projects where id = $1 for update', [project.id]);

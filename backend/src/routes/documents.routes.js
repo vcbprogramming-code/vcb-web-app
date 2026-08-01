@@ -655,6 +655,12 @@ router.post(
       await client.query('begin');
       const project = await client.query('select id, doc_prefix, code from projects where id = $1', [input.projectId]).then((r) => r.rows[0]);
       if (!project) throw new ApiError(404, 'Project not found');
+      // A stale "อ้างถึง" pick (document since deleted) hit the FK and surfaced as a
+      // 500 — answer 400 with something the user can act on.
+      if (input.referenceDocId) {
+        const ref = await client.query('select 1 from documents where id = $1', [input.referenceDocId]);
+        if (!ref.rowCount) throw new ApiError(400, 'ไม่พบเอกสารที่อ้างถึง — กรุณาเลือกเอกสารอ้างถึงใหม่');
+      }
       const { runNo, docNumber, department } = await allocateDocNumber(client, { project, docCode: input.docCode });
       const { rows } = await client.query(
         `insert into documents
@@ -722,6 +728,11 @@ router.patch(
       if (acted) throw new ApiError(409, 'มีผู้อนุมัติในสายทางแล้ว ไม่สามารถแก้ไขเนื้อหาได้ (ให้ตีกลับเพื่อแก้ไข)');
     }
     const f = parsed.data;
+    // same guard as create — a stale "อ้างถึง" pick must not become a 500
+    if (f.referenceDocId) {
+      const ref = await queryOne('select 1 from documents where id = $1', [f.referenceDocId]);
+      if (!ref) throw new ApiError(400, 'ไม่พบเอกสารที่อ้างถึง — กรุณาเลือกเอกสารอ้างถึงใหม่');
+    }
     const sets = [];
     const vals = [];
     // Track before→after per field so the audit trail can show what changed.
@@ -825,7 +836,13 @@ router.post(
   '/:id/attachments',
   upload.single('file'),
   asyncHandler(async (req, res) => {
-    await loadDocForMutation(req);
+    const doc = await loadDocForMutation(req);
+    // The combined "one file" is rebuilt on every upload, so allowing an
+    // attachment after approval silently changes an already-approved record.
+    // PATCH already refuses; attachments must match.
+    if (doc.status === 'approved' || doc.status === 'cancelled') {
+      throw new ApiError(409, 'เอกสารที่อนุมัติหรือยกเลิกแล้ว แนบไฟล์เพิ่มไม่ได้');
+    }
     if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
     const fileName = decodeFilename(req.file.originalname);
     const safeName = storageSafeName(fileName);
@@ -854,9 +871,16 @@ router.get(
     if (!att) throw new ApiError(404, 'Attachment not found');
     const obj = await openDownloadStream(att.storage_key);
     if (!obj) throw new ApiError(404, 'File not found in storage');
-    res.setHeader('Content-Type', obj.contentType || att.content_type || 'application/octet-stream');
+    const ctype = obj.contentType || att.content_type || 'application/octet-stream';
+    res.setHeader('Content-Type', ctype);
     if (obj.length != null) res.setHeader('Content-Length', obj.length);
-    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(att.file_name || 'file')}`);
+    // Only formats the viewer previews in place are served inline. An SVG (or any
+    // markup type) rendered inline executes its own script in THIS origin, so
+    // everything else is forced to download instead. `nosniff` doesn't help when
+    // the declared type is the dangerous one.
+    const inlineSafe = ctype === 'application/pdf' || /^image\/(png|jpeg|jpg|gif|webp|bmp)$/i.test(ctype);
+    const disp = inlineSafe ? 'inline' : 'attachment';
+    res.setHeader('Content-Disposition', `${disp}; filename*=UTF-8''${encodeURIComponent(att.file_name || 'file')}`);
     obj.stream.on('error', () => res.destroy());
     obj.stream.pipe(res);
   })

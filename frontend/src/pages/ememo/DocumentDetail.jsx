@@ -45,6 +45,7 @@ const AUDIT_ACTION_TH = {
   forwarded: 'ส่งต่อ',
   resent: 'ส่งอนุมัติซ้ำ',
   email_failed: 'ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ',
+  combine_skipped: 'มีไฟล์แนบที่รวมเข้าไฟล์เดียวไม่ได้',
 };
 
 export default function DocumentDetail() {
@@ -637,7 +638,7 @@ export default function DocumentDetail() {
 // lifecycle audit actions shown inline in the timeline. approve/reject/return/
 // consult are represented by their step/message rows, so they're excluded here to
 // avoid duplicate entries.
-const TIMELINE_LIFECYCLE = new Set(['created', 'submitted', 'edited', 'cancelled', 'resent', 'email_failed', 'forwarded']);
+const TIMELINE_LIFECYCLE = new Set(['created', 'submitted', 'edited', 'cancelled', 'resent', 'email_failed', 'combine_skipped', 'forwarded']);
 
 /**
  * ONE unified timeline (#4/#5): document-lifecycle audit events + approval-chain

@@ -166,7 +166,18 @@ export async function autoCombine(documentId, uploadedBy = null) {
       [documentId]
     );
     if (!hasInline) return;
-    await generateCombinedPdf(documentId, uploadedBy);
+    const res = await generateCombinedPdf(documentId, uploadedBy);
+    // A PDF that pdf-lib can't parse (damaged, password-protected) is dropped from
+    // the merge. That used to be invisible: the user got a "รวมเอกสาร" file quietly
+    // missing an attachment, and the approver reviewed an incomplete package.
+    // Record it so the document's timeline says so.
+    if (res?.skipped?.length) {
+      await query(
+        `insert into audit_log (document_id, actor_id, actor_label, action, detail)
+         values ($1,$2,null,'combine_skipped',$3)`,
+        [documentId, uploadedBy || null, JSON.stringify({ files: res.skipped })]
+      ).catch((e) => console.error('combine_skipped audit failed:', e.message));
+    }
   } catch (e) {
     console.error('auto-combine failed:', e.message);
   }

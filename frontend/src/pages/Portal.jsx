@@ -148,8 +148,10 @@ export default function Portal() {
     /* Arbitrary page background: index.css remaps bg-slate-50/bg-white in dark
        mode with !important, which would make the PAGE lighter than the CARDS on
        it. An arbitrary value isn't remapped, so the hierarchy stays correct. */
-    <div className="min-h-full bg-[#f8fafc] text-slate-800 dark:bg-[#0b1220] dark:text-slate-100">
-      <div className="mx-auto flex min-h-full max-w-screen-2xl">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 dark:bg-[#0b1220] dark:text-slate-100">
+      {/* full-bleed: capping at max-w-screen-2xl (1536px) left black bars down
+          both sides of any wider monitor */}
+      <div className="flex min-h-screen">
         {/* ── Sidebar ── */}
         {navOpen && <div className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden="true" />}
         <aside id="portal-sidebar" aria-label="เมนูหลัก"
@@ -243,7 +245,8 @@ export default function Portal() {
                     <h2 className="text-sm font-bold text-slate-700">แอปพลิเคชัน</h2>
                     <span className="text-xs text-slate-500" aria-live="polite">{shownLive.length + shownSoon.length} รายการ</span>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* a third column once the window is wide enough to carry it */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
                     {shownLive.map((a) => (
                       <AppCard key={a.to} app={a} awaiting={a.to === '/memos' ? awaiting : 0} onOpen={() => go(a.to)} />
                     ))}

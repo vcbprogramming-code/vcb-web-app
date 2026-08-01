@@ -65,7 +65,7 @@ export default function ModuleShell() {
           bar stayed white while its text was remapped to near-white. Give the
           light header explicit dark values. */}
       <header className={`sticky top-0 z-20 border-b backdrop-blur-lg ${navyHeader ? 'border-white/10 bg-[#0a1226]/95' : 'border-slate-200/70 bg-white/80 dark:border-white/10 dark:bg-slate-900/90'}`}>
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-8">
           <div className="flex min-w-0 shrink-0 items-center gap-3">
             <button
               onClick={() => navigate('/')}
@@ -164,7 +164,7 @@ export default function ModuleShell() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-6 md:px-8">
+      <main className="w-full flex-1 px-4 py-6 md:px-8">
         <Outlet />
       </main>
     </div>

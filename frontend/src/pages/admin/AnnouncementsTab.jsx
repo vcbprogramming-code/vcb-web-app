@@ -7,8 +7,12 @@ import { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 
 const LEVELS = { info: 'ทั่วไป', warning: 'เตือน', success: 'สำเร็จ' };
+// explicit dark variants: the global .dark remaps recolour the *backgrounds* but
+// not these 700-weight text colours, which would leave dark-on-dark chips
 const LEVEL_CHIP = {
-  info: 'bg-sky-50 text-sky-700', warning: 'bg-amber-50 text-amber-700', success: 'bg-emerald-50 text-emerald-700',
+  info: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
+  warning: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
+  success: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
 };
 const field = 'field';
 
@@ -31,8 +35,10 @@ function AnnouncementModal({ item, onClose, onSaved }) {
       if (editing) await portalApi.updateAnnouncement(item.id, body);
       else await portalApi.createAnnouncement(body);
       toast.success(editing ? 'บันทึกประกาศแล้ว' : 'เพิ่มประกาศแล้ว');
-      onSaved();
-    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+      onSaved(); // unmounts this modal — don't setBusy afterwards
+      return;
+    } catch (err) { toast.error(err.message); }
+    setBusy(false);
   };
 
   return (
@@ -81,7 +87,11 @@ export default function AnnouncementsTab() {
     try { await portalApi.deleteAnnouncement(a.id); toast.success('ลบแล้ว'); load(); } catch (e) { toast.error(e.message); }
   };
   const toggleActive = async (a) => {
-    try { await portalApi.updateAnnouncement(a.id, { isActive: !a.is_active }); load(); } catch (e) { toast.error(e.message); }
+    try {
+      await portalApi.updateAnnouncement(a.id, { isActive: !a.is_active });
+      toast.success(a.is_active ? 'ซ่อนประกาศแล้ว' : 'แสดงประกาศแล้ว');
+      load();
+    } catch (e) { toast.error(e.message); }
   };
 
   return (
@@ -99,10 +109,18 @@ export default function AnnouncementsTab() {
               <tbody className="divide-y divide-slate-100">
                 {list.map((a) => (
                   <tr key={a.id} className="tbl-row">
-                    <td className="tbl-td"><div className="font-medium text-slate-800">{a.pinned && '📌 '}{a.title}</div>{a.body && <div className="truncate text-xs text-slate-400">{a.body}</div>}</td>
+                    <td className="tbl-td">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                        {a.pinned && <Icon name="pin" className="h-3.5 w-3.5 shrink-0 text-slate-400" />}{a.title}
+                      </div>
+                      {a.body && <div className="truncate text-xs text-slate-400">{a.body}</div>}
+                    </td>
                     <td className="tbl-td"><span className={`chip ${LEVEL_CHIP[a.level] || LEVEL_CHIP.info}`}>{LEVELS[a.level] || a.level}</span></td>
                     <td className="tbl-td">
-                      <button onClick={() => toggleActive(a)} className={`chip ${a.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{a.is_active ? 'แสดง' : 'ซ่อน'} ⇄</button>
+                      <button onClick={() => toggleActive(a)} title="สลับการแสดงผล"
+                        className={`chip inline-flex items-center gap-1 ${a.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200' : 'bg-slate-100 text-slate-500'}`}>
+                        {a.is_active ? 'แสดง' : 'ซ่อน'} <Icon name="undo" className="h-3 w-3" />
+                      </button>
                     </td>
                     <td className="tbl-td text-right">
                       <button onClick={() => setEdit(a)} className="mr-3 text-sm text-brand hover:underline">แก้ไข</button>

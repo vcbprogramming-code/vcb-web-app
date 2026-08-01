@@ -41,7 +41,9 @@ async function sendViaBrevoApi({ to, subject, html, text }) {
     },
     body: JSON.stringify({
       sender,
-      to: [{ email: to }],
+      // accept a single address OR a list — Brevo wants [{email}], and passing an
+      // array straight through produced {"email":[...]} which it rejects.
+      to: (Array.isArray(to) ? to : [to]).filter(Boolean).map((email) => ({ email })),
       subject,
       htmlContent: html,
       textContent: text,
@@ -70,7 +72,7 @@ export async function sendEmail({ to, subject, html, text }) {
   return { dev: true };
 }
 
-const esc = (s) =>
+export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** Thai Buddhist-era long date, e.g. "8 มิถุนายน 2569". */

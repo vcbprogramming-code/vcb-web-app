@@ -1,17 +1,29 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal } from './ui/index.js';
 import { useToast } from './Toast.jsx';
 import { BusyLabel } from './Spinner.jsx';
 import { portalApi } from '../lib/portal.js';
 import { apps } from '../config/nav.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 /** "Help / report an issue" — a short message emailed to the admins. */
 export default function HelpModal({ onClose }) {
   const toast = useToast();
+  const { profile } = useAuth();
   const [area, setArea] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const field = 'field';
+
+  // only offer modules this user can actually reach — otherwise the picker leaks
+  // the existence of restricted/disabled modules to everyone
+  const areaOptions = useMemo(() => {
+    const role = profile?.role;
+    const eff = profile?.effective_permissions;
+    return apps.filter((a) => (!a.roles || (role && a.roles.includes(role)))
+      && (!a.perm || !eff || eff[a.perm[0]]?.[a.perm[1]] === true)
+      && a.enabled !== false);
+  }, [profile]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -42,7 +54,7 @@ export default function HelpModal({ onClose }) {
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">ส่วนที่เกี่ยวข้อง</label>
           <select value={area} onChange={(e) => setArea(e.target.value)} className={field}>
             <option value="">— เลือกส่วนที่เกี่ยวข้อง —</option>
-            {apps.map((a) => <option key={a.to} value={a.title}>{a.title}</option>)}
+            {areaOptions.map((a) => <option key={a.to} value={a.title}>{a.title}</option>)}
             <option value="อื่น ๆ">อื่น ๆ</option>
           </select>
         </div>

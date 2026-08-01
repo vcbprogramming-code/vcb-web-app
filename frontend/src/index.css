@@ -189,4 +189,55 @@
 .dark [class~="bg-orange-50"] { background-color: rgba(245,158,11,0.12) !important; }
 .dark [class~="bg-blue-50"] { background-color: rgba(59,130,246,0.12) !important; }
 .dark [class~="bg-purple-50"] { background-color: rgba(168,85,247,0.12) !important; }
+.dark [class~="bg-sky-50"] { background-color: rgba(14,165,233,0.12) !important; }
+.dark [class~="bg-rose-50"] { background-color: rgba(244,63,94,0.12) !important; }
+.dark [class~="bg-violet-50"] { background-color: rgba(139,92,246,0.12) !important; }
+.dark [class~="bg-pink-50"] { background-color: rgba(236,72,153,0.12) !important; }
+.dark [class~="bg-amber-100"] { background-color: rgba(245,158,11,0.18) !important; }
+.dark [class~="bg-emerald-100"] { background-color: rgba(16,185,129,0.18) !important; }
+.dark [class~="bg-sky-100"] { background-color: rgba(14,165,233,0.18) !important; }
+.dark [class~="bg-violet-100"] { background-color: rgba(139,92,246,0.18) !important; }
 .dark [class~="bg-slate-900"] { background-color: #020617 !important; } /* keep dark table header darker */
+
+/* Semantic TEXT on those tints. The tinted backgrounds above go dark, but the
+   matching 600–800 text colours stayed dark too — every status chip, badge and
+   inline link rendered dark-on-dark. Lift them to the 300-level so the chip's
+   meaning survives the theme. */
+.dark [class~="text-red-700"], .dark [class~="text-red-600"], .dark [class~="text-red-800"] { color: #fca5a5 !important; }
+.dark [class~="text-rose-700"], .dark [class~="text-rose-600"], .dark [class~="text-rose-500"] { color: #fda4af !important; }
+.dark [class~="text-emerald-700"], .dark [class~="text-emerald-600"], .dark [class~="text-emerald-800"] { color: #6ee7b7 !important; }
+.dark [class~="text-amber-700"], .dark [class~="text-amber-600"], .dark [class~="text-amber-800"] { color: #fcd34d !important; }
+.dark [class~="text-orange-700"], .dark [class~="text-orange-600"] { color: #fdba74 !important; }
+.dark [class~="text-sky-700"], .dark [class~="text-sky-600"], .dark [class~="text-sky-800"] { color: #7dd3fc !important; }
+.dark [class~="text-blue-700"], .dark [class~="text-blue-600"] { color: #93c5fd !important; }
+.dark [class~="text-purple-700"], .dark [class~="text-purple-600"] { color: #d8b4fe !important; }
+.dark [class~="text-violet-700"], .dark [class~="text-violet-600"] { color: #c4b5fd !important; }
+.dark [class~="text-pink-700"], .dark [class~="text-pink-600"] { color: #f9a8d4 !important; }
+.dark [class~="text-orange-800"] { color: #fdba74 !important; }
+.dark [class~="text-rose-800"] { color: #fda4af !important; }
+.dark [class~="text-purple-800"] { color: #d8b4fe !important; }
+.dark [class~="text-violet-800"] { color: #c4b5fd !important; }
+/* brand-coloured inline links/labels ("แก้ไข", "ไปตั้งค่า…") on dark surfaces */
+.dark [class~="text-brand"] { color: #7dabff !important; }
+/* SVG text (progress rings) uses fill-*, which the text-* rules above don't match */
+.dark [class~="fill-slate-800"], .dark [class~="fill-slate-900"] { fill: #f1f5f9 !important; }
+
+/* HOVER surfaces. Only hover:bg-slate-50/100 were remapped, so every other hover
+   repainted the element LIGHT while its text stayed near-white — rows and list
+   options became unreadable exactly while being pointed at. */
+.dark [class~="hover:bg-white"]:hover { background-color: #1e293b !important; }
+.dark [class~="hover:bg-slate-200"]:hover { background-color: #334155 !important; }
+.dark [class~="hover:bg-brand-tint"]:hover { background-color: rgba(37,99,235,0.18) !important; }
+.dark [class~="hover:bg-red-50"]:hover { background-color: rgba(239,68,68,0.15) !important; }
+.dark [class~="hover:bg-rose-50"]:hover { background-color: rgba(244,63,94,0.15) !important; }
+.dark [class~="hover:bg-amber-50"]:hover { background-color: rgba(245,158,11,0.15) !important; }
+.dark [class~="hover:bg-amber-100"]:hover { background-color: rgba(245,158,11,0.22) !important; }
+.dark [class~="hover:bg-emerald-50"]:hover { background-color: rgba(16,185,129,0.15) !important; }
+.dark [class~="hover:bg-blue-50"]:hover { background-color: rgba(59,130,246,0.15) !important; }
+.dark [class~="hover:bg-orange-100"]:hover { background-color: rgba(245,158,11,0.22) !important; }
+.dark [class~="hover:bg-red-100"]:hover { background-color: rgba(239,68,68,0.22) !important; }
+.dark [class~="hover:bg-emerald-100"]:hover { background-color: rgba(16,185,129,0.22) !important; }
+
+/* light neutral tiles/rules that stayed bright on a dark page */
+.dark [class~="bg-slate-200"] { background-color: #334155 !important; }
+.dark [class~="bg-slate-300"] { background-color: #475569 !important; }

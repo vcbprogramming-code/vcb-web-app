@@ -243,7 +243,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       {pageH > 0 && Array.from({ length: pageCount }).map((_, p) => (
         <div
           key={p}
-          className="relative w-full overflow-hidden rounded-lg bg-white text-[13px] leading-relaxed text-slate-900 shadow-lg ring-1 ring-slate-200"
+          className="relative w-full overflow-hidden rounded-lg bg-[#ffffff] text-[13px] leading-relaxed text-[#0f172a] shadow-lg ring-1 ring-slate-200"
           style={{ height: pageH }}
         >
           {/* top margin (blank) on EVERY page — genuine padding above the clip box */}

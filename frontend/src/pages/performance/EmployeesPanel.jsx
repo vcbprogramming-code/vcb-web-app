@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { perfApi } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
@@ -12,6 +13,7 @@ import Icon from '../../components/Icon.jsx';
  */
 export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ fullName: '', employeeCode: '', kind: 'operation' });
@@ -34,10 +36,16 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
   };
   const toggleKind = async (emp) => {
     setRowBusy(emp.eid);
-    try { await perfApi.updateEmployee(emp.eid, { kind: emp.kind === 'operation' ? 'support' : 'operation' }); setDirty(true); await load(); }
+    try { await perfApi.updateEmployee(emp.eid, { kind: emp.kind === 'operation' ? 'support' : 'operation' }); setDirty(true); toast.success('เปลี่ยนประเภทพนักงานแล้ว'); await load(); }
     catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
   };
   const toggleActive = async (emp) => {
+    const ok = await confirm({
+      title: 'ปิดใช้งานพนักงาน',
+      message: `ปิดใช้งาน "${emp.name}"?\nจะไม่ปรากฏในตารางบันทึกงานอีก (ข้อมูลเดิมยังอยู่)`,
+      confirmLabel: 'ปิดใช้งาน', danger: true,
+    });
+    if (!ok) return;
     setRowBusy(emp.eid);
     try { await perfApi.updateEmployee(emp.eid, { isActive: false }); setDirty(true); toast.success('ปิดใช้งานพนักงานแล้ว'); await load(); }
     catch (e) { toast.error(e.message); } finally { setRowBusy(null); }

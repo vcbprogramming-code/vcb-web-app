@@ -227,7 +227,7 @@ export default function DocumentRegister() {
             and set apart from the secondary buttons so it isn't hit by accident. */}
         <button
           onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-slate-900 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300"
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-[#0f172a] shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300"
         >
           <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> เพิ่มเอกสาร
         </button>
@@ -401,7 +401,7 @@ export default function DocumentRegister() {
                 <tr
                   key={d.id}
                   onClick={() => navigate(`/memos/${d.id}`)}
-                  className={`tbl-row cursor-pointer ${d.is_awaiting_me ? 'bg-amber-50/70 hover:bg-amber-50' : ''}`}
+                  className={`tbl-row cursor-pointer ${d.is_awaiting_me ? 'bg-amber-50/70 dark:bg-amber-500/10 hover:bg-amber-50' : ''}`}
                 >
                   <td className={`tbl-td text-slate-400 ${d.is_awaiting_me ? 'border-l-4 border-amber-400' : ''}`}>{(page - 1) * pageSize + i + 1}</td>
                   <td className="tbl-td whitespace-nowrap text-slate-600">{formatThaiDate(d.date_received)}</td>
@@ -423,7 +423,7 @@ export default function DocumentRegister() {
                         <span className="font-semibold text-slate-800">{d.doc_number}</span>
                         {/* #2: "รออนุมัติจากคุณ" marker right beside the doc number */}
                         {d.is_awaiting_me && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-[#0f172a]">
                             <Icon name="clock" className="h-3 w-3" /> รออนุมัติจากคุณ
                           </span>
                         )}

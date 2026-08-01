@@ -23,11 +23,13 @@ export const PERMISSION_CATALOG = [
     ],
   },
   {
+    // renamed with the Module 2 rework: this is the daily work-ACTIVITY log
+    // (hr-worklog) — there is no OT in it any more.
     module: 'performance',
-    label: 'ประเมินผล & OT',
+    label: 'รายงานการปฏิบัติงาน',
     actions: [
       { key: 'view', label: 'ดูข้อมูล' },
-      { key: 'edit', label: 'บันทึก/แก้ไข' },
+      { key: 'edit', label: 'บันทึก/แก้ไขงานรายวัน' },
     ],
   },
   {

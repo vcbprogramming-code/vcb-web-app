@@ -55,7 +55,8 @@ export default function DocumentDetail() {
   const confirm = useConfirm();
   const composerRef = useRef(null);
   const [doc, setDoc] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null);       // action errors (inline, non-fatal)
+  const [loadError, setLoadError] = useState(null); // initial fetch failed → full-page state
   const [busy, setBusy] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -83,7 +84,7 @@ export default function DocumentDetail() {
   const [postAction, setPostAction] = useState(null); // { action, next: {id,doc_number}|null, count }
 
   const load = useCallback(() => {
-    ememoApi.getDocument(id).then((r) => setDoc(r.data)).catch((e) => setError(e.message));
+    ememoApi.getDocument(id).then((r) => { setDoc(r.data); setLoadError(null); }).catch((e) => setLoadError(e.message));
     ememoApi.myApproval(id).then((r) => setMyApproval(r.data)).catch(() => setMyApproval({ canApprove: false }));
   }, [id]);
 
@@ -214,7 +215,7 @@ export default function DocumentDetail() {
   const generatePdf = async () => {
     setBusy(true); setError(null);
     try { await ememoApi.generatePdf(id); load(); }
-    catch (e) { setError(e.message); } finally { setBusy(false); }
+    catch (e) { setError(e.message); toast.error(e.message); } finally { setBusy(false); }
   };
 
   const openAttachment = async (attId) => {
@@ -260,7 +261,15 @@ export default function DocumentDetail() {
     } catch (e) { setError(e.message); toast.error(e.message); } finally { setPosting(false); }
   };
 
-  if (error) return <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3">{error}</div>;
+  if (loadError) return (
+    <div className="space-y-3">
+      <button onClick={() => navigate('/memos')} className="text-sm text-brand hover:underline">← กลับทะเบียนเอกสาร</button>
+      <div className="rounded-xl bg-red-50 px-4 py-3 text-red-700">
+        {loadError}
+        <button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+      </div>
+    </div>
+  );
   if (!doc) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
 
   const status = STATUS_META[doc.status] || STATUS_META.pending;

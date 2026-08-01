@@ -329,7 +329,7 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                     // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window
                     const onOpen = (field, anchor) => openPicker(e.eid, day.date, field, anchor, locked && isAdmin);
                     return (
-                      <td key={day.date} className={`rounded border align-top ${day.weekend ? 'bg-amber-50/40' : 'bg-white'} ${locked ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
+                      <td key={day.date} className={`rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
                         <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked} onOpen={onOpen} />
                         <Slot val={v.pm || ''} field="pm" isSecond weekend={day.weekend} locked={locked} onOpen={onOpen} />
                       </td>
@@ -341,7 +341,7 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-400">คลิกช่องเพื่อเลือกกิจกรรม → หมวดงาน · เซลล์ที่เกิน {lockDays} วันจะล็อกอัตโนมัติ</p>
+      <p className="mt-2 text-[11px] text-slate-400">คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · เซลล์ที่เกิน {lockDays} วันจะล็อกอัตโนมัติ</p>
     </div>
   );
 }

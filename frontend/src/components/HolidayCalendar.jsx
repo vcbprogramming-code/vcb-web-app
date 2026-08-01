@@ -103,7 +103,7 @@ export default function HolidayCalendar() {
                 {c.day}
                 {/* centred under the digit; also shown on today (white so it reads on the brand fill) */}
                 {name && (
-                  <span className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${isToday ? 'bg-white' : 'bg-rose-500'}`} />
+                  <span className={`absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${isToday ? 'bg-[#ffffff]' : 'bg-rose-500'}`} />
                 )}
               </div>
             </div>

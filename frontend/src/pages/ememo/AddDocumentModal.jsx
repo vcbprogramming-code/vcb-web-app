@@ -664,7 +664,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
           {/* ผู้จัดการโครงการ / ผู้ลงนาม = ผู้อนุมัติลำดับแรก. From the project if bound,
               else the creator must pick one. Signs under "ขอแสดงความนับถือ". */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-4">
             <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
             <p className="mb-2 text-xs text-slate-400">
               เซ็นใต้ "ขอแสดงความนับถือ" และ<b className="text-slate-600">อนุมัติเป็นลำดับแรก</b>ก่อนส่งต่อผู้อนุมัติที่สูงกว่า · ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นผู้ร่าง
@@ -715,7 +715,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
           {step === 3 && (<>
           {/* approvers — optional, OR auto-filled+locked from the doc-code config */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-4">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติที่สูงกว่า (ลำดับถัดจากผู้จัดการโครงการ) {approversLocked ? '' : '(ไม่บังคับ)'}</label>
               {approversLocked && (

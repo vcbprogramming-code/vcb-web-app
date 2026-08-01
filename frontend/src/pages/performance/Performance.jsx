@@ -80,8 +80,11 @@ export default function Performance() {
             <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
               <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> Excel</BusyLabel>
             </button>
+            {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
+                with no bg class the control kept the browser's white default while
+                its text was lifted to near-white (unreadable). */}
             <select value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
               {boot.sites.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
             </select>
           </div>

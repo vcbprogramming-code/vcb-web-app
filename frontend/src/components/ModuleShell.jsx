@@ -60,9 +60,13 @@ export default function ModuleShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className={`sticky top-0 z-20 border-b backdrop-blur-lg ${navyHeader ? 'border-white/10 bg-[#0a1226]/95' : 'border-slate-200/70 bg-white/80'}`}>
+      {/* `bg-white/80` is an opacity variant, so the global .dark remap (which
+          matches the exact class `bg-white`) never touches it — in dark mode the
+          bar stayed white while its text was remapped to near-white. Give the
+          light header explicit dark values. */}
+      <header className={`sticky top-0 z-20 border-b backdrop-blur-lg ${navyHeader ? 'border-white/10 bg-[#0a1226]/95' : 'border-slate-200/70 bg-white/80 dark:border-white/10 dark:bg-slate-900/90'}`}>
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-3 px-4 py-3 md:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
             <button
               onClick={() => navigate('/')}
               title="กลับสู่หน้า Portal"
@@ -72,7 +76,9 @@ export default function ModuleShell() {
                 {/* crisp SVG mark on every theme — the old /logo.png rasterised badly when scaled */}
                 <GlobeMark className="h-6 w-6" />
               </span>
-              <span className="min-w-0 text-left leading-tight">
+              {/* hidden on phones: the page actions (add / awaiting badge / gear)
+                  need the width, and this text used to collide with them */}
+              <span className="hidden min-w-0 text-left leading-tight sm:block">
                 <span className={`block text-sm font-bold tracking-tight ${navyHeader ? 'text-white' : 'text-slate-900'}`}>{brand}</span>
                 {title && <span className={`block truncate text-[11px] ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{title}</span>}
               </span>

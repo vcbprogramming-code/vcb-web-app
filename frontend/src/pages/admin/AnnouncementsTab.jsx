@@ -77,9 +77,12 @@ export default function AnnouncementsTab() {
   const toast = useToast();
   const confirm = useConfirm();
   const [list, setList] = useState(null);
+  const [loadErr, setLoadErr] = useState(null);
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
 
-  const load = () => portalApi.allAnnouncements().then((r) => setList(r.data)).catch((e) => toast.error(e.message));
+  const load = () => portalApi.allAnnouncements()
+    .then((r) => { setList(r.data); setLoadErr(null); })
+    .catch((e) => { setLoadErr(e.message); toast.error(e.message); });
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const remove = async (a) => {
@@ -100,7 +103,12 @@ export default function AnnouncementsTab() {
         <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มประกาศ</button>
       </div>
 
-      {!list ? <div className="py-10 text-center text-sm text-slate-400">กำลังโหลด…</div>
+      {loadErr ? (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadErr}
+          <button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+        </div>
+      ) : !list ? <div className="py-10 text-center text-sm text-slate-500">กำลังโหลด…</div>
         : list.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">ยังไม่มีประกาศ — กด “เพิ่มประกาศ”</div>
         : (
           <div className="overflow-x-auto rounded-xl border border-slate-200">

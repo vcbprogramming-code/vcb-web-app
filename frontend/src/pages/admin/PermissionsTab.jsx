@@ -22,7 +22,10 @@ export default function PermissionsTab() {
   const [role, setRole] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [dirty, setDirty] = useState(false); // unsaved permission/visibility edits
+  // two INDEPENDENT save buttons — one shared flag let saving visibility clear the
+  // warning while permission edits were still unsaved (silently lost on user switch)
+  const [permDirty, setPermDirty] = useState(false);
+  const [visDirty, setVisDirty] = useState(false);
   const [error, setError] = useState(null);
   // per-user document visibility (#8)
   const [projects, setProjects] = useState([]);
@@ -43,14 +46,14 @@ export default function PermissionsTab() {
   }, []);
 
   const selectUser = async (id) => {
-    if (dirty && id !== selectedId) {
+    if ((permDirty || visDirty) && id !== selectedId) {
       const ok = await confirm({ title: 'มีการแก้ไขที่ยังไม่บันทึก', message: 'สลับผู้ใช้โดยไม่บันทึก? การเปลี่ยนแปลงสิทธิ์/การมองเห็นที่ยังไม่ได้บันทึกจะหายไป', confirmLabel: 'สลับโดยไม่บันทึก', danger: false });
       if (!ok) return;
     }
     setSelectedId(id);
     setSaved(false);
     setVisSaved(false);
-    setDirty(false);
+    setPermDirty(false); setVisDirty(false);
     setError(null);
     if (!id) { setEffective({}); setDefaults({}); setRole(null); setVisProjects([]); setVisCodes([]); return; }
     setUserLoading(true);
@@ -65,18 +68,18 @@ export default function PermissionsTab() {
     finally { setUserLoading(false); }
   };
 
-  const toggleVisProject = (pid) => { setVisSaved(false); setDirty(true); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
-  const toggleVisCode = (code) => { setVisSaved(false); setDirty(true); setVisCodes((prev) => prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]); };
+  const toggleVisProject = (pid) => { setVisSaved(false); setVisDirty(true); setVisProjects((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]); };
+  const toggleVisCode = (code) => { setVisSaved(false); setVisDirty(true); setVisCodes((prev) => prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]); };
   const saveVisibility = async () => {
     setVisBusy(true); setError(null);
-    try { await adminApi.saveUserVisibility(selectedId, visProjects, visCodes); setVisSaved(true); setDirty(false); toast.success('บันทึกการมองเห็นแล้ว'); }
+    try { await adminApi.saveUserVisibility(selectedId, visProjects, visCodes); setVisSaved(true); setVisDirty(false); toast.success('บันทึกการมองเห็นแล้ว'); }
     catch (e) { setError(e.message); toast.error(e.message); }
     finally { setVisBusy(false); }
   };
 
   const toggle = (module, action) => {
     setSaved(false);
-    setDirty(true);
+    setPermDirty(true);
     setEffective((prev) => ({
       ...prev,
       [module]: { ...(prev[module] || {}), [action]: !(prev[module]?.[action]) },
@@ -86,7 +89,7 @@ export default function PermissionsTab() {
   // reset one action back to the role default (removes the per-user override)
   const resetOne = (module, action) => {
     setSaved(false);
-    setDirty(true);
+    setPermDirty(true);
     setEffective((prev) => ({
       ...prev,
       [module]: { ...(prev[module] || {}), [action]: Boolean(defaults[module]?.[action]) },
@@ -100,11 +103,19 @@ export default function PermissionsTab() {
       // send the whole effective map (backend stores only the diff vs role default)
       await adminApi.saveUserPermissions(selectedId, effective);
       setSaved(true);
-      setDirty(false);
+      setPermDirty(false);
       toast.success('บันทึกสิทธิ์แล้ว');
     } catch (e) { setError(e.message); toast.error(e.message); }
     finally { setBusy(false); }
   };
+
+  // browser-level guard: unsaved permission/visibility edits shouldn't vanish silently
+  useEffect(() => {
+    if (!permDirty && !visDirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [permDirty, visDirty]);
 
   const isAdmin = role === 'admin';
 

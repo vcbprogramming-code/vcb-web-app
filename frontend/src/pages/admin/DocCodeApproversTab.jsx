@@ -137,7 +137,7 @@ export default function DocCodeApproversTab() {
 
       {/* add-code form */}
       {showAdd && (
-        <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+        <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 dark:bg-blue-500/10 p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">รหัส <span className="text-red-500">*</span></label>

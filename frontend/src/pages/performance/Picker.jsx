@@ -45,7 +45,7 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
 
   const groups = {}; const order = [];
   filtered.forEach((it) => {
-    const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดงาน (Work Category)';
+    const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดต้นทุน';
     if (!groups[c]) { groups[c] = []; order.push(c); }
     groups[c].push(it);
   });
@@ -66,8 +66,8 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
       <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${step === 2 ? 'cursor-pointer text-brand' : 'text-slate-700'} bg-slate-50 border-b border-slate-200`}
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
         {step === 1
-          ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> เลือกกิจกรรม (Activity)</>
-          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> เลือกหมวดงาน · งาน: <b>{pending?.code}</b></>}
+          ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> เลือกกิจกรรม</>
+          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> เลือกหมวดต้นทุน · งาน: <b>{pending?.code}</b></>}
       </div>
       <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1.5">
         <input ref={searchRef} type="text" placeholder="ค้นหา…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}

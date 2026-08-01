@@ -86,7 +86,7 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
 
           {/* #11: re-submitting a rejected/returned doc requires a reason */}
           {resubmit && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 dark:bg-amber-500/10 p-3">
               <label className="mb-1 block text-sm font-medium text-amber-800">เหตุผลที่ส่งพิจารณาอีกครั้ง <span className="text-red-500">*</span></label>
               <textarea
                 value={resubmitNote}
@@ -100,7 +100,7 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
           )}
 
           {/* PM = signer / first approver */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-3">
             <label className="mb-1 block text-sm font-medium text-slate-600">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
             {pmConfigured ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">

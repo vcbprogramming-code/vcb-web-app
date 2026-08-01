@@ -155,7 +155,7 @@ function ProjectModal({ project, onClose, onSaved }) {
                     <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
                   ))}
                 </select>
-                <p className="mt-1 text-[11px] text-slate-400">เอกสารทุกใบของโครงการนี้จะใช้หัวกระดาษนี้โดยอัตโนมัติ (ผู้สร้างเอกสารเปลี่ยนตราไม่ได้)</p>
+                <p className="mt-1 text-[11px] text-slate-400">เอกสารทุกใบของโครงการนี้จะใช้หัวกระดาษนี้โดยอัตโนมัติ (ผู้สร้างเอกสารเปลี่ยนได้หากจำเป็น)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อบริษัท / หน่วยงาน (ไทย)</label>
@@ -196,7 +196,7 @@ function ProjectModal({ project, onClose, onSaved }) {
               </div>
 
               {/* ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ) — auto-route approval here (#3) */}
-              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 dark:bg-blue-500/10 p-3">
                 <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ)</label>
                 <p className="mb-2 text-[11px] text-slate-400">เลือกบัญชีผู้ใช้ในระบบที่เป็นผู้จัดการโครงการ — เวลาสร้าง/ส่งอนุมัติเอกสารของโครงการนี้ ระบบจะส่งให้ท่านนี้อนุมัติโดยอัตโนมัติ (แก้เปลี่ยนได้ตอนส่ง)</p>
                 <select
@@ -223,7 +223,7 @@ function ProjectModal({ project, onClose, onSaved }) {
               </div>
 
               {/* ลายเซ็นของผู้ลงนาม — ประทับอัตโนมัติบนทุกเอกสารของโครงการ (#6) */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-3">
                 <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็นผู้ลงนาม (อัตโนมัติ)</label>
                 <p className="mb-2 text-[11px] text-slate-400">อัปโหลดรูปลายเซ็น (พื้นหลังโปร่งใส .png จะสวยที่สุด) — ระบบจะประทับลายเซ็นนี้ใต้ “ขอแสดงความนับถือ” ให้อัตโนมัติทุกเอกสาร ไม่ต้องรอเซ็นทีละใบ</p>
                 <div className="flex items-center gap-3">

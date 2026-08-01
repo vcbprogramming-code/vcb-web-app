@@ -177,11 +177,30 @@ function buildWhere(q, visibility = null) {
   // the first value so a malformed URL can't crash the register. (#C3)
   const one = (v) => (Array.isArray(v) ? v[0] : v);
   const add = (clause, value) => { params.push(value); where.push(clause.replace('$$', `$${params.length}`)); };
-  if (q.projectId) add('d.project_id = $$', one(q.projectId));
+  // A hand-edited or stale URL used to reach Postgres as a bad ::uuid / ::date cast
+  // and come back as a 500. Validate the shape here and answer 400 instead.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const YMD = /^\d{4}-\d{2}-\d{2}$/;
+  const uuidArg = (v, label) => {
+    const s = one(v);
+    if (!UUID.test(String(s))) throw new ApiError(400, `ตัวกรอง${label}ไม่ถูกต้อง — กรุณาล้างตัวกรองแล้วลองใหม่`);
+    return s;
+  };
+  const dateArg = (v, label) => {
+    const s = String(one(v));
+    // shape AND real calendar date — "2026-13-99" matches the pattern but blows up
+    // the ::date cast.
+    const d = YMD.test(s) ? new Date(`${s}T00:00:00Z`) : null;
+    if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) {
+      throw new ApiError(400, `${label}ไม่ถูกต้อง (ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD)`);
+    }
+    return s;
+  };
+  if (q.projectId) add('d.project_id = $$', uuidArg(q.projectId, 'โครงการ'));
   if (q.status) add('d.status = $$', one(q.status));
-  if (q.docTypeId) add('d.doc_type_id = $$', one(q.docTypeId));
-  if (q.from) add('d.date_received >= $$', one(q.from));
-  if (q.to) add('d.date_received <= $$', one(q.to));
+  if (q.docTypeId) add('d.doc_type_id = $$', uuidArg(q.docTypeId, 'ประเภทเอกสาร'));
+  if (q.from) add('d.date_received >= $$', dateArg(q.from, 'วันที่เริ่มต้น'));
+  if (q.to) add('d.date_received <= $$', dateArg(q.to, 'วันที่สิ้นสุด'));
   if (q.search) {
     params.push(`%${one(q.search)}%`);
     const i = params.length;
@@ -209,11 +228,8 @@ router.get(
     const visibility = await loadVisibility(req.profile);
     const { whereSql, params } = buildWhere(req.query, visibility);
 
-    const countRow = await queryOne(`select count(*)::int as total ${LIST_FROM} ${whereSql}`, params);
-    const offset = (page - 1) * pageSize;
-    // #2: flag rows whose CURRENT pending step awaits the logged-in user, and float
-    // them to the very top of the register so a reviewer sees them first (server-side
-    // sort works across pagination — the alert banner used to only link one doc).
+    // Flag rows whose CURRENT pending step awaits the logged-in user. Used for the
+    // per-row marker and for the "รออนุมัติ N" filter.
     const email = (req.profile?.email || '').toLowerCase();
     const listParams = [...params, email];
     const meIdx = listParams.length;
@@ -224,10 +240,24 @@ router.get(
          and s.step_no = (select min(s2.step_no) from approval_steps s2
                             where s2.document_id = s.document_id and s2.action = 'pending')
     )`;
+    // ?awaiting=me narrows the register to the reviewer's own queue. This replaces
+    // the old "float awaiting rows to the top" sort, which silently pushed a
+    // just-created document off page 1 for anyone with a full approval queue —
+    // the "เอกสารที่เพิ่งบันทึกหายไป" report. Counting has to apply the same filter.
+    const onlyAwaiting = (Array.isArray(req.query.awaiting) ? req.query.awaiting[0] : req.query.awaiting) === 'me';
+    const awaitingSql = onlyAwaiting ? `${whereSql ? 'and' : 'where'} ${awaitingExpr}` : '';
+
+    const countRow = await queryOne(
+      `select count(*)::int as total ${LIST_FROM} ${whereSql} ${awaitingSql}`,
+      onlyAwaiting ? listParams : params
+    );
+    const offset = (page - 1) * pageSize;
+    // Newest ENTERED first. Ordering by date_received (the letter's own date) hid a
+    // back-dated memo below newer ones the moment it was saved; created_at is what
+    // makes "the document I just saved" the first row, every time.
     const { rows } = await query(
-      `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me ${LIST_FROM} ${whereSql}
-        order by is_awaiting_me desc,
-                 d.date_received desc, d.created_at desc
+      `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me ${LIST_FROM} ${whereSql} ${awaitingSql}
+        order by d.created_at desc, d.date_received desc, d.doc_number desc
         limit ${pageSize} offset ${offset}`,
       listParams
     );
@@ -1006,6 +1036,20 @@ router.post(
       await regenerateOriginalWithAudit(result.document.id).catch((e) => console.error('audit-pdf failed:', e.message));
       await autoCombine(result.document.id);
     }
+    // Close the loop for the "สำเนาเรียน" recipients: they were told the document
+    // was under review, so they must also be told it finished. Without this a CC
+    // recipient never learns the outcome.
+    if (result.finalized) {
+      const ccEmails = extractCcEmails(result.document.cc_recipients);
+      if (ccEmails.length) {
+        await sendCcNotification({
+          toEmails: ccEmails,
+          doc: result.document,
+          actorName: req.profile.full_name || req.profile.email,
+          stage: 'approved',
+        }).catch((e) => console.error('cc approved notification failed:', e.message));
+      }
+    }
     if (result.finalized || parsed.data.action === 'returned' || parsed.data.action === 'rejected') {
       const author = await queryOne(
         `select pr.full_name, pr.email from documents d join profiles pr on pr.id = d.created_by where d.id = $1`,
@@ -1066,6 +1110,19 @@ router.post(
     const isResubmit = doc.status === 'returned' || doc.status === 'rejected';
     if (isResubmit && !parsed.data.resubmitNote?.trim()) {
       throw new ApiError(400, 'กรุณาระบุเหตุผลที่ส่งเอกสารกลับเข้าพิจารณาอีกครั้ง');
+    }
+
+    // A document must be reviewed by somebody other than its author. When the author
+    // is also the ผู้ลงนาม, createApprovalChain auto-approves that step — so a chain
+    // consisting ONLY of the author would jump straight to 'approved' with nobody
+    // having read it, while the wizard promised "เว้นว่างไว้ = ฉบับร่าง".
+    const first = parsed.data.approvers[0];
+    const authorIsSoleApprover =
+      parsed.data.approvers.length === 1 &&
+      first?.isSigner &&
+      first.email.toLowerCase() === (req.profile.email || '').toLowerCase();
+    if (authorIsSoleApprover) {
+      throw new ApiError(400, 'ท่านเป็นผู้ลงนามของเอกสารนี้เอง — กรุณาเลือกผู้อนุมัติที่สูงกว่าอย่างน้อย 1 คน มิฉะนั้นเอกสารจะถูกอนุมัติโดยไม่ผ่านการตรวจสอบจากผู้อื่น (หรือกดบันทึกเป็นฉบับร่างไว้ก่อน)');
     }
 
     // Every approver must have an ACTIVE account: the approval email links to the

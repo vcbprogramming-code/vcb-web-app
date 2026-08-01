@@ -107,8 +107,11 @@ export default function DocumentRegister() {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [awaitingOnly, setAwaitingOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  // 10 rows made a freshly-saved document easy to lose behind a page break; 25 keeps
+  // a normal day's work on one screen.
+  const pageSize = 25;
 
   // documents awaiting the logged-in user's approval — the home alert (#8)
   const [awaiting, setAwaiting] = useState({ count: 0, items: [] });
@@ -136,14 +139,15 @@ export default function DocumentRegister() {
   const loadDocs = useCallback(() => {
     setLoading(true);
     ememoApi
-      .listDocuments({ projectId, docTypeId, status, search, from, to, page, pageSize })
+      .listDocuments({ projectId, docTypeId, status, search, from, to, page, pageSize,
+        awaiting: awaitingOnly ? 'me' : undefined })
       .then((res) => {
         setDocs(res.data);
         setTotal(res.total);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [projectId, docTypeId, status, search, from, to, page]);
+  }, [projectId, docTypeId, status, search, from, to, page, awaitingOnly]);
 
   // debounce search; reload on filter change
   useEffect(() => {
@@ -154,7 +158,7 @@ export default function DocumentRegister() {
   // reset to page 1 whenever a non-page filter changes
   useEffect(() => {
     setPage(1);
-  }, [projectId, docTypeId, status, search, from, to]);
+  }, [projectId, docTypeId, status, search, from, to, awaitingOnly]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const clearDates = () => {
@@ -162,9 +166,10 @@ export default function DocumentRegister() {
     setTo('');
   };
   // is any filter narrowing the list? (drives the "clear all" control + empty state)
-  const anyFilter = Boolean(projectId || docTypeId || status || search.trim() || from || to);
+  const anyFilter = Boolean(projectId || docTypeId || status || search.trim() || from || to || awaitingOnly);
   const clearAllFilters = () => {
-    setProjectId(''); setDocTypeId(''); setStatus(''); setSearch(''); setFrom(''); setTo(''); setPage(1);
+    setProjectId(''); setDocTypeId(''); setStatus(''); setSearch(''); setFrom(''); setTo('');
+    setAwaitingOnly(false); setPage(1);
   };
   // "แสดง 1–10 จาก 45 ฉบับ" range for the pager
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -199,15 +204,22 @@ export default function DocumentRegister() {
   useHeaderSlot(
     (
       <>
-        {/* #2: informational "awaiting me" count — clicking clears filters so the
-            pinned (top-sorted) awaiting rows are guaranteed visible on page 1. */}
+        {/* Toggles the register to the reviewer's own approval queue. It used to only
+            clear filters and rely on awaiting rows being sorted to the top — which is
+            what buried a freshly-saved document below a full queue. */}
         {awaiting.count > 0 && (
           <button
-            onClick={() => { setStatus(''); setProjectId(''); setDocTypeId(''); setSearch(''); setFrom(''); setTo(''); setPage(1); }}
-            title="เอกสารที่รอการอนุมัติจากคุณ — จัดเรียงไว้บนสุดของตาราง"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/90 px-3 py-2 text-sm font-bold text-white ring-1 ring-inset ring-amber-300/40 transition hover:bg-amber-500"
+            onClick={() => { clearAllFilters(); setAwaitingOnly((v) => !v); }}
+            aria-pressed={awaitingOnly}
+            title={awaitingOnly ? 'แสดงเอกสารทั้งหมด' : 'แสดงเฉพาะเอกสารที่รอการอนุมัติจากคุณ'}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ring-1 ring-inset transition ${
+              awaitingOnly
+                ? 'bg-white text-amber-600 ring-amber-300'
+                : 'bg-amber-500/90 text-white ring-amber-300/40 hover:bg-amber-500'
+            }`}
           >
             <Icon name="clock" className="h-4 w-4" /> รออนุมัติ {awaiting.count}
+            {awaitingOnly && <Icon name="x" className="h-3.5 w-3.5" />}
           </button>
         )}
         <div className="hidden rounded-lg bg-white/10 px-3.5 py-1.5 text-sm text-cyan-100/80 ring-1 ring-inset ring-white/15 md:block">
@@ -233,7 +245,7 @@ export default function DocumentRegister() {
         </button>
       </>
     ),
-    [total, isAdmin, awaiting.count]
+    [total, isAdmin, awaiting.count, awaitingOnly]
   );
 
   return (

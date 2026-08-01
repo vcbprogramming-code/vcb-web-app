@@ -188,8 +188,12 @@ export async function applyApprovalAction(client, { token, stepId, action, comme
 
   await client.query(`update documents set status = $1 where id = $2`, [docStatus, step.document_id]);
 
+  // cc_recipients/recipient/date_received are here because the caller sends the
+  // "สำเนาเรียน" outcome notice from this row — selecting only id/number/subject
+  // silently produced a CC email with no recipients.
   const { rows: docRows } = await client.query(
-    `select id, doc_number, subject, status from documents where id = $1`,
+    `select id, doc_number, subject, status, cc_recipients, recipient, date_received
+       from documents where id = $1`,
     [step.document_id]
   );
 

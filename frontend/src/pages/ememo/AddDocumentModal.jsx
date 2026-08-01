@@ -50,6 +50,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   // จากโครงการถ้าตั้งไว้ (ล็อก) ไม่งั้นผู้สร้างเลือกเอง.
   const [pmEmail, setPmEmail] = useState('');
   const [pmConfigured, setPmConfigured] = useState(false);
+  // The signer's own step auto-approves when they are the one submitting, so this
+  // decides whether "no higher approver" means ฉบับร่าง or an unreviewed approval.
+  const authorEmail = (profile?.email || user?.email || '').toLowerCase();
+  const authorIsSigner = Boolean(pmEmail.trim()) && pmEmail.trim().toLowerCase() === authorEmail;
   const [dateReceived, setDateReceived] = useState(() => {
     // local date, not UTC — toISOString() would show yesterday late at night in Thailand
     const d = new Date();
@@ -275,7 +279,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     onClose();
   };
 
-  const submit = async (e) => {
+  const submit = async (e, { asDraft = false } = {}) => {
     e.preventDefault();
     // only the last step may actually submit — guards against Enter / stray
     // submit events advancing past the wizard and closing the modal early
@@ -294,6 +298,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     if (!pmEmail.trim() && approvers.some((a) => a.email.trim())) {
       setError('กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) ในขั้นที่ 2 ก่อน — เอกสารต้องผ่าน ผจก. ก่อนส่งผู้อนุมัติที่สูงกว่า');
       setStep(2);
+      return;
+    }
+    // The author's own signer step auto-approves, so a chain of just themself would
+    // finalise the document with nobody having reviewed it. Make that impossible.
+    if (!asDraft && authorIsSigner && !approvers.some((a) => a.email.trim())) {
+      setError('ท่านเป็นผู้ลงนามของเอกสารนี้เอง — กรุณาเลือกผู้อนุมัติที่สูงกว่าอย่างน้อย 1 คน หรือกด “บันทึกเป็นฉบับร่าง” ไว้ก่อน');
       return;
     }
     // synchronous guard: a fast double-click / Enter+click can fire submit twice
@@ -350,7 +360,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       const cleanedExecs = approvers
         .map((a) => ({ name: a.name.trim() || undefined, email: a.email.trim() }))
         .filter((a) => a.email && a.email.toLowerCase() !== pmKey);
-      const finalApprovers = pmEmail.trim()
+      const finalApprovers = !asDraft && pmEmail.trim()
         ? [{ name: signerName.trim() || undefined, email: pmEmail.trim(), isSigner: true }, ...cleanedExecs]
         : [];
       let emailSent = true;
@@ -727,8 +737,18 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <p className="mb-3 text-xs text-slate-400">
               {approversLocked
                 ? 'สายอนุมัติถูกกำหนดไว้ตามรหัสเอกสารนี้ (แก้ไขได้ที่ ตั้งค่าระบบ → รหัสเอกสาร)'
-                : 'เลือกผู้อนุมัติตามลำดับขั้น (ต้องมีบัญชีในระบบ) — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ หากเว้นว่างไว้ เอกสารจะถูกบันทึกเป็นฉบับร่าง'}
+                : 'เลือกผู้อนุมัติตามลำดับขั้น (ต้องมีบัญชีในระบบ) — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ · ต้องการเก็บไว้ก่อนโดยยังไม่ส่ง ให้กด “บันทึกเป็นฉบับร่าง”'}
             </p>
+            <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+              ผู้อนุมัติลำดับที่ 1 คือ <b className="text-slate-800">{signerName || pmEmail || '— ยังไม่ได้เลือก —'}</b> (ผู้จัดการโครงการ / ผู้ลงนาม)
+              {authorIsSigner && ' — ซึ่งคือตัวท่านเอง จึงถือว่าลงนามแล้วทันที'}
+            </div>
+            {authorIsSigner && !approvers.some((a) => a.email.trim()) && (
+              <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>ท่านเป็นผู้ลงนามของเอกสารนี้เอง ถ้าไม่เลือกผู้อนุมัติที่สูงกว่า จะไม่มีผู้ใดตรวจสอบเอกสารเลย — เลือกอย่างน้อย 1 คน หรือกด “บันทึกเป็นฉบับร่าง”</span>
+              </div>
+            )}
             {!approversLocked && approverUsers.length === 0 && (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 ยังไม่มีบัญชีผู้อนุมัติในระบบ — ติดต่อผู้ดูแลระบบให้เพิ่มผู้ใช้ก่อน หรือเว้นว่างไว้เพื่อบันทึกเป็น <b>ฉบับร่าง</b> แล้วส่งอนุมัติภายหลังได้
@@ -791,13 +811,20 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             {step < 3 ? (
               <button key="next" type="button" onClick={goNext} className="btn-primary">ถัดไป →</button>
             ) : (
-              <button key="submit" type="submit" disabled={submitting} className="btn-primary">
-                {submitting
-                  ? (uploadingIdx >= 0 ? `กำลังอัปโหลดไฟล์ (${uploadingIdx + 1}/${files.length})…` : 'กำลังบันทึก…')
-                  : pmEmail.trim()
-                    ? 'บันทึกและส่งอนุมัติ'
-                    : 'บันทึกเอกสาร'}
-              </button>
+              <div className="flex items-center gap-2">
+                {pmEmail.trim() && (
+                  <button type="button" disabled={submitting} onClick={(e) => submit(e, { asDraft: true })} className="btn-outline">
+                    บันทึกเป็นฉบับร่าง
+                  </button>
+                )}
+                <button key="submit" type="submit" disabled={submitting} className="btn-primary">
+                  {submitting
+                    ? (uploadingIdx >= 0 ? `กำลังอัปโหลดไฟล์ (${uploadingIdx + 1}/${files.length})…` : 'กำลังบันทึก…')
+                    : pmEmail.trim()
+                      ? 'บันทึกและส่งอนุมัติ'
+                      : 'บันทึกเอกสาร'}
+                </button>
+              </div>
             )}
           </div>
         </form>

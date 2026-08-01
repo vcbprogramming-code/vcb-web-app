@@ -170,9 +170,19 @@ export function extractCcEmails(ccText) {
  * people are consulted, they do not approve and get no action link. `toEmails`
  * is an array; one email is sent per recipient.
  */
-export async function sendCcNotification({ toEmails, doc, actorName }) {
+export async function sendCcNotification({ toEmails, doc, actorName, stage = 'submitted' }) {
   const emails = Array.isArray(toEmails) ? toEmails.filter(Boolean) : [];
   if (!emails.length) return { skipped: true };
+  // A "เพื่อทราบ" copy is only useful if it also carries the outcome — the submit
+  // notice alone left CC recipients never learning whether the document passed.
+  const done = stage === 'approved';
+  const heading = done ? 'สำเนาเรียน — เอกสารได้รับการอนุมัติแล้ว' : 'สำเนาเรียน (เพื่อทราบ / ปรึกษา)';
+  const lead = done
+    ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่าน <b>ได้รับการอนุมัติครบทุกลำดับแล้ว</b> สามารถเปิดดูหนังสือฉบับที่ลงนามแล้วได้จากปุ่มด้านล่าง'
+    : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบหรือขอปรึกษา <b>ท่านไม่จำเป็นต้องอนุมัติ</b> เอกสารนี้อยู่ระหว่างการพิจารณาตามสายอนุมัติปกติ';
+  const accent = done ? '#15803d' : '#0f766e';
+  const accent2 = done ? '#16a34a' : '#0d9488';
+  const tag = done ? 'อนุมัติแล้ว' : 'สำเนาเรียน';
   // open THIS document directly (not the register), so the CC recipient sees
   // exactly which document was copied to them
   const url = `${env.appBaseUrl}/memos/${doc.id}`;
@@ -185,15 +195,12 @@ export async function sendCcNotification({ toEmails, doc, actorName }) {
   const html = `
   <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
-      <div style="background:#0f766e;background:linear-gradient(135deg,#0d9488,#0f766e);padding:24px 28px;color:#fff">
+      <div style="background:${accent};background:linear-gradient(135deg,${accent2},${accent});padding:24px 28px;color:#fff">
         <div style="font-size:13px;letter-spacing:.5px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
-        <div style="font-size:20px;font-weight:700;margin-top:4px">สำเนาเรียน (เพื่อทราบ / ปรึกษา)</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">${heading}</div>
       </div>
       <div style="padding:28px">
-        <p style="margin:0 0 16px;font-size:15px;color:#334155">
-          เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบหรือขอปรึกษา
-          <b>ท่านไม่จำเป็นต้องอนุมัติ</b> เอกสารนี้อยู่ระหว่างการพิจารณาตามสายอนุมัติปกติ
-        </p>
+        <p style="margin:0 0 16px;font-size:15px;color:#334155">${lead}</p>
         <table style="border-collapse:collapse;width:100%;font-size:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px">
           ${row('เลขที่หนังสือ', `<b style="font-size:15px">${esc(doc.doc_number)}</b>`)}
           ${row('เรื่อง', esc(doc.subject))}
@@ -202,7 +209,7 @@ export async function sendCcNotification({ toEmails, doc, actorName }) {
           ${actorName ? row('ผู้ส่งเรื่อง', esc(actorName)) : ''}
         </table>
         <div style="text-align:center;margin:8px 0 4px">
-          <a href="${url}" style="display:inline-block;background:#0d9488;color:#fff;font-size:15px;font-weight:600;padding:12px 30px;border-radius:10px;text-decoration:none">
+          <a href="${url}" style="display:inline-block;background:${accent2};color:#fff;font-size:15px;font-weight:600;padding:12px 30px;border-radius:10px;text-decoration:none">
             เปิดดูเอกสาร
           </a>
         </div>
@@ -217,9 +224,9 @@ export async function sendCcNotification({ toEmails, doc, actorName }) {
   for (const to of emails) {
     const r = await sendEmail({
       to,
-      subject: `[สำเนาเรียน] ${doc.doc_number} — ${doc.subject}`,
+      subject: `[${tag}] ${doc.doc_number} — ${doc.subject}`,
       html,
-      text: `เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู: ${url}`,
+      text: `${done ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่านได้รับการอนุมัติครบทุกลำดับแล้ว' : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)'}\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู: ${url}`,
     }).catch((e) => ({ error: e.message, to }));
     results.push(r);
   }

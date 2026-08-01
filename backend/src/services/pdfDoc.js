@@ -126,8 +126,13 @@ export async function regenerateOriginalWithAudit(documentId, uploadedBy = null)
   // returned/rejected → back to an unsigned letter; the decision trail is appended.
   const authorSignature = null;
   const { rows: auditSteps } = await query(
-    `select approver_name, approver_email, action, comment, acted_at
-       from approval_steps where document_id = $1 order by step_no`,
+    // same name resolution as the signature block — the decision page printed raw
+    // gmail addresses whenever a step carried no typed name.
+    `select coalesce(nullif(pr.full_name,''), nullif(s.approver_name,''), s.approver_email) as approver_name,
+            s.approver_email, s.action, s.comment, s.acted_at
+       from approval_steps s
+       left join profiles pr on pr.id = s.approver_id
+      where s.document_id = $1 order by s.step_no`,
     [documentId]
   );
   const qr = await buildVerifyQr(doc);
@@ -175,7 +180,12 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
   const { doc, letter } = await loadDocAndLetter(documentId);
 
   const { rows: steps } = await query(
-    `select s.approver_name, s.signature_url, s.is_signer, pr.job_title as approver_title,
+    // The account's own full_name/job_title win over whatever text was typed into
+    // the step when the chain was built: the signature block must name the person
+    // who actually signed, and a step created without a name printed "()" on a
+    // formal letter.
+    `select coalesce(nullif(pr.full_name,''), nullif(s.approver_name,''), s.approver_email) as approver_name,
+            s.signature_url, s.is_signer, pr.job_title as approver_title,
             pr.signature_url as profile_signature
        from approval_steps s
        left join profiles pr on pr.id = s.approver_id
@@ -197,14 +207,27 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     if (sigKey) {
       try { image = await getObjectBuffer(sigKey); } catch { image = null; }
     }
-    if (s.is_signer) signerSignature = image;
-    else signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
+    if (s.is_signer) {
+      signerSignature = image;
+      // Whoever actually signed step 1 IS the ผู้ลงนาม. loadDocAndLetter falls back
+      // to the preparer when signer_name is blank, which printed the clerk's name
+      // above the project manager's signature.
+      doc.signer_name = s.approver_name || doc.signer_name;
+      doc.signer_title = s.approver_title || doc.signer_title;
+    } else {
+      signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
+    }
   }
 
   // full decision trail for the "บันทึกการพิจารณา" page
   const { rows: auditSteps } = await query(
-    `select approver_name, approver_email, action, comment, acted_at
-       from approval_steps where document_id = $1 order by step_no`,
+    // same name resolution as the signature block — the decision page printed raw
+    // gmail addresses whenever a step carried no typed name.
+    `select coalesce(nullif(pr.full_name,''), nullif(s.approver_name,''), s.approver_email) as approver_name,
+            s.approver_email, s.action, s.comment, s.acted_at
+       from approval_steps s
+       left join profiles pr on pr.id = s.approver_id
+      where s.document_id = $1 order by s.step_no`,
     [documentId]
   );
 

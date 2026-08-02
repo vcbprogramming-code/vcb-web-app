@@ -1,4 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
+import zlib from 'node:zlib';
 import { query, queryOne } from '../config/db.js';
 import { putObject, deleteObject, getObjectBuffer } from '../config/storage.js';
 import { parseXlsxToSheets, renderSheetTablePdf } from './sheetPdf.js';
@@ -10,6 +11,68 @@ const isImage = (ct) => IMAGE_TYPES.has((ct || '').toLowerCase());
 // .xlsx → rendered to table page(s) and appended (not embeddable as-is)
 const isXlsx = (ct, name) =>
   /spreadsheetml|officedocument\.spreadsheet/i.test(ct || '') || /\.xlsx$/i.test(name || '');
+
+// The largest picture we will try to lay onto a page. Anything beyond this is a
+// scanner artefact or a crafted file, not a site photo.
+const MAX_IMAGE_PIXELS = 80_000_000; // ~80 MP
+
+/**
+ * Decide whether an image is safe to hand to pdf-lib.
+ *
+ * A TRUNCATED PNG — valid signature and IHDR, but the pixel data cut short —
+ * makes pdf-lib's decoder spin forever. It never throws, so try/catch cannot
+ * save us, and because the loop is synchronous it blocks Node's event loop:
+ * one damaged attachment takes the whole API down for every user until someone
+ * restarts the process. That is exactly how production died on 2 Aug 2026.
+ *
+ * So the file is validated up front: walk the chunk table, require IEND, and
+ * actually inflate the pixel data. Costs ~1ms and turns a fatal hang into a
+ * skipped attachment the user is told about.
+ *
+ * @returns {string|null} null when safe, otherwise the reason it was rejected.
+ */
+export function imageRejectReason(bytes, contentType) {
+  const ct = (contentType || '').toLowerCase();
+  if (!Buffer.isBuffer(bytes) || bytes.length < 24) return 'ไฟล์ภาพว่างหรือเล็กผิดปกติ';
+
+  if (ct.includes('png')) {
+    if (bytes.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') return 'ไม่ใช่ไฟล์ PNG ที่ถูกต้อง';
+    const idat = [];
+    let off = 8;
+    let sawIhdr = false;
+    let sawIend = false;
+    let width = 0;
+    let height = 0;
+    while (off + 8 <= bytes.length) {
+      const len = bytes.readUInt32BE(off);
+      const type = bytes.slice(off + 4, off + 8).toString('latin1');
+      const end = off + 12 + len; // length + type + data + CRC
+      // a length that runs past the end of the file means the file is truncated
+      if (len > bytes.length || end > bytes.length) return 'ไฟล์ภาพไม่สมบูรณ์ (ข้อมูลขาดหาย)';
+      if (type === 'IHDR') {
+        sawIhdr = true;
+        width = bytes.readUInt32BE(off + 8);
+        height = bytes.readUInt32BE(off + 12);
+      } else if (type === 'IDAT') {
+        idat.push(bytes.slice(off + 8, off + 8 + len));
+      } else if (type === 'IEND') { sawIend = true; break; }
+      off = end;
+    }
+    if (!sawIhdr || !sawIend) return 'ไฟล์ภาพไม่สมบูรณ์ (โครงสร้างไม่ครบ)';
+    if (!width || !height) return 'ไฟล์ภาพไม่ระบุขนาด';
+    if (width * height > MAX_IMAGE_PIXELS) return 'ไฟล์ภาพมีความละเอียดสูงเกินกำหนด';
+    if (!idat.length) return 'ไฟล์ภาพไม่มีข้อมูลภาพ';
+    try { zlib.inflateSync(Buffer.concat(idat)); } catch { return 'ไฟล์ภาพเสียหาย (ข้อมูลภาพอ่านไม่ได้)'; }
+    return null;
+  }
+
+  // JPEG: must start with SOI and end with EOI, or the decoder can run off the end
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return 'ไม่ใช่ไฟล์ JPEG ที่ถูกต้อง';
+  if (bytes[bytes.length - 2] !== 0xff || bytes[bytes.length - 1] !== 0xd9) {
+    return 'ไฟล์ภาพไม่สมบูรณ์ (ข้อมูลขาดหาย)';
+  }
+  return null;
+}
 
 /**
  * Append an image (jpg/png) as one full A4 page, scaled to fit with a margin.
@@ -104,6 +167,13 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
         pages.forEach((p) => outPdf.addPage(p));
       } else if (isImage(att.content_type)) {
         const bytes = await getObjectBuffer(att.storage_key);
+        // never hand an unverified image to the decoder — see imageRejectReason
+        const bad = imageRejectReason(bytes, att.content_type);
+        if (bad) {
+          console.error(`ข้ามไฟล์ภาพ "${att.file_name}": ${bad}`);
+          skipped.push(att.file_name);
+          continue;
+        }
         await addImagePage(outPdf, bytes, att.content_type);
       } else if (isXlsx(att.content_type, att.file_name)) {
         // render the spreadsheet as table page(s), then append like a PDF

@@ -1556,16 +1556,8 @@ a {
     display: none;
   }
   #calendar-panel,
-  #birthdays-panel {
-    display: none;
-  }
   .side-row {
-    grid-template-columns: 1fr;
-  }
-  .side-row > div,
-  .side-row > div:last-child {
-    padding: 0;
-    border-left: none;
+    display: none;
   }
   .content {
     max-width: 100%;

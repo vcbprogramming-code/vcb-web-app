@@ -69,7 +69,7 @@ export const APPS: AppEntry[] = [
     key: 'credit',
     name: 'Credit Facility Manager',
     desc: 'Credit limits, drawdowns, requests & approvals.',
-    url: 'https://script.google.com/a/macros/vcb-con.com/s/AKfycbztWhyi0anTnTu8lOkMYVrECpRStAn0jqjlNrfxPlnnTwkk1t45XfCofWiv9wLLVEisjQ/exec',
+    url: 'https://script.google.com/macros/s/AKfycbytkA07aNklbDv3gKca-iI02FPCdC1Q0i3gAtE1Ls1ry9MCoIUmG_KabhCBip8C0vn91g/exec',
     icon: 'credit',
     accent: '#fbbf24',
   },

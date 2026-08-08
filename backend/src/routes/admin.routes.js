@@ -187,8 +187,14 @@ router.post(
       throw new ApiError(400, 'บัญชีนี้เข้าสู่ระบบด้วย Google — ตั้งรหัสผ่านไม่ได้');
     }
     const hash = await hashPassword(parsed.data.password);
+    // Clear any lockout too: an employee who locked themselves out and rang the
+    // admin should be able to use the new password straight away, not sit out
+    // the remaining minutes of a lock that no longer means anything.
     const row = await queryOne(
-      'update profiles set password_hash = $1, password_changed_at = now() where id = $2 returning id',
+      `update profiles
+          set password_hash = $1, password_changed_at = now(),
+              failed_login_count = 0, login_locked_until = null
+        where id = $2 returning id`,
       [hash, req.params.id]
     );
     if (!row) throw new ApiError(404, 'User not found');

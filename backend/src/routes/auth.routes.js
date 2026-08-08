@@ -3,7 +3,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import multer from 'multer';
 import { OAuth2Client } from 'google-auth-library';
-import { queryOne } from '../config/db.js';
+import { query, queryOne } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -44,6 +44,12 @@ function loginResponse(profile) {
 // dependency. Keyed by IP + email, generous enough not to bother real users.
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const LOGIN_MAX = 12;
+// Per-account lockout (see the login handler). 10 wrong passwords is far beyond
+// an honest typo but still short of an attacker's budget; 15 minutes is long
+// enough to be useless to a guesser and short enough that a locked-out employee
+// isn't stuck waiting for the admin.
+const LOGIN_FAIL_MAX = 10;
+const LOGIN_LOCK_SECONDS = 15 * 60;
 const loginHits = new Map(); // key -> { count, resetAt }
 
 function throttleKey(req) {
@@ -94,7 +100,8 @@ router.post(
     const { email, password } = parsed.data;
 
     const profile = await queryOne(
-      `select id, full_name, email, role, unit_id, is_active, password_hash, permissions, login_method
+      `select id, full_name, email, role, unit_id, is_active, password_hash, permissions, login_method,
+              failed_login_count, login_locked_until
          from profiles where lower(email) = lower($1)`,
       [email]
     );
@@ -107,15 +114,49 @@ router.post(
     if (profile.login_method === 'google') {
       throw new ApiError(403, 'บัญชีนี้ต้องเข้าสู่ระบบด้วย Google เท่านั้น');
     }
+
+    // Per-account lockout. The in-memory IP limiter above is the first layer, but
+    // the hosting proxy doesn't hold a stable client IP, so its count scatters
+    // and a determined guesser slips through. This one lives in the database:
+    // it survives restarts, ignores which IP the guesses come from, and guards
+    // the account itself.
+    const lockedFor = profile.login_locked_until
+      ? Math.ceil((new Date(profile.login_locked_until).getTime() - Date.now()) / 1000)
+      : 0;
+    if (lockedFor > 0) {
+      res.setHeader('Retry-After', String(lockedFor));
+      throw new ApiError(429, `พยายามเข้าสู่ระบบผิดหลายครั้งเกินไป บัญชีนี้ถูกระงับชั่วคราว กรุณารออีก ${Math.ceil(lockedFor / 60)} นาที`);
+    }
+
     // password is required and must match.
     const ok = profile.password_hash && await verifyPassword(password, profile.password_hash);
-    if (!ok) throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    if (!ok) {
+      const n = (profile.failed_login_count || 0) + 1;
+      const lock = n >= LOGIN_FAIL_MAX;
+      await query(
+        `update profiles
+            set failed_login_count = $2,
+                login_locked_until = case when $3 then now() + ($4 || ' seconds')::interval else login_locked_until end
+          where id = $1`,
+        [profile.id, lock ? 0 : n, lock, String(LOGIN_LOCK_SECONDS)]
+      ).catch((e) => console.error('login counter update failed:', e.message));
+      if (lock) {
+        res.setHeader('Retry-After', String(LOGIN_LOCK_SECONDS));
+        throw new ApiError(429, `พยายามเข้าสู่ระบบผิดหลายครั้งเกินไป บัญชีนี้ถูกระงับชั่วคราว กรุณารออีก ${Math.ceil(LOGIN_LOCK_SECONDS / 60)} นาที`);
+      }
+      throw new ApiError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    }
 
     if (!profile.is_active) {
       throw new ApiError(403, 'บัญชีนี้ยังไม่ได้เปิดใช้งาน');
     }
 
-    clearThrottle(req); // successful login — reset the attempt counter
+    // a good password clears the slate, so an ordinary typo never accumulates
+    if (profile.failed_login_count || profile.login_locked_until) {
+      await query('update profiles set failed_login_count = 0, login_locked_until = null where id = $1', [profile.id])
+        .catch((e) => console.error('login counter reset failed:', e.message));
+    }
+    clearThrottle(req); // successful login — reset the IP-level counter too
     res.json(loginResponse(profile));
   })
 );

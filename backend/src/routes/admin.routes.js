@@ -17,6 +17,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 *
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
 
+// A settings id that isn't a UUID reached Postgres as a bad cast and came back
+// as a bare 500 — same trap already closed on the documents/projects routers.
+// (:code params are plain text and are matched case-insensitively, so they are
+// deliberately not covered here.)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.param('id', (req, res, next, value) =>
+  next(UUID_RE.test(value) ? undefined : new ApiError(404, 'ไม่พบรายการที่ต้องการ')));
+
 const ROLES = ['admin', 'executive', 'hr'];
 
 // ===========================================================================
@@ -547,7 +555,19 @@ router.patch(
 router.delete(
   '/document-types/:id',
   asyncHandler(async (req, res) => {
-    await query('delete from document_types where id = $1', [req.params.id]);
+    // documents.doc_type_id is ON DELETE SET NULL, so deleting a type that is in
+    // use does not fail — it silently strips the type off every document that
+    // had it, with no warning and no way back. Refuse, and say how many, the way
+    // the doc-code delete already does.
+    const used = await queryOne(
+      'select count(*)::int as n from documents where doc_type_id = $1', [req.params.id]);
+    if (used && used.n > 0) {
+      throw new ApiError(409, `ลบไม่ได้ — มีเอกสาร ${used.n} ฉบับใช้ประเภทนี้อยู่ (หากต้องการ กรุณาเปลี่ยนประเภทของเอกสารเหล่านั้นก่อน)`);
+    }
+    // "deleted: true" used to come back even when nothing matched, so a stale
+    // list in a second tab reported success for a row that was already gone.
+    const row = await queryOne('delete from document_types where id = $1 returning id', [req.params.id]);
+    if (!row) throw new ApiError(404, 'ไม่พบประเภทเอกสารนี้');
     res.json({ data: { deleted: true } });
   })
 );

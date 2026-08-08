@@ -2,9 +2,16 @@ import { Router } from 'express';
 import { query, queryOne } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiError } from '../middleware/errorHandler.js';
 
 const router = Router();
 router.use(requireAuth);
+
+// same guard as the documents router: a non-UUID id is a bad Postgres cast, not
+// a server fault — see documents.routes.js
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.param('id', (req, res, next, value) =>
+  next(UUID_RE.test(value) ? undefined : new ApiError(404, 'ไม่พบโครงการ')));
 
 /** GET /api/projects — list projects (the register chips). */
 router.get(

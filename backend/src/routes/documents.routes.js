@@ -25,6 +25,19 @@ import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsul
 const router = Router();
 router.use(requireAuth);
 
+/**
+ * An id in the path that isn't a UUID reaches Postgres as a bad cast and comes
+ * back as a bare 500 — which is what a truncated or mistyped document link
+ * produced. It's simply not found, so say so, once, for every :id route.
+ * (Literal routes like /export and /next-number are declared before /:id and
+ * match first, so they never reach this.)
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+for (const name of ['id', 'attId', 'msgId']) {
+  router.param(name, (req, res, next, value) =>
+    next(UUID_RE.test(value) ? undefined : new ApiError(404, 'ไม่พบเอกสาร')));
+}
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
 
 /**
@@ -196,8 +209,18 @@ function buildWhere(q, visibility = null) {
     }
     return s;
   };
+  // A status outside the known set reaches Postgres as a bad cast and came back
+  // as a 500 — the same trap as the uuid/date filters above, and just as easy to
+  // hit from a stale bookmark or a hand-edited URL.
+  const statusArg = (v) => {
+    const s = String(one(v));
+    if (!Object.hasOwn(STATUS_TH, s)) {
+      throw new ApiError(400, 'ตัวกรองสถานะไม่ถูกต้อง — กรุณาล้างตัวกรองแล้วลองใหม่');
+    }
+    return s;
+  };
   if (q.projectId) add('d.project_id = $$', uuidArg(q.projectId, 'โครงการ'));
-  if (q.status) add('d.status = $$', one(q.status));
+  if (q.status) add('d.status = $$', statusArg(q.status));
   if (q.docTypeId) add('d.doc_type_id = $$', uuidArg(q.docTypeId, 'ประเภทเอกสาร'));
   if (q.from) add('d.date_received >= $$', dateArg(q.from, 'วันที่เริ่มต้น'));
   if (q.to) add('d.date_received <= $$', dateArg(q.to, 'วันที่สิ้นสุด'));

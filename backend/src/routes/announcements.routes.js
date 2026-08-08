@@ -76,6 +76,11 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   res.status(201).json({ data: row });
 }));
 
+// non-UUID id → 404, not a Postgres cast error surfacing as 500 (see documents.routes.js)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.param('id', (req, res, next, value) =>
+  next(UUID_RE.test(value) ? undefined : new ApiError(404, 'ไม่พบประกาศ')));
+
 router.patch('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   assertUuid(req.params.id);
   // `.partial()` on a refined schema needs the inner object — rebuild the check

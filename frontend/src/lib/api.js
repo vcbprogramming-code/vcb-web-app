@@ -127,19 +127,21 @@ export async function apiUpload(path, file, { field = 'file', extra = {} } = {})
  * Storage downloads stream through the API; window.open can't send a Bearer
  * header, hence this blob-fetch helper.
  */
-/** Absolute URL for an API path. Only for endpoints that need NO Authorization
- *  header — a token-gated public file the browser can load directly (iframe,
- *  <a download>), where apiBlobUrl's fetch+blob round-trip buys nothing. */
-export const apiUrl = (path) => `${BASE}${path}`;
-
-export async function apiBlobUrl(path) {
+/**
+ * `auth: false` for a token-gated PUBLIC file (the สำเนาเรียน link), where there
+ * is no session to attach — the blob step is still required. The API sets
+ * `X-Frame-Options: SAMEORIGIN` and `frame-ancestors 'self'`, so pointing an
+ * <iframe> straight at an API URL renders nothing once the app and the API sit
+ * on different hosts, as they do in production.
+ */
+export async function apiBlobUrl(path, { auth = true } = {}) {
   const headers = {};
-  const token = tokenStore.get();
+  const token = auth ? tokenStore.get() : null;
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await timedFetch(`${BASE}${path}`, { headers }, TRANSFER_TIMEOUT_MS);
   if (!res.ok) {
-    handleUnauthorized(res, true);
+    if (auth) handleUnauthorized(res, true);
     const data = await res.json().catch(() => ({}));
     throw apiError(data.error || `เปิดไฟล์ไม่สำเร็จ (${res.status})`, { status: res.status });
   }

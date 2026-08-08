@@ -59,10 +59,23 @@ export default function SharedDocument() {
 }
 
 function Shared({ data, token }) {
-  const { document: doc, approval_steps: steps = [], has_file: hasFile, shared_with: sharedWith } = data;
+  const { document: doc, approval_steps: steps = [], has_file: hasFile, file_name: fileName, shared_with: sharedWith } = data;
   const status = STATUS_META[doc.status] || STATUS_META.pending;
-  const fileUrl = ememoApi.sharedFileUrl(token);
   const approved = doc.status === 'approved';
+
+  // The API refuses to be framed from another host, so the bytes are pulled in
+  // and shown from a blob instead of pointing the iframe at the API URL.
+  const [fileUrl, setFileUrl] = useState(null);
+  const [fileError, setFileError] = useState(null);
+  useEffect(() => {
+    if (!hasFile) return undefined;
+    let url = null;
+    let alive = true;
+    ememoApi.sharedFileBlobUrl(token)
+      .then((u) => { if (alive) { url = u; setFileUrl(u); } else URL.revokeObjectURL(u); })
+      .catch((e) => alive && setFileError(e.message));
+    return () => { alive = false; if (url) URL.revokeObjectURL(url); };
+  }, [token, hasFile]);
 
   return (
     <div className="space-y-4">
@@ -109,16 +122,23 @@ function Shared({ data, token }) {
               <Icon name="document" className="h-4 w-4 text-slate-400" /> หนังสือ
             </h3>
             <a
-              href={fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-light"
+              href={fileUrl || undefined}
+              download={fileName || `${doc.doc_number.replace(/\//g, '-')}.pdf`}
+              aria-disabled={!fileUrl}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white transition ${
+                fileUrl ? 'bg-brand hover:bg-brand-light' : 'pointer-events-none bg-slate-300'
+              }`}
             >
               <Icon name="download" className="h-3.5 w-3.5" /> เปิด / บันทึกไฟล์
             </a>
           </div>
-          {/* the PDF is public via the same token, so the browser loads it directly */}
-          <iframe src={fileUrl} title={doc.doc_number} className="h-[75vh] w-full bg-slate-100" />
+          {fileError ? (
+            <div className="px-5 py-8 text-center text-sm text-red-600">เปิดไฟล์หนังสือไม่สำเร็จ — {fileError}</div>
+          ) : fileUrl ? (
+            <iframe src={fileUrl} title={doc.doc_number} className="h-[75vh] w-full bg-slate-100" />
+          ) : (
+            <div className="flex h-[40vh] items-center justify-center bg-slate-50"><Spinner label="กำลังโหลดหนังสือ…" /></div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">

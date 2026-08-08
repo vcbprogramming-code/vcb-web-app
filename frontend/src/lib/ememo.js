@@ -1,4 +1,4 @@
-import { api, apiUpload, apiBlobUrl, apiUrl } from './api.js';
+import { api, apiUpload, apiBlobUrl } from './api.js';
 
 /** Build a querystring from an object, skipping empty values. */
 function qs(params) {
@@ -73,8 +73,9 @@ export const ememoApi = {
 
   // read-only copy for a สำเนาเรียน (CC) recipient — token from their email, no login
   sharedDocument: (token) => api(`/share/${token}`, { auth: false }),
-  // the letter itself; loaded straight into an <iframe> (no auth header needed)
-  sharedFileUrl: (token) => apiUrl(`/share/${token}/file`),
+  // the letter itself — fetched to a blob so it can be shown inline (the API
+  // refuses to be framed from another host); no session involved
+  sharedFileBlobUrl: (token) => apiBlobUrl(`/share/${token}/file`, { auth: false }),
 
   // public approval (no auth — token from email link)
   lookupApproval: (token) => api(`/approvals/${token}`, { auth: false }),

@@ -283,10 +283,15 @@ router.get(
   })
 );
 
+// .strict(): with both fields defaulting to [] and zod silently dropping unknown
+// keys, a request carrying the wrong field names parsed cleanly into "no scopes
+// at all" — so a malformed save answered 200 and QUIETLY REMOVED every
+// restriction the user had. Silently widening someone's access is the worst way
+// for this endpoint to fail; make the caller say what it means.
 const visibilitySchema = z.object({
   projectIds: z.array(z.string().uuid()).default([]),
   docCodes: z.array(z.string()).default([]),
-});
+}).strict();
 
 /** PUT /api/admin/users/:id/visibility — replace the user's visibility scopes.
  *  Empty arrays = no restriction (the user sees everything). */

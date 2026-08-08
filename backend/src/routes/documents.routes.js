@@ -315,7 +315,15 @@ router.get(
     ws.getRow(1).font = { bold: true };
     ws.columns.forEach((c) => { c.width = 18; });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="documents-register.xlsx"');
+    // Thai name + พ.ศ. date. The browser download names it from the client side,
+    // but this is what anyone calling the endpoint directly gets.
+    const now = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear() + 543}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="documents-register-${stamp}.xlsx"; filename*=UTF-8''${encodeURIComponent(`ทะเบียนเอกสาร-${stamp}.xlsx`)}`
+    );
     await wb.xlsx.write(res);
     res.end();
   })

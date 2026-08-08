@@ -108,6 +108,7 @@ export default function DocumentRegister() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [exporting, setExporting] = useState(false); // Excel download in flight
   const [page, setPage] = useState(1);
   // 10 rows made a freshly-saved document easy to lose behind a page break; 25 keeps
   // a normal day's work on one screen.
@@ -159,6 +160,37 @@ export default function DocumentRegister() {
   useEffect(() => {
     setPage(1);
   }, [projectId, docTypeId, status, search, from, to, awaitingOnly]);
+
+  /**
+   * Download the register as Excel, with exactly the filters on screen.
+   * The filename names those filters: every download used to arrive as
+   * "documents-register.xlsx", so three of them became (1) and (2) and nobody
+   * could tell which was which.
+   */
+  const downloadExcel = async () => {
+    setExporting(true);
+    try {
+      const url = await ememoApi.exportUrl({ projectId, docTypeId, status, search, from, to,
+        awaiting: awaitingOnly ? 'me' : undefined });
+      const now = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      // พ.ศ. in the name, to match every date the rest of the app shows
+      const stamp = `${now.getFullYear() + 543}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+      const parts = ['ทะเบียนเอกสาร'];
+      const proj = projects.find((x) => x.id === projectId);
+      if (proj) parts.push(proj.code);
+      if (status) parts.push(STATUS_OPTIONS.find((s) => s.value === status)?.label || status);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${parts.join('-')}-${stamp}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const clearDates = () => {
@@ -368,6 +400,24 @@ export default function DocumentRegister() {
               <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
             </>
           )}
+
+          {/* The register export has worked since day one, but nothing in the UI
+              ever called it — the only way in was to type the API address. It
+              honours whatever is filtered right now, so say so: without that line
+              people assume they always get everything and think rows are missing. */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-slate-400 sm:inline">ได้ตามตัวกรองที่เลือก · {total} ฉบับ</span>
+            <button
+              onClick={downloadExcel}
+              disabled={exporting || total === 0}
+              title={total === 0 ? 'ไม่มีเอกสารให้ส่งออก' : `ดาวน์โหลดทะเบียน ${total} ฉบับตามตัวกรองปัจจุบันเป็นไฟล์ Excel`}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+            >
+              {exporting
+                ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-600" /> กำลังเตรียมไฟล์…</>
+                : <><Icon name="download" className="h-3.5 w-3.5" /> ดาวน์โหลด Excel</>}
+            </button>
+          </div>
         </div>
       </div>
 

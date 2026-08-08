@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ememoApi, STATUS_META, APPROVAL_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import { compressImage } from '../../lib/imageCompress.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
@@ -48,6 +48,14 @@ const AUDIT_ACTION_TH = {
   combine_skipped: 'มีไฟล์แนบที่รวมเข้าไฟล์เดียวไม่ได้',
 };
 
+/** somchai@gmail.com → s•••••@gmail.com — enough to recognise your own address
+ *  without printing a colleague's in full on a shared screen. */
+function maskEmail(email) {
+  const [name = '', host = ''] = String(email || '').split('@');
+  if (!host) return email || '';
+  return `${name.slice(0, 1)}${'•'.repeat(Math.max(3, Math.min(6, name.length - 1)))}@${host}`;
+}
+
 /** Rebuild { pm, execs } from an existing chain, so a rejected document going
  *  back for review reopens with the same approvers instead of a blank form. */
 function chainPrefill(steps) {
@@ -63,7 +71,9 @@ function chainPrefill(steps) {
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { profile, user } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { profile, user, logout } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
   const composerRef = useRef(null);
@@ -95,6 +105,25 @@ export default function DocumentDetail() {
   // after acting, a persistent "what happened + next" state so the approver gets
   // closure and a path to their next pending item (not just a fleeting toast).
   const [postAction, setPostAction] = useState(null); // { action, next: {id,doc_number}|null, count }
+
+  // Who was this notice addressed to? Emails carry ?for=<their address>. On a
+  // phone signed into several accounts the browser opens the link under whichever
+  // session it already holds, and the real recipient could only tell that
+  // something was wrong from the *absence* of an approve button.
+  const addressedTo = (searchParams.get('for') || '').trim().toLowerCase();
+  const myEmail = (profile?.email || user?.email || '').toLowerCase();
+  const wrongAccount = Boolean(addressedTo && myEmail && addressedTo !== myEmail);
+
+  /** Sign out and come straight back HERE, with the right address pre-filled. */
+  const switchAccount = () => {
+    logout();
+    navigate('/login', {
+      replace: true,
+      // `from` is what ProtectedRoute would have set; `hint` pre-fills the email
+      // box and tells Google which account to offer.
+      state: { from: { pathname: location.pathname, search: location.search }, hint: addressedTo },
+    });
+  };
 
   const load = useCallback(() => {
     ememoApi.getDocument(id).then((r) => { setDoc(r.data); setLoadError(null); }).catch((e) => setLoadError(e.message));
@@ -298,7 +327,7 @@ export default function DocumentDetail() {
   const me = profile?.full_name || user?.email || 'ฉัน';
 
   // consulted-user cue: is there an open "ขอความเห็น" addressed to me?
-  const myEmail = (profile?.email || '').toLowerCase();
+  // (myEmail is resolved once near the top, alongside the wrong-account check)
   const consultForMe = !myApproval.canApprove && (doc.messages || []).some(
     (m) => m.kind === 'consult' && (m.consult_email || '').toLowerCase() === myEmail
   );
@@ -348,6 +377,30 @@ export default function DocumentDetail() {
             <p className="text-xs text-slate-600">ท่านไม่จำเป็นต้องอนุมัติ — เพียงอ่านเอกสารแล้วให้ความเห็นในช่องด้านล่าง</p>
           </div>
           <button onClick={scrollToComposer} className="btn-primary shrink-0"><Icon name="chat" className="h-4 w-4" /> ให้ความเห็น</button>
+        </div>
+      )}
+
+      {/* Opened from an email addressed to somebody else — say so plainly and fix
+          it in one tap, instead of leaving the approver staring at a page with no
+          buttons and no reason why. */}
+      {wrongAccount && !postAction && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 dark:bg-amber-500/10">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+              <Icon name="warning" className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-bold text-amber-900">ท่านกำลังใช้งานด้วยคนละบัญชีกับที่อีเมลส่งถึง</div>
+              <p className="mt-1 text-xs text-amber-800">
+                อีเมลฉบับนี้ส่งถึง <b>{maskEmail(addressedTo)}</b> แต่เครื่องนี้เข้าสู่ระบบด้วย <b>{maskEmail(myEmail)}</b>
+                {' '}จึงยังดำเนินการกับเอกสารนี้ไม่ได้
+              </p>
+              <button onClick={switchAccount} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-amber-700">
+                <Icon name="user" className="h-4 w-4" /> สลับไปบัญชี {maskEmail(addressedTo)}
+              </button>
+              <p className="mt-2 text-[11px] text-amber-700">เข้าสู่ระบบเสร็จแล้วระบบจะพากลับมาที่เอกสารฉบับนี้ให้เอง</p>
+            </div>
+          </div>
         </div>
       )}
 

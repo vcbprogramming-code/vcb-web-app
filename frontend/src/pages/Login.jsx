@@ -33,7 +33,11 @@ export default function Login() {
   const { login, loginWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  // Arriving from "สลับบัญชี" on a document opened under the wrong account: the
+  // address the notice was actually sent to. Pre-fills the box and is handed to
+  // Google so a phone with several accounts offers the right one first.
+  const hint = (location.state?.hint || '').trim();
+  const [email, setEmail] = useState(hint);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -67,6 +71,11 @@ export default function Login() {
         if (cancelled || !window.google?.accounts?.id) return;
         window.google.accounts.id.initialize({
           client_id: googleClientId,
+          // never silently reuse the browser's default account — on a shared or
+          // multi-account phone that is exactly how people ended up signed in as
+          // the wrong person. `login_hint` puts the intended account first.
+          auto_select: false,
+          ...(hint ? { login_hint: hint } : {}),
           callback: async (resp) => {
             setError('');
             setGoogleBusy(true);
@@ -90,10 +99,14 @@ export default function Login() {
       })
       .catch(() => {/* GIS failed to load — email login still works */});
     return () => { cancelled = true; };
-  }, [googleClientId, loginWithGoogle, goDest]);
+  }, [googleClientId, loginWithGoogle, goDest, hint]);
 
   if (!loading && user) {
-    const dest = location.state?.from?.pathname || '/';
+    // keep the query string: an approval link carries ?for=<address>, and dropping
+    // it loses the very context that tells the page which account was expected
+    const dest = location.state?.from?.pathname
+      ? location.state.from.pathname + (location.state.from.search || '')
+      : '/';
     return <Navigate to={dest} replace />;
   }
 
@@ -145,8 +158,15 @@ export default function Login() {
           <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</p>
         </div>
 
-        {/* context strip — reassures a user who arrived from an email link */}
-        {(location.state?.from?.pathname || '').startsWith('/memos/') && (
+        {/* context strip — reassures a user who arrived from an email link. When
+            they came from "สลับบัญชี", name the account they need so a phone with
+            several Google accounts doesn't send them round the loop again. */}
+        {hint ? (
+          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2.5 text-center text-sm text-amber-100">
+            กรุณาเข้าสู่ระบบด้วยบัญชี <b className="break-all">{hint}</b>
+            <span className="mt-1 block text-[11px] text-amber-200/70">เสร็จแล้วระบบจะพากลับไปที่เอกสารเดิมให้เอง</span>
+          </div>
+        ) : (location.state?.from?.pathname || '').startsWith('/memos/') && (
           <div className="mb-4 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2.5 text-center text-sm text-cyan-100">
             เข้าสู่ระบบด้วยบัญชีของท่าน เพื่อเปิดดูเอกสารที่ส่งถึงท่าน
           </div>

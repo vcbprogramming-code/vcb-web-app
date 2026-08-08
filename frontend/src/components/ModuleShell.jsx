@@ -58,6 +58,17 @@ export default function ModuleShell() {
     navigate('/login', { replace: true });
   }
 
+  /** Sign out and return to THIS page once the other account is in. People on a
+   *  multi-account phone had to find "ออกจากระบบ" and then hunt for the document
+   *  again; this keeps their place. */
+  function handleSwitchAccount() {
+    logout();
+    navigate('/login', {
+      replace: true,
+      state: { from: { pathname: location.pathname, search: location.search } },
+    });
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       {/* `bg-white/80` is an opacity variant, so the global .dark remap (which
@@ -152,6 +163,13 @@ export default function ModuleShell() {
                   <Icon name={isDark ? 'sun' : 'moon'} className="h-4 w-4 text-slate-400" /> {isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
                 </button>
                 <div className="my-1 border-t border-slate-100" />
+                <button
+                  onClick={() => { setMenuOpen(false); handleSwitchAccount(); }}
+                  title="ออกจากระบบแล้วเข้าด้วยบัญชีอื่น โดยกลับมาที่หน้านี้"
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Icon name="people" className="h-4 w-4 text-slate-400" /> สลับบัญชี
+                </button>
                 <button
                   onClick={() => { setMenuOpen(false); handleLogout(); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"

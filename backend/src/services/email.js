@@ -93,7 +93,14 @@ function thaiDate(d) {
 export async function sendApprovalRequest({ step, doc }) {
   // Login-gated in-app approval: the link opens the document in the web app
   // (redirecting through login if needed). The approver acts from the detail page.
-  const url = `${env.appBaseUrl}/memos/${doc.id}`;
+  //
+  // ?for= carries WHO the notice was addressed to. On a phone signed into several
+  // Google accounts the link opens under whichever account the browser already
+  // holds — the approver then saw a document with no approve button and no
+  // explanation, and had to work out for themselves that they must sign out.
+  // With this the app can say so and offer to switch in one tap. It is a hint for
+  // the UI only: authorisation is still decided server-side, per step.
+  const url = `${env.appBaseUrl}/memos/${doc.id}?for=${encodeURIComponent(step.approver_email || '')}`;
   const row = (label, value) =>
     `<tr>
        <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
@@ -247,7 +254,8 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
  */
 export async function sendConsultRequest({ toEmail, toName, doc, askerName, question }) {
   if (!toEmail) return { skipped: true };
-  const url = `${env.appBaseUrl}/memos/${doc.id}`;
+  // ?for= — same multi-account hint as the approval notice (see sendApprovalRequest)
+  const url = `${env.appBaseUrl}/memos/${doc.id}?for=${encodeURIComponent(toEmail)}`;
   const row = (label, value) =>
     `<tr>
        <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
@@ -302,7 +310,8 @@ export async function sendAuthorNotification({ toEmail, authorName, doc, outcome
     rejected: { label: 'ไม่ได้รับการอนุมัติ', color: '#dc2626', cta: 'เปิดดูเอกสาร' },
   }[outcome] || { label: outcome, color: '#334155', cta: 'เปิดดูเอกสาร' };
   // open THIS document directly so the author lands on the decided document
-  const url = `${env.appBaseUrl}/memos/${doc.id}`;
+  // (?for= — same multi-account hint as the approval notice)
+  const url = `${env.appBaseUrl}/memos/${doc.id}?for=${encodeURIComponent(toEmail)}`;
   const html = `
   <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">

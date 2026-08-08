@@ -151,6 +151,11 @@ export default function Portal() {
   const shownSoon = soonApps.filter(match); // searchable too — "แผนผัง" must find System Map
 
   function handleLogout() { logout(); navigate('/login', { replace: true }); }
+  // sign out and come back here — see ModuleShell.handleSwitchAccount
+  function handleSwitchAccount() {
+    logout();
+    navigate('/login', { replace: true, state: { from: { pathname: '/', search: '' } } });
+  }
   const go = (to) => { setNavOpen(false); navigate(to); };
 
   return (
@@ -194,6 +199,11 @@ export default function Portal() {
           </nav>
 
           <div className="border-t border-white/10 px-3 py-3">
+            <button onClick={handleSwitchAccount}
+              title="ออกจากระบบแล้วเข้าด้วยบัญชีอื่น"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/10 hover:text-slate-200">
+              <Icon name="people" className="h-[18px] w-[18px]" /> สลับบัญชี
+            </button>
             <button onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300">
               <Icon name="logout" className="h-[18px] w-[18px]" /> ออกจากระบบ

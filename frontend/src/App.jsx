@@ -51,7 +51,17 @@ export default function App() {
 
         {/* Module pages share a slim header with "back to Portal" */}
         <Route element={<ModuleShell />}>
-          <Route path="dashboard" element={<Dashboard />} />
+          {/* admin-only: the overview aggregates the whole register and carries
+              the Excel export. Hiding the menu entry is not a gate — this is,
+              and /documents/stats + /documents/export enforce it server-side. */}
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="memos" element={<DocumentRegister />} />
           <Route path="memos/:id" element={<DocumentDetail />} />

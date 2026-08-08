@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { pool, query, queryOne } from '../config/db.js';
-import { requireAuth, requirePermission } from '../middleware/auth.js';
+import { requireAuth, requirePermission, requireRole } from '../middleware/auth.js';
 import { hasPermission } from '../config/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
@@ -291,7 +291,10 @@ router.get(
 /** GET /api/documents/export — the register (same filters) as .xlsx */
 router.get(
   '/export',
-  requirePermission('ememo', 'view'),
+  // Admin only, by the client's decision: pulling the whole register out as a
+  // spreadsheet is a different act from reading documents in the app. Hiding the
+  // button is not enough — this is the gate that actually holds.
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
     const visibility = await loadVisibility(req.profile);
     const { whereSql, params } = buildWhere(req.query, visibility);
@@ -389,25 +392,50 @@ router.get(
 
 router.get(
   '/stats',
-  requirePermission('ememo', 'view'),
+  // Admin only, by the client's decision — the dashboard aggregates the whole
+  // register across every project, which is a wider view than reading documents.
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
-    // per-user visibility (#8): scoped users must not see other projects'/codes'
-    // doc numbers, subjects or counts on the dashboard.
+    // per-user visibility (#8) still applies on top of the role, so a scoped
+    // admin account never sees counts for projects it was not granted.
     const vis = await loadVisibility(req.profile);
-    const vp = [];
-    const vparts = [];
+    const params = [];
+    const parts = [];
     if (vis) {
-      if (vis.projectIds.length) { vp.push(vis.projectIds); vparts.push(`d.project_id = any($${vp.length}::uuid[])`); }
-      if (vis.docCodes.length) { vp.push(vis.docCodes); vparts.push(`d.doc_code = any($${vp.length}::text[])`); }
+      const scope = [];
+      if (vis.projectIds.length) { params.push(vis.projectIds); scope.push(`d.project_id = any($${params.length}::uuid[])`); }
+      if (vis.docCodes.length) { params.push(vis.docCodes); scope.push(`d.doc_code = any($${params.length}::text[])`); }
+      // UNION of granted scopes (project OR doc_code), matching visibilityAllows()
+      // and buildWhere() — AND-ing them hid docs the user was explicitly granted. (#C1)
+      if (scope.length) parts.push(`(${scope.join(' or ')})`);
     }
-    // UNION of granted scopes (project OR doc_code), matching visibilityAllows() and
-    // buildWhere() — AND-ing them hid docs the user was explicitly granted. (#C1)
-    const vAnd = vparts.length ? ` and (${vparts.join(' or ')})` : '';
-    const vWhere = vparts.length ? ` where (${vparts.join(' or ')})` : '';
-    const [byStatus, byProject, recent, pending, thisMonth] = await Promise.all([
+
+    // Dashboard filters. Same validators as the register, so a hand-edited URL
+    // answers 400 rather than blowing up a ::date / ::uuid cast.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ymd = (v, label) => {
+      const s = String(v);
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`) : null;
+      if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) {
+        throw new ApiError(400, `${label}ไม่ถูกต้อง (ต้องเป็นวันที่จริงในรูปแบบ YYYY-MM-DD)`);
+      }
+      return s;
+    };
+    if (req.query.projectId) {
+      if (!UUID.test(String(req.query.projectId))) throw new ApiError(400, 'ตัวกรองโครงการไม่ถูกต้อง');
+      params.push(req.query.projectId); parts.push(`d.project_id = $${params.length}`);
+    }
+    if (req.query.from) { params.push(ymd(req.query.from, 'วันที่เริ่มต้น')); parts.push(`d.date_received >= $${params.length}`); }
+    if (req.query.to) { params.push(ymd(req.query.to, 'วันที่สิ้นสุด')); parts.push(`d.date_received <= $${params.length}`); }
+
+    const vAnd = parts.length ? ` and ${parts.join(' and ')}` : '';
+    const vWhere = parts.length ? ` where ${parts.join(' and ')}` : '';
+    const vp = params;
+
+    const [byStatus, byProject, recent, pending, thisMonth, monthly, aging, turnaround] = await Promise.all([
       query(`select d.status, count(*)::int as count from documents d${vWhere} group by d.status`, vp),
       query(`select p.code, p.color, count(d.*)::int as count
-               from projects p left join documents d on d.project_id = p.id${vAnd}
+               from projects p left join documents d on d.project_id = p.id${vAnd ? ` and ${parts.join(' and ')}` : ''}
               group by p.id, p.code, p.color order by count desc, p.sort_order`, vp),
       query(`select d.id, d.doc_number, d.subject, d.status, d.date_received,
                     p.code as project_code, p.color as project_color
@@ -419,13 +447,69 @@ router.get(
               where d.status = 'pending'${vAnd} order by d.date_received asc limit 5`, vp),
       queryOne(`select count(*)::int as count from documents d
                  where date_trunc('month', date_received) = date_trunc('month', current_date)${vAnd}`, vp),
+
+      // 12 months of volume, zero-filled so a quiet month is a gap in the line
+      // rather than a missing point that shifts the shape of the trend.
+      query(
+        `with months as (
+           select generate_series(date_trunc('month', current_date) - interval '11 months',
+                                  date_trunc('month', current_date), interval '1 month') as m
+         )
+         select to_char(months.m, 'YYYY-MM') as month,
+                count(d.id)::int as count,
+                count(d.id) filter (where d.status = 'approved')::int as approved
+           from months
+           left join documents d on date_trunc('month', d.date_received) = months.m${vAnd}
+          group by months.m order by months.m`,
+        vp
+      ),
+
+      // How long the pending pile has been waiting. This is the number that turns
+      // "รออนุมัติ 15" into something anyone can act on.
+      query(
+        `select case
+                  when current_date - d.date_received <= 3 then '0-3'
+                  when current_date - d.date_received <= 7 then '4-7'
+                  when current_date - d.date_received <= 14 then '8-14'
+                  else '15+'
+                end as bucket,
+                count(*)::int as count
+           from documents d
+          where d.status = 'pending'${vAnd}
+          group by 1`,
+        vp
+      ),
+
+      // Average days each approver takes, measured from the moment their step
+      // became actionable — NOT from when the document was created, which would
+      // blame step 3 for step 1's delay.
+      query(
+        `select coalesce(nullif(pr.full_name,''), s.approver_email) as name,
+                count(*)::int as steps,
+                round(avg(extract(epoch from (s.acted_at - coalesce(prev.acted_at, d.created_at))) / 86400)::numeric, 1)::float as avg_days
+           from approval_steps s
+           join documents d on d.id = s.document_id
+           left join profiles pr on pr.id = s.approver_id
+           left join lateral (
+             select max(p2.acted_at) as acted_at from approval_steps p2
+              where p2.document_id = s.document_id and p2.step_no < s.step_no and p2.acted_at is not null
+           ) prev on true
+          where s.acted_at is not null and s.action = 'approved'${vAnd}
+          group by 1 having count(*) > 0 order by avg_days desc limit 8`,
+        vp
+      ),
     ]);
     const total = byStatus.rows.reduce((s, r) => s + r.count, 0);
     const statusMap = Object.fromEntries(byStatus.rows.map((r) => [r.status, r.count]));
+    const agingMap = Object.fromEntries(aging.rows.map((r) => [r.bucket, r.count]));
     res.json({
       data: {
         total, thisMonth: thisMonth.count, byStatus: statusMap,
         byProject: byProject.rows, recent: recent.rows, pending: pending.rows,
+        monthly: monthly.rows,
+        aging: ['0-3', '4-7', '8-14', '15+'].map((b) => ({ bucket: b, count: agingMap[b] || 0 })),
+        turnaround: turnaround.rows,
+        generatedAt: new Date().toISOString(),
       },
     });
   })

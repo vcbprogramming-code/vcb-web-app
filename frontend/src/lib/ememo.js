@@ -17,7 +17,8 @@ export const ememoApi = {
   // read-only letterhead (signer/manager) for the create form — works for non-admins
   getLetterhead: (projectId) => api(`/projects/${projectId}/letterhead`),
 
-  stats: () => api('/documents/stats'),
+  // admin-only overview; accepts the dashboard's from/to/projectId filters
+  stats: (filters = {}) => api(`/documents/stats${qs(filters)}`),
   listDocuments: (filters = {}) => api(`/documents${qs(filters)}`),
   getDocument: (id) => api(`/documents/${id}`),
   nextNumber: (projectId, docCode) =>

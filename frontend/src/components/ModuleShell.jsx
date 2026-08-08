@@ -99,7 +99,11 @@ export default function ModuleShell() {
             {brand === 'VCB E-Memo' && (
               <nav className="ml-1 hidden items-center gap-1 md:flex">
                 {[
-                  { to: '/dashboard', label: 'ภาพรวม', active: location.pathname.startsWith('/dashboard') },
+                  // ภาพรวม is admin-only (the route and the API enforce it too) —
+                  // showing the tab to everyone would just be a dead end
+                  ...(role === 'admin'
+                    ? [{ to: '/dashboard', label: 'ภาพรวม', active: location.pathname.startsWith('/dashboard') }]
+                    : []),
                   { to: '/memos', label: 'ทะเบียนเอกสาร', active: location.pathname === '/memos' || location.pathname.startsWith('/memos/') },
                 ].map((t) => (
                   <button

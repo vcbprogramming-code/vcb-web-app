@@ -192,7 +192,9 @@ export default function DocumentDetail() {
       (a) => (a.kind === 'upload') && /^(application\/pdf|image\/)/.test(a.content_type || '')
     );
     const list = [];
-    if (letter) list.push({ id: letter.id, label: 'เอกสาร', isLetter: true, contentType: letter.content_type });
+    // fileName travels with every tab so the download button can save under the
+    // real name instead of the blob's random id
+    if (letter) list.push({ id: letter.id, label: 'เอกสาร', isLetter: true, contentType: letter.content_type, fileName: letter.file_name });
     // number the supplementary files so it's clear which is attachment #1, #2… (#2)
     inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type, fileName: a.file_name }));
     return list;
@@ -515,16 +517,43 @@ export default function DocumentDetail() {
             <div className="mb-2 flex items-center justify-between px-2 pt-1">
               <h3 className="font-bold text-slate-800">เอกสาร</h3>
               {previewUrl ? (
-                <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
-                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
-                </button>
+                <div className="flex items-center gap-4">
+                  {/* Saves whichever tab is open, under its real name. The PDF
+                      viewer's own ⬇ saves as the blob id ("ff3fb917-1c4a…pdf"),
+                      and an image tab has no viewer toolbar to save from at all. */}
+                  <button
+                    onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)}
+                    disabled={attBusy === activePreviewId}
+                    title={activePreview?.fileName ? `ดาวน์โหลด ${activePreview.fileName}` : 'ดาวน์โหลดไฟล์ที่กำลังเปิด'}
+                    className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline disabled:opacity-50"
+                  >
+                    {attBusy === activePreviewId
+                      ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand" /> กำลังเตรียมไฟล์…</>
+                      : <><Icon name="download" className="h-4 w-4" /> ดาวน์โหลด</>}
+                  </button>
+                  <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
+                    <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
+                  </button>
+                </div>
               ) : null}
             </div>
             {/* mobile: the inline A4 preview is small — offer a prominent full-screen read */}
             {previewUrl && (
-              <button onClick={() => window.open(previewUrl, '_blank')} className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white md:hidden">
-                <Icon name="eye" className="h-4 w-4" /> เปิดเอกสารเต็มจอเพื่ออ่าน
-              </button>
+              <div className="mb-2 flex gap-2 md:hidden">
+                <button onClick={() => window.open(previewUrl, '_blank')} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white">
+                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอเพื่ออ่าน
+                </button>
+                <button
+                  onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)}
+                  disabled={attBusy === activePreviewId}
+                  aria-label="ดาวน์โหลดไฟล์ที่กำลังเปิด"
+                  className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  {attBusy === activePreviewId
+                    ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand" />
+                    : <Icon name="download" className="h-4 w-4" />}
+                </button>
+              </div>
             )}
             {combinePending && (
               <div className="mb-2 flex items-center gap-1.5 px-2 text-xs text-slate-400">

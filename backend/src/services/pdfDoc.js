@@ -251,6 +251,8 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
        (document_id, kind, version, file_name, content_type, size_bytes, storage_key, uploaded_by)
      values ($1,'generated_pdf','approved',$2,'application/pdf',$3,$4,$5)
      returning id, storage_key, file_name, created_at`,
-    [doc.id, `${doc.doc_number.replace(/\//g, '-')}-approved.pdf`, pdf.length, key, uploadedBy]
+    // Thai name: this file is handed to people who open it months later, and
+    // "-approved" told them nothing in a system that is otherwise all Thai.
+    [doc.id, `${doc.doc_number.replace(/\//g, '-')}-ฉบับลงนาม.pdf`, pdf.length, key, uploadedBy]
   );
 }

@@ -216,13 +216,17 @@ export default function DocumentRegister() {
             onClick={() => { const on = !awaitingOnly; clearAllFilters(); if (on) setAwaitingOnly(true); }}
             aria-pressed={awaitingOnly}
             title={awaitingOnly ? 'แสดงเอกสารทั้งหมด' : 'แสดงเฉพาะเอกสารที่รอการอนุมัติจากคุณ'}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ring-1 ring-inset transition ${
+            // shrink-0 + nowrap: on a phone these buttons were squeezed until the
+            // Thai labels broke across three lines. The words drop below sm and the
+            // icon carries the meaning instead.
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-bold ring-1 ring-inset transition sm:px-3 ${
               awaitingOnly
                 ? 'bg-white text-amber-600 ring-amber-300'
                 : 'bg-amber-500/90 text-white ring-amber-300/40 hover:bg-amber-500'
             }`}
           >
-            <Icon name="clock" className="h-4 w-4" /> รออนุมัติ {awaiting.count}
+            <Icon name="clock" className="h-4 w-4" />
+            <span className="hidden sm:inline">รออนุมัติ</span> {awaiting.count}
             {awaitingOnly && <Icon name="x" className="h-3.5 w-3.5" />}
           </button>
         )}
@@ -234,7 +238,7 @@ export default function DocumentRegister() {
             onClick={() => navigate('/memos-settings')}
             title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
             aria-label="ตั้งค่า E-Memo"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
             <Icon name="settings" className="h-4 w-4" />
           </button>
@@ -243,9 +247,11 @@ export default function DocumentRegister() {
             and set apart from the secondary buttons so it isn't hit by accident. */}
         <button
           onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-sm font-bold text-[#0f172a] shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300"
+          aria-label="เพิ่มเอกสาร"
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-cyan-400 px-2.5 py-2 text-sm font-bold text-[#0f172a] shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300 sm:px-4"
         >
-          <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> เพิ่มเอกสาร
+          <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} />
+          <span className="hidden sm:inline">เพิ่มเอกสาร</span>
         </button>
       </>
     ),

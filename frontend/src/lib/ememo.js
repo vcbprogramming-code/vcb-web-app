@@ -1,4 +1,4 @@
-import { api, apiUpload, apiBlobUrl } from './api.js';
+import { api, apiUpload, apiBlobUrl, apiUrl } from './api.js';
 
 /** Build a querystring from an object, skipping empty values. */
 function qs(params) {
@@ -59,12 +59,22 @@ export const ememoApi = {
   deleteAttachment: (id, attId) =>
     api(`/documents/${id}/attachments/${attId}`, { method: 'DELETE' }),
 
+  // approvers picked while still drafting — kept so "บันทึกเป็นฉบับร่าง" doesn't
+  // lose them; the real chain is still built at submit time
+  saveDraftApprovers: (id, pm, execs) =>
+    api(`/documents/${id}/draft-approvers`, { method: 'PUT', body: { pm, execs } }),
+
   // approval
   submitForApproval: (id, approvers, resubmitNote) =>
     api(`/documents/${id}/submit`, { method: 'POST', body: { approvers, ...(resubmitNote ? { resubmitNote } : {}) } }),
 
   // public document verification (no auth — QR/token from a printed copy)
   verifyDocument: (token) => api(`/verify/${token}`, { auth: false }),
+
+  // read-only copy for a สำเนาเรียน (CC) recipient — token from their email, no login
+  sharedDocument: (token) => api(`/share/${token}`, { auth: false }),
+  // the letter itself; loaded straight into an <iframe> (no auth header needed)
+  sharedFileUrl: (token) => apiUrl(`/share/${token}/file`),
 
   // public approval (no auth — token from email link)
   lookupApproval: (token) => api(`/approvals/${token}`, { auth: false }),

@@ -209,7 +209,11 @@ export default function DocumentRegister() {
             what buried a freshly-saved document below a full queue. */}
         {awaiting.count > 0 && (
           <button
-            onClick={() => { clearAllFilters(); setAwaitingOnly((v) => !v); }}
+            // Decide the destination FIRST. clearAllFilters() already sets
+            // awaitingOnly=false, so a functional toggle after it read that queued
+            // false and flipped it straight back to true — the ✕ never turned the
+            // filter off, however many times it was clicked.
+            onClick={() => { const on = !awaitingOnly; clearAllFilters(); if (on) setAwaitingOnly(true); }}
             aria-pressed={awaitingOnly}
             title={awaitingOnly ? 'แสดงเอกสารทั้งหมด' : 'แสดงเฉพาะเอกสารที่รอการอนุมัติจากคุณ'}
             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ring-1 ring-inset transition ${
@@ -364,10 +368,22 @@ export default function DocumentRegister() {
       {/* table — wraps in an x-scroll container so it never clips on mobile */}
       <div className="card !p-0">
         <div className="overflow-x-auto">
-        <table className="tbl min-w-[700px]">
+        {/* table-fixed, not auto: a Thai subject has no spaces, so a long one is a
+            single unbreakable "word" whose min-content width stretched the เอกสาร
+            column and squeezed the rest — the register looked different on every
+            project filter. Fixed widths make every filter render identically. */}
+        <table className="tbl min-w-[780px] table-fixed">
+          <colgroup>
+            <col className="w-12" />
+            <col className="w-28" />
+            <col className="w-24" />
+            <col />
+            <col className="w-36" />
+            <col className="w-40" />
+          </colgroup>
           <thead>
             <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">
-              <th className="tbl-th w-12 font-semibold">#</th>
+              <th className="tbl-th font-semibold">#</th>
               <th className="tbl-th font-semibold">วันที่</th>
               <th className="tbl-th font-semibold">รหัส</th>
               <th className="tbl-th font-semibold">เอกสาร</th>
@@ -440,10 +456,12 @@ export default function DocumentRegister() {
                           </span>
                         )}
                       </div>
-                      <div className="line-clamp-1 text-xs text-slate-500">{d.subject}</div>
+                      {/* truncate, not line-clamp: an unbroken Thai subject never
+                          reaches a line break, so only nowrap+ellipsis clips it */}
+                      <div className="truncate text-xs text-slate-500" title={d.subject}>{d.subject}</div>
                     </div>
                   </td>
-                  <td className="tbl-td"><StatusBadge status={d.status} /></td>
+                  <td className="tbl-td whitespace-nowrap"><StatusBadge status={d.status} /></td>
                   <td className="tbl-td text-right">
                     <div className="flex items-center justify-end">
                       <button

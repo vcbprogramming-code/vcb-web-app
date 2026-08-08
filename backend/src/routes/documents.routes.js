@@ -473,7 +473,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await queryOne(
       `select ${LIST_SELECT}, d.body, d.work_unit, d.enclosures, d.reference, d.reference_doc_id, d.cc_recipients,
-              d.signer_name, d.signer_title, d.created_by, d.company_id, d.verify_token, pr.full_name as preparer_name,
+              d.signer_name, d.signer_title, d.created_by, d.company_id, d.verify_token, d.draft_approvers,
+              pr.full_name as preparer_name,
               lh.manager_email, lh.signatory_name as manager_name
          ${LIST_FROM}
          left join profiles pr on pr.id = d.created_by
@@ -1107,6 +1108,43 @@ const submitSchema = z.object({
   resubmitNote: z.string().optional(),
 });
 
+const draftApproversSchema = z.object({
+  pm: z.object({ name: z.string().optional().nullable(), email: z.string().email() }).nullable().optional(),
+  execs: z.array(z.object({ name: z.string().optional().nullable(), email: z.string().email() })).max(20).optional(),
+});
+
+/**
+ * PUT /api/documents/:id/draft-approvers — park the approvers chosen while the
+ * document is still a draft.
+ *
+ * The real chain is only written at submit time, so "บันทึกเป็นฉบับร่าง" used to
+ * discard the approver list the user had just picked; they came back to send it
+ * and found the form empty. This stores the intent only — nothing approves off
+ * it, and submit still builds approval_steps from what is posted then.
+ */
+router.put(
+  '/:id/draft-approvers',
+  asyncHandler(async (req, res) => {
+    const doc = await loadDocForMutation(req);
+    const parsed = draftApproversSchema.safeParse(req.body);
+    if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+    // only meaningful before/between chains — never overwrite while one is live
+    if (doc.status === 'pending' || doc.status === 'approved') {
+      throw new ApiError(409, 'เอกสารนี้อยู่ในสายอนุมัติแล้ว');
+    }
+    const value = {
+      pm: parsed.data.pm?.email ? { name: parsed.data.pm.name || null, email: parsed.data.pm.email } : null,
+      execs: (parsed.data.execs || []).filter((a) => a.email).map((a) => ({ name: a.name || null, email: a.email })),
+    };
+    const empty = !value.pm && !value.execs.length;
+    await query('update documents set draft_approvers = $2::jsonb where id = $1', [
+      doc.id,
+      empty ? null : JSON.stringify(value),
+    ]);
+    res.json({ data: empty ? null : value });
+  })
+);
+
 router.post(
   '/:id/submit',
   requirePermission('ememo', 'submit'),
@@ -1187,6 +1225,10 @@ router.post(
       client.release();
     }
     const firstStep = chain.firstStep;
+
+    // The parked draft list has served its purpose — approval_steps is now the
+    // truth. Leaving it would prefill a stale list if the doc comes back rejected.
+    await query('update documents set draft_approvers = null where id = $1', [doc.id]).catch(() => {});
 
     // Log the resubmission reason to the thread + audit so reviewers see what changed (#11).
     if (isResubmit && parsed.data.resubmitNote?.trim()) {

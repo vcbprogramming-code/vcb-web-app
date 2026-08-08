@@ -5,23 +5,36 @@ import Icon from '../../components/Icon.jsx';
 // stable per-row id so removable rows key by identity, not index (see AddDocumentModal)
 const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
 
-export default function SubmitApprovalModal({ documentId, docCode, projectManager, resubmit = false, onClose, onSubmitted }) {
-  const [approvers, setApprovers] = useState([{ _id: rid(), name: '', email: '' }]); // higher approvers only
+export default function SubmitApprovalModal({ documentId, docCode, projectManager, prefill = null, resubmit = false, onClose, onSubmitted }) {
+  // Start from whatever was already chosen — the draft's parked list, or the
+  // chain a rejected doc went round with. Blank only when there is nothing.
+  const [approvers, setApprovers] = useState(() =>
+    prefill?.execs?.length
+      ? prefill.execs.map((a) => ({ _id: rid(), name: a.name || '', email: a.email || '' }))
+      : [{ _id: rid(), name: '', email: '' }]
+  ); // higher approvers only
   const [locked, setLocked] = useState(false);
   const [users, setUsers] = useState([]); // system accounts, for the picker
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [resubmitNote, setResubmitNote] = useState(''); // reason for re-submitting (#11)
   // ผู้จัดการโครงการ / ผู้ลงนาม = first approver (signs under ขอแสดงความนับถือ)
-  const [pmEmail, setPmEmail] = useState(projectManager?.email || '');
-  const [pmName, setPmName] = useState(projectManager?.name || '');
+  // the project's own PM wins; otherwise reuse whoever was picked before
+  const [pmEmail, setPmEmail] = useState(projectManager?.email || prefill?.pm?.email || '');
+  const [pmName, setPmName] = useState(projectManager?.name || prefill?.pm?.name || '');
   const pmConfigured = Boolean(projectManager?.email);
 
   // load the accounts that can be picked (must have a system account)
   useEffect(() => {
     ememoApi.listApprovers().then((r) => setUsers(r.data)).catch(() => setUsers([]));
   }, []);
-  useEffect(() => { setPmEmail(projectManager?.email || ''); setPmName(projectManager?.name || ''); }, [projectManager?.email, projectManager?.name]);
+  // keep following the project's PM if it arrives/changes — but don't wipe a
+  // previously-chosen one back to blank when the project has none
+  useEffect(() => {
+    if (!projectManager?.email) return;
+    setPmEmail(projectManager.email);
+    setPmName(projectManager.name || '');
+  }, [projectManager?.email, projectManager?.name]);
 
   // prefill + lock the HIGHER approvers from the doc-code config (PM is separate).
   useEffect(() => {

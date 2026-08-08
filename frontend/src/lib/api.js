@@ -127,6 +127,11 @@ export async function apiUpload(path, file, { field = 'file', extra = {} } = {})
  * Storage downloads stream through the API; window.open can't send a Bearer
  * header, hence this blob-fetch helper.
  */
+/** Absolute URL for an API path. Only for endpoints that need NO Authorization
+ *  header — a token-gated public file the browser can load directly (iframe,
+ *  <a download>), where apiBlobUrl's fetch+blob round-trip buys nothing. */
+export const apiUrl = (path) => `${BASE}${path}`;
+
 export async function apiBlobUrl(path) {
   const headers = {};
   const token = tokenStore.get();

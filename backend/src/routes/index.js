@@ -4,6 +4,7 @@ import orgRoutes from './org.routes.js';
 import projectRoutes from './projects.routes.js';
 import documentRoutes from './documents.routes.js';
 import verifyRoutes from './verify.routes.js';
+import shareRoutes from './share.routes.js';
 import adminRoutes from './admin.routes.js';
 import performanceRoutes from './performance.routes.js';
 import creditRoutes from './credit.routes.js';
@@ -37,6 +38,8 @@ router.use('/documents', documentRoutes);
 // unauthenticated mutation/download surface. Any pending step is still actionable
 // via the in-app POST /documents/:id/approve. (approvals.routes.js kept for history.)
 router.use('/verify', verifyRoutes); // public (token-based) document authenticity check
+// public (token-based) read-only copy for สำเนาเรียน recipients without an account
+router.use('/share', shareRoutes);
 router.use('/admin', adminRoutes); // admin-only: users + config
 router.use('/announcements', announcementRoutes); // portal notices (read: all, write: admin)
 router.use('/support', supportRoutes); // portal "report an issue" → emails admins

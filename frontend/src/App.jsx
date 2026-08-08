@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
 import VerifyDocument from './pages/ememo/VerifyDocument.jsx';
+import SharedDocument from './pages/ememo/SharedDocument.jsx';
 import EmemoSettings from './pages/ememo/EmemoSettings.jsx';
 import Settings from './pages/admin/Settings.jsx';
 import Performance from './pages/performance/Performance.jsx';
@@ -34,6 +35,9 @@ export default function App() {
       <Route path="/approve/:token" element={<Navigate to="/login" replace />} />
       {/* public document verification — reached by scanning the QR, no login */}
       <Route path="/verify/:token" element={<VerifyDocument />} />
+      {/* read-only copy for a สำเนาเรียน (CC) recipient — link from their email,
+          no login and no account needed. Opens that one document only. */}
+      <Route path="/doc/:token" element={<SharedDocument />} />
 
       <Route
         element={

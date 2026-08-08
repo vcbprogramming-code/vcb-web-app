@@ -48,6 +48,18 @@ const AUDIT_ACTION_TH = {
   combine_skipped: 'มีไฟล์แนบที่รวมเข้าไฟล์เดียวไม่ได้',
 };
 
+/** Rebuild { pm, execs } from an existing chain, so a rejected document going
+ *  back for review reopens with the same approvers instead of a blank form. */
+function chainPrefill(steps) {
+  if (!Array.isArray(steps) || !steps.length) return null;
+  const ordered = [...steps].sort((a, b) => a.step_no - b.step_no);
+  const signer = ordered.find((s) => s.is_signer);
+  return {
+    pm: signer ? { name: signer.approver_name, email: signer.approver_email } : null,
+    execs: ordered.filter((s) => !s.is_signer).map((s) => ({ name: s.approver_name, email: s.approver_email })),
+  };
+}
+
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -608,6 +620,10 @@ export default function DocumentDetail() {
           documentId={id}
           docCode={doc.doc_code}
           projectManager={doc.manager_email ? { name: doc.manager_name, email: doc.manager_email } : null}
+          // approvers chosen when this was saved as a draft, or — for a rejected
+          // doc going back in — the chain it went round with last time. Either way
+          // the user doesn't re-pick everyone from scratch.
+          prefill={doc.draft_approvers || chainPrefill(doc.approval_steps)}
           resubmit={isResubmit}
           onClose={() => setShowSubmit(false)}
           onSubmitted={(emailFailed) => { setShowSubmit(false); if (emailFailed) toast.error('ส่งเข้าสายอนุมัติแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'); else toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}

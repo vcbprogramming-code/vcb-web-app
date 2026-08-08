@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
+import { ensureShareToken } from './docShare.js';
 
 /**
  * Email delivery. Three modes, picked at send time:
@@ -183,16 +184,13 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
   const accent = done ? '#15803d' : '#0f766e';
   const accent2 = done ? '#16a34a' : '#0d9488';
   const tag = done ? 'อนุมัติแล้ว' : 'สำเนาเรียน';
-  // open THIS document directly (not the register), so the CC recipient sees
-  // exactly which document was copied to them
-  const url = `${env.appBaseUrl}/memos/${doc.id}`;
   const row = (label, value) =>
     `<tr>
        <td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">${label}</td>
        <td style="padding:8px 0;color:#0f172a;font-weight:500">${value}</td>
      </tr>`;
 
-  const html = `
+  const body = (url) => `
   <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
       <div style="background:${accent};background:linear-gradient(135deg,${accent2},${accent});padding:24px 28px;color:#fff">
@@ -213,6 +211,9 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
             เปิดดูเอกสาร
           </a>
         </div>
+        <p style="margin:14px 0 0;font-size:12px;color:#94a3b8;text-align:center">
+          เปิดได้จากลิงก์นี้โดยไม่ต้องเข้าสู่ระบบ · ลิงก์นี้เป็นของท่านโดยเฉพาะ กรุณาอย่าส่งต่อ
+        </p>
       </div>
       <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
         อีเมลฉบับนี้ส่งโดยอัตโนมัติเพื่อทราบ — ไม่ต้องดำเนินการอนุมัติ · กรุณาอย่าตอบกลับ
@@ -222,11 +223,17 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
 
   const results = [];
   for (const to of emails) {
+    // Each recipient gets THEIR OWN read-only link. It used to be /memos/:id for
+    // everyone — a page behind the login wall, which a copied-in person outside
+    // the provisioned account list could never get past. Falls back to the
+    // in-app page if the token can't be minted, so the notice still goes out.
+    const token = await ensureShareToken(doc.id, to);
+    const url = token ? `${env.appBaseUrl}/doc/${token}` : `${env.appBaseUrl}/memos/${doc.id}`;
     const r = await sendEmail({
       to,
       subject: `[${tag}] ${doc.doc_number} — ${doc.subject}`,
-      html,
-      text: `${done ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่านได้รับการอนุมัติครบทุกลำดับแล้ว' : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)'}\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู: ${url}`,
+      html: body(url),
+      text: `${done ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่านได้รับการอนุมัติครบทุกลำดับแล้ว' : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)'}\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู (ไม่ต้องเข้าสู่ระบบ): ${url}`,
     }).catch((e) => ({ error: e.message, to }));
     results.push(r);
   }

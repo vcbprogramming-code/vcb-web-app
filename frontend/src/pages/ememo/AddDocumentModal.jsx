@@ -363,6 +363,17 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       const finalApprovers = !asDraft && pmEmail.trim()
         ? [{ name: signerName.trim() || undefined, email: pmEmail.trim(), isSigner: true }, ...cleanedExecs]
         : [];
+
+      // Saving as a draft used to drop the approvers the user had just picked —
+      // the chain is only written on submit, and a draft never submits. Park the
+      // choice on the document so "ส่งอนุมัติ" later opens with it already filled.
+      if (asDraft && (pmEmail.trim() || cleanedExecs.length)) {
+        await ememoApi.saveDraftApprovers(
+          doc.id,
+          pmEmail.trim() ? { name: signerName.trim() || null, email: pmEmail.trim() } : null,
+          cleanedExecs.map((a) => ({ name: a.name || null, email: a.email }))
+        ).catch((err) => console.error('เก็บผู้อนุมัติของฉบับร่างไม่สำเร็จ:', err.message));
+      }
       let emailSent = true;
       if (finalApprovers.length > 0) {
         try {

@@ -396,8 +396,9 @@ router.get(
   // register across every project, which is a wider view than reading documents.
   requireRole('admin'),
   asyncHandler(async (req, res) => {
-    // per-user visibility (#8) still applies on top of the role, so a scoped
-    // admin account never sees counts for projects it was not granted.
+    // loadVisibility returns null for admins by design (they see everything), so
+    // in practice this adds no scope here — it is kept so the query stays correct
+    // if the route is ever opened to a scoped role.
     const vis = await loadVisibility(req.profile);
     const params = [];
     const parts = [];

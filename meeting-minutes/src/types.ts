@@ -99,6 +99,15 @@ export interface MeetingFull {
   createdAt: string
   updatedAt: string
   attachments: Attachment[]
+  comments: Comment[]
+}
+
+/** A staff comment on a meeting. Author/admin may delete their own. */
+export interface Comment {
+  id: string
+  author: string
+  text: string
+  createdAt: string
 }
 
 /** saveEdit() result. */
@@ -240,4 +249,8 @@ export interface ServerApi {
   addAttachment(meetingId: string, fileName: string, mimeType: string, base64Data: string, token: string): Promise<Attachment[]>
   /** Removes one attachment by fileId. Admin only. Returns the remaining list. */
   removeAttachment(meetingId: string, fileId: string, token: string): Promise<Attachment[]>
+  /** Posts a comment. Any signed-in staff who can see the meeting. Returns the updated list. */
+  addComment(meetingId: string, text: string, token: string): Promise<Comment[]>
+  /** Deletes one comment by id. Author or admin only. Returns the remaining list. */
+  removeComment(meetingId: string, commentId: string, token: string): Promise<Comment[]>
 }

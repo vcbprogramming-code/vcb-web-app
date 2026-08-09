@@ -16,6 +16,7 @@ interface Props {
   byId: Record<string, Project>
   projects: Project[]
   isAdmin: boolean
+  userEmail: string
   onToast: (msg: string) => void
   onBusy: (msg: string | null) => void
   onEdit: (m: MeetingFull) => void
@@ -32,11 +33,14 @@ interface Props {
 }
 
 // Mirrors openMeeting() + renderDetail().
-export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, onBusy, onEdit, onMutated, execUrl, theme }: Props) {
+export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, onToast, onBusy, onEdit, onMutated, execUrl, theme }: Props) {
   const [m, setM] = useState<MeetingFull | null>(getCached(id) ?? null)
   const [loading, setLoading] = useState(!getCached(id))
   const [err, setErr] = useState('')
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentPosting, setCommentPosting] = useState(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { confirm, node: confirmNode } = useConfirm()
@@ -158,6 +162,33 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
       onToast('Attachment removed')
     } catch (e) { onToast('Failed: ' + (e instanceof Error ? e.message : String(e))) } finally { onBusy(null) }
   }
+  async function postComment(): Promise<void> {
+    if (!m) return
+    const text = commentDraft.trim()
+    if (!text) return
+    setCommentPosting(true)
+    try {
+      const comments = await api.addComment(m.id, text, getToken())
+      const next = { ...m, comments }; setCached(m.id, next); setM(next)
+      setCommentDraft('')
+    } catch (e) { onToast('Failed: ' + (e instanceof Error ? e.message : String(e))) } finally { setCommentPosting(false) }
+  }
+  async function deleteComment(commentId: string): Promise<void> {
+    if (!m) return
+    const ok = await confirm('This cannot be undone.', { title: 'Delete this comment?', okLabel: 'Delete' })
+    if (!ok) return
+    onBusy('Deleting…')
+    try {
+      const comments = await api.removeComment(m.id, commentId, getToken())
+      const next = { ...m, comments }; setCached(m.id, next); setM(next)
+    } catch (e) { onToast('Failed: ' + (e instanceof Error ? e.message : String(e))) } finally { onBusy(null) }
+  }
+  function fmtCommentTime(iso: string): string {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ', ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  }
 
   if (loading) return <div className="placeholder"><div className="spin" style={{ borderColor: '#ccc', borderTopColor: '#0b3d62' }} /><div>Loading…</div></div>
   if (err) return <div className="placeholder">Error: {err}</div>
@@ -184,7 +215,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
         )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
         {editable && <button className="dbtn primary" id="d_editapp" onClick={openEditFresh}>✎ Edit here</button>}
-        {isAdmin && m.docUrl && <a className="dbtn" id="d_docedit" href={m.docUrl} target="_blank" rel="noreferrer">Open in Google Docs</a>}
+        <button className={'dbtn' + (commentsOpen ? ' active' : '')} id="d_comments" title="Comments" onClick={() => setCommentsOpen(v => !v)}>💬 <span className="blbl">Comments</span></button>
         <button className="dbtn" id="d_share" title="Share link" onClick={share}>🔗 <span className="blbl">Share link</span></button>
         <button className="dbtn" id="d_print" onClick={print}>🖨 Print / PDF</button>
         <div className="sub">{p.name || ''} · {fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}</div>
@@ -251,6 +282,38 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, onToast, on
         onClose={() => setTagPickerOpen(false)} onTagged={onTagged} onBusy={onBusy} onToast={onToast}
       />
       {confirmNode}
+
+      {commentsOpen && (
+        <>
+          <div className="comments-backdrop" onClick={() => setCommentsOpen(false)} />
+          <aside className="comments-panel">
+            <div className="comments-panel-head">
+              <h3>Comments</h3>
+              <button className="ibtn" title="Close" onClick={() => setCommentsOpen(false)}>✕</button>
+            </div>
+            <div className="comments-panel-body">
+              {m.comments.length === 0 && <div className="comments-empty">No comments yet.</div>}
+              {m.comments.map(c => {
+                const mine = isAdmin || c.author === userEmail
+                return (
+                  <div className="comment-row" key={c.id}>
+                    <div className="comment-meta"><b>{c.author || '(unknown)'}</b><span>{fmtCommentTime(c.createdAt)}</span></div>
+                    <div className="comment-text">{c.text}</div>
+                    {mine && <button type="button" className="comment-del" title="Delete comment" onClick={() => deleteComment(c.id)}>✕</button>}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="comments-panel-foot">
+              <textarea
+                placeholder="Write a comment…" maxLength={4000} rows={2}
+                value={commentDraft} onChange={e => setCommentDraft(e.target.value)}
+              />
+              <button className="dbtn primary" disabled={commentPosting || !commentDraft.trim()} onClick={postComment}>Post</button>
+            </div>
+          </aside>
+        </>
+      )}
     </>
   )
 }

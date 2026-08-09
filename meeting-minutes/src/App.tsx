@@ -204,6 +204,7 @@ export default function App() {
       return (
         <MeetingDetail
           key={activeId} id={activeId} byId={byId} projects={session.projects} isAdmin={session.isAdmin}
+          userEmail={session.user}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
           onMutated={() => { refreshAll() }} execUrl={session.execUrl} theme={theme}
         />

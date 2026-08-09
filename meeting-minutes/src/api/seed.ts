@@ -3,7 +3,7 @@
 // content carrying a real Executive Summary + Action Items section so the
 // project-tab summary extraction has something to pull — exactly like live docs.
 
-import type { Attachment, MeetingKind, MeetingSource, ProjectId } from '../types'
+import type { Attachment, Comment, MeetingKind, MeetingSource, ProjectId } from '../types'
 
 export interface SeedProject {
   id: ProjectId
@@ -80,6 +80,7 @@ export interface SeedRow {
   createdAt?: string
   /** Files attached via addAttachment/removeAttachment. '' or [] = none. */
   attachments?: Attachment[]
+  comments?: Comment[]
 }
 
 interface BodyOpts {

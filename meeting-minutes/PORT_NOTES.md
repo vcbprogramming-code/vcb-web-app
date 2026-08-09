@@ -13,9 +13,65 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-07-23
-- **Live deployment referenced:** `@60` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-09
+- **Live deployment referenced:** `@144` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed 2026-08-09 sync:**
+  - **Staff comments on meetings (new).** A new 💬 Comments button in the
+    meeting detail bar (`MeetingDetail.tsx`) opens a slide-out panel — list of
+    `{author, text, createdAt}` comments, a textarea + Post button, and a ✕
+    delete button shown to a comment's author or an admin. New `Comment` type
+    (`types.ts`) and `MeetingFull.comments: Comment[]`. New `ServerApi`
+    methods `addComment`/`removeComment`, implemented in `mock.ts` (mirrors
+    `addComment`/`removeComment` in Code.js: same "not signed in" / "not
+    authorized" checks, same 4000-char cap) and wired through `client.ts`.
+    `SeedRow` (`seed.ts`) gained an optional `comments?: Comment[]` field.
+    `App.tsx` now threads a new `userEmail={session.user}` prop into
+    `MeetingDetail` so the panel can tell which comments are the current
+    user's own (`session.user` was already returned by `getSessionState`,
+    just not consumed here before). **Note:** unlike the GAS version, this
+    mock has no real anonymous-access gap to worry about — `resolveIdentity()`
+    only ever returns the simulated admin or a fully empty identity (see
+    *Admin simulation* below), so `addComment`/`removeComment` here just
+    mirror the GAS auth rules structurally; they don't reproduce the
+    real-world "anonymous visitors can't be identified" limitation described
+    in `PROJECT_SUMMARY.md`'s *Known limits* — there's no non-admin identity
+    in the mock to exercise that gap with.
+  - **Removed the long-dead "Open in Google Docs" detail-bar button** —
+    `docUrl` was computed but the button was never actually reachable in
+    normal use; mirrors the same removal in `JavaScript.html`. This also
+    obsoletes the "Open-in-Docs" mention in *Known deviations* #1 below (the
+    button no longer exists on either side, so there is nothing left to
+    deviate on for it — left the rest of that note as-is since Pin/Share
+    mobile-lift placement is still a real, current deviation).
+- **What changed 2026-07-26 sync:**
+  - **Mobile nav-race fix on boot.** Tapping a "Latest meetings" tile (rendered
+    instantly from cache on the mobile projects pane) while the initial
+    `getSessionState`/`listMeetings` fetch was still in flight got silently
+    reverted: the boot `.then()` unconditionally called `renderDashboard()`
+    and forced the mobile pane back to `'projects'` once it resolved, even
+    though the user had already navigated into a meeting. `App.tsx`'s boot
+    effect now checks whether a meeting is already open (functional
+    `setActiveId` read) before resetting the pane — mirrors the
+    `S.activeId`/`PENDING_MEETING` guard added to `startApp()` in
+    JavaScript.html.
+  - **Skeleton placeholder for mobile "Latest meetings" tiles.** Before this,
+    `#mobileLatest`/`<MobileLatest>` rendered nothing until data loaded, so it
+    took up zero height and the project list sat flush at the top — then
+    shifted downward the instant real tiles popped in, right under a user's
+    thumb. `MobileLatest.tsx` now renders two inert, non-clickable
+    `.ml-skeleton` tiles (same size as real `.ml-item`s) whenever `!loaded &&
+    latest.length === 0`, so the reserved space never changes; `Sidebar.tsx`
+    and `App.tsx` thread the existing `loaded` state through as a new prop.
+    Matching `renderMobileLatestSkeleton()` + `.ml-skeleton` CSS (pulse
+    animation) added to JavaScript.html/Stylesheet.html.
+  - **Synced to GitHub monorepo, not just this folder.** This session's two
+    fixes above were also pushed to `vcb-web-app` (`VCB-dev` branch,
+    `meeting-minutes/` folder) — see that repo's commit
+    `meeting-minutes: sync React mirror with mobile nav-race and
+    skeleton-loader fixes`. That monorepo copy had drifted ~1 month behind
+    this folder; only these two fixes' files actually differed once copied
+    over (everything else was already in sync, confirmed via full-tree diff).
 - **What changed 2026-07-23 sync:**
   - **6-card desktop cap on "Latest meetings"** — `Dashboard.tsx` mirrors
     `renderDashboard()`'s change in JavaScript.html.
@@ -381,6 +437,8 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `getVersionContent` | `mockApi.getVersionContent` | `VersionContent` (`{html,title,dateLabel,time}` — 2026-07-22, was a bare `string`) |
 | `addAttachment` | `mockApi.addAttachment` | `Attachment[]` (full updated list) |
 | `removeAttachment` | `mockApi.removeAttachment` | `Attachment[]` (full updated list) |
+| `addComment` | `mockApi.addComment` | `Comment[]` (full updated list) |
+| `removeComment` | `mockApi.removeComment` | `Comment[]` (full updated list) |
 
 `autoSync` is no longer in this table — it was removed from Code.js entirely
 2026-07-21 (had been a permanent no-op since Docs stopped being the source of
@@ -473,10 +531,11 @@ This is a faithful entry hook, not an added feature — the GAS code already bra
 on `isAdmin` everywhere.
 
 ## Known deviations (intentional)
-1. **Mobile detail action lift:** the GAS client physically *moves* the Pin/Share/
-   Open-in-Docs buttons onto the mobile back-bar via DOM ops. Here they stay in the
-   detail bar (CSS still orders/hides them on mobile). Desktop is identical; this is
-   a minor mobile-only placement nuance.
+1. **Mobile detail action lift:** the GAS client physically *moves* the Pin/Share
+   buttons onto the mobile back-bar via DOM ops (the old third button in that lift,
+   "Open in Google Docs", was dead code and removed entirely 2026-08-09 — see that
+   sync note above). Here they stay in the detail bar (CSS still orders/hides them
+   on mobile). Desktop is identical; this is a minor mobile-only placement nuance.
 2. **Doc reskin / importer / Drive-chip generation** are server-only GAS concerns
    (they shape the stored HTML). The mock ships already-rendered sample HTML, so the
    render path is identical; the import-time transforms are out of scope for the SPA.

@@ -9,7 +9,7 @@
 // added feature — the GAS code already branches on isAdmin everywhere.
 
 import type {
-  Attachment, AuditEntry, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
+  Attachment, AuditEntry, Comment, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
   SaveMeetingInput, ServerApi, SessionState, ProjectId, VersionContent
 } from '../types'
 import { isInboxProject } from '../types'
@@ -152,6 +152,7 @@ function requireAdmin(): void {
 // Mirrors ATTACHMENT_ALLOWED_MIME / ATTACHMENT_MAX_BYTES in Code.js verbatim.
 const ATTACHMENT_ALLOWED_MIME = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.|application\/vnd\.ms-(excel|powerpoint)|application\/msword|image\/(png|jpe?g|gif|webp)|text\/(plain|csv))/i
 const ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024 // 25MB per file
+const COMMENT_MAX_CHARS = 4000
 
 function toListItem(r: SeedRow, projectId: ProjectId, taggedFromInbox?: boolean): MeetingListItem {
   return {
@@ -212,7 +213,8 @@ export const mockApi: ServerApi = {
       docUrl: isAdmin && proj ? 'https://docs.google.com/document/d/EXAMPLE_' + proj.id + '/edit?tab=' + r.tabId : '',
       projectName: proj ? proj.name : r.projectId,
       createdAt: r.createdAt || '2026-06-21T03:00:00.000Z', updatedAt: '2026-06-21T03:00:00.000Z',
-      attachments: (r.attachments || []).slice()
+      attachments: (r.attachments || []).slice(),
+      comments: (r.comments || []).slice()
     }
   },
 
@@ -484,6 +486,36 @@ export const mockApi: ServerApi = {
     r.attachments = (r.attachments || []).filter(a => a.fileId !== fileId)
     logAudit('remove_attachment', 'meeting', meetingId, { name: target ? target.name : fileId })
     return r.attachments.slice()
+  },
+
+  // Mirrors addComment/removeComment in Code.js: any signed-in staff who can
+  // see the meeting may post; author or admin may delete their own.
+  async addComment(meetingId, text): Promise<Comment[]> {
+    const { email, isAdmin } = resolveIdentity()
+    if (!email && !isAdmin) throw new Error('Not signed in.')
+    const trimmed = text.trim()
+    if (!trimmed) throw new Error('Comment is empty.')
+    if (trimmed.length > COMMENT_MAX_CHARS) throw new Error('Comment is too long (max ' + COMMENT_MAX_CHARS + ' characters).')
+    const r = rows.find(x => x.id === meetingId)
+    if (!r) throw new Error('Meeting not found.')
+    if (!isAdmin && !isVisible(r)) throw new Error('Not authorized.')
+    const comment: Comment = { id: uuid(), author: email || ADMIN_EMAIL, text: trimmed, createdAt: new Date().toISOString() }
+    r.comments = [...(r.comments || []), comment]
+    logAudit('add_comment', 'meeting', meetingId, { commentId: comment.id })
+    return r.comments.slice()
+  },
+
+  async removeComment(meetingId, commentId): Promise<Comment[]> {
+    const { email, isAdmin } = resolveIdentity()
+    if (!email && !isAdmin) throw new Error('Not signed in.')
+    const r = rows.find(x => x.id === meetingId)
+    if (!r) throw new Error('Meeting not found.')
+    const target = (r.comments || []).find(c => c.id === commentId)
+    if (!target) throw new Error('Comment not found.')
+    if (target.author !== email && !isAdmin) throw new Error('Not authorized.')
+    r.comments = (r.comments || []).filter(c => c.id !== commentId)
+    logAudit('remove_comment', 'meeting', meetingId, { commentId })
+    return r.comments.slice()
   }
 }
 

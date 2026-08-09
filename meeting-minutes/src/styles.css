@@ -207,9 +207,31 @@
   .dbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
   .dbtn:hover { background: var(--line-soft); }
   .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
+  .dbtn.active { background: var(--line-soft); border-color: var(--brand-2); color: var(--brand-2); }
   .dbtn.danger:hover { background: #fdeef0; color: var(--danger); border-color: #f3c2c8; }
   .dbtn.danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
   .dbtn.danger-solid:hover { background: #a5121f; border-color: #a5121f; }
+
+  /* Comments slide-out panel. */
+  .ibtn { background: transparent; border: 1px solid transparent; border-radius: 7px; width: 28px; height: 28px; font-size: 14px; color: var(--ink-soft); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ibtn:hover { background: var(--line-soft); border-color: var(--line); }
+  .comments-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.15); z-index: 39; }
+  .comments-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); z-index: 40; display: flex; flex-direction: column; }
+  .comments-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .comments-panel-head h3 { margin: 0; font-size: 15px; }
+  .comments-panel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .comments-empty { color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
+  .comment-row { position: relative; padding-right: 22px; }
+  .comment-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .comment-meta b { font-size: 12.5px; color: var(--ink); }
+  .comment-meta span { font-size: 11px; color: var(--ink-faint); }
+  .comment-text { font-size: 13px; color: var(--ink); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  .comment-del { position: absolute; top: 0; right: 0; background: transparent; border: none; color: var(--ink-faint); font-size: 12px; padding: 2px 4px; }
+  .comment-del:hover { color: var(--danger); }
+  .comments-panel-foot { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .comments-panel-foot textarea { resize: vertical; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); }
+  .comments-panel-foot .dbtn { align-self: flex-end; }
+  .comments-panel-foot .dbtn:disabled { opacity: .5; }
   .attendees { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); background: #fbfcfe; }
   .attendees .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; }
   .chip { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 3px 12px 3px 3px; text-decoration: none; color: var(--ink); }
@@ -823,20 +845,22 @@
     padding: 9px 11px;
     min-height: 38px;
   }
-  /* Mobile detail action row: only Pin, Share, Edit-in-Docs, in that order. */
+  /* Mobile detail action row: only Pin, Comments, Share, Edit-in-Docs, in that order. */
   html.is-mobile #d_vis,
   html.is-mobile #d_editapp,
   html.is-mobile #d_print,
   html.is-mobile #d_recording { display: none; }
   html.is-mobile #d_pin { order: 1; }
-  html.is-mobile #d_share { order: 2; }
-  html.is-mobile #d_docedit { order: 3; }
+  html.is-mobile #d_comments { order: 2; }
+  html.is-mobile #d_share { order: 3; }
+  html.is-mobile #d_docedit { order: 4; }
   /* Action buttons lifted onto the backbar row, right-aligned next to "← Meetings". */
   .backbar-actions { display: none; }
   html.is-mobile .backbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
   html.is-mobile .backbar-actions .dbtn { min-height: 40px; padding: 9px 12px; font-size: 12.5px; }
-  /* Collapse Pin / Share to their icons so the whole row fits without wrapping. */
+  /* Collapse Pin / Comments / Share to their icons so the whole row fits without wrapping. */
   html.is-mobile .backbar-actions #d_pin .blbl,
+  html.is-mobile .backbar-actions #d_comments .blbl,
   html.is-mobile .backbar-actions #d_share .blbl { display: none; }
   html.is-mobile .attendees { padding: 10px 12px; }
   /* A4 doc keeps its native 860px layout / fonts / tables intact, but is

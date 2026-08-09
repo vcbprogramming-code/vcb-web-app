@@ -48,5 +48,7 @@ export const api: ServerApi = {
   getOriginalContent: (id, t) => delay(() => mockApi.getOriginalContent(id, t)),
   getVersionContent: (id, seq, t) => delay(() => mockApi.getVersionContent(id, seq, t)),
   addAttachment: (id, name, mime, b64, t) => delay(() => mockApi.addAttachment(id, name, mime, b64, t)),
-  removeAttachment: (id, fileId, t) => delay(() => mockApi.removeAttachment(id, fileId, t))
+  removeAttachment: (id, fileId, t) => delay(() => mockApi.removeAttachment(id, fileId, t)),
+  addComment: (id, text, t) => delay(() => mockApi.addComment(id, text, t)),
+  removeComment: (id, commentId, t) => delay(() => mockApi.removeComment(id, commentId, t))
 }

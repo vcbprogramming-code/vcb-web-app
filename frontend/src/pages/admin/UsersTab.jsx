@@ -198,14 +198,16 @@ export default function UsersTab() {
               <th className="tbl-th">เข้าระบบด้วย</th>
               <th className="tbl-th">บทบาท</th>
               <th className="tbl-th">สถานะ</th>
+              <th className="tbl-th">สังกัดโครงการ</th>
+              <th className="tbl-th">ลายเซ็น</th>
               <th className="tbl-th text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ยังไม่มีผู้ใช้ — กด “เพิ่มผู้ใช้” เพื่อเริ่ม</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">ยังไม่มีผู้ใช้ — กด “เพิ่มผู้ใช้” เพื่อเริ่ม</td></tr>
             ) : users.map((u) => (
               <tr key={u.id} className="tbl-row">
                 <td className="tbl-td font-medium text-slate-800">{u.full_name}</td>
@@ -222,6 +224,26 @@ export default function UsersTab() {
                   <span className={`chip ${u.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
                     {u.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}
                   </span>
+                </td>
+                {/* which projects this person is scoped to. Empty = no restriction,
+                    which is worth saying in words — a blank cell reads like missing
+                    data rather than "sees everything". */}
+                <td className="tbl-td">
+                  {(u.projects || []).length === 0 ? (
+                    <span className="text-xs text-slate-400">ทุกโครงการ</span>
+                  ) : (
+                    <span className="flex flex-wrap gap-1">
+                      {u.projects.map((p) => (
+                        <span key={p.id} className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                          style={{ backgroundColor: p.color || '#64748b' }}>{p.code}</span>
+                      ))}
+                    </span>
+                  )}
+                </td>
+                <td className="tbl-td">
+                  {u.has_signature
+                    ? <span className="chip bg-emerald-50 text-emerald-700">มีแล้ว</span>
+                    : <span className="text-xs text-slate-400">ยังไม่มี</span>}
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setEditUser(u)} disabled={rowBusy(u)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>

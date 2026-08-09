@@ -268,19 +268,59 @@ router.get(
     // just-created document off page 1 for anyone with a full approval queue —
     // the "เอกสารที่เพิ่งบันทึกหายไป" report. Counting has to apply the same filter.
     const onlyAwaiting = (Array.isArray(req.query.awaiting) ? req.query.awaiting[0] : req.query.awaiting) === 'me';
-    const awaitingSql = onlyAwaiting ? `${whereSql ? 'and' : 'where'} ${awaitingExpr}` : '';
+
+    // "เอกสารของฉัน" — documents this user created.
+    // "ที่ฉันเคยดำเนินการ" — documents this user has actually touched: approved,
+    // rejected, returned, or written in. Neither existed before, so anyone
+    // wanting to find their own past work had to page through the whole register.
+    const meId = req.profile.id;
+    const mineIdx = listParams.push(meId);
+    const mineExpr = `d.created_by = $${mineIdx}`;
+    // when I last did something on this document — drives the sort so the most
+    // recently handled document is the first row, which is how people look for it
+    const actedAtExpr = `(
+      select max(t) from (
+        select s.acted_at as t from approval_steps s
+         where s.document_id = d.id and s.approver_id = $${mineIdx} and s.acted_at is not null
+        union all
+        select m.created_at from document_messages m
+         where m.document_id = d.id and m.author_id = $${mineIdx}
+      ) mine
+    )`;
+    const actedExpr = `(${actedAtExpr} is not null)`;
+
+    const mineOf = (Array.isArray(req.query.mine) ? req.query.mine[0] : req.query.mine);
+    // Both $email and $meId are bound for every call (the SELECT list needs them
+    // for is_awaiting_me / my_last_action_at). Postgres rejects a bind that
+    // supplies more parameters than the statement references, so when a filter is
+    // off its slot carries an always-true guard rather than disappearing — that
+    // keeps one parameter list valid for both the count and the page query.
+    // the casts matter: a bare "$1 is not null" leaves Postgres unable to infer
+    // the parameter's type and the whole statement fails to prepare
+    const guards = [
+      onlyAwaiting ? awaitingExpr : `($${meIdx}::text is not null)`,
+      mineOf === 'created' ? mineExpr : mineOf === 'acted' ? actedExpr : `($${mineIdx}::uuid is not null)`,
+    ];
+    const extraSql = `${whereSql ? 'and' : 'where'} ${guards.join(' and ')}`;
 
     const countRow = await queryOne(
-      `select count(*)::int as total ${LIST_FROM} ${whereSql} ${awaitingSql}`,
-      onlyAwaiting ? listParams : params
+      `select count(*)::int as total ${LIST_FROM} ${whereSql} ${extraSql}`,
+      listParams
     );
     const offset = (page - 1) * pageSize;
-    // Newest ENTERED first. Ordering by date_received (the letter's own date) hid a
-    // back-dated memo below newer ones the moment it was saved; created_at is what
-    // makes "the document I just saved" the first row, every time.
+    // Default: newest ENTERED first. Ordering by date_received (the letter's own
+    // date) hid a back-dated memo below newer ones the moment it was saved;
+    // created_at is what makes "the document I just saved" the first row.
+    // For "ที่ฉันเคยดำเนินการ" the useful order is MY latest action, not the
+    // document's age — the client asked for most-recently-handled at the top.
+    const orderBy = mineOf === 'acted'
+      ? `order by ${actedAtExpr} desc nulls last, d.created_at desc`
+      : 'order by d.created_at desc, d.date_received desc, d.doc_number desc';
     const { rows } = await query(
-      `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me ${LIST_FROM} ${whereSql} ${awaitingSql}
-        order by d.created_at desc, d.date_received desc, d.doc_number desc
+      `select ${LIST_SELECT}, ${awaitingExpr} as is_awaiting_me,
+              ${actedAtExpr} as my_last_action_at
+         ${LIST_FROM} ${whereSql} ${extraSql}
+        ${orderBy}
         limit ${pageSize} offset ${offset}`,
       listParams
     );

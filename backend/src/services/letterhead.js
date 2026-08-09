@@ -19,6 +19,14 @@ function thaiLongDate(iso) {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
+/** Same, plus the clock — an approval record without a time is half a record. */
+function thaiLongDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${thaiLongDate(iso)}\n${p(d.getHours())}:${p(d.getMinutes())} น.`;
+}
+
 /**
  * Build an A4 official letter PDF matching Vichitbhan's real letterhead and
  * resolve to a Buffer.
@@ -348,75 +356,74 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
 
     // (verification QR is now stamped on EVERY page via stampQr/pageAdded — see top)
 
-    // ---- ความเห็น / บันทึก / การพิจารณา — on its OWN page (#14) ----
-    // The client wants this on a separate page (never on the memo body page), and it
-    // must include BOTH the approvers' decision comments AND the conversation thread
-    // (บันทึก/ขอความเห็น). Skipped when opts.commentBox === false (clean original) or
-    // when there is nothing to show (an empty titled box says nothing).
-    const commentSteps = Array.isArray(opts.auditSteps)
-      ? opts.auditSteps.filter((s) => s.comment && s.comment.trim())
-      : [];
-    const threadMsgs = Array.isArray(opts.messages)
-      ? opts.messages.filter((m) => m.body && m.body.trim())
-      : [];
-    const boxEntries = [
-      ...commentSteps.map((s) => ({ who: s.approver_name || s.approver_email || '', tag: 'การพิจารณา', text: s.comment })),
-      ...threadMsgs.map((m) => ({ who: m.author_name || 'ผู้ใช้', tag: m.kind === 'consult' ? 'ขอความเห็น' : 'บันทึก', text: m.body })),
-    ];
-    const wantCommentBox = opts.commentBox !== false && boxEntries.length > 0;
-    if (wantCommentBox) {
-      pdf.addPage(); // #14: always its own page, separate from the memo body
-
-      pdf.font('th-bold').fontSize(16).fillColor('#000')
-        .text('ความเห็นและบันทึกการสนทนา', left, pdf.y, { width: contentW, align: 'center' });
-      pdf.moveDown(0.3);
-      pdf.font('th').fontSize(12).fillColor('#555')
-        .text(`เลขที่เอกสาร ${doc.doc_number}  ·  เรื่อง ${doc.subject || ''}`, left, pdf.y, { width: contentW, align: 'center' });
-      pdf.moveDown(1);
-
-      // each entry: "[tag] who" heading, then the comment/message text below it
-      for (const e of boxEntries) {
-        const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 60; // clear of the QR strip
-        if (pdf.y > bottomLimit) pdf.addPage();
-        pdf.font('th-bold').fontSize(11.5).fillColor('#0f172a')
-          .text(`• ${e.who}`, left + 4, pdf.y, { width: contentW - 8, continued: true })
-          .font('th').fontSize(10).fillColor('#64748b').text(`   (${e.tag})`);
-        pdf.font('th').fontSize(11).fillColor('#334155')
-          .text(e.text, left + 16, pdf.y + 1, { width: contentW - 24 });
-        pdf.moveDown(0.7);
-      }
-    }
-
-    // ---- "บันทึกการพิจารณา" page (approval trail) ----
+    // ---- "บันทึกการพิจารณา" — the letter's only appendix ----
+    //
+    // The separate "ความเห็นและบันทึกการสนทนา" page was removed at the client's
+    // request: the conversation belongs in the system, not stapled to a signed
+    // letter. What remains is one appendix laid out like the on-screen audit
+    // trail — date/time, who, what they did, and the reason where there is one.
+    //
+    // The ผู้จัดการโครงการ's own comment never reaches this page (filtered out in
+    // pdfDoc.js): the memo comes from them, so a note they wrote to themselves is
+    // not for the executives who sign afterwards.
     const trail = Array.isArray(opts.auditSteps) ? opts.auditSteps.filter((s) => s.action && s.action !== 'pending') : [];
-    if (trail.length) {
+    if (opts.commentBox !== false && trail.length) {
       const actionTH = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };
+      const actionColor = { approved: '#15803d', rejected: '#be123c', returned: '#c2410c' };
       pdf.addPage();
       pdf.font('th-bold').fontSize(18).fillColor('#000')
         .text('บันทึกการพิจารณา', left, pdf.y, { width: contentW, align: 'center' });
       pdf.moveDown(0.4);
       pdf.font('th').fontSize(12).fillColor('#555')
         .text(`เลขที่เอกสาร ${doc.doc_number}  ·  เรื่อง ${doc.subject || ''}`, left, pdf.y, { width: contentW, align: 'center' });
-      pdf.moveDown(1);
+      pdf.moveDown(1.2);
 
-      trail.forEach((s, i) => {
-        const acted = s.acted_at ? thaiLongDate(s.acted_at) : '';
-        // card-ish row
+      // column geometry — a real table reads as a record, a list of cards doesn't
+      const cW = { when: 118, who: 150, what: 78 };
+      cW.detail = contentW - cW.when - cW.who - cW.what;
+      const x = { when: left, who: left + cW.when, what: left + cW.when + cW.who };
+      x.detail = x.what + cW.what;
+
+      const header = () => {
         const top = pdf.y;
-        pdf.font('th-bold').fontSize(13).fillColor('#000')
-          .text(`${i + 1}. ${s.approver_name || s.approver_email || ''}`, left, top, { width: contentW - 120, continued: false });
-        pdf.font('th').fontSize(12).fillColor(
-          s.action === 'approved' ? '#16a34a' : s.action === 'rejected' ? '#dc2626' : '#ea580c'
-        ).text(actionTH[s.action] || s.action, left + contentW - 120, top, { width: 120, align: 'right' });
-        if (acted) {
-          pdf.font('th').fontSize(10).fillColor('#888').text(acted, left, pdf.y, { width: contentW });
-        }
-        if (s.comment) {
-          pdf.font('th').fontSize(11.5).fillColor('#333')
-            .text(`เหตุผล/ความเห็น: ${s.comment}`, left + 14, pdf.y + 2, { width: contentW - 14 });
-        }
-        pdf.moveDown(0.8);
-      });
+        pdf.font('th-bold').fontSize(11).fillColor('#334155');
+        pdf.text('วันที่ / เวลา', x.when, top, { width: cW.when });
+        pdf.text('ผู้ดำเนินการ', x.who, top, { width: cW.who });
+        pdf.text('การดำเนินการ', x.what, top, { width: cW.what });
+        pdf.text('รายละเอียด', x.detail, top, { width: cW.detail });
+        pdf.y = top + 16;
+        pdf.moveTo(left, pdf.y).lineTo(left + contentW, pdf.y).lineWidth(0.8).strokeColor('#94a3b8').stroke();
+        pdf.y += 6;
+      };
+      header();
+
+      for (const s of trail) {
+        const when = thaiLongDateTime(s.acted_at);
+        const who = s.approver_name || s.approver_email || '';
+        const what = actionTH[s.action] || s.action;
+        const detail = (s.comment || '').trim() || '—';
+        // measure the tallest cell so the row's rule sits below every column
+        pdf.font('th').fontSize(10.5);
+        const h = Math.max(
+          pdf.heightOfString(when, { width: cW.when - 8 }),
+          pdf.heightOfString(who, { width: cW.who - 8 }),
+          pdf.heightOfString(detail, { width: cW.detail - 4 }),
+          14
+        );
+        const bottomLimit = pdf.page.height - pdf.page.margins.bottom - 64; // clear of the QR strip
+        if (pdf.y + h + 10 > bottomLimit) { pdf.addPage(); header(); }
+
+        const top = pdf.y;
+        pdf.font('th').fontSize(10.5).fillColor('#475569').text(when, x.when, top, { width: cW.when - 8 });
+        pdf.font('th-bold').fontSize(10.5).fillColor('#0f172a').text(who, x.who, top, { width: cW.who - 8 });
+        pdf.font('th-bold').fontSize(10.5).fillColor(actionColor[s.action] || '#334155')
+          .text(what, x.what, top, { width: cW.what - 6 });
+        pdf.font('th').fontSize(10.5).fillColor('#334155').text(detail, x.detail, top, { width: cW.detail - 4 });
+
+        pdf.y = top + h + 6;
+        pdf.moveTo(left, pdf.y).lineTo(left + contentW, pdf.y).lineWidth(0.4).strokeColor('#e2e8f0').stroke();
+        pdf.y += 6;
+      }
     }
 
     // stamp the verification QR on every page now that all content is laid out (#7)

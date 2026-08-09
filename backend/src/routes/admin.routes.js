@@ -8,7 +8,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { hashPassword } from '../utils/auth.js';
 import { PERMISSION_CATALOG, effectivePermissions, overridesFromEffective } from '../config/permissions.js';
-import { putObject } from '../config/storage.js';
+import { putObject, openDownloadStream } from '../config/storage.js';
 import { assertRasterImage } from '../utils/imageUpload.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
@@ -35,14 +35,86 @@ const ROLES = ['admin', 'executive', 'hr'];
 router.get(
   '/users',
   asyncHandler(async (req, res) => {
+    // projects[] and has_signature come back with the list so the admin table can
+    // show "สังกัดโครงการ" and whether a signature is on file, instead of making
+    // the admin open every user one at a time to find out.
     const { rows } = await query(
       `select p.id, p.full_name, p.email, p.role, p.unit_id, p.is_active,
-              p.login_method, p.created_at, u.name as unit_name
+              p.login_method, p.created_at, u.name as unit_name,
+              (p.signature_url is not null) as has_signature,
+              coalesce((
+                select json_agg(json_build_object('id', pr.id, 'code', pr.code, 'color', pr.color) order by pr.sort_order)
+                  from document_visibility dv
+                  join projects pr on pr.id = dv.scope_value::uuid
+                 where dv.profile_id = p.id and dv.scope_type = 'project'
+              ), '[]') as projects
          from profiles p
          left join units u on u.id = p.unit_id
         order by p.created_at`
     );
     res.json({ data: rows });
+  })
+);
+
+/**
+ * POST /api/admin/users/:id/signature — an admin uploads/sets someone else's
+ * signature. Until now a signature could only be set by its owner, so an admin
+ * onboarding an executive had no way to put one on file for them.
+ *
+ * This lets an admin produce a signature that will be printed on signed letters
+ * in another person's name, so every change is written to the audit log with
+ * both names — the record has to say who did it.
+ */
+router.post(
+  '/users/:id/signature',
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    const target = await queryOne('select id, full_name, email, signature_url from profiles where id = $1', [req.params.id]);
+    if (!target) throw new ApiError(404, 'User not found');
+    if (!req.file) throw new ApiError(400, 'No file uploaded (field "file")');
+    const sigType = assertRasterImage(req.file, 'ลายเซ็น'); // sniff bytes, reject SVG
+    const key = `signatures/profile/${target.id}-${crypto.randomUUID()}`;
+    await putObject(key, req.file.buffer, sigType);
+    await query('update profiles set signature_url = $2 where id = $1', [target.id, key]);
+    await query(
+      `insert into audit_log (document_id, actor_id, actor_label, action, detail)
+       values (null,$1,$2,'signature_set',$3)`,
+      [req.profile.id, req.profile.full_name || req.profile.email,
+        JSON.stringify({ target_id: target.id, target_name: target.full_name || target.email, by_admin: true })]
+    ).catch((e) => console.error('signature audit failed:', e.message));
+    res.status(201).json({ data: { key, hasSignature: true } });
+  })
+);
+
+/** GET /api/admin/users/:id/signature — stream a user's signature for preview. */
+router.get(
+  '/users/:id/signature',
+  asyncHandler(async (req, res) => {
+    const row = await queryOne('select signature_url from profiles where id = $1', [req.params.id]);
+    if (!row) throw new ApiError(404, 'User not found');
+    if (!row.signature_url) throw new ApiError(404, 'ยังไม่มีลายเซ็น');
+    const obj = await openDownloadStream(row.signature_url);
+    if (!obj) throw new ApiError(404, 'ไม่พบไฟล์ลายเซ็น');
+    res.setHeader('Content-Type', obj.contentType || 'image/png');
+    obj.stream.on('error', () => res.destroy());
+    obj.stream.pipe(res);
+  })
+);
+
+/** DELETE /api/admin/users/:id/signature — clear a user's signature. */
+router.delete(
+  '/users/:id/signature',
+  asyncHandler(async (req, res) => {
+    const target = await queryOne('select id, full_name, email from profiles where id = $1', [req.params.id]);
+    if (!target) throw new ApiError(404, 'User not found');
+    await query('update profiles set signature_url = null where id = $1', [target.id]);
+    await query(
+      `insert into audit_log (document_id, actor_id, actor_label, action, detail)
+       values (null,$1,$2,'signature_cleared',$3)`,
+      [req.profile.id, req.profile.full_name || req.profile.email,
+        JSON.stringify({ target_id: target.id, target_name: target.full_name || target.email })]
+    ).catch(() => {});
+    res.json({ data: { cleared: true } });
   })
 );
 

@@ -111,6 +111,9 @@ export default function DocumentRegister() {
   const [from, setFrom] = useState(sp.get('from') || '');
   const [to, setTo] = useState(sp.get('to') || '');
   const [awaitingOnly, setAwaitingOnly] = useState(sp.get('awaiting') === 'me');
+  // '' | 'created' | 'acted' — "เอกสารของฉัน" / "ที่ฉันเคยดำเนินการ". Without these
+  // there was no way to find your own past work except paging the whole register.
+  const [mine, setMine] = useState(sp.get('mine') || '');
   const [page, setPage] = useState(1);
   // 10 rows made a freshly-saved document easy to lose behind a page break; 25 keeps
   // a normal day's work on one screen.
@@ -143,14 +146,14 @@ export default function DocumentRegister() {
     setLoading(true);
     ememoApi
       .listDocuments({ projectId, docTypeId, status, search, from, to, page, pageSize,
-        awaiting: awaitingOnly ? 'me' : undefined })
+        awaiting: awaitingOnly ? 'me' : undefined, mine: mine || undefined })
       .then((res) => {
         setDocs(res.data);
         setTotal(res.total);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [projectId, docTypeId, status, search, from, to, page, awaitingOnly]);
+  }, [projectId, docTypeId, status, search, from, to, page, awaitingOnly, mine]);
 
   // debounce search; reload on filter change
   useEffect(() => {
@@ -161,7 +164,7 @@ export default function DocumentRegister() {
   // reset to page 1 whenever a non-page filter changes
   useEffect(() => {
     setPage(1);
-  }, [projectId, docTypeId, status, search, from, to, awaitingOnly]);
+  }, [projectId, docTypeId, status, search, from, to, awaitingOnly, mine]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const clearDates = () => {
@@ -169,10 +172,10 @@ export default function DocumentRegister() {
     setTo('');
   };
   // is any filter narrowing the list? (drives the "clear all" control + empty state)
-  const anyFilter = Boolean(projectId || docTypeId || status || search.trim() || from || to || awaitingOnly);
+  const anyFilter = Boolean(projectId || docTypeId || status || search.trim() || from || to || awaitingOnly || mine);
   const clearAllFilters = () => {
     setProjectId(''); setDocTypeId(''); setStatus(''); setSearch(''); setFrom(''); setTo('');
-    setAwaitingOnly(false); setPage(1);
+    setAwaitingOnly(false); setMine(''); setPage(1);
   };
   // "แสดง 1–10 จาก 45 ฉบับ" range for the pager
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -329,6 +332,30 @@ export default function DocumentRegister() {
               </div>
             )}
           </FilterDropdown>
+
+          {/* "mine" filters — the client's own ask: be able to find the documents
+              you created, and the ones you have actually acted on, without paging
+              through everyone else's work */}
+          {[
+            { key: 'created', label: 'เอกสารของฉัน', title: 'เฉพาะเอกสารที่ฉันเป็นผู้สร้าง' },
+            { key: 'acted', label: 'ที่ฉันเคยดำเนินการ', title: 'เอกสารที่ฉันเคยอนุมัติ ไม่อนุมัติ หรือให้ความเห็น — เรียงจากที่ทำล่าสุด' },
+          ].map((m) => (
+            <button
+              key={m.key}
+              onClick={() => setMine(mine === m.key ? '' : m.key)}
+              aria-pressed={mine === m.key}
+              title={m.title}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                mine === m.key
+                  ? 'bg-brand text-white'
+                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Icon name={m.key === 'created' ? 'document' : 'userClock'} className="h-3.5 w-3.5" />
+              {m.label}
+              {mine === m.key && <Icon name="x" className="h-3 w-3" />}
+            </button>
+          ))}
 
           {/* project chips — scroll horizontally on narrow screens instead of walling up */}
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">

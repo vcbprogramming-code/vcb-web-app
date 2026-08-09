@@ -219,29 +219,30 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     }
   }
 
-  // full decision trail for the "บันทึกการพิจารณา" page
+  // Full decision trail for the "บันทึกการพิจารณา" page.
+  //
+  // is_signer is carried through so the trail can drop the ผู้จัดการโครงการ's own
+  // comment: the memo effectively comes FROM the project manager, so a note they
+  // wrote to themselves has no business being read by the executives who sign
+  // after them. Everyone else's reason still prints — for a rejection it is the
+  // whole point of the page.
   const { rows: auditSteps } = await query(
     // same name resolution as the signature block — the decision page printed raw
     // gmail addresses whenever a step carried no typed name.
     `select coalesce(nullif(pr.full_name,''), nullif(s.approver_name,''), s.approver_email) as approver_name,
-            s.approver_email, s.action, s.comment, s.acted_at
+            s.approver_email, s.action, s.acted_at, s.is_signer,
+            case when s.is_signer then null else s.comment end as comment
        from approval_steps s
        left join profiles pr on pr.id = s.approver_id
       where s.document_id = $1 order by s.step_no`,
     [documentId]
   );
 
-  // conversation thread (บันทึก/ขอความเห็น) — surfaced on the comment page (#14)
-  const { rows: messages } = await query(
-    `select m.body, m.kind, coalesce(pr.full_name, m.author_label) as author_name
-       from document_messages m
-       left join profiles pr on pr.id = m.author_id
-      where m.document_id = $1 order by m.created_at`,
-    [documentId]
-  );
-
   const qr = await buildVerifyQr(doc);
-  const pdf = await generateLetterPdf(doc, letter, { authorSignature: signerSignature, signatures, auditSteps, messages, qr });
+  // messages are deliberately NOT passed: the client asked for the separate
+  // "ความเห็นและบันทึกการสนทนา" page to be dropped from the signed letter. The
+  // conversation still lives in the document page and the audit trail.
+  const pdf = await generateLetterPdf(doc, letter, { authorSignature: signerSignature, signatures, auditSteps, qr });
   const key = `documents/${doc.id}/approved-${doc.run_no}.pdf`;
   await putObject(key, pdf, 'application/pdf');
   await clearVersion(doc.id, 'approved', key);

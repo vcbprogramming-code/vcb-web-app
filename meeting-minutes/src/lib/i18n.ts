@@ -16,9 +16,7 @@ export const I18N: Record<Lang, Dict> = {
     theme: 'โหมดสี / Theme', language: 'ภาษา / Language',
     readingSize: 'ขนาดตัวอักษร / Reading size',
     sizeSmall: 'เล็ก Small', sizeNormal: 'ปกติ Normal', sizeLarge: 'ใหญ่ Large',
-    refreshNow: '🔄 Refresh now', refreshing: 'Refreshing…',
-    alreadyUpToDate: 'Already up to date', updated: 'Updated', newWord: 'new', changedWord: 'changed',
-    refreshFailed: 'Refresh failed', about: 'เกี่ยวกับ / ABOUT',
+    about: 'เกี่ยวกับ / ABOUT',
     build: 'Build', adminLabel: 'Admin', close: 'Close',
     records: 'record', recordsPlural: 'records', backToPortal: 'Back to VCB Connect home'
   },
@@ -34,9 +32,7 @@ export const I18N: Record<Lang, Dict> = {
     theme: 'โหมดสี / Theme', language: 'ภาษา / Language',
     readingSize: 'ขนาดตัวอักษร / Reading size',
     sizeSmall: 'เล็ก Small', sizeNormal: 'ปกติ Normal', sizeLarge: 'ใหญ่ Large',
-    refreshNow: '🔄 รีเฟรชตอนนี้', refreshing: 'กำลังรีเฟรช…',
-    alreadyUpToDate: 'อัพเดทล่าสุดแล้ว', updated: 'อัพเดทแล้ว', newWord: 'ใหม่', changedWord: 'เปลี่ยน',
-    refreshFailed: 'รีเฟรชล้มเหลว', about: 'เกี่ยวกับ / ABOUT',
+    about: 'เกี่ยวกับ / ABOUT',
     build: 'เวอร์ชั่น', adminLabel: 'ผู้ดูแล', close: 'ปิด',
     records: 'รายการ', recordsPlural: 'รายการ', backToPortal: 'กลับไปหน้าหลัก VCB Connect'
   }

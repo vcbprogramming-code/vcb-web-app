@@ -11,11 +11,13 @@ interface Props {
   meetings: MeetingListItem[]
   onOpen: (id: string) => void
   tr: Tr
+  execUrl: string
+  onToast: (msg: string) => void
 }
 
 // Per-project panel: Exec Summary + action items of the most recent meeting.
 // Mirrors renderProjectDashboard() + loadSummary().
-export default function ProjectDashboard({ project, meetings, onOpen, tr }: Props) {
+export default function ProjectDashboard({ project, meetings, onOpen, tr, execUrl, onToast }: Props) {
   const items = meetings
     .filter(m => m.projectId === project.id && m.kind !== 'overview')
     .slice()
@@ -36,6 +38,22 @@ export default function ProjectDashboard({ project, meetings, onOpen, tr }: Prop
     return () => { alive = false }
   }, [m?.id, m?.excerpt])
 
+  // Project permalink: unlike MeetingDetail's share() (which points at one
+  // fixed meeting), this always resolves to whatever meeting is CURRENTLY
+  // latest in the project at the time the link is opened (see App.tsx's
+  // pendingProject boot handling) — paste once, reuse forever. Mirrors
+  // shareProjectLink() in JavaScript.html.
+  function shareProjectLink(): void {
+    const base = (execUrl || '').split('?')[0]
+    const link = base ? base + '?project=' + encodeURIComponent(project.id) : project.id
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(link).then(
+        () => onToast('Latest-meeting link copied to clipboard'),
+        () => window.prompt('Copy this link to share (always opens the latest meeting):', link)
+      )
+    } else window.prompt('Copy this link to share (always opens the latest meeting):', link)
+  }
+
   if (!m) {
     return <div className="placeholder"><div className="big">📄</div><div>No meetings yet for {project.name || 'this project'}.</div></div>
   }
@@ -47,12 +65,14 @@ export default function ProjectDashboard({ project, meetings, onOpen, tr }: Prop
           <span className="dot" style={{ display: 'inline-block', width: 11, height: 11, borderRadius: '50%', background: project.color || '#888', verticalAlign: 'middle', marginRight: 7 }} />
           {project.name || ''} — {tr('latestMeetings')}
         </h2>
+        <button type="button" className="dbtn" id="d_shareProject" title="Copy a permanent link that always opens this project's latest meeting" onClick={shareProjectLink}>🔗 Share latest-meeting link</button>
         <p>Executive summary and action items from the most recent meeting — click to read the full record.</p>
       </div>
       <div className="pbig-card" style={cssVar('--c', project.color || '#888')} onClick={(e) => { if ((e.target as HTMLElement).closest('a')) return; onOpen(m.id) }}>
         <div className="pbig-ttl">🗓 {fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}
-          {m.pinned && <>&nbsp;<span className="badge pin">★ Pinned</span></>}
+          {m.pinned && <>&nbsp;<span className="badge pin" title="Pinned">★</span></>}
           {m.hasFathom && <>&nbsp;<span className="badge fathom">▶ Fathom</span></>}
+          {m.source === 'transkriptor' && <>&nbsp;<span className="badge fathom">▤ Transkriptor</span></>}
         </div>
         {!titleIsDate && <div className="pbig-sub">{m.title}</div>}
         <div className="pbig-body" dangerouslySetInnerHTML={{ __html: sum }} />

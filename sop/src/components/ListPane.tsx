@@ -5,8 +5,16 @@ import { useMemo } from 'react';
 import type { Store } from '../store';
 import { MODULES, MODULES_EN, MODULE_INFO } from '../data/config';
 import { SOP_FLOWS } from '../data/flows';
+import { Icon } from '../lib/icons';
 
 const FLOW_GROUP_ORDER = ['BD', 'PO', 'IC', 'OF', 'AP', 'AR', 'FA', 'GL'];
+
+// True if a case belongs to `mod` — either as its primary module or one of
+// its extra tags. Numbering/color/badge still come only from the primary
+// module; this only affects list membership.
+function caseInModule(sc: { module: string; extraModules?: string[] }, mod: string): boolean {
+  return sc.module === mod || (sc.extraModules || []).indexOf(mod) >= 0;
+}
 
 function MBack({ s }: { s: Store }) {
   return (
@@ -23,28 +31,41 @@ function ScenarioList({ s }: { s: Store }) {
   const { nav } = s;
   const q = nav.q.toLowerCase();
 
-  const rows = useMemo(
-    () =>
-      s.scenarios.filter((sc) => {
-        if (nav.mod !== 'ALL' && sc.module !== nav.mod) return false;
-        if (!q) return true;
-        const hay = (
-          sc.titleTH +
-          ' ' +
-          sc.titleEN +
-          ' ' +
-          sc.when +
-          ' ' +
-          sc.steps.join(' ') +
-          ' ' +
-          sc.module +
-          ' ' +
-          sc.ref
-        ).toLowerCase();
-        return hay.indexOf(q) >= 0;
-      }),
-    [s.scenarios, nav.mod, q],
-  );
+  const rows = useMemo(() => {
+    const filtered = s.scenarios.filter((sc) => {
+      if (nav.mod !== 'ALL' && !caseInModule(sc, nav.mod)) return false;
+      if (!q) return true;
+      const hay = (
+        sc.titleTH +
+        ' ' +
+        sc.titleEN +
+        ' ' +
+        sc.when +
+        ' ' +
+        sc.steps.join(' ') +
+        ' ' +
+        sc.module +
+        ' ' +
+        sc.ref +
+        ' ' +
+        (sc.displayNo || '') +
+        ' ' +
+        (sc.extraModules || []).join(' ')
+      ).toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+    // When viewing a specific module, cases whose PRIMARY module matches come
+    // first (in their normal order); cases only present via an extra tag are
+    // pushed after — otherwise a tagged-in case interleaves with real PO-N
+    // cases by row position, which reads as broken numbering (Array.sort is
+    // stable, so relative order within each group is preserved).
+    if (nav.mod !== 'ALL') {
+      return filtered
+        .slice()
+        .sort((a, b) => (a.module === nav.mod ? 0 : 1) - (b.module === nav.mod ? 0 : 1));
+    }
+    return filtered;
+  }, [s.scenarios, nav.mod, q]);
 
   const modLbl =
     s.lang === 'en'
@@ -64,7 +85,17 @@ function ScenarioList({ s }: { s: Store }) {
   return (
     <>
       <div className="list-head" id="listHead">
-        {headText}
+        {s.isAdmin ? (
+          <>
+            <span className="lh-text">{headText}</span>
+            <button type="button" className="lh-new" onClick={s.openNewScenarioModal}>
+              <Icon name="plus" />
+              <span>{s.t('newCaseBtn')}</span>
+            </button>
+          </>
+        ) : (
+          headText
+        )}
       </div>
       <div id="cards">
         {mi && (
@@ -79,6 +110,13 @@ function ScenarioList({ s }: { s: Store }) {
         ) : (
           rows.map((sc) => {
             const title = s.lang === 'en' && sc.titleEN ? sc.titleEN : sc.titleTH;
+            // When filtered to a specific module and this card is showing only
+            // via an extra-module tag (not its primary module), badge it with
+            // its true home module. Otherwise (viewing "All", or viewing the
+            // card's own primary module) show its extra tags, if any — so the
+            // tagging is visible no matter which list you're looking at.
+            const isTag = nav.mod !== 'ALL' && sc.module !== nav.mod;
+            const tagMods = isTag ? [sc.module] : sc.extraModules || [];
             return (
               <div
                 key={sc.no}
@@ -87,8 +125,16 @@ function ScenarioList({ s }: { s: Store }) {
                 onClick={() => s.selectItem(sc.no)}
               >
                 <div className="lc-top">
-                  <span className="lc-no">{sc.no}</span>
-                  <span className="lc-badge">{sc.module}</span>
+                  <span className="lc-no lc-no-mod">{sc.displayNo || sc.no}</span>
+                  {tagMods.length > 0 && (
+                    <span className="lc-tags">
+                      {tagMods.map((m) => (
+                        <span key={m} className={'lc-badge lc-badge-tag m-' + m}>
+                          {m}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
                 <div className="lc-title">{title}</div>
                 <div className="lc-ex">{sc.when}</div>

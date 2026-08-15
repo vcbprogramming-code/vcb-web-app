@@ -113,7 +113,6 @@
   html.is-mobile .settings-btn{width:38px;height:38px;font-size:19px;border-radius:9px;
     background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24)}
   .settings-btn:hover{background:rgba(255,255,255,.28)}
-  .settings-btn.is-syncing{animation:gear-spin 1.1s linear infinite}
   /* Settings modal — opened from the gear button */
   .settings-modal{max-width:520px;padding:20px 22px}
   .settings-modal h3{margin:0 0 6px;font-size:1.2rem;font-weight:800;color:var(--ink);letter-spacing:.2px}
@@ -271,13 +270,24 @@
 
   /* ----- Middle list ----- */
   .list{background:var(--bg);border-right:1px solid var(--line);overflow-y:auto}
-  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1}
+  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .list-head .lh-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lh-new{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);color:var(--brand);
+    border-radius:8px;padding:5px 10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .lh-new:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .lh-new .ico{--ico:13px}
+  html.dark .lh-new{background:#1a2230;border-color:#30363d;color:#9cc2ea}
+  html.dark .lh-new:hover{background:var(--brand-soft);border-color:#2e4d7a}
   .lcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 12px;padding:10px 12px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
   .lcard:hover{border-color:#c0c8d0;box-shadow:var(--shadow)}
   .lcard.active{border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(46,117,182,.18)}
   .lc-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
   .lc-no{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:var(--brand-soft);color:var(--brand-dark);font-weight:700;font-size:.74rem;display:flex;align-items:center;justify-content:center}
+  .lc-no.lc-no-mod{width:auto;min-width:22px;padding:0 7px;background:var(--mc,var(--brand-soft));color:#fff}
   .lc-badge{flex:0 0 auto;background:var(--mc,#999);color:#fff;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.5px}
+  .lc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-left:auto}
+  .lc-badge-tag{background:color-mix(in srgb, var(--mc,#999) 16%, #fff);color:var(--mc,#666)}
+  html.dark .lc-badge-tag{background:color-mix(in srgb, var(--mc,#999) 28%, #0e1726);color:color-mix(in srgb, var(--mc,#999) 70%, #fff)}
   .lc-title{font-weight:700;font-size:.9rem;line-height:1.35;color:var(--ink)}
   .lc-ex{margin-top:4px;font-size:.8rem;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .empty{padding:30px 16px;color:var(--faint);text-align:center;font-size:.88rem}
@@ -310,12 +320,12 @@
   .w-notes ul li::before{content:'–';position:absolute;left:0;color:#a16f12}
 
   .d-wrap{padding:22px 26px;max-width:900px}
-  .d-head{display:flex;align-items:center;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
-  .d-num{flex:0 0 auto;width:36px;height:36px;border-radius:9px;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem}
+  .d-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+  .d-num{flex:0 0 auto;min-width:36px;height:36px;padding:0 11px;border-radius:9px;background:var(--mc,var(--brand));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem;white-space:nowrap;margin-top:1px}
   .d-titles{flex:1 1 auto;min-width:0}
   .d-th{font-weight:700;font-size:1.18rem;line-height:1.35}
   .d-en{font-size:.85rem;color:var(--muted);margin-top:2px}
-  .d-badge{flex:0 0 auto;align-self:flex-start;background:var(--mc,#999);color:#fff;font-size:.72rem;font-weight:700;padding:4px 11px;border-radius:999px;letter-spacing:.5px}
+  .d-badge{flex:0 0 auto;background:var(--mc,#999);color:#fff;font-size:.72rem;font-weight:700;padding:4px 11px;border-radius:999px;letter-spacing:.5px}
 
   .d-sec{margin-bottom:18px}
   .lbl{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
@@ -330,6 +340,18 @@
   li.sub::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
   li.sub .stxt{position:relative;padding-left:17px;display:block}
   li.sub .stxt::before{content:'';position:absolute;left:3px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  /* depth 2 (» » ) — one more indent level, square marker so it reads as
+     distinct from depth 1's dot rather than just "further right". */
+  li.sub-2{padding-left:56px !important}
+  li.sub-2 .stxt{padding-left:17px}
+  li.sub-2 .stxt::before{border-radius:2px;width:6px;height:6px;background:var(--muted)}
+  /* depth 3 (» » » ) clamp — same marker as depth 2, one indent further. */
+  li.sub-3{padding-left:78px !important}
+  /* '· ' captions — plain body text under the previous step, no number, no
+     bullet glyph at all (contrast li.sub, which still shows a dot marker). */
+  li.cap{padding:2px 0 2px 34px !important;counter-increment:none !important;color:#3c4a44}
+  li.cap::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
+  html.dark li.cap{color:#b9c2cc}
 
   .note{margin-top:14px;background:#fdeceb;border:1px solid #f6c9c5;border-radius:9px;padding:10px 13px;font-size:.88rem;color:#8d2820}
   .note b{color:#b5302a}
@@ -390,8 +412,6 @@
     margin-left:auto;
     z-index:10
   }
-  @keyframes gear-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-
   /* Bottom row inside topbar: Admin badge + Search spread across full width */
   html.is-mobile .hdr-right{order:3;flex:1 1 100%;width:100%;
     display:flex;gap:8px;margin-left:0;margin-top:0;align-items:center;
@@ -475,7 +495,7 @@
   /* Detail / welcome */
   html.is-mobile .d-wrap{padding:18px 16px;max-width:none}
   html.is-mobile .d-head{gap:10px;padding-bottom:12px;margin-bottom:14px}
-  html.is-mobile .d-num{width:32px;height:32px;font-size:.95rem}
+  html.is-mobile .d-num{min-width:32px;height:32px;font-size:.95rem}
   html.is-mobile .d-th{font-size:1.05rem}
   html.is-mobile .welcome{padding:18px 16px;max-width:none}
   html.is-mobile .w-title{font-size:1.25rem}
@@ -518,6 +538,9 @@
   .modal textarea{resize:vertical;min-height:60px;line-height:1.55;font-family:var(--sans)}
   .modal .hint{font-size:.74rem;color:var(--faint);margin-top:4px;line-height:1.5}
   .modal .hint code{background:var(--line-soft);padding:1px 5px;border-radius:4px;font-size:.86em}
+  .chk-grid{display:flex;flex-wrap:wrap;gap:6px 14px}
+  .chk-grid label{display:inline-flex;align-items:center;gap:5px;font-size:.86rem;font-weight:500;color:var(--ink);cursor:pointer;width:auto}
+  .chk-grid input[type=checkbox]{margin:0;cursor:pointer}
   .modal .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid var(--line-soft);padding-top:14px}
   .btn{padding:8px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);
     border-radius:8px;font-family:var(--sans);font-size:.92rem;font-weight:600;cursor:pointer}
@@ -527,8 +550,16 @@
   .btn[disabled]{opacity:.6;cursor:wait}
   .tbtn.on{background:rgba(40,200,140,.35);border-color:rgba(40,200,140,.65)}
   .d-edit{background:#fff;border:1px solid var(--line);color:var(--brand);
-    border-radius:8px;padding:5px 11px;font-size:.82rem;font-weight:700;cursor:pointer;margin-left:8px;font-family:var(--sans)}
+    border-radius:8px;padding:5px 11px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--sans);
+    flex:0 0 auto;white-space:nowrap}
   .d-edit:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .btn-danger{color:#B5302A}
+  .btn-danger:hover{background:#FBEBEA;border-color:#E3A8A2}
+  html.dark .btn-danger{color:#e08b83}
+  html.dark .btn-danger:hover{background:#3a2422;border-color:#5a3330}
+  .btn-danger-solid{background:#B5302A;border-color:#B5302A;color:#fff}
+  .btn-danger-solid:hover{background:#9c2822;border-color:#9c2822}
+  .confirm-msg{font-size:.88rem;line-height:1.6;color:var(--ink);white-space:pre-line;margin:4px 0 0}
 
   /* ===== Process-flow diagrams (Process Flows view) =====
      Each flow is a swimlane diagram: lanes = responsible actors/modules,

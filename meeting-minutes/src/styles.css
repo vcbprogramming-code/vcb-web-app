@@ -68,6 +68,9 @@
 
   .body { display: grid; grid-template-columns: 294px 360px 1fr; min-height: 0; }
   @media (max-width: 1100px) { .body { grid-template-columns: 258px 320px 1fr; } }
+  .body.timeline-mode { grid-template-columns: 294px 0 1fr; }
+  @media (max-width: 1100px) { .body.timeline-mode { grid-template-columns: 258px 0 1fr; } }
+  .body.timeline-mode .list { border-right: none; overflow: hidden; }
 
   /* ----- Sidebar ----- */
   .sidebar { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
@@ -80,8 +83,13 @@
   .proj .pn b { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .proj .pn small { color: var(--ink-faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   .proj .cnt { font-size: 11.5px; color: var(--ink-soft); background: var(--line-soft); border-radius: 20px; padding: 1px 8px; }
+  .proj-rename { border: none; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; padding: 5px 6px; border-radius: 6px; opacity: 0; flex: none; }
+  .proj:hover .proj-rename { opacity: 1; }
+  .proj-rename:hover { background: var(--line-soft); color: var(--ink); }
   .newbtn { width: 100%; margin-top: 12px; background: var(--brand-2); color: #fff; border: none; border-radius: 9px; padding: 10px; font-size: 13.5px; font-weight: 600; }
   .newbtn:hover { filter: brightness(1.05); }
+  .newbtn.secondary { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); margin-top: 8px; }
+  .newbtn.secondary:hover { background: var(--line-soft); filter: none; }
 
   /* ----- Meeting list ----- */
   .list { background: var(--bg); border-right: 1px solid var(--line); overflow-y: auto; }
@@ -97,6 +105,7 @@
   .dash-wrap { padding: 26px 28px; max-width: 1100px; }
   .dash-head h2 { margin: 0 0 4px; font-size: 20px; color: var(--brand); }
   .dash-head p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13.5px; }
+  .dash-head #d_shareProject { margin: 2px 0 12px; }
   .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   .dash-card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c, var(--brand)); border-radius: 12px; padding: 15px 16px; cursor: pointer; transition: box-shadow .12s, transform .12s; }
   .dash-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
@@ -120,6 +129,54 @@
   .secbody ul, .secbody ol { margin: 0 0 9px; padding-left: 20px; }
   .secbody li { margin: 0 0 5px; }
   .secbody h1, .secbody h2, .secbody h3 { font-size: 14.5px; color: var(--brand); margin: 11px 0 5px; }
+
+  /* Timeline — one fixed layout shell shared by both modes so the header/toggle
+     row never shifts, and the body below always fills the rest of the page. */
+  .tl-wrap { padding: 20px 28px 24px; display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+  .tl-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; flex: none; }
+  .tl-head h2 { margin: 0 auto 0 0; font-size: 20px; color: var(--brand); display: inline-flex; align-items: center; gap: 8px; }
+  .tl-year-nav { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+  .tl-year-nav .dbtn { padding: 5px 11px; }
+  .tl-mode-switch { display: flex; gap: 4px; background: var(--line-soft); border-radius: 9px; padding: 3px; }
+  .tl-mode-switch button { display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent; padding: 6px 14px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+  .tl-mode-switch button svg { flex: none; }
+  .tl-mode-switch button.active { background: var(--panel); color: var(--brand-2); box-shadow: var(--shadow); }
+  .tl-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; flex: none; }
+  .tl-toggle { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--panel); border-radius: 20px; padding: 5px 13px 5px 8px; font-size: 12.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .tl-toggle .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .tl-toggle.off { opacity: .45; text-decoration: line-through; }
+  .tl-toggle:hover { border-color: var(--brand-2); }
+  #tlBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  .tl-horizontal { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tl-lanes-area { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tl-lane { display: grid; grid-template-columns: 200px 1fr; align-items: center; gap: 14px; padding: 10px 0; flex: 1; min-height: 0; position: relative; z-index: 1; }
+  .tl-lane-label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-lane-label .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .tl-lane-label small { color: var(--ink-faint); font-weight: 400; }
+  .tl-lane-track { position: relative; height: 22px; background: var(--line-soft); border-radius: 4px; }
+  .tl-dot { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--c, var(--brand)); border: 2px solid var(--panel); transform: translate(-50%, -50%); cursor: pointer; box-shadow: var(--shadow); transition: transform .1s; }
+  .tl-dot:hover { transform: translate(-50%, -50%) scale(1.35); z-index: 2; }
+  .tl-gridlines { position: absolute; top: 0; bottom: 0; left: 214px; right: 0; pointer-events: none; z-index: 0; }
+  .tl-gridline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--line); }
+  .tl-axis { position: relative; height: 26px; margin-top: 6px; margin-left: 214px; flex: none; }
+  .tl-tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; }
+
+  /* Year calendar (12 mini-months on one page, sized to fill the viewport with no scrolling) */
+  .tl-year-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 1100px) { .tl-year-grid { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); } }
+  @media (max-width: 760px) { .tl-year-grid { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(6, 1fr); } }
+  .tl-year-month { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .tl-year-month-name { font-size: 14px; font-weight: 700; color: var(--brand); margin-bottom: 6px; text-align: center; flex: none; }
+  .tl-year-dow { display: grid; grid-template-columns: repeat(7, 1fr); font-size: 10px; font-weight: 700; color: var(--ink-faint); text-align: center; flex: none; margin-bottom: 2px; }
+  .tl-year-grid-days { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 2px; }
+  .tl-year-day { position: relative; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink); border-radius: 5px; cursor: default; min-height: 0; }
+  .tl-year-day.tl-year-day-empty { visibility: hidden; }
+  .tl-year-day.tl-year-day-today { background: var(--brand-2); color: #fff; font-weight: 700; }
+  .tl-year-day.tl-year-day-has-meetings { cursor: pointer; font-weight: 700; }
+  .tl-year-day-dots { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); display: flex; gap: 2.5px; }
+  .tl-year-day-dots span { width: 5px; height: 5px; border-radius: 50%; }
+  .tl-year-day-today .tl-year-day-dots span { outline: 1px solid #fff; }
   .secbody table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin: 4px 0 9px; }
   .secbody td, .secbody th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; text-align: left; }
   .secbody a { color: var(--brand-2); }
@@ -127,7 +184,9 @@
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 8px 12px; padding: 11px 13px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
   .card:hover { border-color: #c0c8d0; box-shadow: var(--shadow); }
   .card.active { border-color: var(--brand-2); box-shadow: 0 0 0 2px rgba(31,111,235,.18); }
-  .card .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .card .meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; min-width: 0; }
+  .card .meta .date { flex: none; white-space: nowrap; }
+  .card .meta .badge { flex: none; }
   .card .date { font-size: 12px; font-weight: 700; color: var(--brand); }
   .card .ttl { font-size: 13.5px; font-weight: 600; margin: 1px 0 4px; }
   .card .ex { font-size: 12px; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -137,6 +196,9 @@
   .badge.manual { background: #eafbf0; color: #1a7f37; }
   .badge.pin { background: #fff4d6; color: #9a6700; }
   .badge.hiddenb { background: #ffe9e9; color: #cf222e; }
+  .badge.suggest-badge { margin-left: auto; }
+  .proj.suggested { background: #fff9e0; box-shadow: inset 0 0 0 1.5px #e8c94a; }
+  .proj.suggested:hover { background: #fff4c8; }
   .card.ishidden { opacity: .62; background: repeating-linear-gradient(45deg, #fff, #fff 10px, #fcf4f4 10px, #fcf4f4 20px); }
   .empty { padding: 30px 16px; color: var(--ink-faint); text-align: center; }
 
@@ -149,6 +211,33 @@
   .dbtn:hover { background: var(--line-soft); }
   .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
   .dbtn.danger:hover { background: #fdeef0; color: var(--danger); border-color: #f3c2c8; }
+  .dbtn.danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .dbtn.danger-solid:hover { background: #a5121f; border-color: #a5121f; }
+
+  /* Comments slide-out panel — toggled via a "show" class from openComments()/
+     closeComments() in JavaScript.html, not conditional DOM creation, so it
+     survives renderDetail() re-runs (pin/visibility toggles rebuild #detailContent). */
+  .ibtn { background: transparent; border: 1px solid transparent; border-radius: 7px; width: 28px; height: 28px; font-size: 14px; color: var(--ink-soft); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ibtn:hover { background: var(--line-soft); border-color: var(--line); }
+  .comments-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.15); z-index: 44; }
+  .comments-backdrop.show { display: block; }
+  .comments-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); z-index: 45; flex-direction: column; }
+  .comments-panel.show { display: flex; }
+  .comments-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .comments-panel-head h3 { margin: 0; font-size: 15px; }
+  .comments-panel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .comments-empty { color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
+  .comment-row { position: relative; padding-right: 22px; }
+  .comment-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .comment-meta b { font-size: 12.5px; color: var(--ink); }
+  .comment-meta span { font-size: 11px; color: var(--ink-faint); }
+  .comment-text { font-size: 13px; color: var(--ink); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  .comment-del { position: absolute; top: 0; right: 0; background: transparent; border: none; color: var(--ink-faint); font-size: 12px; padding: 2px 4px; }
+  .comment-del:hover { color: var(--danger); }
+  .comments-panel-foot { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .comments-panel-foot textarea { resize: vertical; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); }
+  .comments-panel-foot .dbtn { align-self: flex-end; }
+
   .attendees { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); background: #fbfcfe; }
   .attendees .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; }
   .chip { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 3px 12px 3px 3px; text-decoration: none; color: var(--ink); }
@@ -157,8 +246,24 @@
   .chip .cm { display: flex; flex-direction: column; line-height: 1.15; }
   .chip .cm b { font-size: 12px; font-weight: 600; text-transform: capitalize; }
   .chip .cm small { font-size: 10.5px; color: var(--ink-faint); }
+  .tagchip { padding: 3px 6px 3px 12px; border-left: 3px solid var(--c, #888); gap: 6px; }
+  .tagchip .cm b { text-transform: none; }
+  .chip-x { border: none; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; padding: 5px 6px; border-radius: 50%; }
+  .chip-x:hover { background: #ffe9e9; color: #cf222e; }
+  .attachchip .fi { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 18px; border-radius: 3px; color: #fff; font-size: 9px; font-weight: 700; padding: 0 3px; flex: none; }
+  .fi.xls { background: #1a7f37; } .fi.ppt { background: #d24726; } .fi.pdf { background: #cf222e; }
+  .fi.doc { background: #1f6feb; } .fi.img { background: #8250df; } .fi.gen { background: #6e7781; }
+  .attachchip .cm small { text-transform: none; }
+  .attach-upload-btn { border: 1px dashed var(--line); background: transparent; color: var(--ink-soft); border-radius: 22px; padding: 5px 14px; font-size: 12.5px; cursor: pointer; }
+  .attach-upload-btn:hover { border-color: var(--brand-2); color: var(--brand-2); }
   .frame-wrap { flex: 1; overflow: auto; background: #eef1f4; padding: 22px; }
   .paper { max-width: 860px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
+  /* Sits below .paper inside .frame-wrap's own scroll area — same max-width/
+     centering as .paper so it lines up with the document above it, own card
+     chrome (white, rounded, shadowed) so it reads as a distinct trailing
+     section rather than a continuation of the paper or a floating strip. */
+  .attach-footer { max-width: 860px; margin: 16px auto 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .attach-footer .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; flex-basis: 100%; }
   iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 400px; }
   .placeholder { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ink-faint); flex-direction: column; gap: 10px; text-align: center; padding: 40px; }
   .placeholder .big { font-size: 40px; opacity: .4; }
@@ -169,10 +274,47 @@
   .modal { background: #fff; border-radius: 14px; width: 560px; max-width: 92vw; max-height: 88vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
   .modal h3 { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 16px; }
   .modal .form { padding: 16px 20px; display: grid; gap: 12px; }
+  .modal .subhead { margin: 0; padding: 12px 20px 0; color: var(--ink-faint); font-size: 12.5px; }
   .modal label { font-size: 12px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 4px; }
   .modal input:not([type="checkbox"]):not([type="radio"]), .modal select, .modal textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 13.5px; font-family: inherit; }
   .modal textarea { min-height: 160px; resize: vertical; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .date-field { position: relative; }
+  .date-field input { padding-right: 34px; }
+  /* Native <input type="date"> was abandoned entirely — every reskin of its
+     own calendar icon leaked some native behavior through (placeholder
+     segments, its own tooltip, inconsistent click/cursor hit-testing across
+     browsers). This is a small self-contained popup calendar instead: a
+     plain button toggles a div-based month grid we fully control. */
+  .date-pick-btn {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    border: none; background: transparent; cursor: pointer; font-size: 15px;
+    line-height: 1; padding: 6px; border-radius: 6px; color: var(--ink-faint);
+  }
+  .date-pick-btn:hover { background: var(--line-soft); }
+  .cal-pop {
+    display: none; position: absolute; z-index: 60; top: 100%; left: 0; margin-top: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 10px; width: 240px;
+  }
+  .cal-pop.show { display: block; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-title { font-size: 13px; font-weight: 600; }
+  .cal-nav {
+    border: none; background: transparent; cursor: pointer; font-size: 16px;
+    line-height: 1; padding: 4px 8px; border-radius: 6px; color: var(--ink-soft);
+  }
+  .cal-nav:hover { background: var(--line-soft); }
+  .cal-dow, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow span { text-align: center; font-size: 10.5px; color: var(--ink-faint); padding: 2px 0; }
+  .cal-grid button {
+    border: none; background: transparent; cursor: pointer; font-size: 12.5px;
+    padding: 6px 0; border-radius: 6px; color: var(--ink);
+  }
+  .cal-grid button:hover { background: var(--line-soft); }
+  .cal-grid button.cal-muted { color: var(--ink-faint); }
+  .cal-grid button.cal-today { font-weight: 700; box-shadow: inset 0 0 0 1px var(--brand-2, #1f6feb); }
+  .cal-grid button.cal-selected { background: var(--brand-2, #1f6feb); color: #fff; }
   .modal .actions { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
 
   .busy { position: fixed; inset: 0; background: rgba(15,20,28,.28); display: none; align-items: center; justify-content: center; z-index: 70; backdrop-filter: blur(1px); }
@@ -181,15 +323,28 @@
   .editor { background: #fff; border-radius: 14px; width: 900px; max-width: 95vw; height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
   .editor h3 { margin: 0; padding: 14px 20px; border-bottom: 1px solid var(--line); font-size: 16px; }
   .editor h3 #edTitle { font-weight: 400; color: var(--ink-soft); font-size: 14px; }
-  .ed-toolbar { display: flex; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: #fbfcfe; }
+  .ed-meta { display: flex; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .ed-meta > div { flex: 1; min-width: 140px; }
+  .ed-meta label { display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 3px; }
+  .ed-meta input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+  .ed-toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: #fbfcfe; }
   .ed-toolbar button { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 5px 11px; font-size: 13px; color: var(--ink); }
   .ed-toolbar button:hover { background: var(--line-soft); }
+  .ed-group { display: flex; gap: 6px; }
+  .ed-sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 2px; }
   .ed-area { flex: 1; overflow: auto; padding: 26px 34px; font-size: 14.5px; line-height: 1.62; outline: none; font-family: var(--sans); }
   .ed-area h1, .ed-area h2 { color: #0b3d62; }
   .ed-area table { border-collapse: collapse; width: 100%; margin: 12px 0; }
   .ed-area td, .ed-area th { border: 1px solid var(--line); padding: 6px 9px; }
-  .ed-doc { margin-right: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink); }
-  .ed-doc .hint { color: var(--ink-faint); font-size: 11.5px; }
+  /* Checklist (green tick) list — no bullet dot, a green ✓ instead, via
+     ::before rather than list-style (custom colored glyphs aren't supported
+     by list-style-type directly). Same rule also lives in OVERRIDE_CSS
+     (JavaScript.html) so it renders identically in the final A4 view. */
+  .ed-area .tick-list, .ed-area .tick-list li { list-style: none; }
+  .ed-area .tick-list { padding-left: 24px; }
+  .ed-area .tick-list li { position: relative; }
+  .ed-area .tick-list li::before { content: '✓'; position: absolute; left: -22px; color: #1a7f37; font-weight: 700; }
+  .editor .actions { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: none; }
   .ac-status { font-size: 13px; padding: 9px 12px; border-radius: 8px; background: #eef6ff; color: #0b3d62; font-weight: 600; }
   .ac-status.restricted { background: #fff4d6; color: #9a6700; }
   .ac-proj { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
@@ -230,25 +385,16 @@
     line-height: 1;
   }
   html.is-mobile .settings-btn-d.tbtn { display: none; }
+  html.is-mobile #timelineBtn { display: none; }
 
-  /* ⚙ Settings — mobile variant lives in .brandwrap. Hidden on desktop. */
+  /* ⚙ Settings — removed from mobile entirely (2026-07-22): theme/language/
+     Project Access/build-info are desktop-only now, reachable via
+     #settingsBtnD (already hidden on mobile, unaffected by this). Kept as
+     display:none rather than deleting the button/modal outright — the
+     underlying #setBg modal and its wiring still exist, unreachable on
+     mobile with no entry point, harmless to leave in place. */
   .settings-btn { display: none; }
-  html.is-mobile .settings-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    background: rgba(255,255,255,.14);
-    border: 1px solid rgba(255,255,255,.22);
-    border-radius: 10px;
-    color: #fff;
-    font-size: 18px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  html.is-mobile .settings-btn:active { background: rgba(255,255,255,.28); }
+  html.is-mobile .settings-btn { display: none; }
   /* Settings sheet — identity + segmented controls */
   .set-who { font-size: 14px; padding: 2px 0; color: var(--ink); font-weight: 600; }
   .set-group { display: flex; flex-direction: column; gap: 8px; }
@@ -343,6 +489,8 @@
   html.theme-dark .modal textarea { background: #0d1117; color: var(--ink); border-color: var(--line); }
   html.theme-dark .editor { background: var(--panel); color: var(--ink); }
   html.theme-dark .editor h3 { border-bottom-color: var(--line); }
+  html.theme-dark .ed-meta { border-bottom-color: var(--line); }
+  html.theme-dark .ed-meta input { background: #0d1117; color: var(--ink); border-color: var(--line); }
   html.theme-dark .ed-toolbar { background: #1c2128; border-bottom-color: var(--line); }
   html.theme-dark .ed-toolbar button { background: var(--panel); color: var(--ink); border-color: var(--line); }
   html.theme-dark .ed-toolbar button:hover { background: var(--line-soft); }
@@ -352,13 +500,17 @@
   html.theme-dark .dbtn { background: var(--panel); color: var(--ink); border-color: var(--line); }
   html.theme-dark .dbtn:hover { background: var(--line-soft); }
   html.theme-dark .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
+  html.theme-dark .dbtn.danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+  html.theme-dark .comments-panel-foot textarea { background: #0d1117; color: var(--ink); border-color: var(--line); }
   html.theme-dark .proj.active { background: rgba(88,166,255,.18); }
   html.theme-dark .proj:hover { background: var(--line-soft); }
   html.theme-dark .range button { background: var(--panel); color: var(--ink-soft); border-color: var(--line); }
   html.theme-dark .range button:not(.active):hover { background: var(--line-soft); }
   html.theme-dark .attendees { background: #1c2128; border-bottom-color: var(--line); }
   html.theme-dark .chip { background: var(--panel); border-color: var(--line); color: var(--ink); }
+  html.theme-dark .chip-x:hover { background: #3a1d23; color: #ff7a85; }
   html.theme-dark .frame-wrap { background: #1a1f26; }
+  html.theme-dark .paper { background: #161b22; }
   html.theme-dark .mobile-backbar { background: var(--panel); border-bottom-color: var(--line); }
   html.theme-dark .mobile-back-btn { background: transparent; border-color: var(--line); color: var(--brand-2); }
   html.theme-dark.is-mobile .ml-item { background: var(--panel); border-color: var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 12px rgba(0,0,0,.3); }
@@ -373,6 +525,9 @@
   html.theme-dark .badge.manual { background: #1c2e23; color: #6dcf7e; }
   html.theme-dark .badge.pin { background: #3a2e16; color: #ffce62; }
   html.theme-dark .badge.hiddenb { background: #3a1d23; color: #ff7a85; }
+  html.theme-dark .badge.suggest-badge { background: #3a2e16; color: #ffce62; }
+  html.theme-dark .proj.suggested { background: #2e2712; box-shadow: inset 0 0 0 1.5px #a4822c; }
+  html.theme-dark .proj.suggested:hover { background: #3a3018; }
   html.theme-dark .card.ishidden { background: repeating-linear-gradient(45deg, #161b22, #161b22 10px, #1f1719 10px, #1f1719 20px); }
   html.theme-dark .ac-status { background: #1e2a40; color: #7aa2f7; }
   html.theme-dark .ac-status.restricted { background: #3a2e16; color: #ffce62; }
@@ -382,6 +537,13 @@
 
   html.is-mobile {
     -webkit-tap-highlight-color: rgba(31, 111, 235, 0.18);
+  }
+  /* Fathom tagging (File into project / tag chips) is an admin desktop-review
+     workflow — nobody triages recordings from a phone, and the button/chips
+     just eat space in the already-tight mobile detail bar. */
+  html.is-mobile #d_file,
+  html.is-mobile .tag-chips {
+    display: none;
   }
   html.is-mobile body {
     overscroll-behavior-y: contain;
@@ -393,6 +555,16 @@
     height: 100dvh;
   }
 
+  /* html/body background matches the topbar's own blue on mobile (2026-07-22
+     fix) — with viewport-fit=cover + env(safe-area-inset-top), the area
+     behind the iOS notch/status-bar is real page space above .topbar's own
+     box; its color came from body's background (the light grey app
+     background, --bg), not the topbar, showing as a mismatched white/grey
+     sliver above the blue header ("banner not fully connected to the top").
+     Matching body's background to the topbar's own blue makes that inset
+     region blend in seamlessly regardless of exactly how much of it the
+     browser chrome exposes. */
+  html.is-mobile, html.is-mobile body { background: #1F3864; }
   /* --- Topbar compaction: brand on row 1, search + buttons on a single nowrap row 2 --- */
   html.is-mobile .topbar {
     flex-direction: column;
@@ -612,6 +784,20 @@
     font-weight: 700;
     color: var(--brand-2);
   }
+  /* Placeholder tiles shown before any meeting data has loaded — same size as
+     real .ml-item tiles (so nothing shifts when they're replaced) but inert
+     and visibly "loading" rather than tappable. */
+  html.is-mobile .ml-skeleton {
+    cursor: default;
+    border-left-color: var(--line);
+    background: linear-gradient(90deg, var(--line-soft) 25%, var(--panel, #f2f2f2) 37%, var(--line-soft) 63%);
+    background-size: 400% 100%;
+    animation: ml-skeleton-pulse 1.4s ease infinite;
+  }
+  @keyframes ml-skeleton-pulse {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+  }
 
   /* --- Sidebar (project) list — bigger touch targets --- */
   html.is-mobile .side-label { font-size: 12px; margin: 4px 4px 10px; }
@@ -670,11 +856,20 @@
     padding: 9px 11px;
     min-height: 38px;
   }
-  /* Mobile detail action row: only Pin, Share, Edit-in-Docs, in that order. */
+  /* Mobile detail action row: only Pin, Share, Edit-in-Docs, in that order.
+     #d_history was missing from this list (2026-07-22 fix) — it rendered as
+     its own visible row below the back-bar instead of being hidden like
+     every other admin/edit-only action here. */
   html.is-mobile #d_vis,
   html.is-mobile #d_editapp,
   html.is-mobile #d_print,
-  html.is-mobile #d_recording { display: none; }
+  html.is-mobile #d_recording,
+  html.is-mobile #d_history { display: none; }
+  /* Attach-file is an editing action like Edit-here/Print, not something
+     mobile visitors need — viewing/removing EXISTING attachments still
+     works on mobile, only the "+ Attach file" upload affordance is hidden
+     (2026-07-22 — was cluttering an already-tight mobile screen). */
+  html.is-mobile .attach-upload-btn { display: none; }
   html.is-mobile #d_pin { order: 1; }
   html.is-mobile #d_share { order: 2; }
   html.is-mobile #d_docedit { order: 3; }
@@ -732,7 +927,7 @@
   }
   html.is-mobile .modal h3 { padding: 14px 18px; font-size: 15.5px; }
   html.is-mobile .modal .form { padding: 14px 18px; gap: 14px; }
-  html.is-mobile .modal .form input:not([type="checkbox"]):not([type="radio"]),
+  html.is-mobile .modal .form input:not([type="checkbox"]):not([type="radio"]):not([type="date"]),
   html.is-mobile .modal .form select,
   html.is-mobile .modal .form textarea { padding: 11px 12px; min-height: 44px; }
   html.is-mobile .modal textarea { min-height: 180px; }

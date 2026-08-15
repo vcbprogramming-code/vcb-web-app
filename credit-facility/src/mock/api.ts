@@ -328,9 +328,13 @@ function decideRequest(p: { id: string; decision: string }): WriteResult {
 }
 
 // ---- cash plan ----
-function getCashPlan(project: string, month: string): CashPlanPeriod[] {
+// variant: 'plan' (forecast Cash Plan, default) | 'actual' (recorded real T-bar).
+// Blank/undefined on old rows is treated as 'plan', mirroring Code.js#getCashPlan.
+function getCashPlan(project: string, month: string, variant?: string): CashPlanPeriod[] {
+  const v = variant || 'plan';
   return cashPlan
-    .filter((r) => (!project || r.project === project) && (!month || r.month === month))
+    .filter((r) => (!project || r.project === project) && (!month || r.month === month)
+      && ((r.variant || 'plan') === v))
     .map((r) => ({ ...r }))
     .sort((a, b) => a.periodIdx - b.periodIdx);
 }
@@ -344,7 +348,8 @@ function saveCashPlanPeriod(p: Partial<CashPlanPeriod>): WriteResult {
     paidIds: p.paidIds || [], deductions: p.deductions || [], incomeBreak: p.incomeBreak || [],
     avalAmount: Number(p.avalAmount) || 0, newPNAmount: Number(p.newPNAmount) || 0,
     newPNNote: p.newPNNote || '', note: p.note || '',
-    showAllDue: !!p.showAllDue, updated: fmt_(new Date()),
+    showAllDue: !!p.showAllDue, variant: p.variant || 'plan', extraRows: p.extraRows || [],
+    updated: fmt_(new Date()),
   };
   if (p.id) {
     const idx = cashPlan.findIndex((r) => r.id === p.id);
@@ -365,9 +370,7 @@ function deleteCashPlanPeriod(p: { id: string }): WriteResult {
 function projCompany_(D: AppData, code: string): string {
   const p = D.projects.filter((x) => x.code === code)[0];
   if (!p) return '';
-  const m = String(p.th || '').match(/\(([^)]+)\)/);
-  return (m ? m[1].trim() : 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด')
-    .replace(/^บริษัท\s*/, '').replace(/\s*จำกัด\s*$/, '').trim();
+  return String(p.company || '').replace(/^บริษัท\s*/, '').replace(/\s*จำกัด\s*/g, ' ').trim();
 }
 function facTypeName_(D: AppData, no: number | string): string {
   const t = D.facTypes.filter((x) => String(x.no) === String(no))[0];

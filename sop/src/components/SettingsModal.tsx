@@ -150,17 +150,6 @@ export default function SettingsModal({ s }: { s: Store }) {
         </div>
 
         <div className="sm-section">
-          <button
-            className="sm-action"
-            type="button"
-            onClick={() => {
-              s.doSync();
-              s.closeSettings();
-            }}
-          >
-            <Icon name="refresh" />
-            <span>{s.t('menuSync')}</span>
-          </button>
           <button className="sm-action sm-signout" type="button" onClick={s.signOut}>
             <Icon name="logout" />
             <span>{s.t('signOutLbl')}</span>

@@ -1,4 +1,4 @@
-var D=null, VIEW='fac', editId=null, kindFilter='';
+var D=null, VIEW='fac', editId=null;
 var _cardsLastHtml='';  // fingerprint: skip cards innerHTML swap when unchanged
 // Direct setter (used by the settings modal's checkbox).
 function setDark(on){
@@ -23,6 +23,17 @@ var I18N_DICT={
  'แดชบอร์ด':'Dashboard','ผู้เยี่ยมชม':'Guest','🔑 เข้าสู่ระบบด้วย Google':'🔑 Sign in with Google',
  'วงเงิน':'Limit','สินเชื่อ (Facilities)':'Facilities','รายการ':'Items',
  'สินเชื่อ (Credit Ledger)':'Credit Ledger','วางแผน':'Planning','สินเชื่อ (T-bar)':'Cash Plan (T-bar)',
+ // Tab labels (whole Thai phrase → clean English; the English paren-hint in
+ // .tab-x is hidden in EN via CSS so it doesn't double up). วงเงินสินเชื่อ is
+ // already mapped to 'Credit Facilities' below.
+ 'รายการสินเชื่อ':'Credit Ledger','แผนการเงิน':'Cash Plan','สรุปค่าใช้จ่าย':'Cost summary',
+ 'บันทึกจริง':'Actual','หักค่างานตามจริง':'Actual deductions','ผลต่าง':'Variance',
+ 'ยังไม่มีข้อมูลค่าใช้จ่าย':'No expense data yet',
+ // Variance tab whole-node labels.
+ 'ผลต่าง (แผน vs จริง)':'Variance (Plan vs Actual)','รับเงิน (Received)':'Received',
+ 'หักจ่าย (Deducted)':'Deducted','คงเหลือสุทธิ (Net)':'Net','แผน':'Plan','จริง':'Actual',
+ 'ยังไม่มีข้อมูลแผน/จริงในเดือนนี้':'No plan/actual data for this month',
+ 'กำลังโหลด…':'Loading…','โหลดไม่สำเร็จ:':'Load failed:',
  'บริษัท':'Company','ทุกบริษัท':'All companies','ประเภทวงเงิน':'Facility type','ทุกประเภท':'All types',
  'โครงการ':'Project','ทุกโครงการ':'All projects','ระยะเวลา':'Time period','ทุกระยะเวลา':'All periods',
  'ครบใน 7 วัน':'Due within 7 days','เดือนนี้':'This month','เดือนหน้า':'Next month','เกินกำหนด':'Overdue',
@@ -53,6 +64,8 @@ var I18N_DICT={
  'ตั้งค่า / Settings':'Settings','การแสดงผล / Display':'Display','โหมดสี / Theme':'Theme',
  '☀ สว่าง':'☀ Light','🌙 มืด':'🌙 Dark','ภาษา / Language':'Language','ไทย':'Thai',
  'แดชบอร์ด / Dashboard':'Dashboard','วงเงินสินเชื่อ / Credit lines':'Credit lines',
+ 'วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)':'Credit lines (Long-term loans)',
+ 'วงเงินสินเชื่อ (วงเงินหมุนเวียน)':'Credit lines (Revolving)',
  'เลือกพาเนลที่ต้องการแสดงบนแดชบอร์ด · Choose which panels to show':'Choose which panels to show on the dashboard',
  'ส่วนกลาง':'Non-project','(รวม DLC)':'(incl. DLC)',
  'ครบกำหนด / Due dates':'Due dates','สถานะ / Status':'Status',
@@ -197,6 +210,10 @@ function _i18nRestore(root){
 }
 var _i18nObs=null;
 function _i18nStart(){
+  // Reflect the active language on <html lang> so lang-scoped CSS (e.g. hiding
+  // the .tab-x paren-hint in English) applies on first paint, not just after a
+  // manual toggle. setLang() keeps it in sync thereafter.
+  document.documentElement.setAttribute('lang',LANG);
   if(typeof MutationObserver!=='undefined'&&!_i18nObs){
     _i18nObs=new MutationObserver(function(muts){
       if(LANG!=='en')return;
@@ -331,20 +348,33 @@ function saveSettings(){
 function money(n){n=Number(n)||0;return n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});}
 // Strip commas and parse — used wherever an amount input is read.
 function moneyVal(s){return parseFloat(String(s||'').replace(/,/g,''))||0;}
-// Live thousands-separator formatter while typing. Preserves caret roughly.
-function fmtMoneyInput(el){
-  var caret=el.selectionStart||0;
-  var raw=el.value, before=raw.slice(0,caret).replace(/,/g,'').length;
-  var sign=raw.charAt(0)==='-'?'-':'';
-  raw=raw.replace(/[^0-9.]/g,'');
+// Format a string with thousands separators (no caret handling).
+function fmtMoneyStr(v){
+  var s=String(v==null?'':v);
+  var sign=s.charAt(0)==='-'?'-':'';
+  var raw=s.replace(/[^0-9.]/g,'');
+  if(raw==='') return '';
   var parts=raw.split('.'); if(parts.length>2)parts=[parts[0],parts.slice(1).join('')];
   parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  el.value=sign+parts.join('.');
-  // Restore caret: count digits before, then re-walk formatted string.
-  var seen=0,pos=el.value.length;
-  for(var i=0;i<el.value.length;i++){if(el.value[i]!==','&&el.value[i]!=='-'){seen++;if(seen>before){pos=i;break;}}}
-  try{el.setSelectionRange(pos,pos);}catch(_){}
+  return sign+parts.join('.');
 }
+// While a money field is FOCUSED we intentionally leave it as raw digits — live
+// comma insertion makes mid-number delete/replace jump the caret and you can't
+// delete "through" a comma. Commas are stripped on focus and re-applied on blur
+// (global handlers below), so fmtMoneyInput is a no-op during editing.
+function fmtMoneyInput(el){
+  if(document.activeElement===el) return;   // editing → keep raw; blur reformats
+  el.value=fmtMoneyStr(el.value);
+}
+// Strip commas when a money field gains focus (edit pure digits); reapply on blur.
+// Skip readonly fields (auto-calc cells) so they stay formatted.
+function _isMoneyInput(el){return el&&el.tagName==='INPUT'&&!el.readOnly&&el.getAttribute&&el.getAttribute('inputmode')==='decimal';}
+document.addEventListener('focusin', function(e){
+  if(_isMoneyInput(e.target)){var el=e.target,c=el.value.replace(/,/g,''); if(c!==el.value) el.value=c;}
+});
+document.addEventListener('focusout', function(e){
+  if(_isMoneyInput(e.target)) e.target.value=fmtMoneyStr(e.target.value);
+});
 // Parse a due value into a Date. Handles dd/MM/yyyy (from the sheet) and
 // Excel date serials; returns null for blanks / unparseable values.
 function parseDue(s){
@@ -409,7 +439,7 @@ document.addEventListener('click', function(e){
 function typeName(no){var t=(D.facTypes||[]).find(function(x){return String(x.no)===String(no);});return t?t.th:('#'+no);}
 function typeKind(no){var t=(D.facTypes||[]).find(function(x){return String(x.no)===String(no);});return t?t.kind:'';}
 // Short document label (เอกสาร) for the colour pill — B/E, P/N, L/G, T/L.
-function kindShort(no){return ({LG:'BG',LGM:'L/G',TL:'T/L',AVAL:'B/E',PN:'P/N',ML:'M/L',DLC:'DLC'})[typeKind(no)]||typeKind(no)||'-';}
+function kindShort(no){return ({LG:'BG',LGM:'L/G',TL:'T/L',AVAL:'B/E',PN:'P/N',ML:'M/L',DLC:'DLC',PNPOST:'PN-post'})[typeKind(no)]||typeKind(no)||'-';}
 function kindPill(no){return '<span class="pill '+esc(typeKind(no))+'">'+esc(kindShort(no))+'</span>';}
 function projTh(code){var p=(D.projects||[]).find(function(x){return x.code===code;});return p?p.th:code;}
 // Project name without the "(joint venture)" suffix — the บริษัท column already shows it.
@@ -462,7 +492,7 @@ function init(){
   // erase the user's working context.
   restoreFilters();
   try{var savedView=localStorage.getItem('vcb-view');
-    if(savedView==='fac'||savedView==='txn'||savedView==='plan')setView(savedView);
+    if(['fac','txn','plan','actual','variance','cost'].indexOf(savedView)>=0)setView(savedView);
     else setView('fac');
   }catch(e){setView('fac');}
 }
@@ -472,8 +502,23 @@ function ph(id,txt){var s=document.getElementById(id);
   s.insertBefore(o,s.firstChild);s.value='';}
 function fill(id,arr,all){var s=document.getElementById(id);s.innerHTML=(all?'<option value="">ทุกโครงการ</option>':'')
   +arr.map(function(p){return '<option value="'+p.code+'">'+esc(p.code+' · '+p.th)+'</option>';}).join('');}
-function fillTypes(id,all){var s=document.getElementById(id);s.innerHTML=(all?'<option value="">ทุกประเภท</option>':'')
-  +D.facTypes.map(function(t){return '<option value="'+t.no+'">'+esc(t.no+'. '+t.th)+'</option>';}).join('');}
+function fillTypes(id,all){var s=document.getElementById(id);
+  // The filter dropdown (all=true) also offers the two GROUPED credit lines that
+  // the dashboard panels drill into — BG (the 3 guarantee lines, kind LG) and B/E
+  // (รับรอง/อาวัล + L/G วัสดุ + DLC + PN-post). Encoded as "k:<kinds>" so the dropdown
+  // itself is the single source of truth for the type filter — the BG/B/E panels
+  // select these options instead of setting a hidden side-channel. They live in
+  // their own <optgroup> so the grouped (no-number) rows read as a distinct kind
+  // of choice, not as equals to the numbered per-facility rows. Form pickers
+  // (all=false, for creating a request/txn) list only real facilities, flat.
+  var facOpts=D.facTypes.map(function(t){return '<option value="'+t.no+'">'+esc(t.no+'. '+t.th)+'</option>';}).join('');
+  if(!all) { s.innerHTML=facOpts; return; }
+  s.innerHTML='<option value="">ทุกประเภท</option>'
+    +'<optgroup label="รวมกลุ่มวงเงิน / Grouped">'
+      +'<option value="k:LG">BG · วงเงินค้ำประกัน (รวมทุกวงเงิน)</option>'
+      +'<option value="k:AVAL,LGM,DLC,PNPOST">B/E · รับรอง/อาวัล (รวม L/G วัสดุ + DLC + PN-post)</option>'
+    +'</optgroup>'
+    +'<optgroup label="แยกรายวงเงิน / Individual">'+facOpts+'</optgroup>';}
 
 // Snapshot every filter/month/kind selection to localStorage so F5 doesn't
 // reset the user's drill-down. Called at the top of render() — overhead is
@@ -487,7 +532,7 @@ function persistFilters(){
       d:document.getElementById('fDue').value,
       s:document.getElementById('fStatus').value,
       q:document.getElementById('fQ').value,
-      pm:planMonth, kf:kindFilter
+      pm:planMonth
     }));
   }catch(e){}
 }
@@ -502,19 +547,22 @@ function restoreFilters(){
     set('fProj',st.p); set('fCo',st.co); set('fType',st.t);
     set('fDue',st.d); set('fStatus',st.s); set('fQ',st.q);
     if(st.pm) planMonth=st.pm;
-    if(typeof st.kf==='string') kindFilter=st.kf;
   }catch(e){}
 }
 function setView(v){VIEW=v;try{localStorage.setItem('vcb-view',v);}catch(e){}
   document.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('on',b.dataset.v===v);});
-  // Status filter only applies to the ledger/plan views, not the Facilities table.
-  document.getElementById('fStatus').style.display = v==='fac'?'none':'';
-  // Add buttons are always available — both modals let the user pick the
-  // project/facility, so they must not vanish when a card jumps to a view
-  // (e.g. Facilities) that has no inline "add" of its own.
+  // The filter bar (company/type/project/due/status + the add/export actions)
+  // only applies to Facilities and Credit Ledger. The T-bar/Actual tabs pick a
+  // project per-table, and Variance/Cost summary are whole-portfolio overviews —
+  // so hide the bar entirely on those tabs.
+  var showBar=(v==='fac'||v==='txn');
+  document.getElementById('bar').style.display = showBar?'':'none';
+  // Status filter shows only on the ledger (Facilities doesn't use it).
+  document.getElementById('fStatus').style.display = (v==='txn')?'':'none';
   document.getElementById('addReqBtn').style.display = '';
   document.getElementById('addTxnBtn').style.display = '';
   render();}
+
 
 function cards(){
   // The overview cards always show every facility line (scoped only by the
@@ -537,12 +585,18 @@ function cards(){
   ];
   // 8 = M/L, 9 = DLC — new credit-line types, placeholders until the master
   // sheet supplies facilities with those numbers (see Seed.js).
-  var agg={}; [1,2,3,4,5,6,7,8,9].forEach(function(n){agg[n]={lim:0,used:0};});
+  var agg={}; [1,2,3,4,5,6,7,8,9,10].forEach(function(n){agg[n]={lim:0,used:0};});
   f.forEach(function(x){var a=agg[x.facilityNo];if(a){a.lim+=x.limit;a.used+=x.used;}});
-  // Fold L/G วัสดุ/สาธารณูปโภค (#5) and DLC (#9) into B/E (#6) — both share the
-  // B/E credit cap, so they're shown inside the B/E box rather than as their own.
-  agg[6].lim+=agg[5].lim+agg[9].lim; agg[6].used+=agg[5].used+agg[9].used;
-  agg[5]={lim:0,used:0}; agg[9]={lim:0,used:0};
+  // Capture the B/E component breakdown BEFORE folding, so the B/E card can show
+  // L/G วัสดุ / DLC / PN-post as visible subsets of the shared B/E credit line.
+  // Only components with usage appear (so it stays compact when there's nothing).
+  var beParts=[{no:6,label:'B/E'},{no:5,label:'L/G วัสดุ'},{no:9,label:'DLC'},{no:10,label:'PN-post'}]
+    .map(function(z){var a=agg[z.no]||{lim:0,used:0};return {label:z.label,used:a.used,lim:a.lim};})
+    .filter(function(z){return z.used>0||z.lim>0;});
+  // Fold L/G วัสดุ/สาธารณูปโภค (#5), DLC (#9) and PN-post (#10, CVE-only) into B/E
+  // (#6) — all share the B/E credit cap, so they live inside the B/E box.
+  agg[6].lim+=agg[5].lim+agg[9].lim+agg[10].lim; agg[6].used+=agg[5].used+agg[9].used+agg[10].used;
+  agg[5]={lim:0,used:0}; agg[9]={lim:0,used:0}; agg[10]={lim:0,used:0};
 
   var rq=(D.transactions||[]).filter(function(r){return (!q.p||r.project===q.p)&&matchCo(r.project,q);});
   var cNew=0,cWait=0,cAppr=0, aNew=0,aWait=0,aAppr=0;
@@ -570,7 +624,7 @@ function cards(){
   // Render one overview box (handles the no-data state). `accent` = top bar.
   // Per-line accent colours live in the LINES catalogue below; KPI cards pass
   // their own. The rest of the app keeps the brand --navy/--orange/--bad palette.
-  function box(label,a,click,tip,accent){
+  function box(label,a,click,tip,accent,parts){
     var st=' style="border-top:3px solid '+accent+'"';
     var pct=a.lim>0?Math.min(100,Math.round(a.used/a.lim*100)):(a.used>0?100:0);
     var avail=a.lim-a.used;
@@ -578,11 +632,25 @@ function cards(){
     if(a.lim===0 && a.used===0)
       return open+'<div class="val sm muted" style="margin-top:auto">— ไม่มีข้อมูล</div></div>';
     var used=pct>=100?'var(--bad)':pct>=80?'var(--orange)':'var(--blue)';
+    // Optional subset breakdown (used by the B/E box): small "ใช้ไป" rows per
+    // component line, shown only when there's more than one component.
+    var partsHtml='';
+    if(parts && parts.length>1){
+      partsHtml='<div style="margin-top:7px;padding-top:6px;border-top:1px dashed var(--bd);display:flex;flex-direction:column;gap:3px">'
+        +parts.map(function(z){
+          return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:10.5px">'
+            +'<span class="muted">'+esc(z.label)+'</span>'
+            +'<span style="font-variant-numeric:tabular-nums;color:var(--ink)">ใช้ ฿'+money(z.used)+'</span></div>';
+        }).join('')
+      +'</div>';
+    }
     return open
       +'<div class="val sm">฿'+money(avail)+'</div>'
       +'<div class="vizslot"><div class="meter"><i class="'+(pct>=100?'full':pct>=80?'hi':'')
         +'" style="width:'+pct+'%"></i></div></div>'
-      +'<div class="muted" style="font-size:11px;margin-top:5px">ใช้ไปแล้ว '+pct+'%</div></div>';
+      +'<div class="muted" style="font-size:11px;margin-top:5px">ใช้ไปแล้ว '+pct+'%</div>'
+      +partsHtml
+      +'</div>';
   }
   // Sum the limit/used across a set of facility numbers (a "credit line" may
   // bundle several — e.g. BG = the three หนังสือค้ำประกัน #1-3).
@@ -602,7 +670,7 @@ function cards(){
     {key:'tl',  sec:'lt',  label:'T/L', nos:[4],     accent:'#7FB069', click:'onclick="jumpFac(4)"',  tip:'ดูรายละเอียดวงเงิน T/L'},
     {key:'bg',  sec:'lt',  label:'BG',  nos:[1,2,3], accent:'#B59FD6', click:'onclick="jumpBG()"',   tip:bgTip},
     {key:'ml',  sec:'lt',  label:'M/L', nos:[8],     accent:'#9CCB7A', click:'onclick="jumpFac(8)"',  tip:'ดูรายละเอียดวงเงิน M/L'},
-    {key:'be',  sec:'rev', label:'B/E', nos:[6],     accent:'#F0A95F', click:'onclick="jumpBE()"',   tip:'ดูรายละเอียดวงเงิน B/E (รวม L/G วัสดุ/สาธารณูปโภค + DLC)'},
+    {key:'be',  sec:'rev', label:'B/E', nos:[6],     accent:'#F0A95F', click:'onclick="jumpBE()"',   tip:'ดูรายละเอียดวงเงิน B/E (รวม L/G วัสดุ/สาธารณูปโภค + DLC + PN-post)', parts:beParts},
     {key:'pn',  sec:'rev', label:'P/N', nos:[7],     accent:'#6FC1E0', click:'onclick="jumpFac(7)"',  tip:'ดูรายละเอียดวงเงิน P/N'}
   ];
   var pf=getDashPrefs();
@@ -611,7 +679,7 @@ function cards(){
     LINES.forEach(function(L){
       if(L.sec!==sec) return;
       if(pf.lines[L.key]===false) return;   // user hid this line in Settings
-      inner+=box(L.label,aggOf(L.nos),L.click,L.tip,L.accent);
+      inner+=box(L.label,aggOf(L.nos),L.click,L.tip,L.accent,L.parts);
     });
     return inner;
   }
@@ -631,25 +699,28 @@ function cards(){
       +'<div class="muted" style="font-size:12px;margin-top:4px">฿'+money(amt)+'</div>'
       +'<div class="go">ดูรายการ →</div></div>';
   }
-  function grp(ttl,inner){
-    return '<section class="grp"><h4 class="grp-ttl">'+ttl+'</h4><div class="grp-row">'+inner+'</div></section>';
+  // Dashboard section — always open (not collapsible; folding just left an empty
+  // stretched box and saved no space). `key` kept for call-site compatibility.
+  function grp(ttl,inner,key){
+    return '<section class="grp"><h4 class="grp-ttl">'+ttl+'</h4>'
+      +'<div class="grp-row">'+inner+'</div></section>';
   }
 
   // Assemble the visible sections. Every panel is individually toggleable in
   // Settings; a whole section vanishes when all of its panels are switched off.
   var html='';
-  var ltInner=lineSection('lt');  if(ltInner)  html+=grp('วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)', ltInner);
-  var revInner=lineSection('rev'); if(revInner) html+=grp('วงเงินสินเชื่อ (วงเงินหมุนเวียน)', revInner);
+  var ltInner=lineSection('lt');  if(ltInner)  html+=grp('วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)', ltInner, 'lt');
+  var revInner=lineSection('rev'); if(revInner) html+=grp('วงเงินสินเชื่อ (วงเงินหมุนเวียน)', revInner, 'rev');
   var dueInner='';
   if(pf.due.week) dueInner+=dueCard('ครบกำหนด — ภายใน 1 สัปดาห์',due7,cnt7,'7d','#E89A3C');
   if(pf.due.this) dueInner+=dueCard('ครบกำหนด — เดือนนี้',dueThis,cntThis,'this','#F2D04A',dueOver>0?' · เกินกำหนดค้าง ฿'+money(dueOver):'');
   if(pf.due.next) dueInner+=dueCard('ครบกำหนด — เดือนหน้า',dueNext,cntNext,'next','#E37D7D');
-  if(dueInner) html+=grp('ครบกำหนด', dueInner);
+  if(dueInner) html+=grp('ครบกำหนด', dueInner, 'due');
   var stInner='';
   if(pf.status.new)      stInner+=statusBox('คำขอใหม่',cNew,aNew,'คำขอใหม่','#6CA0F0');
   if(pf.status.proposed) stInner+=statusBox('อยู่ระหว่างเสนออนุมัติ',cWait,aWait,'อยู่ระหว่างเสนออนุมัติ','#E0B341');
   if(pf.status.approved) stInner+=statusBox('อนุมัติ',cAppr,aAppr,'อนุมัติแล้ว','#5BC279');
-  if(stInner) html+=grp('สถานะ', stInner);
+  if(stInner) html+=grp('สถานะ', stInner, 'st');
   // Skip the DOM swap when the cards would be byte-identical to what's already
   // there — keeps the bar-rise animation from re-playing on tab switches / sort
   // clicks (it should only fire when data or filters actually change the cards).
@@ -659,9 +730,15 @@ function cards(){
   }
 }
 
-function flt(){return{p:document.getElementById('fProj').value,t:document.getElementById('fType').value,
+function flt(){
+  // fType is the SINGLE source of truth for the type filter. A plain value is a
+  // facility number ("4"); a "k:<kinds>" value is a grouped kind filter (BG/B/E).
+  // They're mutually exclusive, so picking either from the dropdown fully replaces
+  // the other — no stale hidden filter, no impossible "number AND kind" dead-ends.
+  var ft=document.getElementById('fType').value, isKind=ft.indexOf('k:')===0;
+  return{p:document.getElementById('fProj').value,t:isKind?'':ft,
   s:document.getElementById('fStatus').value,d:document.getElementById('fDue').value,
-  co:document.getElementById('fCo').value,k:kindFilter,
+  co:document.getElementById('fCo').value,k:isKind?ft.slice(2):'',
   q:document.getElementById('fQ').value.trim().toLowerCase()};}
 function matchCo(project,q){return !q.co||projCompany(project)===q.co;}
 // Status filter: q may be one status, or a comma-joined set (e.g. the
@@ -683,7 +760,6 @@ function resetDrillFilters(){
   document.getElementById('fDue').value='';
   document.getElementById('fStatus').value='';
   document.getElementById('fQ').value='';
-  kindFilter='';
 }
 
 // From a due KPI box: show ONLY that due window in the Transactions list.
@@ -712,30 +788,35 @@ function jumpStatus(status){
   document.getElementById('fStatus').value=status;
   setView('txn');
 }
-// BG box groups the 3 guarantee lines (LG-kind: #1, #2, #3) — filter to them
-// via the invisible kindFilter (no single facility number to pin the dropdown to).
+// BG box groups the 3 guarantee lines (LG-kind: #1, #2, #3) — filter to them via
+// the grouped "BG" dropdown option (a kind filter, since no single facility number
+// covers all three), so the selection is visible like every other panel.
 function jumpBG(){
   resetDrillFilters();
-  kindFilter='LG';
+  document.getElementById('fType').value='k:LG';   // shows in the dropdown, like every other panel
   setView('fac');
 }
-// B/E + L/G วัสดุ + DLC share a single bank credit cap on the dashboard card, so
-// the drill-in mirrors that by filtering to all three kinds (AVAL + LGM + DLC) —
-// invisible kindFilter, same approach as BG. Picking "6. B/E รับรอง/อาวัลตั๋ว"
-// from the dropdown manually still gives just facility #6 for fine-grained drill.
+// B/E + L/G วัสดุ + DLC + PN-post share a single bank credit cap on the dashboard
+// card, so the drill-in mirrors that by selecting the grouped "B/E" dropdown
+// option (kind filter). Picking "6. B/E รับรอง/อาวัลตั๋ว" from the dropdown manually
+// still gives just facility #6 for fine-grained drill.
 function jumpBE(){
   resetDrillFilters();
-  kindFilter='AVAL,LGM,DLC';
+  document.getElementById('fType').value='k:AVAL,LGM,DLC,PNPOST';   // shows in the dropdown
   setView('fac');
 }
 
 function render(){
   if(!D)return;
-  persistFilters();   // snapshot filter selections + planMonth + kindFilter on every render
+  persistFilters();   // snapshot filter selections + planMonth on every render
   cards();            // dashboard cards sit on top of every view
   var b=document.getElementById('body');
   if(VIEW==='fac')b.innerHTML=facTable();
-  else if(VIEW==='plan'){b.innerHTML=planTable();planAfterRender();}
+  else if(VIEW==='plan'){planActivate('plan');b.innerHTML=planTable();planAfterRender();}
+  else if(VIEW==='actual'){planActivate('actual');b.innerHTML=planTable();planAfterRender();}
+  else if(VIEW==='variance'){b.innerHTML=varianceTable();varianceAfterRender();}
+  else if(VIEW==='cost'){var cs=categorySummary(D.transactions||[],{open:true});
+    b.innerHTML=cs||'<div class="ctr">ยังไม่มีข้อมูลค่าใช้จ่าย</div>';}
   else b.innerHTML=txnTable();
 }
 
@@ -781,11 +862,8 @@ function facTable(){
     function(x){return x.limit>0?x.used/x.limit:0;}
   ]);
   // Column widths keep the table evenly spread but slightly compact so บริษัท and ประเภท sit closer together.
-  // Prepend the category-summary panel — same data context the user gets on
-  // the Credit Ledger tab. Budget tracking belongs above both tables since
-  // it's about credit usage, which applies across both views.
-  var h=categorySummary(D.transactions||[])
-    +'<table style="table-layout:auto"><colgroup>'
+  // (The cost-category summary now lives on its own "สรุปค่าใช้จ่าย" tab, not here.)
+  var h='<table style="table-layout:auto"><colgroup>'
       +'<col style="width:4%">'
       +'<col style="width:15%"><col style="width:17%"><col style="width:9%">'
       +'<col style="width:11%"><col style="width:11%"><col style="width:11%">'
@@ -890,9 +968,45 @@ function reqTable(){
 // Replicates the T-bar layout: left = expected receipts (income) minus
 // compulsory deductions; right = list of due items being paid this period.
 // Each (project, month) holds up to 5 numbered periods sorted by date.
-var planCache={}; // {projectCode: [periods]} for the current month
+var planCache={}; // {projectCode: [periods]} for the current month (active variant)
 var prevPlanCache={}; // {projectCode: [periods]} for the PREVIOUS month — for PN carry-over defaults
 var planMonth=''; // current selected month YYYY-MM
+// The T-bar screen is shared by two tabs: the forecast Cash Plan ('plan') and the
+// recorded Actual T-bar ('actual'). PLAN_VARIANT selects which one the shared plan
+// functions read/write. planCache holds only the active variant; switching tabs
+// clears it and forces a reload (data is small and every edit saves immediately,
+// so nothing is lost). Periods are stamped with .variant so saves land in the
+// right variant.
+var PLAN_VARIANT='plan';
+// Fixed column widths for the T-bar "due items" tables (ครบ / ประเภท / เลขที่ /
+// รายละเอียด / จำนวน / actions) so the columns line up across every section.
+// Due-list columns: date, pill, ref, amount and the action buttons get FIXED px
+// widths (the action column must fit ↑ ↓ 🗑 or the buttons overflow the cell and
+// get clipped at the card edge); รายละเอียด (detail, truncates) takes the slack.
+var PLAN_DUE_COLS='<colgroup><col style="width:78px"><col style="width:56px"><col style="width:116px"><col><col style="width:104px"><col style="width:112px"></colgroup>';
+// Shared left-panel column layout (รายการ | ค่างาน | ขอเบิก P/N | %) so EVERY
+// section's cells line up vertically. The deduction/aval sections reuse the same
+// grid but put their single amount in the ขอเบิก P/N column, leaving the ค่างาน
+// and % columns as aligned gaps.
+var PLAN_LEFT_COLS='<colgroup><col><col style="width:128px"><col style="width:128px"><col style="width:58px"></colgroup>';
+// Shared 3-column T-bar layout: รับ (Cash in) · จ่าย (Cash out, shrunk to make room)
+// · สุทธิ (Net, fixed ~116px). Band, body and subtotal all use it so the three
+// columns line up vertically. The Net column is the per-section difference — it sits
+// on its own, not under either รับ or จ่าย.
+var PLAN_GRID='minmax(0,0.84fr) minmax(0,1.04fr) 116px';
+// Per-variant caches so switching plan ↔ actual is INSTANT after the first load
+// (no re-fetch). Each variant keeps its own cache + which month it fetched.
+var _pcStore={plan:{cache:{},prev:{},key:''}, actual:{cache:{},prev:{},key:''}};
+function planActivate(variant){
+  if(PLAN_VARIANT===variant) return;
+  // Stash the current variant's live cache, then restore the target variant's.
+  var cur=_pcStore[PLAN_VARIANT]; if(cur){ cur.cache=planCache; cur.prev=prevPlanCache; cur.key=planFetchedMonth; }
+  PLAN_VARIANT=variant;
+  var nxt=_pcStore[variant]||(_pcStore[variant]={cache:{},prev:{},key:''});
+  planCache=nxt.cache; prevPlanCache=nxt.prev; planFetchedMonth=nxt.key;
+  // planAfterRender then skips the network round-trip if this variant+month is
+  // already cached (planFetchedMonth===planMonth) — so repeat switches are instant.
+}
 function planMonthOptions(){
   // last 6 months + this + next 6 — covers historical and forecast
   var out=[],now=new Date();
@@ -917,9 +1031,8 @@ function planTable(){
     +planMonthOptions().map(function(o){
       return '<option value="'+o.v+'"'+(o.v===planMonth?' selected':'')+'>'+esc(o.l)+'</option>';
     }).join('')+'</select>';
-  // Tip when no specific project is filtered → all projects appear stacked.
-  var q=flt();
-  var scope=q.p?('โครงการ: '+esc(projTh(q.p))):'ทุกโครงการ';
+  // The plan tab is self-scoped (its own project picker / switcher / add button),
+  // so the header no longer echoes the filter-bar project — see planVisibleProjects.
   // Render the empty-state template OR cached cards immediately — no "กำลังโหลด…"
   // text wait. If a fetch is pending, the small spinner in the toolbar shows
   // that the picker dropdown's project list might still be updating.
@@ -928,26 +1041,53 @@ function planTable(){
     ? '<div class="ctr muted" style="padding:10px;font-size:11px">— จะอัปเดตเมื่อโหลดเสร็จ —</div>'
     : renderTemplateCard();
   // Inline project picker — always available at the top of the tab. Replaces
-  // the old "＋ เพิ่มโครงการ" → modal flow with a one-click dropdown. Options
-  // are filtered to projects not yet in the current month's plan.
-  var addable=(D.projects||[]).filter(function(p){return !planCache[p.code]||!planCache[p.code].length;});
-  var addOpts='<option value="">＋ เพิ่มโครงการ —</option>'
-    +addable.map(function(p){return '<option value="'+esc(p.code)+'">'+esc(p.code+' · '+p.th)+'</option>';}).join('');
-  var pickerHtml=addable.length
-    ? '<select id="planAddSel" onchange="if(this.value){var v=this.value;this.value=\'\';planAddProject(v);}" style="padding:5px 10px;font-size:13px;background:var(--orange);color:#fff;border-radius:6px;border:0;font-weight:600;cursor:pointer">'+addOpts+'</select>'
-    : '<span class="muted" style="font-size:12px">ทุกโครงการมีแผนแล้ว</span>';
+  // the old "＋ เพิ่มโครงการ" → modal flow with a one-click dropdown. Options are
+  // the projects not yet in this month's plan; wrapped in #planAddWrap so it can
+  // be refreshed (planRefreshAddPicker) after every add/swap/remove without a
+  // full tab re-render — otherwise a swapped-away project never reappears here.
+  var pickerHtml='<span id="planAddWrap">'+planAddPickerHtml()+'</span>';
   var h=''
     +'<div style="display:flex;gap:10px;align-items:center;margin:8px 0 14px;flex-wrap:wrap">'
-      +'<div class="secttl" style="margin:0">แผนการเงิน · '+scope+' · เดือน '+monthSel+'</div>'
+      +'<div class="secttl" style="margin:0">'+(PLAN_VARIANT==='actual'?'หักค่างานตามจริง':'แผนการเงิน')+' · เดือน '+monthSel+'</div>'
       +pickerHtml
       +'<span id="planLoading" class="muted" style="font-size:11px;display:none;align-items:center;gap:5px">'
         +'<span style="display:inline-block;width:13px;height:13px;border:2px solid var(--bd);border-top-color:var(--brand2);border-radius:50%;animation:spin 0.7s linear infinite"></span>'
         +'กำลังโหลด</span>'
-      +'<div id="planSum" style="margin-left:auto;font-size:13px"></div>'
+      +'<div style="margin-left:auto;display:flex;align-items:center;gap:12px">'
+        +'<div id="planSum" style="font-size:13px"></div>'
+        +'<button class="btn export sm" onclick="planExportTbar()" title="ส่งออก T-bar เป็น Excel (รูปแบบจะกำหนดในขั้นถัดไป)">📥 Export T-bar</button>'
+      +'</div>'
     +'</div>'
     +'<div id="planBody" class="plan">'+initialBody+'</div>';
   return h;
 }
+// The orange "＋ เพิ่มโครงการ" options = projects with no plan yet this month.
+// Built as a function so it can be re-synced live after the cache changes.
+function planAddPickerHtml(){
+  var hasAny=Object.keys(planCache).some(function(c){return planCache[c]&&planCache[c].length;});
+  var addable=planProjects().filter(function(p){return !planCache[p.code]||!planCache[p.code].length;});
+  if(!addable.length) return '<span class="muted" style="font-size:12px">ทุกโครงการมีแผนแล้ว</span>';
+  // Sequential flow: until the FIRST T-bar exists, pick a project from the
+  // "เริ่มต้น" card below (which is flashed for attention). Gray out "add project"
+  // so there aren't two competing pickers on first access.
+  if(!hasAny){
+    return '<span title="เลือกโครงการแรกจากการ์ด “เริ่มต้น” ด้านล่างก่อน" '
+      +'style="padding:5px 10px;font-size:13px;background:#e5e9f0;color:#9aa5b5;border-radius:6px;'
+      +'font-weight:600;cursor:not-allowed;user-select:none">＋ เพิ่มโครงการ —</span>';
+  }
+  var addOpts='<option value="">＋ เพิ่มโครงการ —</option>'
+    +addable.map(function(p){return '<option value="'+esc(p.code)+'">'+esc(p.code+' · '+p.th)+'</option>';}).join('');
+  return '<select id="planAddSel" onchange="if(this.value){var v=this.value;this.value=\'\';planAddProject(v);}" style="padding:5px 10px;font-size:13px;background:var(--orange);color:#fff;border-radius:6px;border:0;font-weight:600;cursor:pointer">'+addOpts+'</select>';
+}
+// Re-sync the orange picker's options to the current cache (e.g. after a project
+// swap frees the old project / claims the new one). No-op if the tab isn't shown.
+function planRefreshAddPicker(){var el=document.getElementById('planAddWrap'); if(el) el.innerHTML=planAddPickerHtml();}
+// Projects that cannot have a T-bar cash plan (head office / non-construction, or
+// projects financed outside the work-payment + B/E + P/N model) — hidden from
+// every plan-tab project picker: the Start card, each card's switcher, and the
+// orange "เพิ่มโครงการ" button. Edit this list if a project starts/stops using the plan.
+var PLAN_EXCLUDE={HO:1,LPB:1};
+function planProjects(){return (D.projects||[]).filter(function(p){return !PLAN_EXCLUDE[p.code];});}
 function onPlanMonth(v){planMonth=v;planAfterRender();}
 // Group periods by project so we can render one big table per project.
 function planGroupByProject(rows){
@@ -957,12 +1097,14 @@ function planGroupByProject(rows){
 // Projects shown in the plan = only those the user has explicitly added a
 // period for this month. Filters narrow further (project / company).
 function planVisibleProjects(){
-  var q=flt();
+  // The plan tab manages its OWN project set — the "เริ่มต้น" Start picker, each
+  // card's project switcher, and the orange "เพิ่มโครงการ" button. So it is NOT
+  // narrowed by the filter bar (fProj/fCo): if it were, picking or adding any
+  // project other than the one in the filter bar would be saved but silently
+  // vanish from view (the bug where non-BT1 projects "disappeared" and the
+  // orange button "didn't add a second table").
   return Object.keys(planCache).filter(function(code){
-    if(!planCache[code]||!planCache[code].length)return false;
-    if(q.p && code!==q.p)return false;
-    if(q.co && projCompany(code)!==q.co)return false;
-    return true;
+    return planCache[code]&&planCache[code].length;
   });
 }
 // Projects available to ADD this month = all projects MINUS the ones already added.
@@ -1001,8 +1143,11 @@ function planAddProject(proj){
   if(existing.length){toast('โครงการ '+proj+' มีอยู่ในแผนแล้ว');return;}
   var startIdx=existing.reduce(function(m,p){return Math.max(m,p.periodIdx);},0)+1;
   var allElig=planEligibleItems(proj).map(function(t){return t.id;});
-  var types=['income','deduction','income'];
-  var incomeOrd=0;
+  // Default order: รับเงินค่างาน + หักหนี้ (deduction) FIRST, then the two P/N-draw
+  // (income) sections — mirrors the bank cashflow sheet (receive+deduct, then plan
+  // the next งวด's P/N sale).
+  var types=['deduction','income','income'];
+  var incomeOrd=0, claimedElig=false;
   var periods=types.map(function(type,i){
     var idx=startIdx+i;
     var p={id:'PL-'+Date.now()+'-'+i+'-'+Math.floor(Math.random()*1000),
@@ -1010,11 +1155,13 @@ function planAddProject(proj){
       periodLabel:(type==='income')?('งวดที่ '+(++incomeOrd)):'',
       periodType:type,periodDate:'',income:0,workRef:'',paidIds:[],
       deductions:[],incomeBreak:[],avalAmount:0,
-      newPNAmount:0,newPNNote:'',note:''};
+      newPNAmount:0,newPNNote:'',note:'',variant:PLAN_VARIANT};
     if(type==='income'){
-      p.incomeBreak=planDefaultIncome();
-      // First income section claims every eligible item this month.
-      if(i===0) p.paidIds=allElig.slice();
+      // First P/N section = ค่างาน (full calc); second = Workdone (progress, 50%).
+      p.incomeBreak=planDefaultIncome(incomeOrd>=2?'progress':'work');
+      // The FIRST income section claims every eligible item this month (not i===0,
+      // since the deduction section now leads).
+      if(!claimedElig){ p.paidIds=allElig.slice(); claimedElig=true; }
     } else if(type==='deduction'){
       p.deductions=planDefaultDeductions();
       // Carry over previous month's issued P/N into "หัก PN" on the first
@@ -1056,19 +1203,29 @@ function planAfterRender(){
   if(planCache && Object.keys(planCache).length>0) renderPlanBody();
   // 2. Skip the network round-trip if we've already loaded this month and nothing is pending.
   if(planFetchedMonth===planMonth && Object.keys(planCache).length>0 && _savingN===0) return;
-  // 3. Otherwise, refresh in the background — the template card is already
-  //    visible so the user can pick a project while data loads.
+  // 3. Otherwise refresh. A MONTH/VARIANT switch must always load the requested
+  //    data — so first FLUSH any queued edits (they upsert by their own id, to
+  //    their own month) so nothing is lost, then load. A same-month background
+  //    refresh still defers to in-progress edits so it doesn't clobber them.
+  var monthSwitch = (planFetchedMonth!==planMonth);
+  if(monthSwitch) planFlushPendingSaves();
+  var reqMonth=planMonth, reqVariant=PLAN_VARIANT;
   setLoading(true);
   google.script.run.withSuccessHandler(function(rows){
-    if(_savingN>0){setLoading(false);return;}    // don't clobber pending edits
+    if(reqMonth!==planMonth || reqVariant!==PLAN_VARIANT){setLoading(false);return;} // user moved on — ignore stale response
+    if(!monthSwitch && _savingN>0){setLoading(false);return;}                        // same-month refresh: don't clobber live edits
     planCache=planGroupByProject(rows);
     planFetchedMonth=planMonth;
+    setLoading(false);
+    renderPlanBody();   // show the current month NOW — don't wait for the prev-month fetch
+    // On the ACTUAL tab: mirror any plan projects that don't yet have an Actual T-bar
+    // (copy the plan's structure + amounts as the starting point).
+    if(reqVariant==='actual') planMirrorFromPlan(reqMonth);
+    // Prev month loads in the BACKGROUND (only used for the PN carry-over default when
+    // ADDING a project) — so the tab transition isn't blocked by a second round-trip.
     google.script.run.withSuccessHandler(function(prev){
-      prevPlanCache=planGroupByProject(prev);
-      setLoading(false);
-      renderPlanBody();
-    }).withFailureHandler(function(){setLoading(false);prevPlanCache={};renderPlanBody();})
-      .getCashPlan('',planPrevMonth());
+      if(reqMonth===planMonth && reqVariant===PLAN_VARIANT) prevPlanCache=planGroupByProject(prev);
+    }).withFailureHandler(function(){}).getCashPlan('',planPrevMonth(),reqVariant);
   }).withFailureHandler(function(e){
     setLoading(false);
     if(!planCache || Object.keys(planCache).length===0){
@@ -1077,7 +1234,34 @@ function planAfterRender(){
     } else {
       toast('โหลดข้อมูลล่าสุดไม่สำเร็จ — แสดงข้อมูลจากแคช');
     }
-  }).getCashPlan('',planMonth);
+  }).getCashPlan('',reqMonth,reqVariant);
+}
+// Actual tab: mirror the plan → copy the plan's structure + amounts for any project
+// that doesn't yet have an Actual T-bar this month (chosen: auto-mirror, copy amounts).
+// Existing Actual projects are left untouched. Runs once per Actual load (fetch is
+// skipped on repeat tab switches by the per-variant cache).
+function planMirrorFromPlan(reqMonth){
+  google.script.run.withSuccessHandler(function(planRows){
+    if(reqMonth!==planMonth || PLAN_VARIANT!=='actual') return;   // user moved on
+    var planByProj=planGroupByProject(planRows||[]);
+    var created=[];
+    Object.keys(planByProj).forEach(function(proj){
+      if(planCache[proj] && planCache[proj].length) return;       // Actual already has this project
+      var mirrored=(planByProj[proj]||[]).slice()
+        .sort(function(a,b){return a.periodIdx-b.periodIdx;})
+        .map(function(pp){
+          var c=JSON.parse(JSON.stringify(pp));                   // deep copy structure + amounts
+          c.id='PL-'+Date.now()+'-'+proj+'-'+c.periodIdx+'-'+Math.floor(Math.random()*100000);
+          c.variant='actual';
+          return c;
+        });
+      if(mirrored.length){ planCache[proj]=mirrored; created.push.apply(created,mirrored); }
+    });
+    if(created.length){
+      renderPlanBody();
+      created.forEach(function(p){ planScheduleSave(p); });       // persist the mirrored Actual rows
+    }
+  }).withFailureHandler(function(){}).getCashPlan('',reqMonth,'plan');
 }
 // Sum of P/N issued (ขอทำ P/N) across all periods in a given project, previous month.
 // Only the "ค่างานรับสุทธิ" row counts — that's the real P/N being discounted.
@@ -1085,11 +1269,7 @@ function planAfterRender(){
 function planPrevPnTotal(proj){
   var list=prevPlanCache[proj]||[];
   return list.reduce(function(sum,p){
-    var inc=p.incomeBreak||[];
-    return sum+inc.reduce(function(s,r){
-      if(String(r.label||'').indexOf('ค่างานรับสุทธิ')!==0) return s;
-      return s+(Number(r.pnAmount)||0);
-    },0);
+    return sum+(p.periodType==='income'?planIncomeCalc(p).totalPN:0);
   },0);
 }
 // Default deductions every new period starts with (matches the bank's T-bar).
@@ -1139,7 +1319,7 @@ function planAddPeriod(proj,type,onDone,suppressRender){
     periodLabel:(type==='income')?('งวดที่ '+incomeOrdinal):'',
     periodType:type,periodDate:'',income:0,workRef:'',paidIds:[],
     deductions:[],incomeBreak:[],avalAmount:0,
-    newPNAmount:0,newPNNote:'',note:''};
+    newPNAmount:0,newPNNote:'',note:'',variant:PLAN_VARIANT};
   if(type==='income'){
     p.incomeBreak=planDefaultIncome();
     // First income section claims EVERY eligible item this month (B/E + P/N alike)
@@ -1181,12 +1361,74 @@ function planAddPeriod(proj,type,onDone,suppressRender){
   }).withFailureHandler(function(e){toast('เพิ่มไม่สำเร็จ: '+(e.message||e));if(onDone)onDone();}).saveCashPlanPeriod(p);
 }
 // Default 3 income rows for the ขอเบิก P/N section.
-function planDefaultIncome(){
-  return [
-    {label:'ค่างานรับสุทธิ งวด … (ประมาณ)', workValue:0, pnAmount:0},
-    {label:'เงินประกันผลงาน งวด …',         workValue:0, pnAmount:0},
-    {label:'ผลงานแล้วเสร็จ ณ …',            workValue:0, pnAmount:0}
-  ];
+// Default P/N draw threshold per income row (the % of ค่างาน the bank lets us sell):
+//   ค่างานรับสุทธิ 80% · เงินประกันผลงาน 80% · ผลงานแล้วเสร็จ 50%.
+function planIncomeDefaultPct(idx){var d=[0.8,0.8,0.5];return d[idx]!=null?d[idx]:0.8;}
+// The งวด number for an income section — from a number typed in the period label
+// ("งวดที่ 2" → 2), else the income-section ordinal. Used to auto-fill "งวด …" in
+// the row labels so they read "งวด 1" etc. without the user retyping it.
+function planIncomeGuadNo(p, proj){
+  var m=String(p.periodLabel||'').match(/\d+/);
+  if(m) return m[0];
+  var incomes=(planCache[proj]||[]).filter(function(x){return x.periodType==='income';});
+  var ord=incomes.findIndex(function(x){return x.id===p.id;})+1;
+  return ord>0?String(ord):String(p.periodIdx||'');
+}
+// ── P/N-sale income model (งวด P/N calc) ─────────────────────────────────────
+// incomeBreak is an OBJECT of inputs: work (ส่งงาน), segment (ค่า segment CVE),
+// pnSold (PN ที่ขายไว้ — manual), rt (ค่างาน retention). Old array format (the
+// pre-redesign 3-row model) is treated as empty. Everything else is derived.
+// kind: 'work' = full ค่างาน calc (80% ceiling / 60% segment / PN sold / RT).
+//       'progress' = simple Workdone sale at 50%, no deductions.
+function planDefaultIncome(kind){ return {kind:kind||'work',work:0,segment:0,pnSold:0,rt:0,daysNew:90,daysRT:90}; }
+function planIncomeObj(p){
+  var o=p&&p.incomeBreak;
+  if(o && !Array.isArray(o) && typeof o==='object') return o;
+  return planDefaultIncome();
+}
+function planIncomeKind(p){ return (planIncomeObj(p).kind==='progress')?'progress':'work'; }
+// Progress mode: P/N = Workdone × 50%. Work mode: sellable base = MIN(80% work,
+// work − 60% segment); new P/N = base − P/N already sold; total = new P/N + RT×80%.
+function planIncomeCalc(p){
+  var o=planIncomeObj(p);
+  var work=Number(o.work)||0;
+  var daysNew=(o.daysNew==null?90:Number(o.daysNew)), daysRT=(o.daysRT==null?90:Number(o.daysRT));
+  if((o.kind==='progress')){
+    var tp=work*0.5;
+    return {kind:'progress',work:work,seg:0,pnSold:0,rt:0,ceil1:0,seg60:0,remain:0,
+      sellBase:tp,newPN:tp,rtPN:0,totalPN:tp,daysNew:daysNew,daysRT:daysRT};
+  }
+  var seg=Number(o.segment)||0, pnSold=Number(o.pnSold)||0, rt=Number(o.rt)||0;
+  var ceil1=work*0.8, seg60=seg*0.6, remain=work-seg60;
+  var sellBase=work>0?Math.min(ceil1,remain):0;
+  var newPN=sellBase-pnSold, rtPN=rt*0.8, totalPN=newPN+rtPN;
+  return {kind:'work',work:work,seg:seg,pnSold:pnSold,rt:rt,ceil1:ceil1,seg60:seg60,remain:remain,
+    sellBase:sellBase,newPN:newPN,rtPN:rtPN,totalPN:totalPN,daysNew:daysNew,daysRT:daysRT};
+}
+function planIncEnsure_(p){
+  var o=p.incomeBreak;
+  if(!o||Array.isArray(o)||typeof o!=='object') o=p.incomeBreak=planDefaultIncome();
+  return o;
+}
+function planEditIncLive(pid,field,val){
+  var p=planFind(pid); if(!p) return;
+  planIncEnsure_(p)[field]=Number(val)||0;
+  planRefreshIncomeCells(p);
+  planRefreshIncomeInterest(p.id);
+  planRefreshDeductionCells(p.project);   // deduction's หัก PN ขอเบิกใหม่ feeds off this
+  planScheduleSave(p);                    // auto-save while typing (debounced), not just on blur
+}
+function planEditIncSave(pid,field,val){
+  var p=planFind(pid); if(!p) return;
+  planIncEnsure_(p)[field]=Number(val)||0;
+  planScheduleSave(p);
+}
+// Money input for a P/N-section field (live recompute on input, save on blur).
+function planMoneyInp(pid,field,val,extra){
+  return '<input type="text" inputmode="decimal" value="'+(val?Number(val).toLocaleString("en-US"):"")+'" '
+    +'oninput="fmtMoneyInput(this);planEditIncLive(\''+pid+'\',\''+field+'\',moneyVal(this.value))" '
+    +'onchange="planEditIncSave(\''+pid+'\',\''+field+'\',moneyVal(this.value))" '
+    +'style="width:100%;text-align:right;'+(extra||'')+'">';
 }
 function planCopyPrev(proj){
   var ym=planMonth.split('-'),y=+ym[0],m=+ym[1]-1;
@@ -1205,11 +1447,102 @@ function planCopyPrev(proj){
         deductions:p.deductions||(p.periodType==='deduction'?planDefaultDeductions():[]),
         incomeBreak:p.incomeBreak||(p.periodType==='income'?planDefaultIncome():[]),
         avalAmount:p.avalAmount||0,
-        newPNAmount:0,newPNNote:'',note:''};
+        newPNAmount:0,newPNNote:'',note:'',variant:PLAN_VARIANT};
       google.script.run.withSuccessHandler(function(){if(++saved===target)planAfterRender();})
         .saveCashPlanPeriod(copy);
     });
-  }).getCashPlan('',prev);
+  }).getCashPlan('',prev,PLAN_VARIANT);
+}
+
+// ---------- Variance (Cash Plan vs Actual T-bar) ----------
+// P/N sold this month from a period list = pnAmount on the "ค่างานรับสุทธิ" income
+// rows. Same idea as planPnSoldThisMonth but driven by an explicit list so it
+// works for either variant without touching planCache.
+function planPnSoldFrom(periods){
+  var sum=0;
+  (periods||[]).forEach(function(p){
+    if(p.periodType==='income') sum+=planIncomeCalc(p).totalPN;
+  });
+  return sum;
+}
+// Received / Deducted / Net for one project's period list — mirrors the T-bar
+// card totals (income work-value = received; deductions auto-calc + paid items +
+// aval = deducted) but headless, so the Variance tab can total either variant.
+function planTotalsForPeriods(periods, project){
+  var received=0, deducted=0;
+  var pnSold=planPnSoldFrom(periods);
+  var byId={}; planAllOutstanding(project).forEach(function(t){byId[t.id]=Number(t.amount)||0;});
+  (periods||[]).forEach(function(p){
+    if(p.periodType==='income'){
+      received+=planIncomeCalc(p).work;   // submitted work value (ส่งงาน)
+    } else if(p.periodType==='deduction'){
+      var income=Number(p.income)||0;
+      (p.deductions||[]).forEach(function(d){
+        var lbl=String(d.label||'');
+        if(lbl.indexOf('TL')>=0)             deducted+=Math.round(income*0.15*100)/100;
+        else if(lbl.indexOf('ML')>=0)        deducted+=Math.round(income*0.015*100)/100;
+        else if(lbl.indexOf('ขอเบิกใหม่')>=0) deducted+=pnSold;
+        else                                  deducted+=Number(d.amount)||0;
+      });
+      (Array.isArray(p.paidIds)?p.paidIds:[]).forEach(function(id){deducted+=byId[id]||0;});
+    } else if(p.periodType==='aval'){
+      deducted+=Number(p.avalAmount)||0;
+    }
+  });
+  return {received:received, deducted:deducted, net:received-deducted};
+}
+// Variance tab shell: month selector + a body filled in async by varianceAfterRender.
+function varianceTable(){
+  if(!planMonth){var d=new Date(); planMonth=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);}
+  var monthSel='<select id="planMonth" onchange="onVarianceMonth(this.value)">'
+    +planMonthOptions().map(function(o){return '<option value="'+o.v+'"'+(o.v===planMonth?' selected':'')+'>'+esc(o.l)+'</option>';}).join('')+'</select>';
+  return ''
+    +'<div style="display:flex;gap:10px;align-items:center;margin:8px 0 14px;flex-wrap:wrap">'
+      +'<div class="secttl" style="margin:0">ผลต่าง (แผน vs จริง) · เดือน '+monthSel+'</div>'
+    +'</div>'
+    +'<div id="varBody"><div class="ctr muted" style="padding:20px">กำลังโหลด…</div></div>';
+}
+function onVarianceMonth(v){planMonth=v;varianceAfterRender();}
+// Pull BOTH variants for the month and render the comparison. Read-only, so it
+// doesn't touch planCache / PLAN_VARIANT.
+function varianceAfterRender(){
+  var m=planMonth;
+  google.script.run.withSuccessHandler(function(planRows){
+    var planBy=planGroupByProject(planRows);
+    google.script.run.withSuccessHandler(function(actRows){
+      renderVariance(planBy, planGroupByProject(actRows));
+    }).withFailureHandler(function(){renderVariance(planBy,{});}).getCashPlan('',m,'actual');
+  }).withFailureHandler(function(e){
+    var el=document.getElementById('varBody'); if(el)el.innerHTML='<div class="ctr">โหลดไม่สำเร็จ: '+esc(e.message||e)+'</div>';
+  }).getCashPlan('',m,'plan');
+}
+function renderVariance(planBy, actBy){
+  var el=document.getElementById('varBody'); if(!el)return;
+  var codes={}; Object.keys(planBy).forEach(function(c){codes[c]=1;}); Object.keys(actBy).forEach(function(c){codes[c]=1;});
+  var list=Object.keys(codes).sort();
+  if(!list.length){el.innerHTML='<div class="ctr">ยังไม่มีข้อมูลแผน/จริงในเดือนนี้</div>';return;}
+  // Δ = actual − plan. Coloured only by sign so it reads as a neutral difference.
+  function cell(plan,act){
+    var d=act-plan, sign=d>0?'+':d<0?'−':'';
+    var col=d<0?'var(--bad)':d>0?'var(--ok)':'var(--mut)';
+    return '<td class="num">฿'+money(plan)+'</td><td class="num">฿'+money(act)+'</td>'
+      +'<td class="num" style="font-weight:600;color:'+col+'">'+sign+'฿'+money(Math.abs(d))+'</td>';
+  }
+  var rows=list.map(function(code){
+    var pt=planTotalsForPeriods(planBy[code]||[],code);
+    var at=planTotalsForPeriods(actBy[code]||[],code);
+    return '<tr><td><b>'+esc(code)+'</b> <span class="muted" style="font-size:12px">'+esc(projThShort(code))+'</span></td>'
+      +cell(pt.received,at.received)+cell(pt.deducted,at.deducted)+cell(pt.net,at.net)+'</tr>';
+  }).join('');
+  el.innerHTML='<table style="table-layout:auto"><thead>'
+    +'<tr><th rowspan="2">โครงการ</th>'
+      +'<th colspan="3" class="num">รับเงิน (Received)</th>'
+      +'<th colspan="3" class="num">หักจ่าย (Deducted)</th>'
+      +'<th colspan="3" class="num">คงเหลือสุทธิ (Net)</th></tr>'
+    +'<tr><th class="num">แผน</th><th class="num">จริง</th><th class="num">ผลต่าง</th>'
+        +'<th class="num">แผน</th><th class="num">จริง</th><th class="num">ผลต่าง</th>'
+        +'<th class="num">แผน</th><th class="num">จริง</th><th class="num">ผลต่าง</th></tr>'
+    +'</thead><tbody>'+rows+'</tbody></table>';
 }
 // Items eligible to "pay off" — authorized, positive, unpaid AND due in the
 // selected month (so each month's plan only shows the items it should address).
@@ -1245,56 +1578,79 @@ function planEligibleItems(proj){
 // totals row — but with disabled inputs and blank values. A project picker
 // at the top is the only enabled control; selecting a project triggers
 // planAddProject which materializes the real sections with due items.
-function tmplIncomeTable(){
-  var rows=planDefaultIncome().map(function(r){
-    return '<tr><td><input type="text" disabled value="'+esc(r.label)+'" style="width:100%;background:#f5f5f5;opacity:.65"></td>'
-      +'<td class="num"><input type="text" disabled style="width:110px;text-align:right;background:#f5f5f5;opacity:.65"></td>'
-      +'<td class="num"><input type="text" disabled style="width:110px;text-align:right;background:#f5f5f5;opacity:.65"></td>'
-      +'<td class="num muted" style="font-size:11px"></td></tr>';
-  }).join('');
-  return '<table style="margin:0"><thead><tr><th>รายการ</th><th class="num">ขอเบิก P/N</th><th class="num">ค่างาน</th><th class="num">%</th></tr></thead><tbody>'
-    +rows
-    +'<tr style="background:#eef3fa"><td><b>รวม</b></td><td class="num"><b>฿0</b></td><td class="num"><b>฿0</b></td><td></td></tr>'
+// Blank preview tables — MUST mirror the real renderPlanPeriodCard layout exactly
+// (same PLAN_LEFT_COLS colgroup, same column order ค่างาน|ขอเบิก P/N|%, same 4-cell
+// deduction rows) so the starter template lines up identically to a live project.
+function tmplIncomeTable(kind){
+  var din='<input type="text" disabled style="width:100%;text-align:right;background:#f5f5f5;opacity:.65">';
+  var pctc='font-size:11px;color:var(--mut)';
+  if(kind==='progress'){
+    // Workdone (progress) preview — 50% only, no deductions.
+    return '<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">คำนวณ</th><th class="num">%</th></tr></thead><tbody>'
+      +'<tr><td>ผลงานที่ทำได้ งวด … (Workdone)<div class="muted" style="font-size:10px;font-weight:400">ยังไม่ถึงงวดเบิก · ธนาคารสนับสนุนล่วงหน้า · จากรายงานความก้าวหน้า/ใบวิทยุ</div></td><td class="num">'+din+'</td><td class="num">฿0</td><td class="num" style="'+pctc+'">50%</td></tr>'
+      +'<tr style="background:#eef3fa"><td><b>รวม P/N ที่ขาย</b></td><td></td><td class="num"><b>฿0</b></td><td></td></tr>'
+      +'</tbody></table>';
+  }
+  // Disabled preview mirroring the live ค่างาน P/N section (4 inputs + 2 computed).
+  return '<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">คำนวณ</th><th class="num">%</th></tr></thead><tbody>'
+    +'<tr><td>ส่งงานงวด … (ค่างานที่ส่ง)</td><td class="num">'+din+'</td><td class="num">฿0</td><td class="num" style="'+pctc+'">80%</td></tr>'
+    +'<tr><td>หัก ค่า segment CVE</td><td class="num">'+din+'</td><td class="num">฿0</td><td class="num" style="'+pctc+'">60%</td></tr>'
+    +'<tr style="background:#fbf3e6"><td><b>เหลือค่างวด …</b></td><td></td><td class="num"><b>฿0</b></td><td></td></tr>'
+    +'<tr><td>หัก PN ที่ขายไว้ (เดือนก่อน)</td><td></td><td class="num">'+din+'</td><td></td></tr>'
+    +'<tr style="background:#e3eefb"><td><b>จะคงเหลือ P/N ที่ขายได้</b></td><td></td><td class="num"><b>฿0</b></td><td></td></tr>'
+    +'<tr><td>ขาย PN RT งวด … (เงินประกัน)</td><td class="num">'+din+'</td><td class="num">฿0</td><td class="num" style="'+pctc+'">80%</td></tr>'
+    +'<tr style="background:#eef3fa"><td><b>รวม P/N ที่ขาย</b></td><td></td><td class="num"><b>฿0</b></td><td></td></tr>'
     +'</tbody></table>';
 }
 function tmplDeductionTable(){
   var rows=planDefaultDeductions().map(function(d){
     var isTL=d.label.indexOf('TL')>=0, isML=d.label.indexOf('ML')>=0,
-        isPNNew=d.label.indexOf('ขอเบิกใหม่')>=0;
+        isPNNew=d.label.indexOf('ขอเบิกใหม่')>=0, isPNwork=d.label.indexOf('PN')>=0 && !isPNNew;
     var hint=isTL?' <span class="muted" style="font-size:10px">(auto 15%)</span>'
             :isML?' <span class="muted" style="font-size:10px">(auto 1.5%)</span>'
-            :isPNNew?' <span class="muted" style="font-size:10px">(auto จาก P/N แถว "ค่างานรับสุทธิ" เท่านั้น)</span>':'';
-    return '<tr><td style="color:#9a3232">'+esc(d.label)+hint+'</td>'
-      +'<td class="num"><input type="text" disabled style="width:140px;text-align:right;color:#9a3232;background:#f5f5f5;opacity:.65"></td></tr>';
+            :isPNNew?' <span class="muted" style="font-size:10px">(PN ต่อค่างานงวดนี้ · auto จาก P/N ที่ขาย)</span>'
+            :isPNwork?' <span class="muted" style="font-size:10px">(PN Work Done ของงวดก่อน)</span>':'';
+    return '<tr><td style="color:#9a3232">'+esc(d.label)+hint+'</td><td></td>'
+      +'<td class="num"><input type="text" disabled style="width:100%;text-align:right;color:#9a3232;background:#f5f5f5;opacity:.65"></td><td></td></tr>';
   }).join('');
-  return '<table style="margin:0"><tbody>'
-    +'<tr><td><b>รับเงินค่างานสุทธิ</b></td>'
-      +'<td class="num"><input type="text" disabled style="width:140px;text-align:right;font-weight:600;background:#f5f5f5;opacity:.65"></td></tr>'
+  return '<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<tbody>'
+    +'<tr><td><b>รับเงินค่างานสุทธิ</b></td><td></td>'
+      +'<td class="num"><input type="text" disabled style="width:100%;text-align:right;font-weight:600;background:#f5f5f5;opacity:.65"></td><td></td></tr>'
     +rows
-    +'<tr><td><b>คงเหลือ</b></td><td class="num"><b style="color:var(--navy)">฿0</b></td></tr>'
+    +'<tr><td><b>คงเหลือ</b></td><td></td><td class="num"><b style="color:var(--navy)">฿0</b></td><td></td></tr>'
     +'</tbody></table>';
 }
-function renderTemplateSectionFull(num,type,periodLabel){
+function renderTemplateSectionFull(num,type,periodLabel,kind){
   var label={income:'ขอเบิก P/N',deduction:'รับเงินค่างาน + หักหนี้'}[type];
+  if(type==='income') label='ขอเบิก P/N '+(kind==='progress'?'Workdone':'ค่างาน');
   var isDed=type==='deduction';
   var hdr='<div style="display:flex;gap:10px;align-items:center;background:#f5f8fc;padding:3px 10px;border-bottom:1px solid var(--bd)">'
     +'<b style="font-size:13px;background:var(--navy);color:#fff;border-radius:4px;padding:1px 8px">'+num+'</b>'
     +'<span style="background:#e8eef7;padding:1px 7px;border-radius:999px;font-size:11px;color:var(--navy);font-weight:600">'+esc(label)+'</span>'
     +(isDed?'':'<span style="font-size:11px;color:var(--mut)">วันที่ส่งงาน</span>')
     +'<input type="date" disabled style="font-size:12px;padding:2px 4px;background:#f5f5f5;opacity:.65">'
-    +(isDed?'':'<input type="text" disabled placeholder="'+periodLabel+'" style="width:120px;font-size:12px;padding:2px 4px;background:#f5f5f5;opacity:.65">')
+    +'<span style="font-size:11px;color:var(--mut)">งวดที่</span>'
+    +'<input type="text" disabled placeholder="'+num+'" style="width:48px;text-align:center;font-size:12px;padding:2px 4px;background:#f5f5f5;opacity:.65">'
   +'</div>';
-  var leftHtml=(type==='income')?tmplIncomeTable():tmplDeductionTable();
-  var rightHtml='<div class="ctr muted" style="padding:8px;font-size:11px;font-style:italic">— เลือกโครงการเพื่อโหลดรายการ —</div>';
+  var leftHtml=(type==='income')?tmplIncomeTable(kind):tmplDeductionTable();
+  leftHtml+='<div style="padding:3px 4px 2px"><button class="btn ghost sm" disabled style="font-size:11px;padding:2px 8px;color:#1F6E3A;border-style:dashed;opacity:.6">＋ เพิ่มรายรับจากแหล่งอื่น</button></div>';
+  // Placeholder grows (flex:1) so the รวมจ่าย total sinks to the BOTTOM of the cell,
+  // landing on the same line as the รวม at the bottom of the Cash-in table.
+  var rightHtml='<div class="ctr muted" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-style:italic">— เลือกโครงการเพื่อโหลดรายการ —</div>'
+    +'<div style="background:#eef3fa;padding:4px 12px;display:flex;justify-content:space-between;font-weight:700;font-size:12px"><span>รวมจ่าย</span><span>฿0</span></div>';
   return hdr
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">'
-      +'<div style="padding:4px 8px;border-right:1px solid var(--bd)">'+leftHtml+'</div>'
-      +'<div style="padding:4px 8px">'+rightHtml+'</div>'
+    +'<div style="display:grid;grid-template-columns:'+PLAN_GRID+';gap:0">'
+      +'<div style="padding:4px 8px;border-right:1px solid var(--bd);min-width:0;overflow-x:auto">'+leftHtml+'</div>'
+      +'<div style="padding:4px 8px;min-width:0;overflow-x:auto;display:flex;flex-direction:column">'+rightHtml+'</div>'
+      +'<div style="padding:6px 8px;border-left:1px solid var(--bd);background:#f7f9fc;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right">'
+        +'<span class="muted" style="font-size:10px;white-space:nowrap">สุทธิงวดนี้ / Net</span>'
+        +'<b style="font-size:15px;color:var(--navy)">฿0</b>'
+      +'</div>'
     +'</div>';
 }
 function renderTemplateCard(){
   var present={}; Object.keys(planCache||{}).forEach(function(c){present[c]=1;});
-  var available=(D.projects||[]).filter(function(p){return !present[p.code];});
+  var available=planProjects().filter(function(p){return !present[p.code];});
   if(!available.length){
     return '<div class="ctr" style="padding:30px;font-size:14px">ทุกโครงการมีแผนในเดือนนี้แล้ว</div>';
   }
@@ -1304,17 +1660,22 @@ function renderTemplateCard(){
     }).join('');
   return '<div style="background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:14px">'
     +'<div style="background:#0b1220;color:#fff;padding:5px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      +'<b style="font-size:14px">เริ่มต้น</b>'
-      +'<select onchange="if(this.value)planAddProject(this.value)" style="padding:4px 10px;font-size:13px;background:#fff;color:var(--ink);border-radius:6px;border:1px solid #334155;min-width:240px">'
+      +'<b style="font-size:14px">① เริ่มต้น</b>'
+      +'<select class="flash-pick" onchange="if(this.value)planAddProject(this.value)" style="padding:4px 10px;font-size:13px;background:#fff;color:var(--ink);border-radius:6px;border:1px solid #334155;min-width:240px">'
         +pickOpts
       +'</select>'
       +'<span style="opacity:.85;font-size:12px">เลือกโครงการเพื่อสร้างแผน 3 ส่วน พร้อม B/E + P/N ที่ครบกำหนดเดือนนี้</span>'
     +'</div>'
-    +renderTemplateSectionFull(1,'income','งวดที่ 1')
+    +'<div style="display:grid;grid-template-columns:'+PLAN_GRID+';gap:0;font-size:12px;font-weight:700;letter-spacing:.5px">'
+      +'<div style="padding:4px 12px;text-align:center;background:#eaf6ee;color:#1F6E3A;border-right:1px solid var(--bd)">รับ · Cash in</div>'
+      +'<div style="padding:4px 12px;text-align:center;background:#fdecec;color:#A91D1D">จ่าย · Cash out</div>'
+      +'<div style="padding:4px 12px;text-align:center;background:#eef2f9;color:var(--navy);border-left:1px solid var(--bd)">สุทธิ · Net</div>'
+    +'</div>'
+    +renderTemplateSectionFull(1,'deduction','')
     +'<div style="border-top:2px dotted #888;margin:0"></div>'
-    +renderTemplateSectionFull(2,'deduction','')
+    +renderTemplateSectionFull(2,'income','งวดที่ 1','work')
     +'<div style="border-top:2px dotted #888;margin:0"></div>'
-    +renderTemplateSectionFull(3,'income','งวดที่ 2')
+    +renderTemplateSectionFull(3,'income','งวดที่ 2','progress')
     +'<div style="display:flex;justify-content:flex-end;gap:18px;font-size:13px;padding:5px 12px;border-top:1px solid var(--bd);background:#fafbfd">'
       +'<span class="muted">รวมรับ</span><b>฿0</b>'
       +'<span class="muted">รวมจ่าย</span><b>฿0</b>'
@@ -1346,6 +1707,7 @@ function renderPlanBody(){
       el.innerHTML=renderTemplateCard();
     }
     document.getElementById('planSum').innerHTML='';
+    planRefreshAddPicker();
     return;
   }
   var grandIn=0,grandOut=0;
@@ -1360,7 +1722,7 @@ function renderPlanBody(){
     // identity (keeps the 3-section structure, resets paidIds since they were
     // tied to the old project's transactions). Options exclude projects that
     // already have a plan this month (no duplicates).
-    var switchOpts=(D.projects||[]).filter(function(pp){
+    var switchOpts=planProjects().filter(function(pp){
       return pp.code===proj || !planCache[pp.code] || !planCache[pp.code].length;
     }).map(function(pp){
       return '<option value="'+esc(pp.code)+'"'+(pp.code===proj?' selected':'')+'>'+esc(pp.code+' · '+pp.th)+'</option>';
@@ -1371,10 +1733,20 @@ function renderPlanBody(){
           +'style="background:#fff;color:var(--ink);border:1px solid #334155;border-radius:6px;padding:2px 8px;font-size:14px;font-weight:700;cursor:pointer">'+switchOpts+'</select>'
         +'<span style="opacity:.7;font-size:12px">'+esc(projCompany(proj))+'</span>'
         +'<div style="margin-left:auto;display:flex;gap:6px">'
-          +'<button class="btn ghost" onclick="planPickType(\''+esc(proj)+'\')">＋ เพิ่มส่วน</button>'
-          +'<button class="btn ghost ico-copy" onclick="planCopyPrev(\''+esc(proj)+'\')" title="คัดลอกจากเดือนก่อน"></button>'
+          +'<button class="btn ghost sm" onclick="planPickType(\''+esc(proj)+'\')">＋ เพิ่มส่วน</button>'
+          +'<button class="btn ghost sm ico-copy" onclick="planCopyPrev(\''+esc(proj)+'\')" title="คัดลอกจากเดือนก่อน"></button>'
+          +'<button class="btn ghost sm ico-trash" onclick="planDelProject(\''+esc(proj)+'\')" title="ลบ T-bar ของโครงการนี้ทั้งหมด"></button>'
         +'</div>'
       +'</div>'
+      // Explicit รับ (Cash in) · จ่าย (Cash out) · สุทธิ (Net) band — uses PLAN_GRID so
+      // it lines up with every section's 3 columns below.
+      +(periods.length
+        ? '<div style="display:grid;grid-template-columns:'+PLAN_GRID+';gap:0;font-size:12px;font-weight:700;letter-spacing:.5px">'
+            +'<div style="padding:4px 12px;text-align:center;background:#eaf6ee;color:#1F6E3A;border-right:1px solid var(--bd)">รับ · Cash in</div>'
+            +'<div style="padding:4px 12px;text-align:center;background:#fdecec;color:#A91D1D">จ่าย · Cash out</div>'
+            +'<div style="padding:4px 12px;text-align:center;background:#eef2f9;color:var(--navy);border-left:1px solid var(--bd)">สุทธิ · Net</div>'
+          +'</div>'
+        : '')
       +(periods.length?rows:'<div class="ctr muted" style="padding:14px">ยังไม่มีส่วน — กด <b>＋ เพิ่มส่วน</b> เพื่อเริ่ม</div>')
       +'<div style="display:flex;justify-content:flex-end;gap:18px;font-size:13px;padding:5px 12px;border-top:1px solid var(--bd);background:#fafbfd">'
         +'<span class="muted">รวมรับ</span><b>฿'+money(totalIn)+'</b>'
@@ -1383,13 +1755,138 @@ function renderPlanBody(){
       +'</div>'
     +'</div>';
   }).join('');
-  el.innerHTML=sections;
   var diffTot=grandIn-grandOut;
+  // Grand total across every added T-bar this month — prominent block at the end,
+  // netting all sections (income − outflow) into one signed number.
+  var grandBlock='<div style="background:var(--card);border:1px solid var(--bd);border-radius:12px;'
+    +'box-shadow:var(--sh-sm);padding:13px 18px;margin-top:2px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px">'
+    +'<span style="font-weight:700;color:var(--navy);margin-right:auto;font-size:14px">รวมทุก T-bar (Total all)</span>'
+    +'<span class="muted" style="font-size:12px">รวมรับ</span><b style="font-variant-numeric:tabular-nums">฿'+money(grandIn)+'</b>'
+    +'<span class="muted" style="font-size:12px">รวมจ่าย</span><b style="font-variant-numeric:tabular-nums">฿'+money(grandOut)+'</b>'
+    +'<span class="muted" style="font-size:12px">คงเหลือสุทธิ</span>'
+    +'<b style="font-size:17px;font-variant-numeric:tabular-nums;color:'+(diffTot<0?'var(--bad)':'var(--ok)')+'">฿'+money(diffTot)+'</b>'
+  +'</div>';
+  el.innerHTML=sections+grandBlock;
   document.getElementById('planSum').innerHTML='รวมทุกโครงการ · รับ <b>฿'+money(grandIn)+'</b> · จ่าย <b>฿'+money(grandOut)+'</b> · คงเหลือ <b style="color:'+(diffTot<0?'var(--bad)':'var(--ok)')+'">฿'+money(diffTot)+'</b>';
+  planRefreshAddPicker();   // keep the orange "Add project" list in sync after swaps/adds/removes
+}
+// Per-project P/N discount rate (annual, as a fraction). Default 6.35%/yr — matches
+// the bank cashflow sheet. Stored per project in localStorage (a planning assumption,
+// not ledger data), so it persists across reloads on this device.
+function planPnRate(proj){
+  try{ var v=localStorage.getItem('vcb-pnrate-'+proj); if(v!=null&&v!=='') { var n=Number(v); if(isFinite(n)&&n>=0) return n; } }catch(e){}
+  return 0.0635;
+}
+function planSetPnRate(proj,pct){
+  var r=Number(pct)/100; if(!isFinite(r)||r<0) r=0.0635;
+  try{ localStorage.setItem('vcb-pnrate-'+proj, r); }catch(e){}
+  renderPlanBody();
+}
+// T-bar export — button is in place; the Excel layout/formatting is the NEXT step
+// (to be designed with the user). Stub keeps the button live without a dead click.
+function planExportTbar(){
+  toast('ปุ่ม Export พร้อมแล้ว ✓ — จะออกแบบรูปแบบไฟล์ Excel ในขั้นตอนถัดไป');
+}
+// ── Free-form extra income rows (รายรับจากแหล่งอื่น) — any section, any amount, so
+// the admin can key in unforeseen funds without fitting the fixed structure. ──────
+function planExtraEnsure_(p){ if(!Array.isArray(p.extraRows)) p.extraRows=[]; return p.extraRows; }
+function planExtraTotal(p){ return (p.extraRows||[]).reduce(function(s,r){return s+(Number(r.amount)||0);},0); }
+function planAddExtra(pid){ var p=planFind(pid); if(!p)return; planExtraEnsure_(p).push({label:'',amount:0}); renderPlanBody(); planScheduleSave(p); }
+function planDelExtra(pid,idx){ var p=planFind(pid); if(!p)return; planExtraEnsure_(p).splice(idx,1); renderPlanBody(); planScheduleSave(p); }
+function planEditExtra(pid,idx,field,val){
+  var p=planFind(pid); if(!p)return; var a=planExtraEnsure_(p); if(!a[idx])return;
+  a[idx][field]=(field==='amount')?(Number(val)||0):val;
+  planScheduleSave(p);
+  if(field==='amount') renderPlanBody();   // totals depend on the amount
+}
+// Live save of an extra-row amount while typing (no re-render → keeps focus).
+function planEditExtraLive(pid,idx,val){
+  var p=planFind(pid); if(!p)return; var a=planExtraEnsure_(p); if(!a[idx])return;
+  a[idx].amount=Number(val)||0;
+  planScheduleSave(p);
+}
+// Extra-income rows + the minimal "＋ เพิ่มรายรับจากแหล่งอื่น" button, under a section.
+// Rendered as a table with PLAN_LEFT_COLS so the amount box lines up with the
+// จำนวน/ขอเบิก P/N column of the rows above; the 🗑 sits in the % column.
+function planExtraRows(p){
+  var pid=esc(p.id);
+  var rows=(p.extraRows||[]).map(function(r,i){
+    return '<tr>'
+      +'<td><input type="text" value="'+esc(r.label||'')+'" placeholder="แหล่งที่มา…" '
+        +'onchange="planEditExtra(\''+pid+'\','+i+',\'label\',this.value)" style="width:100%;font-size:12px"></td><td></td>'
+      +'<td class="num"><input type="text" inputmode="decimal" value="'+(r.amount?Number(r.amount).toLocaleString("en-US"):"")+'" '
+        +'oninput="fmtMoneyInput(this);planEditExtraLive(\''+pid+'\','+i+',moneyVal(this.value))" onchange="planEditExtra(\''+pid+'\','+i+',\'amount\',moneyVal(this.value))" '
+        +'style="width:100%;text-align:right;color:#1F6E3A;font-weight:600"></td>'
+      +'<td class="num"><button class="iconbtn del ico-trash" title="ลบแถวนี้" onclick="planDelExtra(\''+pid+'\','+i+')"></button></td></tr>';
+  }).join('');
+  return (rows?'<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<tbody>'+rows+'</tbody></table>':'')
+    +'<div style="padding:2px 4px"><button class="btn ghost sm" style="font-size:11px;padding:2px 8px;color:#1F6E3A;border-style:dashed" '
+      +'onclick="planAddExtra(\''+pid+'\')">＋ เพิ่มรายรับจากแหล่งอื่น</button></div>';
+}
+// Compact P/N interest table (the จ่าย financing cost). Title + rate are MERGED
+// into the header row (everything under the orange box is P/N interest, so no
+// separate caption needed). Returns '' when no P/N is keyed in yet. Built as a
+// function so it can refresh live (planRefreshIncomeInterest) the instant ค่างาน
+// is typed — the auto-filled ขอเบิก P/N immediately produces its interest.
+function planInterestBlock(p){
+  var c=planIncomeCalc(p), rate=planPnRate(p.project), pid=esc(p.id);
+  // Interest is owed on the P/N we actually sell: the new P/N (จะคงเหลือ) and the
+  // retention RT — each amount × its own วัน × rate/365.
+  var items=[];
+  if(c.newPN>0) items.push({label:'P/N ที่ขายได้', amt:c.newPN, days:c.daysNew, field:'daysNew'});
+  if(c.rtPN>0)  items.push({label:'P/N RT (เงินประกัน)', amt:c.rtPN, days:c.daysRT, field:'daysRT'});
+  var rows='', total=0, any=items.length>0;
+  items.forEach(function(it){
+    var interest=Math.round(it.amt*it.days*rate/365*100)/100; total+=interest;
+    rows+='<tr><td><div class="trunc">'+esc(it.label)+'</div></td>'
+      +'<td class="num">'+money(it.amt)+'</td>'
+      +'<td class="num"><input type="number" min="0" value="'+it.days+'" '
+        +'onchange="planEditIncSave(\''+pid+'\',\''+it.field+'\',Number(this.value)||0);planRefreshIncomeInterest(\''+pid+'\')" '
+        +'style="width:52px;text-align:right"></td>'
+      +'<td class="num">'+money(interest)+'</td></tr>';
+  });
+  if(!any) return '';
+  var rateInput='<input type="number" step="0.01" min="0" value="'+(rate*100)+'" '
+    +'onchange="planSetPnRate(\''+esc(p.project)+'\',this.value)" title="อัตราดอกเบี้ยต่อปี (ตั้งได้ต่อโครงการ)" '
+    +'style="width:56px;text-align:right;font-size:11px;padding:1px 4px">';
+  return '<table style="margin:0"><thead><tr>'
+    +'<th style="color:#9a3232">ดอกเบี้ย P/N ที่ต้องจ่าย'
+      +' <span style="font-weight:400;color:var(--mut);font-size:10px">· อัตรา</span> '+rateInput
+      +' <span style="font-weight:400;color:var(--mut);font-size:10px">%/ปี</span></th>'
+    +'<th class="num">ยอด P/N</th><th class="num">วัน</th><th class="num">ดอกเบี้ย</th></tr></thead>'
+    +'<tbody>'+rows
+    +'<tr style="background:#fde8d5"><td><b>รวมที่ต้องจ่าย</b></td><td></td><td></td><td class="num"><b>฿'+money(total)+'</b></td></tr>'
+    +'</tbody></table>';
+}
+// Live refresh of the interest box (no full re-render → keeps input focus).
+function planRefreshIncomeInterest(pid){
+  var p=planFind(pid); if(!p) return;
+  var el=document.getElementById('int-'+pid); if(el) el.innerHTML=planInterestBlock(p);
+}
+// Due-list table with the collapse/expand toggle MERGED into its own header row
+// (no separate summary row). The count sits in the รายละเอียด header; the total is
+// NOT repeated here — it already shows in the section subtotal at the bottom.
+function planDueTable(rows,count,pid){
+  return '<table class="plan-due" style="table-layout:fixed">'+PLAN_DUE_COLS
+    +'<thead><tr style="cursor:pointer" onclick="planToggleDue(\''+pid+'\')" title="กดเพื่อย่อ/ขยายรายการ">'
+      +'<th class="date"><span id="dc-'+pid+'" style="color:var(--brand2)">▾</span> ครบ</th>'
+      +'<th>ประเภท</th><th>เลขที่</th>'
+      +'<th>รายละเอียด <span class="muted" style="font-weight:400">('+count+' รายการ)</span></th>'
+      +'<th class="num">จำนวน</th><th></th></tr></thead>'
+    +'<tbody id="db-'+pid+'">'+rows+'</tbody></table>';
+}
+function planToggleDue(pid){
+  var b=document.getElementById('db-'+pid), c=document.getElementById('dc-'+pid);
+  if(!b) return;
+  var hidden=(b.style.display==='none');
+  b.style.display=hidden?'':'none';
+  if(c) c.textContent=hidden?'▾':'▸';
 }
 function renderPlanPeriodCard(p,elig,tally){
   var type=p.periodType||'mixed';
   var typeLabel={'income':'ขอเบิก P/N','deduction':'รับเงินค่างาน + หักหนี้','aval':'ขอออก Aval จัดสรร','mixed':'งวดผสม'}[type];
+  // P/N sections are titled by mode: ค่างาน (full calc) vs Workdone (progress 50%).
+  if(type==='income') typeLabel='ขอเบิก P/N '+(planIncomeKind(p)==='progress'?'Workdone':'ค่างาน');
   // New single-ownership model: a section's right panel shows ONLY items in its
   // paidIds (items it actually pays). Items belong to exactly one section at a
   // time; user moves them via the ↓ / ↑ buttons. Legacy rows with no paidIds
@@ -1412,12 +1909,12 @@ function renderPlanPeriodCard(p,elig,tally){
     paidSum+=Number(t.amount)||0;
     var upBtn=prevS
       ? '<button class="iconbtn" title="ย้ายไปส่วน '+prevS.periodIdx+'" '
-        +'style="font-size:13px;color:var(--brand2)" '
+        +'style="font-size:14px;font-weight:700;color:var(--brand2);background:#eaf1f9" '
         +'onclick="planMoveBetween(\''+esc(p.id)+'\',\''+esc(t.id)+'\','+prevS.periodIdx+')">↑</button>'
       : '<span class="iconbtn" style="visibility:hidden">↑</span>';
     var dnBtn=nextS
       ? '<button class="iconbtn" title="ย้ายไปส่วน '+nextS.periodIdx+'" '
-        +'style="font-size:13px;color:var(--brand2)" '
+        +'style="font-size:14px;font-weight:700;color:var(--brand2);background:#eaf1f9" '
         +'onclick="planMoveBetween(\''+esc(p.id)+'\',\''+esc(t.id)+'\','+nextS.periodIdx+')">↓</button>'
       : '<span class="iconbtn" style="visibility:hidden">↓</span>';
     return '<tr><td class="date">'+esc(t.due||'—')+'</td>'
@@ -1432,35 +1929,61 @@ function renderPlanPeriodCard(p,elig,tally){
       +'</div></td></tr>';
   }).join('');
   // Compute per-type left side + per-type total contribution to project sums.
-  var leftHtml='', sectionIn=0, sectionOut=0;
+  var leftHtml='', interestHtml='', sectionIn=0, sectionOut=0;
   if(type==='income'){
-    var inc=(p.incomeBreak&&p.incomeBreak.length)?p.incomeBreak:planDefaultIncome();
-    p.incomeBreak=inc;
-    var incTotal=inc.reduce(function(s,r){return s+(Number(r.workValue)||0);},0);
-    var pnTotal =inc.reduce(function(s,r){return s+(Number(r.pnAmount )||0);},0);
-    p.income=incTotal;
-    sectionIn=incTotal;
     var pid=esc(p.id);
+    var c=planIncomeCalc(p);
+    p.income=c.work;
+    sectionIn=c.totalPN;          // cash-in for this section = total P/N sold
+    var pnTotal=c.totalPN;        // used by the subtotal (secIn) below
+    var guadNo=planIncomeGuadNo(p, p.project);
+    var orange='border-color:var(--orange);box-shadow:0 0 0 1px rgba(237,125,49,.30);font-weight:600';
+    var red='color:#9a3232;border-color:#e0a6a6;box-shadow:0 0 0 1px rgba(154,50,50,.15);font-weight:600';  // deduction inputs
+    var dedL='color:#9a3232';   // deduction label + computed value
+    var comp='font-size:11px;color:var(--mut)';   // % column
+    if(c.kind==='progress'){
+      // Workdone (progress) P/N sale — 50% only, no deductions.
+      leftHtml='<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">คำนวณ</th><th class="num">%</th></tr></thead><tbody>'
+        +'<tr><td>ผลงานที่ทำได้ งวด '+guadNo+' (Workdone)'
+            +'<div class="muted" style="font-size:10px;font-weight:400">ยังไม่ถึงงวดเบิกกับกรมทางหลวง · ธนาคารสนับสนุนล่วงหน้า · จากรายงานความก้าวหน้า/ใบวิทยุ</div></td>'
+          +'<td class="num">'+planMoneyInp(pid,'work',c.work,orange)+'</td>'
+          +'<td class="num" id="inc-prog-'+pid+'">฿'+money(c.totalPN)+'</td>'
+          +'<td class="num" style="'+comp+'">50%</td></tr>'
+        +'<tr style="background:#eef3fa"><td><b>รวม P/N ที่ขาย</b></td><td></td>'
+          +'<td class="num"><b id="inc-pntot-'+pid+'">฿'+money(c.totalPN)+'</b></td><td></td></tr>'
+        +'</tbody></table>';
+    } else {
     leftHtml=''
-      +'<table style="margin:0"><thead><tr><th>รายการ</th><th class="num">ขอเบิก P/N</th><th class="num">ค่างาน</th><th class="num">%</th></tr></thead><tbody>'
-      +inc.map(function(r,i){
-        var pct=(Number(r.workValue)>0)?Math.round((Number(r.pnAmount)||0)/Number(r.workValue)*10000)/100+'%':'';
-        return '<tr><td><input type="text" value="'+esc(r.label||'')+'" '
-          +'onchange="planEditIncome(\''+pid+'\','+i+',\'label\',this.value)" style="width:100%"></td>'
-          +'<td class="num"><input type="text" inputmode="decimal" value="'+(r.pnAmount?Number(r.pnAmount).toLocaleString("en-US"):"")+'" '
-          +'oninput="fmtMoneyInput(this);planEditIncomeLive(\''+pid+'\','+i+',\'pnAmount\',moneyVal(this.value))" '
-          +'onchange="planEditIncome(\''+pid+'\','+i+',\'pnAmount\',moneyVal(this.value))" '
-          +'style="width:110px;text-align:right"></td>'
-          +'<td class="num"><input type="text" inputmode="decimal" value="'+(r.workValue?Number(r.workValue).toLocaleString("en-US"):"")+'" '
-          +'oninput="fmtMoneyInput(this);planEditIncomeLive(\''+pid+'\','+i+',\'workValue\',moneyVal(this.value))" '
-          +'onchange="planEditIncome(\''+pid+'\','+i+',\'workValue\',moneyVal(this.value))" '
-          +'style="width:110px;text-align:right"></td>'
-          +'<td class="num muted" style="font-size:11px">'+pct+'</td></tr>';
-      }).join('')
-      +'<tr style="background:#eef3fa"><td><b>รวม</b></td>'
-        +'<td class="num"><b>฿'+money(pnTotal)+'</b></td>'
-        +'<td class="num"><b>฿'+money(incTotal)+'</b></td><td></td></tr>'
+      +'<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">คำนวณ</th><th class="num">%</th></tr></thead><tbody>'
+      // ① ส่งงาน × 80% — ceiling 1 (can't sell above 80% of submitted work)
+      +'<tr><td>ส่งงานงวด '+guadNo+' (ค่างานที่ส่ง)</td>'
+        +'<td class="num">'+planMoneyInp(pid,'work',c.work,orange)+'</td>'
+        +'<td class="num" id="inc-ceil1-'+pid+'">'+money(c.ceil1)+'</td>'
+        +'<td class="num" style="'+comp+'">80%</td></tr>'
+      // ② หัก segment × 60% (deduction — red)
+      +'<tr><td style="'+dedL+'">หัก ค่า segment CVE</td>'
+        +'<td class="num">'+planMoneyInp(pid,'segment',c.seg,red)+'</td>'
+        +'<td class="num" id="inc-seg60-'+pid+'" style="'+dedL+'">'+money(c.seg60)+'</td>'
+        +'<td class="num" style="'+comp+'">60%</td></tr>'
+      // เหลือค่างวด = work − 60%·segment — ceiling 2
+      +'<tr style="background:#fbf3e6"><td><b>เหลือค่างวด '+guadNo+'</b> <span class="muted" style="font-size:10px">(ค่างาน − 60% seg)</span></td><td></td>'
+        +'<td class="num"><b id="inc-remain-'+pid+'">฿'+money(c.remain)+'</b></td><td></td></tr>'
+      // หัก PN ที่ขายไว้ (manual — deduction, red)
+      +'<tr><td style="'+dedL+'">หัก PN ที่ขายไว้ (เดือนก่อน)</td><td></td>'
+        +'<td class="num">'+planMoneyInp(pid,'pnSold',c.pnSold,red)+'</td><td></td></tr>'
+      // จะคงเหลือ P/N ที่ขายได้ = MIN(①,②) − PN ที่ขายไว้
+      +'<tr style="background:#e3eefb"><td><b>จะคงเหลือ P/N ที่ขายได้</b> <span class="muted" style="font-size:10px">(min − PN ขายไว้)</span></td><td></td>'
+        +'<td class="num"><b id="inc-newpn-'+pid+'" style="color:var(--navy)">฿'+money(c.newPN)+'</b></td><td></td></tr>'
+      // ขาย PN RT (retention) × 80%
+      +'<tr><td>ขาย PN RT งวด '+guadNo+' (เงินประกัน)</td>'
+        +'<td class="num">'+planMoneyInp(pid,'rt',c.rt,orange)+'</td>'
+        +'<td class="num" id="inc-rtpn-'+pid+'">'+money(c.rtPN)+'</td>'
+        +'<td class="num" style="'+comp+'">80%</td></tr>'
+      // total P/N sold this งวด = new P/N + retention
+      +'<tr style="background:#eef3fa"><td><b>รวม P/N ที่ขาย</b></td><td></td>'
+        +'<td class="num"><b id="inc-pntot-'+pid+'">฿'+money(c.totalPN)+'</b></td><td></td></tr>'
       +'</tbody></table>';
+    }
   } else if(type==='deduction'){
     var income=Number(p.income)||0;
     var deds=(p.deductions&&p.deductions.length)?p.deductions:planDefaultDeductions();
@@ -1483,71 +2006,59 @@ function renderPlanPeriodCard(p,elig,tally){
       var isTL=d.label.indexOf('TL')>=0;
       var isML=d.label.indexOf('ML')>=0;
       var isPNNew=d.label.indexOf('ขอเบิกใหม่')>=0;
+      var isPNwork=d.label.indexOf('PN')>=0 && !isPNNew;   // the plain "หัก PN"
       var isAuto=isTL||isML||isPNNew;
       var hint=isTL?' <span class="muted" style="font-size:10px">(auto 15%)</span>'
               :isML?' <span class="muted" style="font-size:10px">(auto 1.5%)</span>'
-              :isPNNew?' <span class="muted" style="font-size:10px">(auto จาก P/N แถว "ค่างานรับสุทธิ" เท่านั้น)</span>':'';
+              :isPNNew?' <span class="muted" style="font-size:10px">(PN ต่อค่างานงวดนี้ · auto จาก P/N ที่ขาย)</span>'
+              :isPNwork?' <span class="muted" style="font-size:10px">(PN Work Done ของงวดก่อน)</span>':'';
       var cellId=isTL?'ded-'+pid+'-TL':isML?'ded-'+pid+'-ML':isPNNew?'ded-'+pid+'-PNNEW':'';
-      return '<tr><td style="color:#9a3232">'+esc(d.label)+hint+'</td>'
+      return '<tr><td style="color:#9a3232">'+esc(d.label)+hint+'</td><td></td>'
         +'<td class="num"><input type="text" inputmode="decimal" '+(isAuto?'readonly':'')+' '
           +(cellId?'id="'+cellId+'" ':'')
           +'value="'+(d.amount?Number(d.amount).toLocaleString("en-US"):"")+'" '
           +(isAuto?'':'oninput="fmtMoneyInput(this)" onchange="planEditDeduction(\''+pid+'\','+i+',moneyVal(this.value))" ')
-          +'style="width:140px;text-align:right;color:#9a3232'+(isAuto?';background:#f5f5f5':'')+'"></td></tr>';
+          +'style="width:100%;text-align:right;color:#9a3232'+(isAuto?';background:#f5f5f5':'')+'"></td><td></td></tr>';
     }).join('');
     leftHtml=''
-      +'<table style="margin:0"><tbody>'
-        +'<tr><td><b>รับเงินค่างานสุทธิ</b></td>'
+      +'<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<tbody>'
+        +'<tr><td><b>รับเงินค่างานสุทธิ</b></td><td></td>'
           +'<td class="num"><input type="text" inputmode="decimal" '
             +'value="'+(income?Number(income).toLocaleString("en-US"):"")+'" '
             +'oninput="fmtMoneyInput(this);planEditLive(\''+pid+'\',\'income\',moneyVal(this.value))" '
             +'onchange="planEdit(\''+pid+'\',\'income\',moneyVal(this.value))" '
-            +'style="width:140px;text-align:right;font-weight:600"></td></tr>'
+            +'style="width:100%;text-align:right;font-weight:600"></td><td></td></tr>'
         +dedRows
-        +'<tr><td><b>คงเหลือ</b></td><td class="num"><b id="ded-'+pid+'-BAL" style="color:'+(bal<0?'var(--bad)':'var(--navy)')+'">฿'+money(bal)+'</b></td></tr>'
+        +'<tr><td><b>คงเหลือ</b></td><td></td><td class="num"><b id="ded-'+pid+'-BAL" style="color:'+(bal<0?'var(--bad)':'var(--navy)')+'">฿'+money(bal)+'</b></td><td></td></tr>'
       +'</tbody></table>';
   } else if(type==='aval'){
     var av=Number(p.avalAmount)||0;
     sectionOut=av;
     leftHtml=''
-      +'<table style="margin:0"><tbody>'
-        +'<tr><td><b>ขอออก Aval จัดสรร</b></td>'
+      +'<table style="margin:0;table-layout:fixed">'+PLAN_LEFT_COLS+'<tbody>'
+        +'<tr><td><b>ขอออก Aval จัดสรร</b></td><td></td>'
           +'<td class="num"><input type="text" inputmode="decimal" '
             +'value="'+(av?Number(av).toLocaleString("en-US"):"")+'" '
             +'oninput="fmtMoneyInput(this)" onchange="planEdit(\''+esc(p.id)+'\',\'avalAmount\',moneyVal(this.value))" '
-            +'style="width:160px;text-align:right;font-weight:600"></td></tr>'
+            +'style="width:100%;text-align:right;font-weight:600"></td><td></td></tr>'
       +'</tbody></table>';
   }
+  // Free-form extra income (รายรับจากแหล่งอื่น) — appended under EVERY section's
+  // Cash-in table; its total adds to the section's cash-in.
+  var extraTotal=planExtraTotal(p);
+  leftHtml+=planExtraRows(p);
+  sectionIn+=extraTotal;
   if(tally)tally([sectionIn,sectionOut]);
   // Right side varies by section type.
   var rightHtml='';
   if(type==='deduction'){
-    rightHtml=''
-      +(elig.length
-        ? '<table><thead><tr><th class="date">ครบ</th><th>ประเภท</th><th>เลขที่</th><th>รายละเอียด</th><th class="num">จำนวน</th><th></th></tr></thead><tbody>'+paidRows+'</tbody></table>'
-        : '<div class="ctr muted" style="padding:10px">ไม่มีรายการครบกำหนดในเดือนนี้</div>');
+    rightHtml=(paidItems.length
+      ? planDueTable(paidRows,paidItems.length,pid)
+      : '<div class="ctr muted" style="padding:10px">ไม่มีรายการครบกำหนดในเดือนนี้</div>');
   } else if(type==='income'){
-    // PN interest = amount × days × 6.25%/365.  Default term = 90 days; per-row editable.
-    var incRows=p.incomeBreak||[];
     var pid2=esc(p.id);
-    var rateAnnual=0.0625;
-    var pnIxRows='', totalInt=0, anyPn=false;
-    incRows.forEach(function(r,i){
-      var amt=Number(r.pnAmount)||0;
-      if(amt<=0)return;
-      anyPn=true;
-      var days=(r.pnDays==null||r.pnDays==='')?90:Number(r.pnDays);
-      var interest=Math.round(amt*days*rateAnnual/365*100)/100;
-      totalInt+=interest;
-      pnIxRows+='<tr>'
-        +'<td><div class="trunc" title="'+esc(r.label||'')+'">'+esc(r.label||'—')+'</div></td>'
-        +'<td class="num">'+money(amt)+'</td>'
-        +'<td class="num"><input type="number" min="0" value="'+days+'" '
-          +'onchange="planEditIncome(\''+pid2+'\','+i+',\'pnDays\',Number(this.value)||0)" '
-          +'style="width:55px;text-align:right"></td>'
-        +'<td class="num">'+money(interest)+'</td>'
-      +'</tr>';
-    });
+    // The P/N interest table is produced by planInterestBlock(p) below, so it can
+    // refresh live the instant ค่างาน is typed (auto-filled P/N → its interest).
     // Items this income section will pay. Single ownership: each eligible item
     // belongs to exactly one section. A fresh section 1 claims everything (B/E
     // + P/N) by default; user moves things to the deduction section via the ↓
@@ -1589,12 +2100,12 @@ function renderPlanPeriodCard(p,elig,tally){
     var avalRows=itemsShown.map(function(t){
       var upBtn=prevSec
         ? '<button class="iconbtn" title="ย้ายไปส่วน '+prevSec.periodIdx+'" '
-          +'style="font-size:13px;color:var(--brand2)" '
+          +'style="font-size:14px;font-weight:700;color:var(--brand2);background:#eaf1f9" '
           +'onclick="planMoveBetween(\''+pid2+'\',\''+esc(t.id)+'\','+prevSec.periodIdx+')">↑</button>'
         : '<span class="iconbtn" style="visibility:hidden">↑</span>';
       var dnBtn=nextSec
         ? '<button class="iconbtn" title="ย้ายไปส่วน '+nextSec.periodIdx+'" '
-          +'style="font-size:13px;color:var(--brand2)" '
+          +'style="font-size:14px;font-weight:700;color:var(--brand2);background:#eaf1f9" '
           +'onclick="planMoveBetween(\''+pid2+'\',\''+esc(t.id)+'\','+nextSec.periodIdx+')">↓</button>'
         : '<span class="iconbtn" style="visibility:hidden">↓</span>';
       return '<tr><td class="date">'+esc(t.due||'—')+'</td>'
@@ -1607,26 +2118,15 @@ function renderPlanPeriodCard(p,elig,tally){
           +'<button class="iconbtn del ico-trash" title="ตัดออกจากส่วนนี้" onclick="planRemovePaid(\''+pid2+'\',\''+esc(t.id)+'\')"></button>'
         +'</div></td></tr>';
     }).join('');
-    // Rate (6.25%/ปี) is a property of the days×rate calc, so it lives as a
-    // small italic remark inside the "วัน" column header — no banner above
-    // the table, saves vertical space.
-    var rateRemark='<span style="font-style:italic;font-weight:normal;color:var(--mut);font-size:10px;margin-left:4px">('+(rateAnnual*100).toFixed(2)+'%/ปี)</span>';
-    // When no PN amount is keyed in left, hide the entire interest section
-    // (table AND the dotted divider) — saves vertical space and avoids the
-    // gray placeholder hint the user found noisy.
+    // Live-refreshable P/N interest box (compact: title + rate merged into the
+    // header). ':empty' CSS hides the orange frame until a P/N amount exists.
+    interestHtml='<div id="int-'+p.id+'" class="tbar-int">'+planInterestBlock(p)+'</div>';
     rightHtml=''
-      +(anyPn
-        ? '<table><thead><tr><th>รายการ</th><th class="num">ยอด P/N</th><th class="num">วัน'+rateRemark+'</th><th class="num">ดอกเบี้ย</th></tr></thead>'
-          +'<tbody>'+pnIxRows
-          +'<tr style="background:#fef3e8"><td><b>รวมดอกเบี้ย</b></td><td></td><td></td><td class="num"><b>฿'+money(totalInt)+'</b></td></tr>'
-          +'</tbody></table>'
-          +'<div style="border-top:2px dotted #888;margin:8px 0"></div>'
-        : '')
       +(canAdd.length
         ? '<div style="text-align:right;margin:0 0 4px"><button class="btn ghost sm" style="font-size:11px;padding:2px 8px" onclick="planPickAvalAdd(\''+pid2+'\')">＋ เพิ่ม ('+canAdd.length+')</button></div>'
         : '')
       +(itemsShown.length
-        ? '<table><thead><tr><th class="date">ครบ</th><th>ประเภท</th><th>เลขที่</th><th>รายละเอียด</th><th class="num">จำนวน</th><th></th></tr></thead><tbody>'+avalRows+'</tbody></table>'
+        ? planDueTable(avalRows,itemsShown.length,pid2)
         : '<div class="ctr muted" style="padding:8px;font-size:11px">ไม่มีรายการในส่วนนี้'+(canAdd.length?' — กด ＋ เพิ่ม':'')+'</div>');
   } else {
     rightHtml='<div class="muted" style="font-size:11px;padding:6px">— ('+esc(typeLabel)+')</div>';
@@ -1642,23 +2142,60 @@ function renderPlanPeriodCard(p,elig,tally){
       +'<input type="date" value="'+esc(p.periodDate?dmyToISO(p.periodDate):'')+'" '
         +'onchange="planEdit(\''+esc(p.id)+'\',\'periodDate\',isoToDMY(this.value))" '
         +'style="font-size:12px;padding:2px 4px">'
-      +(isDed?''
-        :(function(){
-            // Placeholder counts income sections only — same logic as creation.
+      +(function(){
+            // "งวดที่" prefix + a small NUMBER box — the user types just the number
+            // (the "งวดที่ " text is fixed). Placeholder = the auto ordinal it defaults
+            // to. planIncomeGuadNo reads the digits back out for the row labels.
             var incomes=(planCache[p.project]||[]).filter(function(x){return x.periodType==='income';});
-            var ordinal=incomes.findIndex(function(x){return x.id===p.id;})+1;
+            var ordinal=(type==='income') ? (incomes.findIndex(function(x){return x.id===p.id;})+1) : 0;
             if(ordinal<=0) ordinal=p.periodIdx;
-            return '<input type="text" value="'+esc(p.periodLabel)+'" placeholder="งวดที่ '+ordinal+'" '
-              +'onchange="planEdit(\''+esc(p.id)+'\',\'periodLabel\',this.value)" '
-              +'style="width:120px;font-size:12px;padding:2px 4px">';
-          })())
+            var numVal=String(p.periodLabel||'').replace(/\D/g,'');
+            return '<span style="font-size:11px;color:var(--mut)">งวดที่</span>'
+              +'<input type="text" inputmode="numeric" value="'+esc(numVal)+'" placeholder="'+ordinal+'" '
+              +'onchange="planEditPeriodLabel(\''+esc(p.id)+'\',this.value)" '
+              +'style="width:48px;text-align:center;font-size:12px;padding:2px 4px">';
+          })()
       +'<button class="iconbtn del ico-trash" title="ลบส่วนนี้" onclick="planDel(\''+esc(p.id)+'\')" style="margin-left:auto"></button>'
     +'</div>';
+  // Cash-out total for this section (used by the subtotal below). The due list's
+  // collapse toggle is now merged into its OWN header row (planDueTable) — no
+  // separate summary row, and the total isn't repeated at the top (it's at the bottom).
+  var rightTotal=0;
+  if(type==='income' && typeof itemsShown!=='undefined' && itemsShown)
+    rightTotal=itemsShown.reduce(function(s,t){return s+(Number(t.amount)||0);},0);
+  else if(type==='deduction') rightTotal=(typeof paidSum!=='undefined')?paidSum:0;
+  var rightCell=interestHtml+rightHtml;
+  // Per-section subtotal — this section's own cash in vs cash out vs net, on one
+  // line under the section (before the project total and the grand T-bar total).
+  //   income:    in = P/N drawn (ขอเบิก P/N), out = due items this section pays
+  //   deduction: in = net work payment received, out = deductions + Aval paid
+  //   aval:      out = Aval issued
+  var secIn=((type==='income')?(typeof pnTotal!=='undefined'?pnTotal:0)
+           :(type==='deduction')?(typeof income!=='undefined'?income:0):0) + extraTotal;
+  var secOut=(type==='income')?rightTotal
+            :(type==='deduction')?((typeof dedSum!=='undefined'?dedSum:0)+(typeof paidSum!=='undefined'?paidSum:0))
+            :(type==='aval')?(typeof av!=='undefined'?av:0):0;
+  var secNet=secIn-secOut;
+  // Subtotal row: รับ beneath the Cash-in column, จ่าย beneath Cash-out. The net is
+  // shown big in the Net column of the body above, so col 3 here stays empty.
+  var subFoot='<div style="display:grid;grid-template-columns:'+PLAN_GRID+';gap:0;font-size:11.5px;background:#e7edf5;border-top:1px solid var(--bd)">'
+    +'<div style="padding:4px 12px;text-align:right"><span class="muted">รวมรับ </span><b id="subin-'+p.id+'" style="color:#1F6E3A">฿'+money(secIn)+'</b></div>'
+    +'<div style="padding:4px 12px;text-align:right;border-left:1px solid var(--bd)"><span class="muted">รวมจ่าย </span><b style="color:#A91D1D">฿'+money(secOut)+'</b></div>'
+    +'<div style="border-left:1px solid var(--bd)"></div>'
+  +'</div>';
+  // min-width:0 lets each grid cell shrink to its track instead of growing to its
+  // content's intrinsic width — otherwise the wide due-list table overflows the
+  // overflow:hidden card and the right-most action buttons get clipped.
   return hdr
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">'
-      +'<div style="padding:4px 8px;border-right:1px solid var(--bd)">'+leftHtml+'</div>'
-      +'<div style="padding:4px 8px">'+rightHtml+'</div>'
-    +'</div>';
+    +'<div style="display:grid;grid-template-columns:'+PLAN_GRID+';gap:0">'
+      +'<div style="padding:4px 8px;border-right:1px solid var(--bd);min-width:0;overflow-x:auto">'+leftHtml+'</div>'
+      +'<div style="padding:4px 8px;min-width:0;overflow-x:auto">'+rightCell+'</div>'
+      +'<div style="padding:6px 8px;border-left:1px solid var(--bd);background:#f7f9fc;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right">'
+        +'<span class="muted" style="font-size:10px;white-space:nowrap">สุทธิงวดนี้ / Net</span>'
+        +'<b id="subnet-'+p.id+'" data-out="'+secOut+'" style="font-size:15px;font-variant-numeric:tabular-nums;color:'+(secNet<0?'var(--bad)':'var(--navy)')+'">฿'+money(secNet)+'</b>'
+      +'</div>'
+    +'</div>'
+    +subFoot;
 }
 function planFind(id){
   for(var proj in planCache){
@@ -1713,16 +2250,40 @@ function planEdit(id,field,val){
   var p=planFind(id);if(!p)return;p[field]=val;
   planScheduleSave(p);
 }
-function planEditIncome(periodId,idx,field,value){
-  var p=planFind(periodId);if(!p)return;
-  p.incomeBreak=p.incomeBreak||planDefaultIncome();
-  if(p.incomeBreak[idx]) p.incomeBreak[idx][field]=(field==='label')?String(value||''):(Number(value)||0);
+// Editing the period's "งวดที่ N" box also updates the "งวด …" in this section's
+// row labels so they mirror it live (only rows still on the default template).
+function planEditPeriodLabel(id,val){
+  var p=planFind(id);if(!p)return;
+  p.periodLabel=val;
   planScheduleSave(p);
+  // Cascade the งวด number when the FIRST section is filled: sections 1 & 2 share the
+  // current installment; section 3+ are the next installment(s). (งวด 5 / 5 / 6 …)
+  var sibs=(planCache[p.project]||[]).slice().sort(function(a,b){return a.periodIdx-b.periodIdx;});
+  if(sibs.length && sibs[0].id===p.id){
+    var n=parseInt(String(val).replace(/\D/g,''),10);
+    if(!isNaN(n)){
+      sibs.forEach(function(s,i){
+        var num=(i<=1)?n:(n+(i-1));   // 0,1 → n · 2 → n+1 · 3 → n+2 …
+        if(String(s.periodLabel||'')!==String(num)){ s.periodLabel=String(num); planScheduleSave(s); }
+      });
+    }
+  }
+  renderPlanBody();   // row labels bake in the งวด number → re-render to update them
 }
-// Update the วันที่ส่งงาน for every row in a sub-block.
+// P/N-section row labels are now static text with the งวด number baked in, so the
+// live label-sync/sub-date helpers only apply to the legacy array format (guarded).
+function planSyncGuadLabels(p){
+  if(!p||!Array.isArray(p.incomeBreak)) return;
+  var guadNo=planIncomeGuadNo(p, p.project);
+  p.incomeBreak.forEach(function(r,i){
+    var el=document.getElementById('inc-label-'+p.id+'-'+i);
+    if(el && document.activeElement!==el)
+      el.value=String(r.label||'').replace('งวด …','งวด '+guadNo).replace('งวด ...','งวด '+guadNo);
+  });
+}
 function planEditSubDate(periodId,sub,isoDate){
   var p=planFind(periodId);if(!p)return;
-  p.incomeBreak=p.incomeBreak||planDefaultIncome();
+  if(!Array.isArray(p.incomeBreak))return;
   var dmy=isoDate?isoToDMY(isoDate):'';
   p.incomeBreak.forEach(function(r){if((r.sub||1)===sub)r.subDate=dmy;});
   planScheduleSave(p);
@@ -1733,17 +2294,12 @@ function planEditDeduction(periodId,idx,amount){
   if(p.deductions[idx])p.deductions[idx].amount=Number(amount)||0;
   planScheduleSave(p);
 }
-// Sum of pnAmount in the same-month income period (the P/N being sold this month).
-// Only the "ค่างานรับสุทธิ" row contributes — that's the real disbursement-backed P/N.
-// "เงินประกันผลงาน" (retention) and "ผลงานแล้วเสร็จ" (completed-work forecast) are
-// informational and must NOT auto-feed the หัก PN ขอเบิกใหม่ deduction.
+// Total P/N sold this month by the first income section (new P/N + retention) —
+// this is what auto-feeds the deduction's "หัก PN ขอเบิกใหม่".
 function planPnSoldThisMonth(proj){
   var inc=(planCache[proj]||[]).filter(function(x){return x.periodType==='income';})[0];
   if(!inc)return 0;
-  return (inc.incomeBreak||[]).reduce(function(s,r){
-    if(String(r.label||'').indexOf('ค่างานรับสุทธิ')!==0) return s;
-    return s+(Number(r.pnAmount)||0);
-  },0);
+  return planIncomeCalc(inc).totalPN;
 }
 // Live recompute of the deduction period's auto cells (TL, ML, PN-new, balance)
 // without re-rendering — so input focus is preserved.
@@ -1770,16 +2326,29 @@ function planRefreshDeductionCells(proj){
   var balEl=document.getElementById(pfx+'BAL');
   if(balEl){balEl.innerHTML='฿'+money(bal);balEl.style.color=(bal<0?'var(--bad)':'var(--navy)');}
 }
-// Cache-only update for instant recompute (no server save until onchange).
+// Live recompute + auto-save (debounced) while typing — so a refresh never loses
+// in-progress edits.
 function planEditLive(id,field,val){
   var p=planFind(id);if(!p)return;p[field]=val;
   if(p.periodType==='deduction') planRefreshDeductionCells(p.project);
+  planScheduleSave(p);
 }
-function planEditIncomeLive(periodId,idx,field,value){
-  var p=planFind(periodId);if(!p)return;
-  p.incomeBreak=p.incomeBreak||planDefaultIncome();
-  if(p.incomeBreak[idx]) p.incomeBreak[idx][field]=(field==='label')?String(value||''):(Number(value)||0);
-  planRefreshDeductionCells(p.project);
+// Live recompute of the P/N section's derived cells (ceilings, เหลือ, จะคงเหลือ, RT,
+// total) + the subtotal (รวมรับ = total P/N sold, Net), without a full re-render.
+function planRefreshIncomeCells(p){
+  var c=planIncomeCalc(p);
+  function set(id,v){var el=document.getElementById(id);if(el)el.innerHTML=v;}
+  set('inc-ceil1-'+p.id, money(c.ceil1));
+  set('inc-seg60-'+p.id, money(c.seg60));
+  set('inc-remain-'+p.id, '฿'+money(c.remain));
+  set('inc-newpn-'+p.id, '฿'+money(c.newPN));
+  set('inc-rtpn-'+p.id, money(c.rtPN));
+  set('inc-prog-'+p.id, '฿'+money(c.totalPN));   // progress-mode result cell
+  set('inc-pntot-'+p.id, '฿'+money(c.totalPN));
+  var si=document.getElementById('subin-'+p.id); if(si)si.innerHTML='฿'+money(c.totalPN);
+  var sn=document.getElementById('subnet-'+p.id);
+  if(sn){ var out=Number(sn.getAttribute('data-out'))||0; var net=c.totalPN-out;
+    sn.innerHTML='฿'+money(net); sn.style.color=(net<0?'var(--bad)':'var(--navy)'); }
 }
 function planRemovePaid(periodId,txnId){
   var p=planFind(periodId);if(!p)return;
@@ -1942,6 +2511,25 @@ function planDel(id){
       }).deleteCashPlanPeriod({id:id});
   },'ลบ');
 }
+// Remove an entire project's T-bar for this month (all its sections at once).
+function planDelProject(proj){
+  var periods=(planCache[proj]||[]).slice();
+  if(!periods.length) return;
+  confirmBox('ลบ T-bar ของโครงการ '+proj+' ทั้งหมด ('+periods.length+' ส่วน)?',function(){
+    var snapshot={}; for(var pr in planCache) snapshot[pr]=planCache[pr].slice();
+    delete planCache[proj];
+    renderPlanBody();
+    var reverted=false;
+    bumpSaving(periods.length);
+    periods.forEach(function(p){
+      google.script.run.withSuccessHandler(function(){bumpSaving(-1);})
+        .withFailureHandler(function(e){
+          bumpSaving(-1);
+          if(!reverted){reverted=true;planCache=snapshot;renderPlanBody();toast('ลบไม่สำเร็จ: '+(e.message||e));}
+        }).deleteCashPlanPeriod({id:p.id});
+    });
+  },'ลบ');
+}
 
 function txnTable(){
   var q=flt(); var rows=D.transactions.filter(function(t){
@@ -1967,10 +2555,8 @@ function txnTable(){
     null
   ]);
   var dueLbl={this:'ครบกำหนดเดือนนี้',next:'ครบกำหนดเดือนหน้า',overdue:'เกินกำหนด'}[q.d];
-  // Category summary mirrors the Facilities tab: always the full transaction
-  // set, not the filtered `rows` — drill-down filters (status / due / search)
-  // shouldn't reshape a high-level "where is budget being used" panel.
-  var h=categorySummary(D.transactions||[]);
+  // (The cost-category summary now lives on its own "สรุปค่าใช้จ่าย" tab, not here.)
+  var h='';
   if(dueLbl)h+='<div class="secttl">แสดงเฉพาะ: '+dueLbl+(q.p?' · '+esc(q.p):'')+'</div>';
   // Row-count line: how many rows the current filter shows out of the full ledger.
   h+='<div class="rowcount">แสดง '+rows.length+' / '+(D.transactions||[]).length+' รายการ</div>';
@@ -2022,11 +2608,18 @@ function txnTable(){
   if(rows.length)h+='<tfoot><tr><th colspan="7" class="num">รวมยอดค้างชำระ'+(dueLbl?' ('+dueLbl+')':'')+'</th><th class="num">฿'+money(tot)+'</th><th class="date"></th><th class="date"></th><th></th><th></th></tr></tfoot>';
   return h+'</table>';
 }
-// Compact grouping of unpaid/active credit requests by (project × หมวดค่าใช้จ่าย),
-// shown as a collapsed <details> panel above the ledger so it doesn't dominate.
-// Same filter context as the ledger — if you filter to BT1, the summary reflects BT1.
-function categorySummary(rows){
-  var q=flt();
+// Shared column layout for the per-project cost tables — category flexes, the six
+// number/action columns are fixed-width, so with table-layout:fixed every project's
+// columns (and the edit pencil) line up on the same vertical planes.
+var CSUM_COLS='<colgroup><col style="width:24%"><col style="width:9%"><col style="width:16%"><col style="width:16%"><col style="width:9%"><col style="width:18%"><col style="width:8%"></colgroup>';
+// Grouping of credit requests by (project × หมวดค่าใช้จ่าย). Now the body of its
+// own "สรุปค่าใช้จ่าย" tab, where it renders expanded (opts.open); the collapsible
+// shell is kept so the header status pills still show. Whole-portfolio: shows all
+// projects (no filter narrowing).
+function categorySummary(rows,opts){
+  var openAttr=(opts&&opts.open)?' open':'';
+  // The Cost summary is its own whole-portfolio tab with no filter bar, so it
+  // always shows every project (no project/company narrowing).
   var groups={};
   // 1. Aggregate ALL request amounts by (project × category) — paid items
   //    still count against the category budget, otherwise you could pay off
@@ -2044,8 +2637,6 @@ function categorySummary(rows){
   // 2. Overlay caps from D.categoryCaps — also create empty groups for caps
   //    that have no transactions yet (so "งบ ฿X · ใช้ไป ฿0" is visible).
   (D.categoryCaps||[]).forEach(function(c){
-    if(q.p && c.project!==q.p) return;
-    if(q.co && projCompany(c.project)!==q.co) return;
     var k=c.project+'|'+c.costCategory;
     if(!groups[k]) groups[k]={project:c.project,category:c.costCategory,amount:0,count:0,cap:Number(c.cap)||0};
     else groups[k].cap=Number(c.cap)||0;
@@ -2147,7 +2738,7 @@ function categorySummary(rows){
       : '<div class="muted" style="font-size:11px;margin-top:4px;font-style:italic">— ยังไม่มีงบที่ตั้งไว้ในโครงการนี้ —</div>';
     var projBadge='<span style="display:inline-block;background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:2px 9px;border-radius:5px;letter-spacing:.3px">'+esc(proj)+'</span>';
     var rows=cats.map(renderCatRow).join('');
-    return '<details class="csum-proj" style="border-left:3px solid '+border+';margin:8px 0;background:#fafbfd;border-radius:6px;padding:6px 12px 4px">'
+    return '<details class="csum-proj" open style="border-left:3px solid '+border+';margin:8px 0;background:#fafbfd;border-radius:6px;padding:6px 12px 4px">'
       +'<summary style="cursor:pointer;font-size:13px;padding:2px 0;list-style:revert">'
         +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
           +projBadge
@@ -2157,7 +2748,10 @@ function categorySummary(rows){
         +meterHtml
       +'</summary>'
       +'<div style="padding:4px 0 8px 16px">'
-        +'<table style="margin:0"><thead><tr>'
+        // table-layout:fixed + a shared colgroup (CSUM_COLS) so EVERY project's
+        // table has identical column widths — cells & the edit pencil line up
+        // vertically across all sections (same idea as the T-bar PLAN_LEFT_COLS).
+        +'<table style="margin:0;table-layout:fixed">'+CSUM_COLS+'<thead><tr>'
           +'<th>หมวดค่าใช้จ่าย</th><th class="num"># รายการ</th>'
           +'<th class="num">ใช้ไป</th><th class="num">งบประมาณ</th>'
           +'<th class="num">% ใช้</th><th class="num">คงเหลือ</th><th></th>'
@@ -2165,7 +2759,7 @@ function categorySummary(rows){
       +'</div>'
     +'</details>';
   }).join('');
-  return '<details class="csum" style="margin:0 0 14px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 12px">'
+  return '<details class="csum"'+openAttr+' style="margin:0 0 14px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px 12px">'
     +'<summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--navy);padding:2px 0">'
       +'สรุปหมวดค่าใช้จ่าย'+headerStatus
     +'</summary>'
@@ -2207,16 +2801,13 @@ function openReq(){
   document.getElementById('ovlReq').classList.add('on');
 }
 function openTxn(){document.getElementById('ovlTxn').classList.add('on');}
-// Company for a project: the entity in the project name's (parentheses) if
-// present, otherwise the default บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด. Adding a
-// "(...)" to any project name in Seed.js automatically reassigns it.
+// Company for a project: the `company` field in Seed.js (SEED_PROJECTS),
+// which names the actual entity holding the facility.
 function projCompany(code){
   var p=(D&&D.projects||[]).filter(function(x){return x.code===code;})[0];
   if(!p)return '';
-  var m=String(p.th||'').match(/\(([^)]+)\)/);
-  // Strip the leading "บริษัท" and trailing "จำกัด" — redundant clutter.
-  return (m?m[1].trim():'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด')
-    .replace(/^บริษัท\s*/,'').replace(/\s*จำกัด\s*$/,'').trim();
+  // Strip the leading "บริษัท" and any "จำกัด" — redundant clutter.
+  return String(p.company||'').replace(/^บริษัท\s*/,'').replace(/\s*จำกัด\s*/g,' ').trim();
 }
 // Remaining available (limit − used) on a facility line for a project.
 function facAvail(project,facilityNo){

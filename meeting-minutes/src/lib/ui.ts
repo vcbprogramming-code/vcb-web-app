@@ -92,3 +92,40 @@ export function applyMobileScale(frame: HTMLIFrameElement | null): void {
 export function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 }
+
+/** Short label + CSS class for an attachment's file type. Mirrors
+ *  fileIconHtml_ in JavaScript.html (same className/label pairs, same
+ *  mime/name-based sniffing) — apply the returned className to a <span
+ *  className={'fi ' + cls}>{label}</span> to match the GAS rendering exactly. */
+export function fileIconKind(mime: string | undefined, name: string | undefined): { cls: string; label: string } {
+  const t = ((mime || '') + ' ' + (name || '')).toLowerCase()
+  if (/sheet|excel|\.xls|\.csv/.test(t)) return { cls: 'xls', label: 'X' }
+  if (/presentation|powerpoint|\.ppt/.test(t)) return { cls: 'ppt', label: 'P' }
+  if (/pdf/.test(t)) return { cls: 'pdf', label: 'PDF' }
+  if (/document|word|\.doc/.test(t)) return { cls: 'doc', label: 'W' }
+  if (/image\//.test(t)) return { cls: 'img', label: '🖼' }
+  return { cls: 'gen', label: '▭' }
+}
+
+/** Mirrors fmtFileSize_ in JavaScript.html. */
+export function fmtFileSize(bytes: number): string {
+  const b = Number(bytes) || 0
+  if (b < 1024) return b + ' B'
+  if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB'
+  return (b / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+/** Reads a File as a base64 string (no data: prefix) for addAttachment's
+ *  base64Data param. Mirrors the FileReader usage in JavaScript.html's
+ *  attachFileInput.onchange. */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      resolve(result.split(',')[1] || '')
+    }
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}

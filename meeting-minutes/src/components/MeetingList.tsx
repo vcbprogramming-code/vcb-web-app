@@ -1,4 +1,5 @@
 import type { Project, MeetingListItem, ProjectId } from '../types'
+import { isInboxProject } from '../types'
 import type { Tr } from '../lib/i18n'
 import { fmtDate, fmtTime } from '../lib/i18n'
 import { inRange, type Range } from '../lib/ui'
@@ -10,6 +11,10 @@ interface Props {
   activeProject: ProjectId
   activeId: string | null
   query: string
+  /** ids matched by the debounced full-content server search for the current
+   *  query (see searchMeetings) — merged into the instant client-side filter
+   *  so a term buried past the excerpt still surfaces a result. */
+  searchMatchIds: Set<string> | null
   range: Range
   loaded: boolean
   onRange: (r: Range) => void
@@ -20,19 +25,44 @@ interface Props {
 const RANGE_LABELS: Record<Range, string> = { all: 'All', week: 'This week', month: 'This month' }
 
 export default function MeetingList(props: Props) {
-  const { meetings, byId, isAdmin, activeProject, activeId, query, range, loaded, onRange, onOpen, tr } = props
+  const { meetings, byId, isAdmin, activeProject, activeId, query, searchMatchIds, range, loaded, onRange, onOpen, tr } = props
+
+  // Timeline mode replaces the list column entirely — the timeline itself
+  // renders in the detail pane (see App.tsx); mirrors renderList()'s early
+  // branch in JavaScript.html (listHead -> "Timeline", rangeFilter/cards cleared).
+  if (activeProject === 'TIMELINE') {
+    return (
+      <section className="list">
+        <div className="mobile-backbar">
+          <button type="button" className="mobile-back-btn" data-back-to="projects">{tr('backProjects')}</button>
+        </div>
+        <div className="list-head">Timeline</div>
+        <div className="range" />
+        <div id="cards" />
+      </section>
+    )
+  }
+
   const label = activeProject === 'ALL' ? tr('allMeetings') : (byId[activeProject]?.name ?? '')
 
+  // "All meetings" is every tracked project's meetings — neither inbox
+  // pseudo-project folds into the ALL aggregate, even though they happen to
+  // share the same meetings array (mirrors the isInboxProject_ exclusion in
+  // JavaScript.html's visibleMeetings/countInRange).
+  const passesProjectFilter = (m: MeetingListItem): boolean =>
+    activeProject === 'ALL' ? !isInboxProject(m.projectId) : m.projectId === activeProject
+
   const countInRange = (r: Range): number =>
-    meetings.filter(m => (activeProject === 'ALL' || m.projectId === activeProject) && inRange(m, r)).length
+    meetings.filter(m => passesProjectFilter(m) && inRange(m, r)).length
 
   const q = query.trim().toLowerCase()
   const items = meetings.filter(m => {
-    if (activeProject !== 'ALL' && m.projectId !== activeProject) return false
+    if (!passesProjectFilter(m)) return false
     if (!inRange(m, range)) return false
     if (q) {
-      const hay = (m.title + ' ' + (m.dateLabel || '') + ' ' + (m.excerpt || '')).toLowerCase()
-      if (hay.indexOf(q) === -1) return false
+      const hay = (m.title + ' ' + (m.dateLabel || '') + ' ' + (m.excerpt || '') + ' ' + m.attendees.join(' ')).toLowerCase()
+      const searchMatch = searchMatchIds?.has(m.id) ?? false
+      if (hay.indexOf(q) === -1 && !searchMatch) return false
     }
     return true
   }).sort((a, b) => {
@@ -72,10 +102,11 @@ export default function MeetingList(props: Props) {
                 <span className="dot" style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: p.color }} />
                 <span className="date">{fmtDate(m)}{fmtTime(m) ? ' · ' + fmtTime(m) : ''}</span>
                 {hidden && <span className="badge hiddenb">🚫 Hidden</span>}
-                {m.pinned && <span className="badge pin">★ Pinned</span>}
+                {m.pinned && <span className="badge pin" title="Pinned">★</span>}
                 {m.kind === 'overview' && <span className="badge overview">Overview</span>}
                 {m.hasFathom && <span className="badge fathom">▶ Fathom</span>}
-                {(m.source === 'manual' || m.source === 'fathom') && <span className="badge manual">{m.source}</span>}
+                {m.source === 'transkriptor' && <span className="badge fathom">▤ Transkriptor</span>}
+                {m.attachmentCount > 0 && <span className="badge manual">📎 {m.attachmentCount}</span>}
               </div>
               <div className="ttl">{m.title}</div>
               <div className="ex">{m.excerpt || ''}</div>

@@ -22,7 +22,10 @@ export default function Sidebar({ s }: { s: Store }) {
 
   const scenarioCounts = useMemo(() => {
     const present: Record<string, number> = {};
-    s.scenarios.forEach((x) => (present[x.module] = (present[x.module] || 0) + 1));
+    s.scenarios.forEach((x) => {
+      present[x.module] = (present[x.module] || 0) + 1;
+      (x.extraModules || []).forEach((m) => (present[m] = (present[m] || 0) + 1));
+    });
     return present;
   }, [s.scenarios]);
 

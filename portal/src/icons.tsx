@@ -11,6 +11,15 @@ const svgProps: SVGProps<SVGSVGElement> = {
   strokeLinejoin: 'round',
 }
 
+export function MailIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  )
+}
+
 export function GlobeIcon() {
   return (
     <svg {...svgProps}>
@@ -35,6 +44,103 @@ export function AnnouncementIcon() {
   return (
     <svg {...svgProps}>
       <path d="M3 11l18-7-4 16-5-5-5 2-4-6z" />
+    </svg>
+  )
+}
+
+export function SearchIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  )
+}
+
+export function MenuIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </svg>
+  )
+}
+
+export function HelpIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.8-2 3.4" />
+      <path d="M12 17h.01" />
+    </svg>
+  )
+}
+
+export function OnboardingIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="3.5" />
+      <path d="M19 8v6" />
+      <path d="M22 11h-6" />
+    </svg>
+  )
+}
+
+export function ErpIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h4" />
+    </svg>
+  )
+}
+
+export function ZoomIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="6" width="12" height="12" rx="2" />
+      <path d="m15 10 6-3v10l-6-3" />
+    </svg>
+  )
+}
+
+export function AiTavernIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 3l1.8 4.3L18 9l-4.2 1.7L12 15l-1.8-4.3L6 9l4.2-1.7z" />
+      <path d="M19 15l.8 1.9L21.5 18l-1.7.9L19 21l-.8-2.1-1.7-.9 1.7-1.1z" />
+    </svg>
+  )
+}
+
+export function DashboardIcon() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  )
+}
+
+export function NavArrowIcon() {
+  return (
+    <svg
+      className="nav-arrow"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 17L17 7" />
+      <path d="M7 7h10v10" />
     </svg>
   )
 }
@@ -69,6 +175,14 @@ export function AppIcon({ icon }: { icon: AppIconKey }) {
           <path d="M9 15l1.5 1.5L13 14" />
           <path d="M15 11h1" />
           <path d="M15 16h1" />
+        </svg>
+      )
+    case 'sysmap':
+      return (
+        <svg {...svgProps}>
+          <path d="M9 4L3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z" />
+          <path d="M9 4v13" />
+          <path d="M15 6.5v13" />
         </svg>
       )
     case 'hr':

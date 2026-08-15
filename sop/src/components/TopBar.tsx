@@ -56,7 +56,7 @@ export default function TopBar({ s }: { s: Store }) {
         </span>
         <div className="settings-wrap">
           <button
-            className={'settings-btn' + (s.syncing ? ' is-syncing' : '')}
+            className="settings-btn"
             id="settingsBtn"
             type="button"
             onClick={s.openSettings}

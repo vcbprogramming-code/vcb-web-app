@@ -2,6 +2,9 @@
  *  + doSave() in index.html. Labels here are hardcoded Thai, as in the original. */
 import { useState } from 'react';
 import type { Store } from '../store';
+import { MODULES, MODULES_EN } from '../data/config';
+import ExtraModuleChecks from './ExtraModuleChecks';
+import { stepsToStorage, stepsFromStorage } from '../lib/steps';
 
 export default function EditModal({ s }: { s: Store }) {
   const sc = s.scenarios.find((x) => x.no === s.editNo);
@@ -17,15 +20,44 @@ function EditForm({
 }: {
   s: Store;
   no: number;
-  initial: { titleTH: string; titleEN: string; when: string; steps: string[]; note: string; ref: string };
+  initial: {
+    module: string;
+    titleTH: string;
+    titleEN: string;
+    when: string;
+    steps: string[];
+    note: string;
+    ref: string;
+    displayNo?: string;
+    extraModules?: string[];
+  };
 }) {
+  const [module, setModuleState] = useState(initial.module);
   const [titleTH, setTitleTH] = useState(initial.titleTH);
   const [titleEN, setTitleEN] = useState(initial.titleEN);
   const [when, setWhen] = useState(initial.when);
-  const [steps, setSteps] = useState((initial.steps || []).join('\n'));
+  const [steps, setSteps] = useState(stepsFromStorage(initial.steps));
   const [note, setNote] = useState(initial.note || '');
   const [ref, setRef] = useState(initial.ref || '');
+  const [extraModules, setExtraModules] = useState<Set<string>>(new Set(initial.extraModules || []));
+  const [swapWith, setSwapWith] = useState('');
   const [saving, setSaving] = useState(false);
+  const [swapping, setSwapping] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const labels = s.lang === 'en' ? MODULES_EN : MODULES;
+
+  function changeModule(next: string) {
+    setModuleState(next);
+    // Picking a new primary can't also be an extra tag — drop it if checked.
+    setExtraModules((prev) => {
+      if (!prev.has(next)) return prev;
+      const copy = new Set(prev);
+      copy.delete(next);
+      return copy;
+    });
+  }
 
   async function doSave() {
     if (!s.isAdmin) return;
@@ -33,16 +65,22 @@ function EditForm({
     try {
       await s.saveScenario({
         no,
+        module,
         titleTH: titleTH.trim(),
         titleEN: titleEN.trim(),
         when: when.trim(),
-        steps: steps
-          .split(/\r?\n/)
-          .map((x) => x.trim())
-          .filter(Boolean),
+        steps: stepsToStorage(steps),
         note: note.trim(),
         ref: ref.trim(),
+        extraModules: Array.from(extraModules),
       });
+      if (module !== initial.module) {
+        // selectModule() clears the selection (its normal sidebar-click
+        // behaviour) — re-select this case so it doesn't drop back to the
+        // welcome screen after moving it to a different module's list.
+        s.selectModule(module);
+        s.selectItem(no);
+      }
       // success: store closes the modal + refreshes data
     } catch (e: any) {
       setSaving(false);
@@ -50,18 +88,72 @@ function EditForm({
     }
   }
 
+  async function doSwap() {
+    if (!s.isAdmin) return;
+    const target = swapWith.trim().toUpperCase();
+    if (!target) {
+      alert('กรุณาระบุกรณีที่ต้องการสลับ เช่น PO-5 / Enter a case to swap with, e.g. PO-5');
+      return;
+    }
+    setSwapping(true);
+    try {
+      await s.swapScenario({ no, swapWith: target });
+      // success: store closes the modal + refreshes data
+    } catch (e: any) {
+      setSwapping(false);
+      alert('สลับไม่สำเร็จ / Swap failed:\n' + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function confirmDelete() {
+    setConfirmDeleteOpen(false);
+    setDeleting(true);
+    try {
+      await s.deleteScenario(no);
+      // success: store closes the modal + refreshes data
+    } catch (e: any) {
+      setDeleting(false);
+      alert('ลบไม่สำเร็จ / Delete failed:\n' + (e && e.message ? e.message : e));
+    }
+  }
+
   return (
-    <div
-      className="modal-bg open"
-      id="editBg"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) s.closeEdit();
-      }}
-    >
+    // Backdrop click intentionally does nothing — this form can hold a lot of
+    // typed content; only ยกเลิก/Cancel or Save should close it.
+    <div className="modal-bg open" id="editBg">
       <div className="modal" style={{ maxWidth: '780px' }}>
         <h3 id="editTitle">
-          แก้ไขกรณีที่ {no} · {initial.titleTH}
+          แก้ไขกรณีที่ {initial.displayNo || no} · {initial.titleTH}
         </h3>
+        <div className="row">
+          <label>หมวด (Module)</label>
+          <select value={module} onChange={(e) => changeModule(e.target.value)}>
+            {Object.keys(MODULES).map((m) => (
+              <option key={m} value={m}>
+                {m} · {(labels as Record<string, string>)[m] || m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <ExtraModuleChecks primaryMod={module} checked={extraModules} onChange={setExtraModules} />
+        <div className="row">
+          <label>สลับตำแหน่ง</label>
+          <div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="เช่น PO-5"
+                style={{ flex: '1 1 auto' }}
+                value={swapWith}
+                onChange={(e) => setSwapWith(e.target.value)}
+              />
+              <button className="btn" type="button" disabled={swapping} onClick={doSwap}>
+                {swapping ? 'กำลังสลับ…' : '↔ สลับ'}
+              </button>
+            </div>
+            <div className="hint">สลับเนื้อหาทั้งหมดกับกรณีที่ระบุ (เช่น PO-5) · กรณีอื่นๆ ไม่ถูกเลื่อนตำแหน่ง</div>
+          </div>
+        </div>
         <div className="row">
           <label>ชื่อ (ไทย)</label>
           <input id="ed_titleTH" type="text" value={titleTH} onChange={(e) => setTitleTH(e.target.value)} />
@@ -79,7 +171,8 @@ function EditForm({
           <div>
             <textarea id="ed_steps" rows={10} value={steps} onChange={(e) => setSteps(e.target.value)} />
             <div className="hint">
-              1 ขั้นตอน = 1 บรรทัด · ขึ้นต้นบรรทัดด้วย <code>» </code> เพื่อให้เป็นหัวข้อย่อยใต้ขั้นตอนก่อนหน้า
+              ขึ้นต้นด้วยตัวเลข (เช่น <code>1.</code>) &nbsp; ขึ้นต้นด้วย <code>&gt;</code> เพื่อให้เป็นหัวข้อย่อย ·{' '}
+              <code>&gt;&gt;</code> เพื่อให้เป็นหัวข้อย่อยชั้นที่ 3
             </div>
           </div>
         </div>
@@ -107,6 +200,15 @@ function EditForm({
           />
         </div>
         <div className="actions">
+          <button
+            className="btn btn-danger"
+            type="button"
+            style={{ marginRight: 'auto' }}
+            disabled={deleting}
+            onClick={() => setConfirmDeleteOpen(true)}
+          >
+            {deleting ? 'กำลังลบ…' : 'ลบกรณีนี้ · Delete'}
+          </button>
           <button className="btn" onClick={s.closeEdit}>
             ยกเลิก
           </button>
@@ -115,6 +217,26 @@ function EditForm({
           </button>
         </div>
       </div>
+      {confirmDeleteOpen && (
+        <div className="modal-bg open" onClick={(e) => e.target === e.currentTarget && setConfirmDeleteOpen(false)}>
+          <div className="modal" style={{ maxWidth: '440px' }}>
+            <h3>{s.lang === 'en' ? 'Delete this case?' : 'ยืนยันการลบ'}</h3>
+            <p className="confirm-msg">
+              {s.lang === 'en'
+                ? `Delete case ${initial.displayNo || no} — "${initial.titleTH}"?\n\nThis cannot be undone from the app (only via the Doc's version history). Every later case in the same module will renumber up by one.`
+                : `ลบกรณี ${initial.displayNo || no} — "${initial.titleTH}" ใช่หรือไม่?\n\nไม่สามารถกู้คืนได้จากในแอป (ต้องใช้ประวัติเวอร์ชันของ Doc เท่านั้น) กรณีอื่นในหมวดเดียวกันที่อยู่หลังจากนี้จะเลื่อนหมายเลขขึ้นทั้งหมด`}
+            </p>
+            <div className="actions">
+              <button className="btn" onClick={() => setConfirmDeleteOpen(false)}>
+                ยกเลิก
+              </button>
+              <button className="btn primary btn-danger-solid" onClick={confirmDelete}>
+                ลบ · Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

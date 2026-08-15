@@ -1,13 +1,21 @@
 /**
  * Central app store — mirrors the imperative `state` object and handler
- * functions in index.html (selectModule, selectFlows, doSync, setTheme, …),
+ * functions in index.html (selectModule, selectFlows, setTheme, …),
  * re-expressed as a single React hook. One <App/> calls useStore() and threads
  * the returned object down to the panes/modals.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SopData, Scenario, ScenarioEdit } from './data/types';
+import type { SopData, Scenario, ScenarioEdit, ScenarioCreate, ScenarioSwap, ReportCreate } from './data/types';
 import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
-import { bootstrap, getSopDataForClient, syncFromDoc, editScenario } from './lib/api';
+import {
+  bootstrap,
+  getSopDataForClient,
+  editScenario,
+  createScenario,
+  swapScenarioPositions,
+  deleteScenario,
+  createReport,
+} from './lib/api';
 
 export type View = 'sop' | 'flows' | 'reports';
 export type MobileView = 'list' | 'detail' | null;
@@ -85,7 +93,8 @@ export interface Store {
   mobileView: MobileView;
   settingsOpen: boolean;
   editNo: number | null;
-  syncing: boolean;
+  newScenarioOpen: boolean;
+  newReportOpen: boolean;
   // helpers
   t: (key: string) => any;
   labels: Record<string, string>;
@@ -101,10 +110,17 @@ export interface Store {
   onSearch: (value: string) => void;
   setMobileView: (v: MobileView) => void;
   mobileBack: () => void;
-  doSync: () => void;
   openEditModal: (no: number) => void;
   closeEdit: () => void;
   saveScenario: (payload: ScenarioEdit) => Promise<void>;
+  swapScenario: (payload: ScenarioSwap) => Promise<void>;
+  deleteScenario: (no: number) => Promise<void>;
+  openNewScenarioModal: () => void;
+  closeNewScenario: () => void;
+  createNewScenario: (payload: ScenarioCreate) => Promise<number>;
+  openNewReportModal: () => void;
+  closeNewReport: () => void;
+  createNewReport: (payload: ReportCreate) => Promise<void>;
   openSettings: () => void;
   closeSettings: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
@@ -130,7 +146,8 @@ export function useStore(): Store {
   const [mobileView, setMobileViewState] = useState<MobileView>(() => (detectMobile() ? null : null));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editNo, setEditNo] = useState<number | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [newReportOpen, setNewReportOpen] = useState(false);
 
   const t = useCallback((key: string) => tr(lang, key), [lang]);
   const labels = (lang === 'en' ? MODULES_EN : MODULES) as Record<string, string>;
@@ -255,19 +272,6 @@ export function useStore(): Store {
     setData(newData);
   }, []);
 
-  const doSync = useCallback(async () => {
-    setSettingsOpen(false);
-    setSyncing(true);
-    try {
-      await syncFromDoc();
-      await refreshClientData();
-    } catch (e: any) {
-      alert('Sync ล้มเหลว / Sync failed:\n' + (e && e.message ? e.message : e));
-    } finally {
-      setSyncing(false);
-    }
-  }, [refreshClientData]);
-
   const openEditModal = useCallback(
     (no: number) => {
       if (!data.meta.isAdmin) return;
@@ -281,6 +285,56 @@ export function useStore(): Store {
     async (payload: ScenarioEdit) => {
       await editScenario(payload);
       setEditNo(null);
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
+  const swapScenario = useCallback(
+    async (payload: ScenarioSwap) => {
+      await swapScenarioPositions(payload);
+      setEditNo(null);
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
+  const deleteScenarioAction = useCallback(
+    async (no: number) => {
+      await deleteScenario({ no });
+      setEditNo(null);
+      setNav((n) => (n.sel === no ? { ...n, sel: null } : n));
+      await refreshClientData();
+    },
+    [refreshClientData],
+  );
+
+  const openNewScenarioModal = useCallback(() => {
+    if (!data.meta.isAdmin) return;
+    setNewScenarioOpen(true);
+  }, [data.meta.isAdmin]);
+  const closeNewScenario = useCallback(() => setNewScenarioOpen(false), []);
+
+  const createNewScenario = useCallback(
+    async (payload: ScenarioCreate) => {
+      const result = await createScenario(payload);
+      setNewScenarioOpen(false);
+      await refreshClientData();
+      return result.no;
+    },
+    [refreshClientData],
+  );
+
+  const openNewReportModal = useCallback(() => {
+    if (!data.meta.isAdmin) return;
+    setNewReportOpen(true);
+  }, [data.meta.isAdmin]);
+  const closeNewReport = useCallback(() => setNewReportOpen(false), []);
+
+  const createNewReport = useCallback(
+    async (payload: ReportCreate) => {
+      await createReport(payload);
+      setNewReportOpen(false);
       await refreshClientData();
     },
     [refreshClientData],
@@ -362,7 +416,8 @@ export function useStore(): Store {
       mobileView,
       settingsOpen,
       editNo,
-      syncing,
+      newScenarioOpen,
+      newReportOpen,
       t,
       labels,
       getDefaultView,
@@ -376,10 +431,17 @@ export function useStore(): Store {
       onSearch,
       setMobileView,
       mobileBack,
-      doSync,
       openEditModal,
       closeEdit,
       saveScenario,
+      swapScenario,
+      deleteScenario: deleteScenarioAction,
+      openNewScenarioModal,
+      closeNewScenario,
+      createNewScenario,
+      openNewReportModal,
+      closeNewReport,
+      createNewReport,
       openSettings,
       closeSettings,
       setTheme,
@@ -396,7 +458,8 @@ export function useStore(): Store {
       mobileView,
       settingsOpen,
       editNo,
-      syncing,
+      newScenarioOpen,
+      newReportOpen,
       t,
       labels,
       selectModule,
@@ -409,10 +472,17 @@ export function useStore(): Store {
       onSearch,
       setMobileView,
       mobileBack,
-      doSync,
       openEditModal,
       closeEdit,
       saveScenario,
+      swapScenario,
+      deleteScenarioAction,
+      openNewScenarioModal,
+      closeNewScenario,
+      createNewScenario,
+      openNewReportModal,
+      closeNewReport,
+      createNewReport,
       openSettings,
       closeSettings,
       setTheme,

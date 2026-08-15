@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Lang, MeetingFull, MeetingListItem, Project, ProjectId, SessionState, Theme } from './types'
+import type { CreatedProject, Lang, MeetingFull, MeetingListItem, Project, ProjectId, SessionState, Theme } from './types'
 import { api, getToken } from './api/client'
 import { makeTr } from './lib/i18n'
 import {
@@ -13,11 +13,16 @@ import MeetingList from './components/MeetingList'
 import Dashboard from './components/Dashboard'
 import ProjectDashboard from './components/ProjectDashboard'
 import MeetingDetail from './components/MeetingDetail'
+import Timeline from './components/Timeline'
 import SettingsModal from './components/SettingsModal'
 import AccessModal from './components/AccessModal'
 import MeetingModal from './components/MeetingModal'
 import EditorModal from './components/EditorModal'
+import NewProjectModal from './components/NewProjectModal'
+import RenameProjectModal from './components/RenameProjectModal'
 import { Busy, Toast } from './components/Overlays'
+
+const TIMELINE_PROJECT: ProjectId = 'TIMELINE'
 
 const EMPTY_SESSION: SessionState = {
   appTitle: 'VCB Meeting Minutes', appDisplayTitle: 'Meeting Minutes', subtitle: '',
@@ -52,6 +57,18 @@ export default function App() {
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
   const [meetingModalTarget, setMeetingModalTarget] = useState<MeetingFull | null>(null)
   const [editorTarget, setEditorTarget] = useState<MeetingFull | null>(null)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [renameProjectId, setRenameProjectId] = useState<ProjectId | null>(null)
+
+  // Debounced full-content search (see searchMeetings) — the instant
+  // client-side filter in MeetingList covers title/date/excerpt/attendees;
+  // this additionally searches the whole meeting body for a term that didn't
+  // make it into the excerpt. Cached per query so repeat keystrokes don't
+  // re-hit the server. Mirrors the search handler in JavaScript.html.
+  const [searchMatchIds, setSearchMatchIds] = useState<Set<string> | null>(null)
+  const searchCache = useRef<Map<string, Set<string>>>(new Map())
+  const searchTimer = useRef<number | undefined>(undefined)
+  const queryRef = useRef('') // always the latest query, for the debounced callback below
 
   const [busy, setBusy] = useState<string | null>(null)
   const [toastMsg, setToastMsg] = useState('')
@@ -82,15 +99,42 @@ export default function App() {
   // ---- boot ----
   useEffect(() => {
     const pendingMeeting = queryParam('meeting')
-    if (pendingMeeting && isMobile()) { setMobilePane('detail') } else { setBootHidden(true) }
+    const pendingProject = queryParam('project')
+    if ((pendingMeeting || pendingProject) && isMobile()) { setMobilePane('detail') } else { setBootHidden(true) }
     Promise.all([api.getSessionState(getToken()), api.listMeetings(getToken())]).then(([s, m]) => {
       setSession(s); setMeetings(m); writeMeetingCache(m); setLoaded(true)
-      if (pendingMeeting) setActiveId(pendingMeeting)
-      if (isMobile()) setMobilePane(pendingMeeting ? 'detail' : 'projects')
+      // ?project=<id> permalink: switch to THIS project BEFORE activeId is set,
+      // so the sidebar highlight and list header land on the project tab, not
+      // 'ALL' (activeProject's default) — mirrors the same ordering fix in
+      // startApp() (JavaScript.html), which originally set S.activeProject
+      // AFTER the first render and left the sidebar highlight wrong.
+      if (pendingProject) setActiveProject(pendingProject)
+      if (pendingMeeting) {
+        setActiveId(pendingMeeting)
+      } else if (pendingProject) {
+        // Always resolve to THIS project's current latest meeting, computed
+        // fresh from the just-loaded meeting list — never a stored meeting id,
+        // so the same link keeps pointing at whatever is newest each time it's
+        // opened. Mirrors projectLatest(id,1)[0] in JavaScript.html.
+        const latest = m
+          .filter(x => x.projectId === pendingProject && x.kind !== 'overview')
+          .slice()
+          .sort((a, b) => {
+            if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1
+            return (b.date || '0000-00-00').localeCompare(a.date || '0000-00-00')
+          })[0]
+        if (latest) setActiveId(latest.id)
+      }
+      // If the user already tapped into a meeting from the cached "Latest" tiles
+      // while this boot fetch was still in flight, activeId is already set — don't
+      // clobber that navigation by forcing the pane back to 'projects'. Without this,
+      // a fast tap during load would flash into the meeting and snap right back.
+      setActiveId(current => {
+        if (isMobile()) setMobilePane(pendingMeeting || pendingProject || current ? 'detail' : 'projects')
+        return current
+      })
       setBootHidden(true)
       prefetchLatest(s.projects, m, () => setDetailVersion(v => v + 1))
-      // background autoSync (admin only returns changes)
-      api.autoSync(getToken()).then(r => { if (r.ok && (r.added || r.updated)) refreshAll() }).catch(() => { /* silent */ })
     }).catch(() => { setLoaded(true); setBootHidden(true) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -120,26 +164,40 @@ export default function App() {
     setActiveProject(id); setActiveId(null)
     if (isMobile()) setMobilePane('list')
   }
+  const openTimeline = () => {
+    setActiveProject(TIMELINE_PROJECT); setActiveId(null)
+    if (isMobile()) setMobilePane('list')
+  }
   const openMeeting = (id: string) => {
     setActiveId(id)
     if (isMobile()) setMobilePane('detail')
   }
   const onQuery = (q: string) => {
-    setQuery(q)
+    setQuery(q); queryRef.current = q
     if (isMobile() && q) setMobilePane('list')
+    const trimmed = q.trim()
+    window.clearTimeout(searchTimer.current)
+    if (!trimmed) { setSearchMatchIds(null); return }
+    const cached = searchCache.current.get(trimmed)
+    if (cached) { setSearchMatchIds(cached); return }
+    searchTimer.current = window.setTimeout(() => {
+      api.searchMeetings(trimmed, getToken()).then(ids => {
+        const set = new Set(ids)
+        searchCache.current.set(trimmed, set)
+        // Only apply if the query hasn't changed since this request started.
+        if (queryRef.current.trim() === trimmed) setSearchMatchIds(set)
+      }).catch(() => { /* silent — instant filter still applies */ })
+    }, 350)
   }
 
   // ---- admin flows ----
   const openNew = () => { setMeetingModalTarget(null); setMeetingModalOpen(true) }
   const openEdit = (m: MeetingFull) => setEditorTarget(m)
-
-  const manualRefresh = () => {
-    setSettingsOpen(false); onBusy(tr('refreshing'))
-    api.autoSync(getToken()).then(async r => {
-      await refreshAll()
-      if (r && (r.added || r.updated)) toast(`${tr('updated')} · ${r.added || 0} ${tr('newWord')}, ${r.updated || 0} ${tr('changedWord')}`)
-      else toast(tr('alreadyUpToDate'))
-    }).catch(e => toast(tr('refreshFailed') + ': ' + (e instanceof Error ? e.message : String(e)))).finally(() => onBusy(null))
+  const onProjectCreated = async (p: CreatedProject) => {
+    setNewProjectOpen(false)
+    await refreshAll()
+    pickProject(p.id)
+    toast('Created ' + p.name)
   }
 
   const onMeetingSaved = async (id: string) => {
@@ -154,22 +212,30 @@ export default function App() {
     setEditorTarget(null)
     await refreshAll(); setDetailVersion(v => v + 1); openMeeting(id)
   }
+  const onEditorDeleted = async () => {
+    setEditorTarget(null); setActiveId(null)
+    await refreshAll()
+  }
 
   // ---- detail pane content ----
   const detailPane = (() => {
+    if (activeProject === TIMELINE_PROJECT && !activeId) {
+      return <Timeline projects={session.projects} meetings={meetings} byId={byId} loaded={loaded} onOpen={openMeeting} />
+    }
     if (activeId) {
       return (
         <MeetingDetail
-          key={activeId} id={activeId} byId={byId} isAdmin={session.isAdmin}
+          key={activeId} id={activeId} byId={byId} projects={session.projects} isAdmin={session.isAdmin}
+          userEmail={session.user}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
-          onMutated={() => { refreshAll() }} execUrl={session.execUrl}
+          onMutated={() => { refreshAll() }} execUrl={session.execUrl} theme={theme}
         />
       )
     }
     if (activeProject === 'ALL') return <Dashboard projects={session.projects} meetings={meetings} onOpen={openMeeting} tr={tr} />
     const p = byId[activeProject]
     if (!p) return null
-    return <ProjectDashboard key={`${activeProject}:${detailVersion}`} project={p} meetings={meetings} onOpen={openMeeting} tr={tr} />
+    return <ProjectDashboard key={`${activeProject}:${detailVersion}`} project={p} meetings={meetings} onOpen={openMeeting} tr={tr} execUrl={session.execUrl} onToast={toast} />
   })()
 
   // The full record for the New/Edit modal when editing the active meeting.
@@ -181,14 +247,16 @@ export default function App() {
 
       <Topbar session={session} query={query} onQuery={onQuery} onSettings={() => setSettingsOpen(true)} tr={tr} />
 
-      <div className="body">
+      <div className={'body' + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')}>
         <Sidebar
-          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin}
-          active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew} tr={tr}
+          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin} loaded={loaded}
+          active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
+          onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId}
+          onTimeline={openTimeline} tr={tr}
         />
         <MeetingList
           meetings={meetings} byId={byId} isAdmin={session.isAdmin}
-          activeProject={activeProject} activeId={activeId} query={query} range={range}
+          activeProject={activeProject} activeId={activeId} query={query} searchMatchIds={searchMatchIds} range={range}
           loaded={loaded} onRange={setRange} onOpen={openMeeting} tr={tr}
         />
         <main className="detail">
@@ -205,7 +273,7 @@ export default function App() {
       <SettingsModal
         open={settingsOpen} onClose={() => setSettingsOpen(false)} session={session}
         theme={theme} lang={lang} setTheme={setTheme} setLang={setLang}
-        onRefresh={manualRefresh} onAccess={() => { setSettingsOpen(false); setAccessOpen(true) }} tr={tr}
+        onAccess={() => { setSettingsOpen(false); setAccessOpen(true) }} tr={tr}
       />
       <AccessModal open={accessOpen} onClose={() => { setAccessOpen(false); setSettingsOpen(true) }} onBusy={onBusy} onToast={toast} />
       <MeetingModal
@@ -213,7 +281,21 @@ export default function App() {
         onClose={() => setMeetingModalOpen(false)} onSaved={onMeetingSaved} onDeleted={onMeetingDeleted}
         onBusy={onBusy} onToast={toast}
       />
-      <EditorModal meeting={editorTarget} onClose={() => setEditorTarget(null)} onSaved={onEditSaved} onBusy={onBusy} onToast={toast} />
+      <EditorModal
+        meeting={editorTarget} projectName={editorTarget ? byId[editorTarget.projectId]?.name : undefined}
+        onClose={() => setEditorTarget(null)} onSaved={onEditSaved} onDeleted={onEditorDeleted}
+        onBusy={onBusy} onToast={toast}
+      />
+      <NewProjectModal
+        open={newProjectOpen} onClose={() => setNewProjectOpen(false)}
+        onCreated={onProjectCreated} onBusy={onBusy} onToast={toast}
+      />
+      <RenameProjectModal
+        open={!!renameProjectId} project={renameProjectId ? byId[renameProjectId] ?? null : null}
+        onClose={() => setRenameProjectId(null)}
+        onRenamed={() => { setRenameProjectId(null); refreshAll() }}
+        onBusy={onBusy} onToast={toast}
+      />
 
       <Busy msg={busy} />
       <Toast msg={toastMsg} />

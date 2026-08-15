@@ -1,31 +1,46 @@
-# Status: FRONTEND PREVIEW ONLY — backend pending
+# Status: REFERENCE IMPLEMENTATION for the dev handoff — not itself the final app
 
 **App:** Meeting Minute
 **Stack:** React 18 + TypeScript (strict) + Vite
 
-## What this is
-The **frontend only** (the screens/UI), ported from the Google Apps Script demo.
-It runs and looks complete, but the data is **mock/sample data** — see
-`src/api/mock.ts` / `src/api/seed.ts`. **Nothing is saved** (no real database,
-no login, no persistence).
+## What this is, and why it exists
+Google Apps Script (the project one level up) is the **owner's personal sandbox** —
+where the app's behavior is designed and validated first, throwaway once the real
+product exists. This React folder is a **faithful spec/reference implementation**
+of that behavior — every screen, every interaction, every data shape — for a
+developer to pick up on GitHub and build the actual product from: their own real
+backend, deployed independently (e.g. Vercel), with no ongoing dependency on Apps
+Script. Apps Script will be **abandoned** once that real app exists.
 
-## What's NOT here yet
-A **backend** — a server + database to actually store meetings/minutes, handle
-logins, and enforce rules. Edits update local state only and are lost on refresh.
+Because of that, this folder is intentionally **never wired to call the live Apps
+Script backend** — that would be a bridge to a system about to be retired. Its data
+is mock/sample data (`src/api/mock.ts` / `src/api/seed.ts`) purely so every screen
+is fully interactive and demonstrable; the mock's job is to prove the *shape and
+behavior* are right, not to persist anything real.
 
-## To make it fully functional, later
-Pick one:
-1. **Reuse the Google Apps Script backend** — point the React app's data calls
-   (`src/api/client.ts`) at the GAS `/exec` endpoint, keeping the same data shapes.
-2. **Build a real backend** (Node + a database such as Supabase) — the way the
-   E-Memo app (`backend/` + `supabase/`) is built.
+## The actual bar for "done" here
+Not "connected to real data" — **parity with the live Apps Script app.** Every
+feature a user can do in the live app should have a corresponding, correctly
+modeled equivalent here (down to exact field names, exact interaction flow), so
+the developer is never left reverse-engineering a missing feature from the Apps
+Script UI. See `PORT_NOTES.md` for the full GAS→React mapping and its "Last
+synced" log — that's the checklist for verifying parity after any Apps Script change.
 
-## Source of truth
-The canonical app is the **Google Apps Script** project. This React folder is a
-downstream mirror — see `PORT_NOTES.md`.
+## What the eventual real app needs (out of scope here, the developer's job)
+A real backend — server + database to actually store meetings/minutes, handle
+logins, and enforce rules for the ACTUAL production deployment. This folder's
+mock (`src/api/mock.ts`) documents the exact API contract (`src/types.ts`'s
+`ServerApi`) that real backend should implement — swap `src/api/client.ts`'s
+mock-backed calls for real HTTP calls against it once it exists.
+
+## Source of truth for behavior
+The **Google Apps Script** project (one directory up) is where new behavior is
+built and proven first. This folder must be re-synced after any GAS change —
+see `PORT_NOTES.md`.
 
 ## Run locally
 ```sh
 npm install && npm run dev
 ```
-Deploy: Vercel, Root Directory = this folder, framework Vite.
+Deploy (as a standalone preview, not the final app): Vercel, Root Directory =
+this folder, framework Vite.

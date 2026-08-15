@@ -36,12 +36,26 @@ export interface Scenario {
   titleEN: string;
   /** The triggering situation ("when this happens…"). */
   when: string;
-  /** Ordered steps. A leading "» " marks a sub-step. */
+  /** Ordered steps. Each entry is one of: "N. text" (numbered top-level step,
+   * displayed number always follows array position, not the literal N),
+   * "» text" / "» » text" (sub-bullet, depth = '» ' repeat count), or
+   * "· text" (plain caption, no number, no bullet). See src/lib/steps.ts. */
   steps: string[];
   /** Reference into the manual, e.g. "บทที่ 2 …". */
   ref: string;
   /** Optional caveat shown in red. */
   note: string;
+  /** Thai-formatted creation date, e.g. "24 กรกฎาคม 2569". Cases written before
+   * this field existed carry a stand-in backfill date, not a real one. */
+  dateAdded?: string;
+  /** Per-module display label, e.g. "PO-1", "IC-3" — restarts at 1 within each
+   * module. Derived, not an identity: `no` is still the unique key used for
+   * lookups/selection/edits; this is only ever shown to the user. */
+  displayNo?: string;
+  /** Additional modules this case also belongs to, beyond its primary `module`
+   * (which still drives displayNo/color/chapter ref). Purely additive — the
+   * case shows up whenever the sidebar filters to any of these too. */
+  extraModules?: string[];
 }
 
 /** A row in the "which report do I run" table. */
@@ -49,6 +63,13 @@ export interface Report {
   case: number;
   scenario: string;
   /** Navigation path, e.g. "Sales > Reports > …". */
+  path: string;
+}
+
+/** Payload accepted by createReport() / POST /api/report/new. */
+export interface ReportCreate {
+  case: number;
+  scenario: string;
   path: string;
 }
 
@@ -62,12 +83,46 @@ export interface SopData {
 /** Payload accepted by editScenario() / POST /api/scenario. */
 export interface ScenarioEdit {
   no: number;
+  /** Changes the case's PRIMARY module — moves it to a new module's numbering
+   * (e.g. PO-4 → IC-6). Omit to leave the primary module unchanged. */
+  module?: string;
   titleTH?: string;
   titleEN?: string;
   when?: string;
   steps?: string[];
   note?: string;
   ref?: string;
+  /** Replaces the case's extra-module tags wholesale, including clearing them
+   * with an empty array. Omit to leave existing tags untouched. */
+  extraModules?: string[];
+}
+
+/** Payload accepted by createScenario() / POST /api/scenario/new. Server/mock
+ * assigns `no` and stamps `dateAdded` with today's date. */
+export interface ScenarioCreate {
+  module: string;
+  titleTH: string;
+  titleEN?: string;
+  when?: string;
+  steps?: string[];
+  note?: string;
+  ref?: string;
+  extraModules?: string[];
+}
+
+/** Payload accepted by swapScenarioPositions() / POST /api/scenario/swap.
+ * Trades the ENTIRE content of two cases (title/problem/steps/ref/etc.) —
+ * every other case's position is unaffected. `swapWith` is a displayNo
+ * label like "PO-5", not a raw `no`. */
+export interface ScenarioSwap {
+  no: number;
+  swapWith: string;
+}
+
+/** Payload accepted by deleteScenario() / POST /api/scenario/delete. Removes
+ * the case entirely — every later case in the same module renumbers up by one. */
+export interface ScenarioDelete {
+  no: number;
 }
 
 /* ----- Process Flow (swimlane diagram) shapes ----- */

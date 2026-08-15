@@ -1,0 +1,16 @@
+backend/**
+frontend/**
+credit-facility/**
+hr-worklog/**
+meeting-minutes/**
+portal/**
+react-app/**
+sop/**
+supabase/**
+_data/**
+_legacy_live_clasp/**
+_scripts/**
+docs/**
+.claude/**
+.git/**
+node_modules/**

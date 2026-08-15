@@ -126,14 +126,13 @@ export default function Dashboard({ cur, setCur, openSite }:
   return (
     <>
       <div className="card" style={{ padding: '.85rem 1.1rem' }}>
-        <div className="statrow" style={{ alignItems: 'end', gap: '.9rem', marginBottom: 0 }}>
+        <div className="statrow" style={{ alignItems: 'center', gap: '.9rem', marginBottom: 0 }}>
           <div>
             <h1 style={{ margin: 0 }}>{t('แดชบอร์ด')}</h1>
             <div className="sub" style={{ margin: 0 }}>{t('ภาพรวมการบันทึกการทำงานรายหน่วยงาน')} · {mname(cur.m)} {be(cur.y)}</div>
           </div>
           <div className="dash-mrow" style={{ marginLeft: 'auto' }}>
             <div className="fld">
-              <label>{t('มุมมอง')}</label>
               <div className="viewseg">
                 {seg.map(([v, l]) => (
                   <button key={v} className={dashView === v ? 'on' : ''} onClick={() => setDashView(v)}>{l}</button>
@@ -141,11 +140,9 @@ export default function Dashboard({ cur, setCur, openSite }:
               </div>
             </div>
             <div className="fld">
-              <label>{t('เดือน')}</label>
               <MonthNav cur={cur} setCur={setCur} />
             </div>
             <div className="fld">
-              <label>&nbsp;</label>
               <button className="btn xls-btn" title={t('ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)')}>⬇ {t('รายงานวันทำงาน')}</button>
             </div>
           </div>

@@ -1802,6 +1802,7 @@ function boot(){
     bootStage('2·ได้ข้อมูล');
     if(!r||!r.ok){ return onBootError(r); }
     BOOT=r;
+    if(r.degraded){ return bootDegraded_(r); }
     // Surface ANY render error instead of dying on the loading spinner. Clear
     // the spinner FIRST so a later render bug can't trap the whole app on
     // "กำลังโหลด…"; then restore the saved view inside its own guard so a single
@@ -1814,6 +1815,21 @@ function boot(){
       catch(e3){ fatal('VIEW: '+(e2&&e2.message||e2)+' / '+(e3&&e3.stack||e3)); }
     }
   });
+}
+// Data layer is unreachable (see api_bootstrap's catch). Still show the real
+// app shell (topbar/logo) — just swap the content area for a clear inline
+// notice instead of the dashboard, and skip building nav links that need
+// data we don't have.
+function bootDegraded_(r){
+  busy(false);
+  $('topbar').style.display='';
+  var n=$('nav'); if(n) n.innerHTML='<span class="who">'+esc(t('ไม่สามารถเชื่อมต่อฐานข้อมูลได้'))+'</span>';
+  var v=$('view'); if(!v) return;
+  v.style.display='';
+  v.innerHTML='<div class="card"><h1>⚠️ '+esc(t('ไม่สามารถโหลดข้อมูลได้ในขณะนี้'))+'</h1>'
+    +'<p class="hint">'+esc(t('แอปยังใช้งานได้ แต่ข้อมูลจากฐานข้อมูลยังไม่พร้อม ลองใหม่อีกครั้งในอีกสักครู่'))+'</p>'
+    +'<pre class="errbox">'+esc(r.degradedError||'')+'</pre>'
+    +'<p><button class="btn" onclick="location.reload()">'+esc(t('ลองใหม่'))+'</button></p></div>';
 }
 function onBootError(r){
   var code=r&&r.error||'UNKNOWN';
@@ -3038,19 +3054,19 @@ function renderDashboard(){
   var v=$('view');
   v.innerHTML=
     '<div class="card" style="padding:.85rem 1.1rem">'
-      +'<div class="statrow" style="align-items:end;gap:.9rem;margin-bottom:0">'
+      +'<div class="statrow" style="align-items:center;gap:.9rem;margin-bottom:0">'
         +'<div><h1 style="margin:0">'+t('แดชบอร์ด')+'</h1>'
           +'<div class="sub" style="margin:0">'+t('ภาพรวมการบันทึกการทำงานรายหน่วยงาน')+' · '+MNAME(CUR.m)+' '+be(CUR.y)+'</div></div>'
         +'<div class="dash-mrow" style="margin-left:auto">'
-          +'<div class="fld"><label>'+t('มุมมอง')+'</label>'
+          +'<div class="fld">'
             +'<div class="viewseg" id="dView">'
               +'<button data-v="progress" class="'+(DASH.view==='progress'?'on':'')+'">'+t('ความคืบหน้า')+'</button>'
               +'<button data-v="topact"   class="'+(DASH.view==='topact'?'on':'')+'">'+t('กิจกรรมหลัก')+'</button>'
               +'<button data-v="topcost"  class="'+(DASH.view==='topcost'?'on':'')+'">'+t('หมวดงานหลัก')+'</button>'
             +'</div>'
           +'</div>'
-          +'<div class="fld"><label>'+t('เดือน')+'</label><div id="dMonth">'+monthNav()+'</div></div>'
-          +'<div class="fld"><label>&nbsp;</label><button class="btn xls-btn" id="dExport" title="'+esc(t('ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)'))+'">⬇ '+(isMobile()?t('รายงาน'):t('รายงานวันทำงาน'))+'</button></div>'
+          +'<div class="fld"><div id="dMonth">'+monthNav()+'</div></div>'
+          +'<div class="fld"><button class="btn xls-btn" id="dExport" title="'+esc(t('ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)'))+'">⬇ '+(isMobile()?t('รายงาน'):t('รายงานวันทำงาน'))+'</button></div>'
         +'</div>'
       +'</div>'
     +'</div>'
@@ -4432,7 +4448,7 @@ function loadSeed_(){
   if (SEED_CACHE_) return SEED_CACHE_;
   var file;
   try { file = DriveApp.getFileById(SEED_FILE_ID); }
-  catch (err){ throw new Error("อ่านไฟล์ข้อมูลตั้งต้น (hr_seed.json) ไม่ได้ — ตรวจ SEED_FILE_ID หรือสิทธิ์ Drive ของผู้รัน SETUP. ("+(err&&err.message?err.message:err)+")"); }
+  catch (err){ SEED_CACHE_ = { sites:[], support:[], operation:[] }; return SEED_CACHE_; }  // seed file gone — start empty, roster entered via the app
   SEED_CACHE_ = JSON.parse(file.getBlob().getDataAsString("UTF-8"));
   return SEED_CACHE_;
 }
@@ -4447,11 +4463,83 @@ function SEED_ENTRIES(){ var s=loadSeed_(); return { support:s.support||[], oper
 // regardless of whether the visiting user has direct access to the Sheet.
 var DB_ID = "1MYHU0ictzuOYPTWHolWKjB2zNND7gKUakbXhim_5ZIQ";
 var SS_CACHE_ = null;
+// Self-healing: if DB_ID can't be opened (e.g. the file was deleted), the app
+// auto-creates a replacement spreadsheet on first use and remembers its id in
+// Script Properties (DB_ID_OVERRIDE_), so nobody ever has to touch Drive by
+// hand. Employees never see or interact with the sheet directly.
+function activeDbId_(){
+  try {
+    var override = PropertiesService.getScriptProperties().getProperty('DB_ID_OVERRIDE_');
+    if (override) return override;
+  } catch(e){}
+  return DB_ID;
+}
+// Diagnostic: run from the editor to see which spreadsheet the app is
+// currently using and its Drive URL.
+// Walks/creates a Drive folder path from My Drive root, e.g.
+// ['WORK','08 CLAUDE CODE','HR Work Log Web App'] -> that nested folder.
+function walkOrCreatePath_(root, segments){
+  var cur = root;
+  segments.forEach(function(name){
+    var it = cur.getFoldersByName(name);
+    cur = it.hasNext() ? it.next() : cur.createFolder(name);
+  });
+  return cur;
+}
+function WHERE_IS_DB(){
+  var id = activeDbId_();
+  var url = 'https://docs.google.com/spreadsheets/d/' + id + '/edit';
+  var stalePath = ['HR Work Log Web App — Database'];   // wrongly created at Drive root earlier
+  var filedInto = '(unchanged)';
+  try {
+    var projectFolder = walkOrCreatePath_(DriveApp.getRootFolder(), ['WORK','08 CLAUDE CODE','HR Work Log Web App']);
+    var file = DriveApp.getFileById(id);
+    var already = false;
+    var parents = file.getParents();
+    while (parents.hasNext()) { if (parents.next().getId() === projectFolder.getId()) already = true; }
+    if (!already) {
+      projectFolder.addFile(file);
+      var oldParents = file.getParents();
+      while (oldParents.hasNext()) { var p = oldParents.next(); if (p.getId() !== projectFolder.getId()) p.removeFile(file); }
+      filedInto = projectFolder.getUrl();
+    } else { filedInto = 'already in ' + projectFolder.getUrl(); }
+    // Clean up the stray same-named folder mistakenly created at Drive root earlier, if empty.
+    var stale = DriveApp.getFoldersByName(stalePath[0]);
+    while (stale.hasNext()){
+      var sf = stale.next();
+      if (sf.getId() !== projectFolder.getId() && !sf.getFiles().hasNext() && !sf.getFolders().hasNext()){
+        sf.setTrashed(true);
+      }
+    }
+  } catch(e){ filedInto = 'filing failed: ' + e.message; }
+  Logger.log('ACTIVE DB_ID = ' + id);
+  Logger.log('URL          = ' + url);
+  Logger.log('FOLDER       = ' + filedInto);
+  return url;
+}
+function createFreshDb_(){
+  var ss = SpreadsheetApp.create('HR Work Log — Database');
+  try {
+    var folderName = 'HR Work Log Web App — Database';
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    var file = DriveApp.getFileById(ss.getId());
+    folder.addFile(file);
+    DriveApp.getRootFolder().removeFile(file);   // Sheets.create() lands it in My Drive root by default
+  } catch(e){}   // filing is a nicety — never let it block the app from getting a working DB
+  try { PropertiesService.getScriptProperties().setProperty('DB_ID_OVERRIDE_', ss.getId()); } catch(e){}
+  return ss;
+}
 function ss_(){
   if (SS_CACHE_) return SS_CACHE_;
-  try { SS_CACHE_ = SpreadsheetApp.openById(DB_ID); }
-  catch(e){ SS_CACHE_ = SpreadsheetApp.getActiveSpreadsheet(); }   // fallback only
-  if (!SS_CACHE_) throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + DB_ID + ') — ตรวจสิทธิ์/รหัสไฟล์');
+  var id = activeDbId_();
+  try { SS_CACHE_ = SpreadsheetApp.openById(id); }
+  catch(e){
+    // DB missing/inaccessible — provision a brand-new one automatically.
+    try { SS_CACHE_ = createFreshDb_(); SETUP(); }
+    catch(e2){ throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ' + (e && e.message) + ' | สร้างใหม่ไม่สำเร็จ: ' + (e2 && e2.message)); }
+  }
+  if (!SS_CACHE_) throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ตรวจสิทธิ์/รหัสไฟล์');
   return SS_CACHE_;
 }
 function sh_(name){ return ss_().getSheetByName(name); }
@@ -5426,7 +5514,14 @@ function doGet(){
 
 function api_bootstrap(){
   try { rcReset_(); return _api_bootstrap_(); }
-  catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+  catch(e){
+    // Data layer is unreachable even after ss_()'s self-heal attempt (e.g. a
+    // transient Drive/permissions failure). Still return ok:true with
+    // degraded:true so the client can render its shell (header/nav) instead
+    // of a blank fatal-error page — only the data-dependent panels go dark.
+    return { ok:true, degraded:true, degradedError:(e&&e.message?e.message:String(e)),
+      email:'', role:'', isAdmin:false, canEntry:false, sites:[] };
+  }
 }
 function _api_bootstrap_(){
   if(!sh_(SHEETS.EMP)||!sh_(SHEETS.SITES)||!sh_(SHEETS.CONFIG)) return { ok:false, error:'NO_SETUP' };

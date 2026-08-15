@@ -28,6 +28,16 @@ pnpm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
+desktop.ini
+
+# Google Drive for Desktop sync artifacts
+.tmp.driveupload/
+.tmp.drivedownload/
+*.gsheet
+*.gscript
+
+# clasp (deployment-specific — contains the live script ID; .claspignore is kept, defines app source scope)
+.clasp.json
 
 # supabase
 supabase/.temp/

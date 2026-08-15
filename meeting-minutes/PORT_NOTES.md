@@ -13,9 +13,45 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-08-09
-- **Live deployment referenced:** `@144` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-15
+- **Live deployment referenced:** `@146` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed 2026-08-15 sync:**
+  - **Project "latest meeting" permalink (new).** A `?project=<id>` URL param
+    now always resolves to that project's CURRENT latest meeting — resolved
+    fresh from `listMeetings` on every load, never a stored meeting id, so the
+    same pasted link keeps pointing at whatever is newest. Mirrors
+    `?project=` handling in `doGet`/`startApp()` (Code.js/JavaScript.html).
+    `App.tsx`'s boot effect (`queryParam('project')`) sets `activeProject`
+    to the pending project id BEFORE `setActiveId` runs (same batch), so the
+    sidebar highlight and list header land on the project tab immediately —
+    this ordering matters because it mirrors a real bug just fixed on the GAS
+    side, where `S.activeProject` was set AFTER the first `renderProjects()`/
+    `renderList()` and the sidebar highlight stayed stuck on "All meetings"
+    even though the correct meeting opened. React's declarative re-render
+    means there's no separate "stale DOM" step to worry about here, but the
+    state-ordering fix (`setActiveProject` before `setActiveId`, both in the
+    same `.then()`) still needed to be applied so the two updates land in one
+    render rather than flashing 'ALL' first. Falls back to resolving nothing
+    (empty `ProjectDashboard` state) if the project has no meetings yet, same
+    as `renderProjectDashboard()`'s empty-state branch.
+  - **"Share latest-meeting link" button (new)** — `ProjectDashboard.tsx`
+    gained a `shareProjectLink()` handler (mirrors `shareProjectLink()` in
+    JavaScript.html) and a `🔗 Share latest-meeting link` button in the
+    `.dash-head`, next to the project's exec-summary card. Needed `execUrl`
+    and `onToast` threaded down as new props — `ProjectDashboard` previously
+    received neither (only `MeetingDetail` had `execUrl`); `App.tsx` now
+    passes `execUrl={session.execUrl} onToast={toast}` at its
+    `<ProjectDashboard>` call site.
+  - **GAS-side domain-scoped URL fix — verified N/A for React.**
+    `getExecUrl_()` in Code.js was fixed to strip a `/a/<domain>/` Workspace
+    prefix that `ScriptApp.getService().getUrl()` can return for signed-in
+    Workspace accounts (it broke the `?project=`/`?meeting=` query string via
+    Google's own account redirector). The mock's `execUrl`
+    (`mock.ts`, `'https://script.google.com/macros/s/EXAMPLE_DEPLOYMENT_ID/exec'`)
+    has no such prefix and no redirect layer, so there is nothing to strip —
+    confirmed via grep, no action needed. Same "verified N/A" treatment as
+    the attachment-URL note earlier in this file.
 - **What changed 2026-08-09 sync:**
   - **Staff comments on meetings (new).** A new 💬 Comments button in the
     meeting detail bar (`MeetingDetail.tsx`) opens a slide-out panel — list of
@@ -526,6 +562,9 @@ screen reachable for sign-off, the mock derives admin from a **URL flag**:
   edit-here, project access, refresh).
 - `http://localhost:5200/` → public view (what real users currently get).
 - `?meeting=<id>` → deep-link straight into a meeting (parity with the GAS share link).
+- `?project=<id>` → deep-link into a project's CURRENT latest meeting, re-resolved
+  on every load (parity with the GAS project permalink — see the 2026-08-15 sync
+  note above). e.g. `http://localhost:5200/?project=FIN`.
 
 This is a faithful entry hook, not an added feature — the GAS code already branches
 on `isAdmin` everywhere.

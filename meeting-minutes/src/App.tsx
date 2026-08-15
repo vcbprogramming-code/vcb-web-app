@@ -99,16 +99,38 @@ export default function App() {
   // ---- boot ----
   useEffect(() => {
     const pendingMeeting = queryParam('meeting')
-    if (pendingMeeting && isMobile()) { setMobilePane('detail') } else { setBootHidden(true) }
+    const pendingProject = queryParam('project')
+    if ((pendingMeeting || pendingProject) && isMobile()) { setMobilePane('detail') } else { setBootHidden(true) }
     Promise.all([api.getSessionState(getToken()), api.listMeetings(getToken())]).then(([s, m]) => {
       setSession(s); setMeetings(m); writeMeetingCache(m); setLoaded(true)
-      if (pendingMeeting) setActiveId(pendingMeeting)
+      // ?project=<id> permalink: switch to THIS project BEFORE activeId is set,
+      // so the sidebar highlight and list header land on the project tab, not
+      // 'ALL' (activeProject's default) — mirrors the same ordering fix in
+      // startApp() (JavaScript.html), which originally set S.activeProject
+      // AFTER the first render and left the sidebar highlight wrong.
+      if (pendingProject) setActiveProject(pendingProject)
+      if (pendingMeeting) {
+        setActiveId(pendingMeeting)
+      } else if (pendingProject) {
+        // Always resolve to THIS project's current latest meeting, computed
+        // fresh from the just-loaded meeting list — never a stored meeting id,
+        // so the same link keeps pointing at whatever is newest each time it's
+        // opened. Mirrors projectLatest(id,1)[0] in JavaScript.html.
+        const latest = m
+          .filter(x => x.projectId === pendingProject && x.kind !== 'overview')
+          .slice()
+          .sort((a, b) => {
+            if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1
+            return (b.date || '0000-00-00').localeCompare(a.date || '0000-00-00')
+          })[0]
+        if (latest) setActiveId(latest.id)
+      }
       // If the user already tapped into a meeting from the cached "Latest" tiles
       // while this boot fetch was still in flight, activeId is already set — don't
       // clobber that navigation by forcing the pane back to 'projects'. Without this,
       // a fast tap during load would flash into the meeting and snap right back.
       setActiveId(current => {
-        if (isMobile()) setMobilePane(pendingMeeting || current ? 'detail' : 'projects')
+        if (isMobile()) setMobilePane(pendingMeeting || pendingProject || current ? 'detail' : 'projects')
         return current
       })
       setBootHidden(true)
@@ -213,7 +235,7 @@ export default function App() {
     if (activeProject === 'ALL') return <Dashboard projects={session.projects} meetings={meetings} onOpen={openMeeting} tr={tr} />
     const p = byId[activeProject]
     if (!p) return null
-    return <ProjectDashboard key={`${activeProject}:${detailVersion}`} project={p} meetings={meetings} onOpen={openMeeting} tr={tr} />
+    return <ProjectDashboard key={`${activeProject}:${detailVersion}`} project={p} meetings={meetings} onOpen={openMeeting} tr={tr} execUrl={session.execUrl} onToast={toast} />
   })()
 
   // The full record for the New/Edit modal when editing the active meeting.

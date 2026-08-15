@@ -105,6 +105,7 @@
   .dash-wrap { padding: 26px 28px; max-width: 1100px; }
   .dash-head h2 { margin: 0 0 4px; font-size: 20px; color: var(--brand); }
   .dash-head p { margin: 0 0 18px; color: var(--ink-soft); font-size: 13.5px; }
+  .dash-head #d_shareProject { margin: 2px 0 12px; }
   .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   .dash-card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c, var(--brand)); border-radius: 12px; padding: 15px 16px; cursor: pointer; transition: box-shadow .12s, transform .12s; }
   .dash-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
@@ -183,7 +184,9 @@
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin: 8px 12px; padding: 11px 13px; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
   .card:hover { border-color: #c0c8d0; box-shadow: var(--shadow); }
   .card.active { border-color: var(--brand-2); box-shadow: 0 0 0 2px rgba(31,111,235,.18); }
-  .card .meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .card .meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; min-width: 0; }
+  .card .meta .date { flex: none; white-space: nowrap; }
+  .card .meta .badge { flex: none; }
   .card .date { font-size: 12px; font-weight: 700; color: var(--brand); }
   .card .ttl { font-size: 13.5px; font-weight: 600; margin: 1px 0 4px; }
   .card .ex { font-size: 12px; color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -207,16 +210,19 @@
   .dbtn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; font-size: 12.5px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
   .dbtn:hover { background: var(--line-soft); }
   .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
-  .dbtn.active { background: var(--line-soft); border-color: var(--brand-2); color: var(--brand-2); }
   .dbtn.danger:hover { background: #fdeef0; color: var(--danger); border-color: #f3c2c8; }
   .dbtn.danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
   .dbtn.danger-solid:hover { background: #a5121f; border-color: #a5121f; }
 
-  /* Comments slide-out panel. */
+  /* Comments slide-out panel — toggled via a "show" class from openComments()/
+     closeComments() in JavaScript.html, not conditional DOM creation, so it
+     survives renderDetail() re-runs (pin/visibility toggles rebuild #detailContent). */
   .ibtn { background: transparent; border: 1px solid transparent; border-radius: 7px; width: 28px; height: 28px; font-size: 14px; color: var(--ink-soft); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .ibtn:hover { background: var(--line-soft); border-color: var(--line); }
-  .comments-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.15); z-index: 39; }
-  .comments-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); z-index: 40; display: flex; flex-direction: column; }
+  .comments-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.15); z-index: 44; }
+  .comments-backdrop.show { display: block; }
+  .comments-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: min(360px, 100vw); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12); z-index: 45; flex-direction: column; }
+  .comments-panel.show { display: flex; }
   .comments-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
   .comments-panel-head h3 { margin: 0; font-size: 15px; }
   .comments-panel-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
@@ -231,7 +237,7 @@
   .comments-panel-foot { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
   .comments-panel-foot textarea { resize: vertical; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); }
   .comments-panel-foot .dbtn { align-self: flex-end; }
-  .comments-panel-foot .dbtn:disabled { opacity: .5; }
+
   .attendees { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); background: #fbfcfe; }
   .attendees .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; }
   .chip { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 3px 12px 3px 3px; text-decoration: none; color: var(--ink); }
@@ -252,6 +258,12 @@
   .attach-upload-btn:hover { border-color: var(--brand-2); color: var(--brand-2); }
   .frame-wrap { flex: 1; overflow: auto; background: #eef1f4; padding: 22px; }
   .paper { max-width: 860px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
+  /* Sits below .paper inside .frame-wrap's own scroll area — same max-width/
+     centering as .paper so it lines up with the document above it, own card
+     chrome (white, rounded, shadowed) so it reads as a distinct trailing
+     section rather than a continuation of the paper or a floating strip. */
+  .attach-footer { max-width: 860px; margin: 16px auto 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .attach-footer .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; flex-basis: 100%; }
   iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 400px; }
   .placeholder { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ink-faint); flex-direction: column; gap: 10px; text-align: center; padding: 40px; }
   .placeholder .big { font-size: 40px; opacity: .4; }
@@ -324,12 +336,10 @@
   .ed-area h1, .ed-area h2 { color: #0b3d62; }
   .ed-area table { border-collapse: collapse; width: 100%; margin: 12px 0; }
   .ed-area td, .ed-area th { border: 1px solid var(--line); padding: 6px 9px; }
-  /* Checklist (green tick) list — .tick-list is added to a <ul> by
-     tickList() in EditorModal.tsx; renders as a check instead of a bullet
-     dot via ::before (list-style:none first, since ::before can't replace
-     a marker set by list-style-type directly). Same rule also lives in
-     OVERRIDE_CSS (docRender.ts) so it renders identically in the final A4
-     view. Mirrors Stylesheet.html verbatim. */
+  /* Checklist (green tick) list — no bullet dot, a green ✓ instead, via
+     ::before rather than list-style (custom colored glyphs aren't supported
+     by list-style-type directly). Same rule also lives in OVERRIDE_CSS
+     (JavaScript.html) so it renders identically in the final A4 view. */
   .ed-area .tick-list, .ed-area .tick-list li { list-style: none; }
   .ed-area .tick-list { padding-left: 24px; }
   .ed-area .tick-list li { position: relative; }
@@ -377,24 +387,14 @@
   html.is-mobile .settings-btn-d.tbtn { display: none; }
   html.is-mobile #timelineBtn { display: none; }
 
-  /* ⚙ Settings — mobile variant lives in .brandwrap. Hidden on desktop. */
+  /* ⚙ Settings — removed from mobile entirely (2026-07-22): theme/language/
+     Project Access/build-info are desktop-only now, reachable via
+     #settingsBtnD (already hidden on mobile, unaffected by this). Kept as
+     display:none rather than deleting the button/modal outright — the
+     underlying #setBg modal and its wiring still exist, unreachable on
+     mobile with no entry point, harmless to leave in place. */
   .settings-btn { display: none; }
-  html.is-mobile .settings-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    background: rgba(255,255,255,.14);
-    border: 1px solid rgba(255,255,255,.22);
-    border-radius: 10px;
-    color: #fff;
-    font-size: 18px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  html.is-mobile .settings-btn:active { background: rgba(255,255,255,.28); }
+  html.is-mobile .settings-btn { display: none; }
   /* Settings sheet — identity + segmented controls */
   .set-who { font-size: 14px; padding: 2px 0; color: var(--ink); font-weight: 600; }
   .set-group { display: flex; flex-direction: column; gap: 8px; }
@@ -501,6 +501,7 @@
   html.theme-dark .dbtn:hover { background: var(--line-soft); }
   html.theme-dark .dbtn.primary { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
   html.theme-dark .dbtn.danger-solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+  html.theme-dark .comments-panel-foot textarea { background: #0d1117; color: var(--ink); border-color: var(--line); }
   html.theme-dark .proj.active { background: rgba(88,166,255,.18); }
   html.theme-dark .proj:hover { background: var(--line-soft); }
   html.theme-dark .range button { background: var(--panel); color: var(--ink-soft); border-color: var(--line); }
@@ -554,6 +555,16 @@
     height: 100dvh;
   }
 
+  /* html/body background matches the topbar's own blue on mobile (2026-07-22
+     fix) — with viewport-fit=cover + env(safe-area-inset-top), the area
+     behind the iOS notch/status-bar is real page space above .topbar's own
+     box; its color came from body's background (the light grey app
+     background, --bg), not the topbar, showing as a mismatched white/grey
+     sliver above the blue header ("banner not fully connected to the top").
+     Matching body's background to the topbar's own blue makes that inset
+     region blend in seamlessly regardless of exactly how much of it the
+     browser chrome exposes. */
+  html.is-mobile, html.is-mobile body { background: #1F3864; }
   /* --- Topbar compaction: brand on row 1, search + buttons on a single nowrap row 2 --- */
   html.is-mobile .topbar {
     flex-direction: column;
@@ -845,22 +856,29 @@
     padding: 9px 11px;
     min-height: 38px;
   }
-  /* Mobile detail action row: only Pin, Comments, Share, Edit-in-Docs, in that order. */
+  /* Mobile detail action row: only Pin, Share, Edit-in-Docs, in that order.
+     #d_history was missing from this list (2026-07-22 fix) — it rendered as
+     its own visible row below the back-bar instead of being hidden like
+     every other admin/edit-only action here. */
   html.is-mobile #d_vis,
   html.is-mobile #d_editapp,
   html.is-mobile #d_print,
-  html.is-mobile #d_recording { display: none; }
+  html.is-mobile #d_recording,
+  html.is-mobile #d_history { display: none; }
+  /* Attach-file is an editing action like Edit-here/Print, not something
+     mobile visitors need — viewing/removing EXISTING attachments still
+     works on mobile, only the "+ Attach file" upload affordance is hidden
+     (2026-07-22 — was cluttering an already-tight mobile screen). */
+  html.is-mobile .attach-upload-btn { display: none; }
   html.is-mobile #d_pin { order: 1; }
-  html.is-mobile #d_comments { order: 2; }
-  html.is-mobile #d_share { order: 3; }
-  html.is-mobile #d_docedit { order: 4; }
+  html.is-mobile #d_share { order: 2; }
+  html.is-mobile #d_docedit { order: 3; }
   /* Action buttons lifted onto the backbar row, right-aligned next to "← Meetings". */
   .backbar-actions { display: none; }
   html.is-mobile .backbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
   html.is-mobile .backbar-actions .dbtn { min-height: 40px; padding: 9px 12px; font-size: 12.5px; }
-  /* Collapse Pin / Comments / Share to their icons so the whole row fits without wrapping. */
+  /* Collapse Pin / Share to their icons so the whole row fits without wrapping. */
   html.is-mobile .backbar-actions #d_pin .blbl,
-  html.is-mobile .backbar-actions #d_comments .blbl,
   html.is-mobile .backbar-actions #d_share .blbl { display: none; }
   html.is-mobile .attendees { padding: 10px 12px; }
   /* A4 doc keeps its native 860px layout / fonts / tables intact, but is

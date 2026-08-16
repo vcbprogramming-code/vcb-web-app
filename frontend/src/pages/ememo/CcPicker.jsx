@@ -10,23 +10,30 @@ import Icon from '../../components/Icon.jsx';
  * accounts (the client's decision) because they open the same document page as
  * everyone else and take part in the conversation.
  *
+ * Chosen people are listed one per line — numbered, name and address both fully
+ * readable — laid out to match สิ่งที่ส่งมาด้วย right below it, because on a memo
+ * these are two lists of the same kind. The earlier chip row packed the names
+ * into pills too small to check before sending.
+ *
  * `value` is an array of profile ids; `onChange` gets the new array.
  */
 export default function CcPicker({ value = [], onChange, exclude = [] }) {
   const [people, setPeople] = useState([]);
-  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');
   const boxRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => { ememoApi.listPeople().then((r) => setPeople(r.data || [])).catch(() => setPeople([])); }, []);
   useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    if (!adding) return undefined;
+    inputRef.current?.focus();
+    const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) { setAdding(false); setQ(''); } };
+    const onKey = (e) => { if (e.key === 'Escape') { setAdding(false); setQ(''); } };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
+  }, [adding]);
 
   const chosen = value.map((id) => people.find((p) => p.id === id)).filter(Boolean);
   const term = q.trim().toLowerCase();
@@ -34,59 +41,87 @@ export default function CcPicker({ value = [], onChange, exclude = [] }) {
     !value.includes(p.id) && !exclude.includes(p.id)
     && (!term || (p.full_name || '').toLowerCase().includes(term) || p.email.toLowerCase().includes(term)));
 
-  const add = (id) => { onChange([...value, id]); setQ(''); };
+  // stay open after a pick: adding three people in a row is the common case
+  const add = (id) => { onChange([...value, id]); setQ(''); inputRef.current?.focus(); };
   const remove = (id) => onChange(value.filter((x) => x !== id));
 
   return (
-    <div className="relative" ref={boxRef}>
-      <div
-        onClick={() => setOpen(true)}
-        className="flex min-h-[38px] flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm focus-within:border-brand"
-      >
-        {chosen.map((p) => (
-          <span key={p.id} className="inline-flex items-center gap-1 rounded-md bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">
-            {p.full_name || p.email}
-            <button type="button" onClick={(e) => { e.stopPropagation(); remove(p.id); }}
-              title="เอาออก" className="text-brand/60 hover:text-red-600">
-              <Icon name="x" className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-        <input
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          placeholder={chosen.length ? 'เพิ่มอีกคน…' : 'เลือกผู้รับสำเนา (ต้องมีบัญชีในระบบ)'}
-          className="min-w-[160px] flex-1 border-0 bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
-        />
-      </div>
-
-      {open && (
-        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-          {options.length === 0 ? (
-            <div className="px-3 py-2.5 text-xs text-slate-400">
-              {people.length === 0 ? 'กำลังโหลดรายชื่อ…' : 'ไม่พบผู้ใช้ที่ตรงกับคำค้น'}
+    <div ref={boxRef}>
+      {chosen.length > 0 && (
+        <div className="space-y-2">
+          {chosen.map((p, i) => (
+            <div key={p.id} className="flex items-center gap-2">
+              <span className="w-5 shrink-0 text-center text-sm text-slate-400">{i + 1}.</span>
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                  {(p.full_name || p.email).slice(0, 1).toUpperCase()}
+                </span>
+                <span className="truncate text-sm text-slate-800">{p.full_name || p.email}</span>
+                {p.full_name && <span className="truncate text-xs text-slate-400">· {p.email}</span>}
+              </div>
+              <button type="button" onClick={() => remove(p.id)} title="เอาออก"
+                className="px-1 text-slate-400 hover:text-red-600">
+                <Icon name="x" className="h-4 w-4" />
+              </button>
             </div>
-          ) : options.slice(0, 40).map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => add(p.id)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
-                {(p.full_name || p.email).slice(0, 1).toUpperCase()}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm text-slate-800">{p.full_name || p.email}</span>
-                <span className="block truncate text-[11px] text-slate-400">{p.email}</span>
-              </span>
-            </button>
           ))}
         </div>
       )}
-      <p className="mt-1 text-[11px] text-slate-400">
-        ผู้รับสำเนาจะได้รับอีเมลแจ้ง เปิดดูเอกสารและร่วมแสดงความเห็นได้ในหน้าเดียวกับผู้อนุมัติ
+
+      {adding ? (
+        <div className="relative mt-2">
+          <div className="flex items-center gap-2">
+            <span className="w-5 shrink-0 text-center text-sm text-slate-400">{chosen.length + 1}.</span>
+            <div className="flex flex-1 items-center gap-2 rounded-lg border border-brand bg-white px-3 py-2">
+              <Icon name="search" className="h-4 w-4 shrink-0 text-slate-400" />
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="พิมพ์ชื่อหรืออีเมลเพื่อค้นหา"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
+              />
+            </div>
+            <button type="button" onClick={() => { setAdding(false); setQ(''); }} title="ปิด"
+              className="px-1 text-slate-400 hover:text-slate-700">
+              <Icon name="x" className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="absolute left-7 right-7 z-30 mt-1 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+            {options.length === 0 ? (
+              <div className="px-3 py-2.5 text-xs text-slate-400">
+                {people.length === 0 ? 'กำลังโหลดรายชื่อ…'
+                  : term ? 'ไม่พบผู้ใช้ที่ตรงกับคำค้น'
+                    : 'เลือกครบทุกคนแล้ว'}
+              </div>
+            ) : options.slice(0, 40).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => add(p.id)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                  {(p.full_name || p.email).slice(0, 1).toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-slate-800">{p.full_name || p.email}</span>
+                  <span className="block truncate text-[11px] text-slate-400">{p.email}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)}
+          className="mt-2 text-sm font-medium text-blue-600 hover:underline">
+          + เพิ่มผู้รับสำเนา
+        </button>
+      )}
+
+      <p className="mt-1 text-xs text-slate-400">
+        ผู้รับสำเนาต้องมีบัญชีในระบบ · จะได้รับอีเมลแจ้ง เปิดดูเอกสารและร่วมแสดงความเห็นได้ในหน้าเดียวกับผู้อนุมัติ (ไม่ต้องอนุมัติ)
       </p>
     </div>
   );

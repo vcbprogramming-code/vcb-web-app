@@ -40,18 +40,24 @@ let docId = null;
   await page.waitForSelector(MODAL, { timeout: 10000 });
   await settle(1500);
 
-  const hasPicker = await page.evaluate((s) => {
+  // สำเนาเรียน is a numbered list like สิ่งที่ส่งมาด้วย: it starts collapsed behind
+  // "+ เพิ่มผู้รับสำเนา" and there is no free-text address box anywhere in the form
+  const shape = await page.evaluate((s) => {
     const m = document.querySelector(s);
-    return [...m.querySelectorAll('input')].some((i) => (i.placeholder || '').includes('เลือกผู้รับสำเนา'));
+    return {
+      addLink: [...m.querySelectorAll('button')].some((b) => b.innerText.trim() === '+ เพิ่มผู้รับสำเนา'),
+      freeText: [...m.querySelectorAll('input,textarea')]
+        .some((i) => /อีเมล.*สำเนา|สำเนา.*อีเมล|cc/i.test(i.placeholder || '')),
+    };
   }, MODAL);
-  happy('ช่องสำเนาเรียนเป็นตัวเลือกรายชื่อ ไม่ใช่ช่องพิมพ์อิสระ', hasPicker, '');
+  happy('ช่องสำเนาเรียนเป็นตัวเลือกรายชื่อ ไม่ใช่ช่องพิมพ์อิสระ', shape.addLink && !shape.freeText, JSON.stringify(shape));
   await shot('01-ช่องสำเนาเรียน');
 
   const opened = await page.evaluate((s) => {
     const m = document.querySelector(s);
-    const i = [...m.querySelectorAll('input')].find((x) => (x.placeholder || '').includes('เลือกผู้รับสำเนา'));
-    if (!i) return false;
-    i.focus(); i.click();
+    const b = [...m.querySelectorAll('button')].find((x) => x.innerText.trim() === '+ เพิ่มผู้รับสำเนา');
+    if (!b) return false;
+    b.click();
     return true;
   }, MODAL);
   await settle(2000);
@@ -63,23 +69,32 @@ let docId = null;
   happy(`กดแล้วมีรายชื่อคนในระบบให้เลือก (${names.length} คนแรก)`, opened && names.length > 0, names.join(' , '));
   await shot('02-รายชื่อให้เลือก');
 
-  // pick two
+  // pick two — the search stays open between picks so several people go in at once
   for (let i = 0; i < 2; i += 1) {
     await page.evaluate((s) => {
       const m = document.querySelector(s);
-      const inp = [...m.querySelectorAll('input')].find((x) => (x.placeholder || '').includes('ผู้รับสำเนา') || (x.placeholder || '').includes('เพิ่มอีกคน'));
-      if (inp) { inp.focus(); inp.click(); }
       const list = m.querySelector('.absolute.z-30');
       const b = list && list.querySelector('button');
       if (b) b.click();
     }, MODAL);
     await settle(1200);
   }
-  const chips = await page.evaluate((s) => {
+  await page.keyboard.press('Escape');
+  await settle(900);
+  // each recipient is its own numbered row, name and address both readable
+  const picked = await page.evaluate((s) => {
     const m = document.querySelector(s);
-    return [...m.querySelectorAll('span')].filter((x) => x.className.includes('bg-brand/10') && x.querySelector('button')).map((x) => x.innerText.trim());
+    const label = [...m.querySelectorAll('label')].find((l) => l.innerText.includes('สำเนาเรียน'));
+    const block = label?.parentElement;
+    if (!block) return { rows: [], numbered: false };
+    const rows = [...block.querySelectorAll('div')]
+      .filter((d) => /^\d+\.$/.test(d.firstElementChild?.innerText?.trim() || ''))
+      .map((d) => d.innerText.replace(/\s+/g, ' ').trim());
+    return { rows, numbered: rows.every((t, i) => t.startsWith(`${i + 1}.`)) };
   }, MODAL);
-  happy(`เลือกผู้รับสำเนาได้หลายคน (${chips.length} คน)`, chips.length === 2, chips.join(' , '));
+  happy(`เลือกผู้รับสำเนาได้หลายคน (${picked.rows.length} คน)`, picked.rows.length === 2, picked.rows.join(' , '));
+  happy('แสดงเป็นรายการมีเลขลำดับแบบเดียวกับสิ่งที่ส่งมาด้วย', picked.numbered && picked.rows.length > 0, picked.rows.join(' , '));
+  happy('แต่ละบรรทัดเห็นทั้งชื่อและอีเมล', picked.rows.every((t) => t.includes('@')), picked.rows.join(' , '));
   await shot('03-เลือกแล้ว2คน');
 
   await page.keyboard.press('Escape');

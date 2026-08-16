@@ -582,22 +582,24 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             <input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">อ้างถึง (ไม่บังคับ)</label>
-              {/* #3: reference must be a real in-system document (search & pick) */}
-              <ReferencePicker
-                value={{ docId: referenceDocId, text: reference }}
-                onChange={({ docId, text }) => { setReferenceDocId(docId); setReference(text); }}
-                excludeId={initial?.sourceId}
-              />
-              <p className="mt-1 text-xs text-slate-400">เลือกจากเอกสารที่มีอยู่ในระบบ (กดแล้วลิงก์ไปเอกสารตัวจริงได้) · เอกสารอื่นที่ไม่มีในระบบให้แนบเป็นไฟล์แทน</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
-              <CcPicker value={ccIds} onChange={setCcIds} />
-              <p className="mt-1 text-xs text-slate-400">ถ้าใส่อีเมล ระบบจะส่ง “เพื่อทราบ/ปรึกษา” ให้ตอนส่งอนุมัติ (ผู้รับสำเนาไม่ต้องอนุมัติ)</p>
-            </div>
+          {/* อ้างถึง and สำเนาเรียน each take the full width and their own line.
+              Side by side they were two unlike controls squeezed into half a
+              column: the reference search had no room for a document title, and
+              the สำเนาเรียน names collapsed into chips too small to read. */}
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">อ้างถึง (ไม่บังคับ)</label>
+            {/* #3: reference must be a real in-system document (search & pick) */}
+            <ReferencePicker
+              value={{ docId: referenceDocId, text: reference }}
+              onChange={({ docId, text }) => { setReferenceDocId(docId); setReference(text); }}
+              excludeId={initial?.sourceId}
+            />
+            <p className="mt-1 text-xs text-slate-400">เลือกจากเอกสารที่มีอยู่ในระบบ (กดแล้วลิงก์ไปเอกสารตัวจริงได้) · เอกสารอื่นที่ไม่มีในระบบให้แนบเป็นไฟล์แทน</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
+            <CcPicker value={ccIds} onChange={setCcIds} />
           </div>
 
           <div>

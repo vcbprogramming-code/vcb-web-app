@@ -209,10 +209,21 @@ export async function generateCombinedPdf(documentId, uploadedBy = null) {
     await query('delete from document_attachments where id = $1', [o.id]);
   }
 
+  // Upsert, don't plain-insert. autoCombine runs fire-and-forget after an upload,
+  // so a user pressing "รวมไฟล์" while that background job is still in flight used
+  // to lose the race against document_attachments_one_combined_idx and get a 500 —
+  // even though the merged file itself was written correctly. Both jobs produce the
+  // same bytes at the same deterministic key, so the last writer simply wins.
   const row = await queryOne(
     `insert into document_attachments
        (document_id, kind, version, file_name, content_type, size_bytes, storage_key, uploaded_by)
      values ($1,'combined_pdf',null,$2,'application/pdf',$3,$4,$5)
+     on conflict (document_id) where kind = 'combined_pdf'
+     do update set file_name = excluded.file_name,
+                   content_type = excluded.content_type,
+                   size_bytes = excluded.size_bytes,
+                   storage_key = excluded.storage_key,
+                   uploaded_by = excluded.uploaded_by
      returning id, storage_key, file_name, created_at`,
     [doc.id, `${doc.doc_number.replace(/\//g, '-')}-รวมเอกสาร.pdf`, merged.length, key, uploadedBy]
   );

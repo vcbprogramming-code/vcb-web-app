@@ -173,6 +173,16 @@ suite('5. ไฟล์แนบและการรวมไฟล์');
   const cd = await call(`/documents/${d.id}`, { user: B });
   happy('มีไฟล์รวมเล่มเดียว และแจ้งในประวัติว่ามีไฟล์ที่รวมไม่ได้',
     cd.data.attachments.some((a) => a.kind === 'combined_pdf') && cd.data.audit.some((a) => a.action === 'combine_skipped'), '');
+
+  // uploading fires autoCombine in the background; pressing รวมไฟล์ on top of that
+  // used to lose a race on the one-combined-per-doc index and answer 500
+  const again = await call(`/documents/${d.id}/combine`, { method: 'POST', user: B });
+  const twice = await call(`/documents/${d.id}/combine`, { method: 'POST', user: B });
+  happy('กดปุ่มรวมไฟล์ซ้ำได้ ไม่ขึ้นข้อผิดพลาด',
+    [200, 201].includes(again.status) && [200, 201].includes(twice.status), `${again.status}/${twice.status}`);
+  const after = await call(`/documents/${d.id}`, { user: B });
+  happy('กดซ้ำแล้วยังมีไฟล์รวมเล่มเดียว',
+    after.data.attachments.filter((a) => a.kind === 'combined_pdf').length === 1, '');
   happy('ระบุตำแหน่งจัดเก็บของทุกไฟล์', cd.data.attachments.every((a) => !!a.storage_key), '');
 
   const svg = await upload(`/documents/${d.id}/attachments`, B, 'อันตราย.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'image/svg+xml');

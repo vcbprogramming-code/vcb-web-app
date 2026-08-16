@@ -49,6 +49,12 @@ export const TRANSKRIPTOR_INBOX_PROJECT: SeedProject = {
 }
 
 export const ADMIN_EMAIL = 'c.chavananand@vcb-con.com'
+// Simulated editor identity for `?editor=1` — a self-service tier below
+// admin, added to EDITOR_EMAILS via Settings → Project access → Editors
+// rather than hardcoded in Config.js. Any sample address works here; this one
+// is not read from a real EDITOR_EMAILS list (the mock's editor list starts
+// empty, same as a fresh deployment).
+export const EDITOR_EMAIL = 'editor.sample@vcb-con.com'
 export const APP_TITLE = 'VCB Meeting Minutes'
 export const APP_DISPLAY_TITLE = 'Meeting Minutes'
 export const APP_SUBTITLE = 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · รายงานการประชุมภายใน'

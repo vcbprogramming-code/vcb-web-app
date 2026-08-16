@@ -16,6 +16,7 @@ interface Props {
   byId: Record<string, Project>
   projects: Project[]
   isAdmin: boolean
+  isEditor: boolean
   userEmail: string
   onToast: (msg: string) => void
   onBusy: (msg: string | null) => void
@@ -33,7 +34,7 @@ interface Props {
 }
 
 // Mirrors openMeeting() + renderDetail().
-export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, onToast, onBusy, onEdit, onMutated, execUrl, theme }: Props) {
+export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, userEmail, onToast, onBusy, onEdit, onMutated, execUrl, theme }: Props) {
   const [m, setM] = useState<MeetingFull | null>(getCached(id) ?? null)
   const [loading, setLoading] = useState(!getCached(id))
   const [err, setErr] = useState('')
@@ -195,7 +196,8 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, 
   if (!m) { return <div className="placeholder"><div className="big">📄</div><div>Select a meeting on the left to read the full minutes.</div></div> }
 
   const p = byId[m.projectId] || ({} as Project)
-  const editable = isAdmin && m.source !== 'doc-import'
+  const canEdit = isAdmin || isEditor
+  const editable = canEdit && m.source !== 'doc-import'
   const srcdoc = buildMeetingSrcdoc(m.html, m.css, fmtThaiDate(m), {
     isDark: theme === 'dark',
     aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor',
@@ -210,7 +212,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, 
         <h2>{m.title}</h2>
         {isAdmin && <button className={'dbtn' + (m.visible ? '' : ' danger')} id="d_vis" onClick={toggleVisibility}>{m.visible ? '👁 Visible to staff' : '🚫 Hidden'}</button>}
         {isAdmin && <button className="dbtn" id="d_pin" title="Pin" onClick={togglePin}>{m.pinned ? <>★ <span className="blbl">Pinned</span></> : <>☆ <span className="blbl">Pin</span></>}</button>}
-        {isAdmin && (m.source === 'fathom' || m.source === 'transkriptor') && (
+        {canEdit && (m.source === 'fathom' || m.source === 'transkriptor') && (
           <button className="dbtn primary" id="d_file" title="Also show this in a project" onClick={() => setTagPickerOpen(true)}>📂 File into project…</button>
         )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
@@ -236,7 +238,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, 
         </div>
       )}
 
-      {isAdmin && (m.source === 'fathom' || m.source === 'transkriptor') && m.taggedProjectIds.length > 0 && (
+      {canEdit && (m.source === 'fathom' || m.source === 'transkriptor') && m.taggedProjectIds.length > 0 && (
         <div className="attendees tag-chips">
           <span className="atl">Also tagged into</span>
           {m.taggedProjectIds.map(pid => {
@@ -251,7 +253,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, 
         </div>
       )}
 
-      {(m.attachments.length > 0 || isAdmin) && (
+      {(m.attachments.length > 0 || canEdit) && (
         <div className="attendees">
           <span className="atl">Attachments{m.attachments.length ? ' · ' + m.attachments.length : ''}</span>
           {m.attachments.map(a => {
@@ -262,11 +264,11 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, userEmail, 
                   <span className={'fi ' + cls}>{label}</span>
                   <span className="cm"><b>{a.name}</b><small>{fmtFileSize(a.size)}</small></span>
                 </a>
-                {isAdmin && <button type="button" className="chip-x" title="Remove attachment" onClick={() => removeAttachment(a.fileId)}>✕</button>}
+                {canEdit && <button type="button" className="chip-x" title="Remove attachment" onClick={() => removeAttachment(a.fileId)}>✕</button>}
               </span>
             )
           })}
-          {isAdmin && <button type="button" className="attach-upload-btn" onClick={() => fileInputRef.current?.click()}>＋ Attach file</button>}
+          {canEdit && <button type="button" className="attach-upload-btn" onClick={() => fileInputRef.current?.click()}>＋ Attach file</button>}
         </div>
       )}
 

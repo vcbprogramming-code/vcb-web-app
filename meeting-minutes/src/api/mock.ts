@@ -7,6 +7,10 @@
 // true when an admin email is in the Google session. Here that is simulated by the
 // `?admin=1` URL flag (see resolveIdentity). This is a faithful entry hook, not an
 // added feature — the GAS code already branches on isAdmin everywhere.
+//
+// Editor simulation: mirrors the self-service EDITOR_EMAILS tier added to
+// Auth.js — a `?editor=1` URL flag (or `?admin=1`, since admins can do
+// everything an editor can) makes resolveIdentity().isEditor true.
 
 import type {
   Attachment, AuditEntry, Comment, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
@@ -14,20 +18,24 @@ import type {
 } from '../types'
 import { isInboxProject } from '../types'
 import {
-  ADMIN_EMAIL, APP_DISPLAY_TITLE, APP_SUBTITLE, APP_TITLE, DOMAIN,
+  ADMIN_EMAIL, EDITOR_EMAIL, APP_DISPLAY_TITLE, APP_SUBTITLE, APP_TITLE, DOMAIN,
   SOURCE_PROJECTS, FATHOM_INBOX_PROJECT, TRANSKRIPTOR_INBOX_PROJECT, makeSeedRows, type SeedRow, type SeedProject
 } from './seed'
 
 interface AccessRule { domain: boolean; emails: string[] }
 
 // ---- identity (simulated Google session) ----
-function resolveIdentity(): { email: string; isAdmin: boolean } {
+function resolveIdentity(): { email: string; isAdmin: boolean; isEditor: boolean } {
   let admin = false
+  let editor = false
   try {
     const q = new URLSearchParams(window.location.search)
     admin = q.get('admin') === '1'
+    editor = q.get('editor') === '1'
   } catch { /* ignore */ }
-  return admin ? { email: ADMIN_EMAIL, isAdmin: true } : { email: '', isAdmin: false }
+  if (admin) return { email: ADMIN_EMAIL, isAdmin: true, isEditor: true }
+  if (editor) return { email: EDITOR_EMAIL, isAdmin: false, isEditor: true }
+  return { email: '', isAdmin: false, isEditor: false }
 }
 
 // ---- in-memory store ----
@@ -120,9 +128,9 @@ function uuid(): string {
   try { return crypto.randomUUID() } catch { return 'm-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) }
 }
 
-function buildProjects(admin: boolean): Project[] {
+function buildProjects(admin: boolean, editor: boolean): Project[] {
   const counts: Record<string, number> = {}
-  rows.filter(r => admin || isVisible(r)).forEach(r => {
+  rows.filter(r => admin || isVisible(r) || (editor && isInboxProject(r.projectId))).forEach(r => {
     counts[r.projectId] = (counts[r.projectId] || 0) + 1
     ;(r.taggedProjectIds || []).forEach(pid => { counts[pid] = (counts[pid] || 0) + 1 })
   })
@@ -131,9 +139,10 @@ function buildProjects(admin: boolean): Project[] {
     count: counts[d.id] || 0, canSee: true,
     docUrl: admin ? 'https://docs.google.com/document/d/EXAMPLE_' + d.id + '/edit' : ''
   }))
-  // Fathom Inbox and Transkriptor Inbox are both admin-only — mirrors the
-  // `if (admin)` gate in getPublicBootstrap/getSessionState (Auth.js).
-  if (admin) {
+  // Fathom Inbox and Transkriptor Inbox are admin/editor-only — mirrors the
+  // `if (editor)` gate in getPublicBootstrap/getSessionState (Auth.js).
+  // Editors need this to reach recordings they can file into projects.
+  if (editor) {
     ;[FATHOM_INBOX_PROJECT, TRANSKRIPTOR_INBOX_PROJECT].forEach(inbox => {
       projects.push({
         id: inbox.id, name: inbox.name, nameEn: inbox.nameEn,
@@ -147,6 +156,18 @@ function buildProjects(admin: boolean): Project[] {
 
 function requireAdmin(): void {
   if (!resolveIdentity().isAdmin) throw new Error('Not authorized.')
+}
+
+// Mirrors EDITOR_EMAILS (Script Property, Auth.js) — a self-service list an
+// admin manages from Settings → Project access → Editors, no redeploy. The
+// simulated `?editor=1` identity is independent of this list (see
+// resolveIdentity); this store only backs the getEditors/addEditor/
+// removeEditor management calls themselves.
+const editorEmails: string[] = []
+
+function requireEditorOrAdmin(): void {
+  const { isAdmin, isEditor } = resolveIdentity()
+  if (!isAdmin && !isEditor) throw new Error('Not authorized.')
 }
 
 // Mirrors ATTACHMENT_ALLOWED_MIME / ATTACHMENT_MAX_BYTES in Code.js verbatim.
@@ -184,26 +205,28 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 export const mockApi: ServerApi = {
   async getSessionState(): Promise<SessionState> {
-    const { email, isAdmin } = resolveIdentity()
+    const { email, isAdmin, isEditor } = resolveIdentity()
     return {
       appTitle: APP_TITLE, appDisplayTitle: APP_DISPLAY_TITLE, subtitle: APP_SUBTITLE,
-      authed: true, user: email, isAdmin,
-      projects: buildProjects(isAdmin),
+      authed: true, user: email, isAdmin, isEditor,
+      projects: buildProjects(isAdmin, isEditor),
       dbUrl: isAdmin ? 'https://docs.google.com/spreadsheets/d/EXAMPLE_DB/edit' : '',
       execUrl: 'https://script.google.com/macros/s/EXAMPLE_DEPLOYMENT_ID/exec'
     }
   },
 
   async listMeetings(): Promise<MeetingListItem[]> {
-    const { isAdmin } = resolveIdentity()
-    return rows.filter(r => isAdmin || isVisible(r)).flatMap(toListItems)
+    const { isAdmin, isEditor } = resolveIdentity()
+    return rows.filter(r => isAdmin || isVisible(r) || (isEditor && isInboxProject(r.projectId))).flatMap(toListItems)
   },
 
   async getMeeting(id: string): Promise<MeetingFull | null> {
-    const { isAdmin } = resolveIdentity()
+    const { isAdmin, isEditor } = resolveIdentity()
     const r = rows.find(x => x.id === id)
     if (!r) return null
-    if (!isAdmin && !isVisible(r)) return null
+    // Hidden meetings stay admin-only; inbox rows (always non-visible) are
+    // also reachable by editors, who need to open them to file/edit.
+    if (!isAdmin && !isVisible(r) && !(isEditor && isInboxProject(r.projectId))) return null
     const proj = getProjectById(r.projectId)
     return {
       id: r.id, projectId: r.projectId, title: r.title, kind: r.kind,
@@ -231,7 +254,7 @@ export const mockApi: ServerApi = {
   },
 
   async saveMeeting(obj: SaveMeetingInput): Promise<string> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const html = obj.html || ''
     const excerpt = stripTags(html).slice(0, 200)
     const attendees = extractAttendees(html)
@@ -270,7 +293,7 @@ export const mockApi: ServerApi = {
   // Config.js) — the mock has no polling backfill to re-suppress, so there's
   // nothing to mirror here beyond the row removal + audit entry.
   async deleteMeeting(id: string): Promise<boolean> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const i = rows.findIndex(x => x.id === id)
     if (i === -1) return false
     const r = rows[i]
@@ -281,7 +304,7 @@ export const mockApi: ServerApi = {
   // meta (optional): { title, dateLabel, time } — lets the same content editor
   // also fix a mis-set title/date/time in one save. Mirrors saveEdit in Code.js.
   async saveEdit(id: string, html: string, _token: string, meta?: SaveEditMeta): Promise<SaveEditResult> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const r = rows.find(x => x.id === id)
     if (!r) throw new Error('Meeting not found.')
     // Capture title/dateLabel/time BEFORE they're overwritten below — the
@@ -329,13 +352,31 @@ export const mockApi: ServerApi = {
     accessMap[projectId] = r; return accessList()
   },
 
+  // Mirrors getEditors/addEditor/removeEditor in Auth.js.
+  async getEditors(): Promise<string[]> { requireAdmin(); return editorEmails.slice() },
+
+  async addEditor(email): Promise<string[]> {
+    requireAdmin()
+    const e = String(email || '').trim()
+    if (!EMAIL_RE.test(e)) throw new Error('Please enter a valid email address.')
+    if (!editorEmails.some(x => x.toLowerCase() === e.toLowerCase())) editorEmails.push(e)
+    return editorEmails.slice()
+  },
+
+  async removeEditor(email): Promise<string[]> {
+    requireAdmin()
+    const idx = editorEmails.findIndex(x => x.toLowerCase() === String(email).toLowerCase())
+    if (idx !== -1) editorEmails.splice(idx, 1)
+    return editorEmails.slice()
+  },
+
   // Adds projectId to the recording's tag list (never removes existing tags,
   // never moves the row out of its inbox). Accepts rows from EITHER inbox
   // (Fathom or Transkriptor) — mirrors the generalized setFathomTag in
   // Code.js, which checks projectId !== FATHOM_INBOX_ID &&
   // projectId !== TRANSKRIPTOR_INBOX_ID rather than Fathom-only.
   async setFathomTag(id, projectId): Promise<ProjectId[]> {
-    requireAdmin()
+    requireEditorOrAdmin()
     if (!getProjectById(projectId)) throw new Error('Unknown project: ' + projectId)
     const r = rows.find(x => x.id === id)
     if (!r) return []
@@ -350,7 +391,7 @@ export const mockApi: ServerApi = {
   // Removes just projectId from the tag list, leaving any other tags intact.
   // Mirrors untagFathomMeeting in Code.js.
   async untagFathomMeeting(id, projectId): Promise<ProjectId[]> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const r = rows.find(x => x.id === id)
     if (!r) return []
     r.taggedProjectIds = (r.taggedProjectIds || []).filter(p => p !== projectId)
@@ -365,9 +406,9 @@ export const mockApi: ServerApi = {
   async searchMeetings(query): Promise<string[]> {
     const q = String(query || '').trim().toLowerCase()
     if (!q) return []
-    const { isAdmin } = resolveIdentity()
+    const { isAdmin, isEditor } = resolveIdentity()
     const matches: string[] = []
-    rows.filter(r => isAdmin || isVisible(r)).forEach(r => {
+    rows.filter(r => isAdmin || isVisible(r) || (isEditor && isInboxProject(r.projectId))).forEach(r => {
       let hay = (r.title + ' ' + (r.dateLabel || '') + ' ' + r.attendees.join(' ')).toLowerCase()
       if (hay.indexOf(q) === -1) hay += ' ' + stripTags(r.content).toLowerCase()
       if (hay.indexOf(q) !== -1) matches.push(r.id)
@@ -459,7 +500,7 @@ export const mockApi: ServerApi = {
   // host, so it keeps the upload as a data: URL instead — good enough to
   // actually open/download in the browser, which is all the UI needs to prove.
   async addAttachment(meetingId, fileName, mimeType, base64Data): Promise<Attachment[]> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const r = rows.find(x => x.id === meetingId)
     if (!r) throw new Error('Meeting not found.')
     if (!ATTACHMENT_ALLOWED_MIME.test(mimeType || '')) {
@@ -479,7 +520,7 @@ export const mockApi: ServerApi = {
   },
 
   async removeAttachment(meetingId, fileId): Promise<Attachment[]> {
-    requireAdmin()
+    requireEditorOrAdmin()
     const r = rows.find(x => x.id === meetingId)
     if (!r) throw new Error('Meeting not found.')
     const target = (r.attachments || []).find(a => a.fileId === fileId)

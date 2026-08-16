@@ -13,9 +13,51 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-08-15
-- **Live deployment referenced:** `@146` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-16
+- **Live deployment referenced:** `@148` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed 2026-08-16 sync:**
+  - **Self-service "editor" permission tier (new).** A tier between admin and
+    viewer — can edit meeting content, create/delete meetings, add/remove
+    attachments, and file Fathom/Transkriptor inbox recordings into projects,
+    but cannot toggle hidden/pinned status, view edit history, manage access,
+    or touch projects/API keys. Mirrors `EDITOR_EMAILS`/`isEditorOrAdmin_`
+    (`Auth.js`) and the gate swaps on `saveMeeting`/`deleteMeeting`/
+    `saveEdit`/`addAttachment`/`removeAttachment`/`setFathomTag`/
+    `untagFathomMeeting` (`Code.js`). New `SessionState.isEditor` (`types.ts`),
+    threaded from `mockApi.getSessionState` through `App.tsx` into
+    `Sidebar.tsx` ("New meeting" button) and `MeetingDetail.tsx` ("Edit
+    here", "File into project…", attachment upload/remove — all now gated on
+    `isAdmin || isEditor` via a local `canEdit`, replacing bare `isAdmin`
+    checks; Pin/Visibility/Edit-history stay `isAdmin`-only, unchanged).
+    `resolveIdentity()` (`mock.ts`) simulates the editor identity via a new
+    `?editor=1` URL flag (alongside the existing `?admin=1`), returning a new
+    sample `EDITOR_EMAIL` (`seed.ts`) — admin still implies editor. New
+    `getEditors`/`addEditor`/`removeEditor` `ServerApi` methods (mirrors
+    `Auth.js`), backed by an in-memory `editorEmails` list in `mock.ts` and a
+    matching "Editors" section added to `AccessModal.tsx` (list + add/remove,
+    same `.ac-item`/`.ac-add` styling as the per-project viewer list above
+    it) — admin-only to reach, same as the rest of that modal.
+  - **Inbox-visibility bug fix, found during this port's own browser
+    verification (not present when the GAS feature first shipped this
+    session — caught before either side went stale).** Giving editors
+    `setFathomTag`/`untagFathomMeeting` permission was not enough on its
+    own: `getPublicBootstrap`/`getSessionState`/`listMeetings`/`getMeeting`/
+    `searchMeetings` all gated the Fathom/Transkriptor Inbox tiles and rows
+    on `admin` only, so an editor had no sidebar entry point to ever reach
+    an inbox recording to file it. Fixed on the GAS side first (new
+    `isInboxProjectId_` helper in `Config.js`; an `editor` branch added
+    alongside `admin` in all five read paths), then ported here verbatim:
+    `buildProjects` (`mock.ts`) now takes `(admin, editor)` instead of just
+    `admin` and pushes the two inbox pseudo-projects `if (editor)`;
+    `listMeetings`/`getMeeting`/`searchMeetings` each gained an `isEditor &&
+    isInboxProject(r.projectId)` branch alongside their existing `isAdmin ||
+    isVisible(r)` check. Verified with a scripted Playwright pass against
+    the dev server (`?editor=1` sees Fathom/Transkriptor Inbox tiles, can
+    open a recording, sees "File into project…"/"Edit here"/attachment
+    controls, does NOT see Pin/Visibility/Settings→Project access;
+    `?admin=1` still sees everything) — 12/12 checks passed after this fix
+    (were 11/12 before it, the inbox-open case failing).
 - **What changed 2026-08-15 sync:**
   - **Project "latest meeting" permalink (new).** A `?project=<id>` URL param
     now always resolves to that project's CURRENT latest meeting — resolved
@@ -463,6 +505,9 @@ Implemented in `src/api/mock.ts`, typed in `src/types.ts` (`ServerApi`):
 | `setProjectDomain` | `mockApi.setProjectDomain` | `ProjectAccess[]` |
 | `addProjectViewer` | `mockApi.addProjectViewer` | `ProjectAccess[]` |
 | `removeProjectViewer` | `mockApi.removeProjectViewer` | `ProjectAccess[]` |
+| `getEditors` | `mockApi.getEditors` | `string[]` |
+| `addEditor` | `mockApi.addEditor` | `string[]` |
+| `removeEditor` | `mockApi.removeEditor` | `string[]` |
 | `setFathomTag` (now accepts either inbox's rows) | `mockApi.setFathomTag` | `ProjectId[]` (full tag list) |
 | `untagFathomMeeting` | `mockApi.untagFathomMeeting` | `ProjectId[]` (full tag list) |
 | `searchMeetings` | `mockApi.searchMeetings` | `string[]` (matching ids) |
@@ -553,21 +598,25 @@ Use `isInboxProject(id)` (also in `types.ts`) rather than comparing against
 either constant directly — it covers both pseudo-projects in one call and is
 what every component listed in the mapping table above actually uses.
 
-## Admin simulation
-The live web app is `ANYONE_ANONYMOUS`, so `isAdmin` is only ever true when an admin
-email is in the Google session (see `PROJECT_SUMMARY.md`). To make every admin
-screen reachable for sign-off, the mock derives admin from a **URL flag**:
+## Admin / editor simulation
+The live web app requires its own magic-link sign-in (see `PROJECT_SUMMARY.md`'s
+*Access model*), so `isAdmin`/`isEditor` depend on which email signed in. To make
+every admin/editor screen reachable for sign-off, the mock derives identity from a
+**URL flag**:
 
 - `http://localhost:5200/?admin=1` → admin view (New meeting, pin, hide/show,
-  edit-here, project access, refresh).
-- `http://localhost:5200/` → public view (what real users currently get).
+  edit-here, project access incl. Editors, Fathom/Transkriptor Inbox).
+- `http://localhost:5200/?editor=1` → editor view (New meeting, edit-here, file
+  into project, attachments, Fathom/Transkriptor Inbox — no pin/hide/show, no
+  Settings → Project access).
+- `http://localhost:5200/` → public view (what a signed-out visitor gets).
 - `?meeting=<id>` → deep-link straight into a meeting (parity with the GAS share link).
 - `?project=<id>` → deep-link into a project's CURRENT latest meeting, re-resolved
   on every load (parity with the GAS project permalink — see the 2026-08-15 sync
   note above). e.g. `http://localhost:5200/?project=FIN`.
 
 This is a faithful entry hook, not an added feature — the GAS code already branches
-on `isAdmin` everywhere.
+on `isAdmin`/`isEditor` everywhere.
 
 ## Known deviations (intentional)
 1. **Mobile detail action lift:** the GAS client physically *moves* the Pin/Share
@@ -587,7 +636,14 @@ on `isAdmin` everywhere.
    an in-memory `data:` URL instead of a real Drive share link — good enough
    to actually open/download in the browser, which is all the UI needs to
    prove; same MIME allow-list and 25MB cap as Code.js.
-3. **Magic-link sign-in** is retired/vestigial in the GAS source and not reproduced.
+3. **Magic-link sign-in** (`requestMagicLink`/session tokens in `Auth.js`) is active
+   in the GAS source (corrected 2026-08-16 — this note previously said it was
+   retired/vestigial, which was stale) but not reproduced here: the mock has no
+   concept of an emailed one-time link or session cookie, and derives identity
+   purely from the `?admin=1`/`?editor=1` URL flags described in *Admin / editor
+   simulation* above. Reproducing the real flow (email send, token consume,
+   session persistence) would need a mail-sending backend this static mock
+   doesn't have — out of scope unless a real server is wired up (see *Data layer*).
 4. **Timeline per-project toggle state / mode / year** are component-local
    `useState` in `Timeline.tsx` rather than the GAS module-level `TL_*`
    globals — resets on navigating away and back, same as any other React

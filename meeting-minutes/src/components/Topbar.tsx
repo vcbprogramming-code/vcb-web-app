@@ -13,7 +13,7 @@ interface Props {
 // Mirrors the topbar in Index.html + initHeader().
 export default function Topbar({ session, query, onQuery, onSettings, tr }: Props) {
   const placeholder = isMobile() ? tr('searchPlaceholderMobile') : tr('searchPlaceholder')
-  const who = (session.user || '') + (session.isAdmin ? ' · admin' : '')
+  const who = (session.user || '') + (session.isAdmin ? ' · admin' : (session.isEditor ? ' · editor' : ''))
   return (
     <header className="topbar">
       <div className="brandwrap">

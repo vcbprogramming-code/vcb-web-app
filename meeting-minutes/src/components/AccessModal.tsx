@@ -13,11 +13,15 @@ interface Props {
 export default function AccessModal({ open, onClose, onBusy, onToast }: Props) {
   const [list, setList] = useState<ProjectAccess[] | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [editors, setEditors] = useState<string[] | null>(null)
+  const [editorDraft, setEditorDraft] = useState('')
 
   useEffect(() => {
     if (!open) return
     setList(null)
+    setEditors(null)
     api.getProjectAccess(getToken()).then(setList).catch(e => onToast('Failed: ' + (e instanceof Error ? e.message : String(e))))
+    api.getEditors(getToken()).then(setEditors).catch(e => onToast('Failed: ' + (e instanceof Error ? e.message : String(e))))
   }, [open])
 
   if (!open) return null
@@ -34,11 +38,39 @@ export default function AccessModal({ open, onClose, onBusy, onToast }: Props) {
   }
   const removeViewer = (id: string, email: string) => run('Updating…', api.removeProjectViewer(id, email, getToken()))
 
+  const runEditors = (label: string, p: Promise<string[]>) => {
+    onBusy(label)
+    p.then(setEditors).catch(e => onToast('Failed: ' + (e instanceof Error ? e.message : String(e)))).finally(() => onBusy(null))
+  }
+  const addEditor = () => {
+    const email = editorDraft.trim(); if (!email) return
+    setEditorDraft('')
+    runEditors('Adding…', api.addEditor(email, getToken()))
+  }
+  const removeEditor = (email: string) => runEditors('Updating…', api.removeEditor(email, getToken()))
+
   return (
     <div className="modal-bg show" onClick={e => { if ((e.target as HTMLElement).classList.contains('modal-bg')) onClose() }}>
       <div className="modal" style={{ maxWidth: 640 }}>
         <h3>Project access</h3>
-        <div className="ac-note" style={{ padding: '2px 20px 6px' }}>For each project: tick to allow all <b>@vcb-con.com</b> staff, and/or add specific email addresses (any email — gmail, hotmail, etc.). The dashboard tiles stay visible to everyone; this controls who can open the meetings.</div>
+
+        <div className="ac-note" style={{ padding: '2px 20px 6px' }}>Editors can edit meeting content, add/remove attachments, create/delete meetings, and file Fathom/Transkriptor recordings into projects. They cannot manage access, projects, or hidden/pinned status.</div>
+        <div className="ac-list" style={{ marginBottom: 14, padding: '0 20px' }}>
+          {!editors ? <div className="empty">Loading…</div> : (editors.length ? editors.map(em => (
+            <div key={em} className="ac-item"><span>{em}</span><button onClick={() => removeEditor(em)}>Remove</button></div>
+          )) : <div className="empty" style={{ padding: '4px 0' }}>No editors yet.</div>)}
+        </div>
+        <div className="ac-add" style={{ padding: '0 20px' }}>
+          <input
+            type="email" placeholder="add editor email"
+            value={editorDraft}
+            onChange={e => setEditorDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addEditor() }}
+          />
+          <button className="dbtn primary" onClick={addEditor}>Add</button>
+        </div>
+
+        <div className="ac-note" style={{ padding: '18px 20px 6px' }}>For each project: tick to allow all <b>@vcb-con.com</b> staff, and/or add specific email addresses (any email — gmail, hotmail, etc.). The dashboard tiles stay visible to everyone; this controls who can open the meetings.</div>
         <div className="form" style={{ gap: 8, maxHeight: 'calc(88vh - 150px)', overflow: 'auto', scrollbarGutter: 'stable' }}>
           {!list ? <div className="empty">Loading…</div> : list.map(p => (
             <div key={p.id} className="ac-proj">

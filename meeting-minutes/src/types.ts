@@ -30,6 +30,11 @@ export interface SessionState {
   authed: boolean
   user: string
   isAdmin: boolean
+  /** True for admins too. A self-service tier below admin: can edit/create/
+   *  delete meeting content and attachments, and file inbox recordings into
+   *  projects, but cannot manage access lists, projects, or API keys.
+   *  Mirrors EDITOR_EMAILS / isEditorOrAdmin_ in Auth.js. */
+  isEditor: boolean
   projects: Project[]
   dbUrl?: string
   execUrl: string
@@ -216,20 +221,32 @@ export interface ServerApi {
   getSessionState(token: string): Promise<SessionState>
   listMeetings(token: string): Promise<MeetingListItem[]>
   getMeeting(id: string, token: string): Promise<MeetingFull | null>
+  /** Admin only. */
   togglePin(id: string, token: string): Promise<boolean>
+  /** Admin only. */
   setVisibility(id: string, visible: boolean, token: string): Promise<boolean>
+  /** Editor or admin. */
   saveMeeting(obj: SaveMeetingInput, token: string): Promise<string>
+  /** Editor or admin. */
   deleteMeeting(id: string, token: string): Promise<boolean>
-  /** meta (optional): { title, dateLabel, time } — lets the same content editor
-   *  also fix a mis-set title/date/time in one save. */
+  /** Editor or admin. meta (optional): { title, dateLabel, time } — lets the
+   *  same content editor also fix a mis-set title/date/time in one save. */
   saveEdit(id: string, html: string, token: string, meta?: SaveEditMeta): Promise<SaveEditResult>
   getProjectAccess(token: string): Promise<ProjectAccess[]>
   setProjectDomain(projectId: ProjectId, allowDomain: boolean, token: string): Promise<ProjectAccess[]>
   addProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
   removeProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
-  /** Adds projectId to the recording's tag list (does not remove existing tags). Returns the full updated list. Works for either inbox pseudo-project's rows. */
+  /** The current editor email list. Admin only. Mirrors getEditors in Auth.js. */
+  getEditors(token: string): Promise<string[]>
+  /** Adds an email to the editor tier (self-service, no redeploy). Admin only.
+   *  Returns the full updated list. Mirrors addEditor in Auth.js. */
+  addEditor(email: string, token: string): Promise<string[]>
+  /** Removes an email from the editor tier. Admin only. Returns the full
+   *  updated list. Mirrors removeEditor in Auth.js. */
+  removeEditor(email: string, token: string): Promise<string[]>
+  /** Editor or admin. Adds projectId to the recording's tag list (does not remove existing tags). Returns the full updated list. Works for either inbox pseudo-project's rows. */
   setFathomTag(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
-  /** Removes just projectId from the recording's tag list, leaving other tags intact. Returns the full updated list. */
+  /** Editor or admin. Removes just projectId from the recording's tag list, leaving other tags intact. Returns the full updated list. */
   untagFathomMeeting(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
   /** Full-content search (title/dateLabel/attendees/whole body) — returns matching meeting ids. */
   searchMeetings(query: string, token: string): Promise<string[]>
@@ -244,10 +261,10 @@ export interface ServerApi {
   getOriginalContent(meetingId: string, token: string): Promise<VersionContent>
   /** One numbered version's full HTML plus the title/dateLabel/time captured with it. Admin only. */
   getVersionContent(meetingId: string, seq: string, token: string): Promise<VersionContent>
-  /** Uploads a file (base64) and attaches it to a meeting. Admin only.
+  /** Uploads a file (base64) and attaches it to a meeting. Editor or admin.
    *  Mirrors Code.js's addAttachment — same MIME allow-list, 25MB cap. */
   addAttachment(meetingId: string, fileName: string, mimeType: string, base64Data: string, token: string): Promise<Attachment[]>
-  /** Removes one attachment by fileId. Admin only. Returns the remaining list. */
+  /** Removes one attachment by fileId. Editor or admin. Returns the remaining list. */
   removeAttachment(meetingId: string, fileId: string, token: string): Promise<Attachment[]>
   /** Posts a comment. Any signed-in staff who can see the meeting. Returns the updated list. */
   addComment(meetingId: string, text: string, token: string): Promise<Comment[]>

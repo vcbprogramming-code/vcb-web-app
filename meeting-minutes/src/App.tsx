@@ -26,7 +26,7 @@ const TIMELINE_PROJECT: ProjectId = 'TIMELINE'
 
 const EMPTY_SESSION: SessionState = {
   appTitle: 'VCB Meeting Minutes', appDisplayTitle: 'Meeting Minutes', subtitle: '',
-  authed: true, user: '', isAdmin: false, projects: [], execUrl: ''
+  authed: true, user: '', isAdmin: false, isEditor: false, projects: [], execUrl: ''
 }
 
 // Meetings metadata cache (paints instantly on reload). Mirrors vcb_mm_meetings_cache.
@@ -226,6 +226,7 @@ export default function App() {
       return (
         <MeetingDetail
           key={activeId} id={activeId} byId={byId} projects={session.projects} isAdmin={session.isAdmin}
+          isEditor={session.isEditor}
           userEmail={session.user}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
           onMutated={() => { refreshAll() }} execUrl={session.execUrl} theme={theme}
@@ -249,7 +250,7 @@ export default function App() {
 
       <div className={'body' + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')}>
         <Sidebar
-          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin} loaded={loaded}
+          projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin} isEditor={session.isEditor} loaded={loaded}
           active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
           onNewProject={() => setNewProjectOpen(true)} onRenameProject={setRenameProjectId}
           onTimeline={openTimeline} tr={tr}

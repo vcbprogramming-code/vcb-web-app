@@ -105,22 +105,22 @@ export default function MySignatureTab() {
 
       <div className="card space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล</label>
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
+          <label htmlFor="me-name" className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล</label>
+          <input id="me-name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">อีเมล</label>
-            <input value={profile.email || ''} disabled className={`${field} bg-slate-100 text-slate-500`} />
+            <label htmlFor="me-email" className="mb-1 block text-sm font-medium text-slate-600">อีเมล</label>
+            <input id="me-email" value={profile.email || ''} disabled className={`${field} bg-slate-100 text-slate-500`} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">บทบาท</label>
-            <input value={ROLE_LABELS[profile.role] || profile.role} disabled className={`${field} bg-slate-100 text-slate-500`} />
+            <label htmlFor="me-role" className="mb-1 block text-sm font-medium text-slate-600">บทบาท</label>
+            <input id="me-role" value={ROLE_LABELS[profile.role] || profile.role} disabled className={`${field} bg-slate-100 text-slate-500`} />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่ง (แสดงใต้ชื่อในเอกสาร)</label>
-          <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
+          <label htmlFor="me-title" className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่ง (แสดงใต้ชื่อในเอกสาร)</label>
+          <input id="me-title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
         </div>
 
         {/* signature */}

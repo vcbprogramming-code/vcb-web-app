@@ -17,7 +17,7 @@ export const apps = [
     // break saved links and every stored permission key for no user benefit.
     to: '/performance',
     title: 'บันทึกงานฝ่ายบุคคล',
-    desc: 'การลงเวลา บันทึกงาน และตารางเวลาทำงานสำหรับทีม HR',
+    desc: 'บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน',
     icon: 'userClock',
     color: 'bg-emerald-50 text-emerald-600',
     enabled: true, // live (Module 2 — hr-worklog)

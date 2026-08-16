@@ -546,12 +546,17 @@ router.get(
       // became actionable — NOT from when the document was created, which would
       // blame step 3 for step 1's delay.
       query(
-        `select coalesce(nullif(pr.full_name,''), s.approver_email) as name,
+        // Name, never a raw address. Older steps carry no approver_id, so match the
+        // account by email as well before falling back — the chart was labelling a
+        // person "c.chavananand" in front of their own management.
+        `select coalesce(nullif(pr.full_name,''), nullif(pe.full_name,''),
+                        nullif(s.approver_name,''), s.approver_email) as name,
                 count(*)::int as steps,
                 round(avg(extract(epoch from (s.acted_at - coalesce(prev.acted_at, d.created_at))) / 86400)::numeric, 1)::float as avg_days
            from approval_steps s
            join documents d on d.id = s.document_id
            left join profiles pr on pr.id = s.approver_id
+           left join profiles pe on lower(pe.email) = lower(s.approver_email)
            left join lateral (
              select max(p2.acted_at) as acted_at from approval_steps p2
               where p2.document_id = s.document_id and p2.step_no < s.step_no and p2.acted_at is not null

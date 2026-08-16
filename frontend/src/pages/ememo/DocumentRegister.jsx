@@ -357,8 +357,12 @@ export default function DocumentRegister() {
             </button>
           ))}
 
-          {/* project chips — scroll horizontally on narrow screens instead of walling up */}
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-0.5">
+          {/* Project chips wrap onto the next line rather than scrolling sideways.
+              They used to sit in an overflow-x container that was squeezed by the
+              filters beside it: 4 of the 9 projects were parked past the right edge
+              with nothing to say so, and a reader would take the register for having
+              only the projects they could see. */}
+          <div className="flex min-w-0 basis-full flex-wrap items-center gap-2">
             <ProjectChip code="ทุกโครงการ" subtle active={!projectId} onClick={() => setProjectId('')} />
             {projects.map((p) => (
               <ProjectChip

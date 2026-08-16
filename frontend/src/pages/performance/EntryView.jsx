@@ -130,7 +130,10 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
       {/* sub-view toggle + manage employees + flash */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {[['coverage', 'ภาพรวม'], ['week', 'รายสัปดาห์']].map(([k, label]) => (
+          {/* "ความครบถ้วน", not "ภาพรวม" — the page already carries a top-level
+              ภาพรวม tab, and two tabs of the same name in one screen left no way to
+              tell which view you were looking at. */}
+          {[['coverage', 'ความครบถ้วน'], ['week', 'รายสัปดาห์']].map(([k, label]) => (
             <button key={k} onClick={() => setMode(k)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
               {label}

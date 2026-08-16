@@ -54,14 +54,18 @@ export default function Performance() {
 
   return (
     <div className="space-y-4">
+      {/* The subtitle records what each person WORKED ON each day. This module is
+          not a clock-in system and carries no OT — the old wording ("การลงเวลา …
+          ตารางเวลาทำงาน") promised both. */}
       <PageHeader
         title="บันทึกงานฝ่ายบุคคล"
-        subtitle="การลงเวลา บันทึกงาน และตารางเวลาทำงานสำหรับทีม HR"
+        subtitle="บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน"
         right={
           <div className="flex items-center gap-2">
-            <button onClick={() => setCur(shift(cur, -1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
+            {/* icon-only: the month they move to has to be readable, not guessable */}
+            <button onClick={() => setCur(shift(cur, -1))} aria-label="เดือนก่อนหน้า" title="เดือนก่อนหน้า" className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
             <span className="chip bg-brand/10 text-brand min-w-[130px] justify-center">{monthLabel(cur)}</span>
-            <button onClick={() => setCur(shift(cur, 1))} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, 1))} aria-label="เดือนถัดไป" title="เดือนถัดไป" className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
           </div>
         }
       />
@@ -78,7 +82,7 @@ export default function Performance() {
         {view === 'entry' && boot.sites.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
-              <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> Excel</BusyLabel>
+              <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> ส่งออก Excel</BusyLabel>
             </button>
             {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
                 with no bg class the control kept the browser's white default while

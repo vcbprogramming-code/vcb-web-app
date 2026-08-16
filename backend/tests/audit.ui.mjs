@@ -130,7 +130,7 @@ for (const { u, role, key } of WHO) {
     if (r.overflowX > 1) note('กลาง', tag, `หน้าเลื่อนออกด้านข้าง ${r.overflowX}px`);
     if (r.latinChunks.length) note('ตรวจถ้อยคำ', tag, `ภาษาอังกฤษบนหน้าจอ: ${r.latinChunks.join(' · ')}`);
 
-    const file = `${key}${p.path.replace(/[^\w]+/g, '-').slice(0, 40)}`;
+    const file = `${key}-${String(PAGES.indexOf(p) + 1).padStart(2, '0')}${p.path.replace(/[^\w]+/g, '-').slice(0, 34)}`;
     await page.screenshot({ path: `${SHOTS}/${file}.png` });
     fs.writeFileSync(`${SHOTS}/${file}.txt`, r.text);
   }

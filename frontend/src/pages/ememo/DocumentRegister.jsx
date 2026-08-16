@@ -241,7 +241,7 @@ export default function DocumentRegister() {
         </div>
         {isAdmin && (
           <button
-            onClick={() => navigate('/memos-settings')}
+            onClick={() => navigate('/settings?s=projects')}
             title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
             aria-label="ตั้งค่า E-Memo"
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/15"

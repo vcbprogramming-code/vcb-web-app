@@ -13,6 +13,72 @@ const ROLE_CHIP = {
   hr: 'bg-slate-100 text-slate-600',
 };
 
+
+/**
+ * The signature an admin holds on file for another user. Kept out of the main
+ * form on purpose: it uploads on pick, so a half-filled form that is cancelled
+ * never leaves a stale image behind.
+ */
+function UserSignature({ user }) {
+  const toast = useToast();
+  const [url, setUrl] = useState(null);
+  const [has, setHas] = useState(Boolean(user?.has_signature));
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!has) { setUrl(null); return undefined; }
+    let live = true; let made = null;
+    adminApi.userSignatureBlobUrl(user.id)
+      .then((u) => { if (live) { made = u; setUrl(u); } else URL.revokeObjectURL(u); })
+      .catch(() => {});
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [user?.id, has]);
+
+  const pick = async (f) => {
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { toast.error('ลายเซ็นต้องเป็นรูปภาพ'); return; }
+    if (f.size > 2 * 1024 * 1024) { toast.error('รูปลายเซ็นใหญ่เกิน 2 MB'); return; }
+    setBusy(true);
+    try { await adminApi.uploadUserSignature(user.id, f); setHas(true); toast.success('บันทึกลายเซ็นแล้ว'); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  const clear = async () => {
+    setBusy(true);
+    try { await adminApi.clearUserSignature(user.id); setHas(false); toast.success('ลบลายเซ็นแล้ว'); }
+    catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-600">ลายเซ็นของผู้ใช้รายนี้</label>
+      <p className="mb-2 text-xs text-slate-400">
+        ใช้พิมพ์บนหนังสือที่ผู้ใช้รายนี้อนุมัติ · การเปลี่ยนแปลงถูกบันทึกในประวัติระบบว่าผู้ดูแลคนใดเป็นผู้ตั้งให้
+      </p>
+      {has ? (
+        <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-3">
+          {url
+            ? <img src={url} alt="ลายเซ็น" className="h-14 w-auto object-contain" />
+            : <span className="text-xs text-slate-400">กำลังโหลด…</span>}
+          <div className="flex gap-3">
+            <label className={`cursor-pointer text-sm font-medium text-blue-600 hover:underline ${busy ? 'pointer-events-none opacity-50' : ''}`}>
+              เปลี่ยนรูป
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pick(f); }} />
+            </label>
+            <button type="button" onClick={clear} disabled={busy} className="text-sm text-red-500 hover:underline disabled:opacity-50">ลบลายเซ็น</button>
+          </div>
+        </div>
+      ) : (
+        <label className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 py-5 hover:border-slate-300 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
+          <Icon name="signature" className="h-5 w-5 text-slate-400" />
+          <span className="text-sm text-slate-600">{busy ? 'กำลังอัปโหลด…' : 'คลิกเพื่ออัปโหลดลายเซ็นให้ผู้ใช้รายนี้'}</span>
+          <span className="text-xs text-slate-400">PNG/JPG · สูงสุด 2 MB</span>
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pick(f); }} />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function UserModal({ user, onClose, onSaved }) {
   const editing = Boolean(user);
   const [fullName, setFullName] = useState(user?.full_name || '');
@@ -136,6 +202,13 @@ function UserModal({ user, onClose, onSaved }) {
               <option value="admin">ผู้ดูแลระบบ</option>
             </select>
           </div>
+
+          {/* Signature — admins can put one on file for someone else, which the
+              client asked for so an executive can be onboarded ready to sign.
+              Only on EDIT: the account has to exist before a file can hang off
+              it. Uploading takes effect immediately (it is not part of this
+              form's save) and is recorded in the audit log with both names. */}
+          {editing && <UserSignature user={user} />}
 
           {error && <div ref={errRef} className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
         </form>

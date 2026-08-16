@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { profileApi, ROLE_LABELS } from '../lib/ememo.js';
-import Icon from '../components/Icon.jsx';
-import Spinner, { BusyLabel } from '../components/Spinner.jsx';
-import { PageHeader } from '../components/ui/index.js';
+import { profileApi, ROLE_LABELS } from '../../lib/ememo.js';
+import Icon from '../../components/Icon.jsx';
+import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 
 /**
- * "โปรไฟล์ของฉัน" — each user sets their display name, job title and a default
- * signature. New memos use these automatically (title under the name, signature
- * image above it).
+ * "โปรไฟล์และลายเซ็น" — each user sets their display name, job title and a
+ * default signature. New memos use these automatically (title under the name,
+ * signature image above it).
+ *
+ * This used to be its own page at /profile. The client asked for every setting
+ * to live in one place, so it is a section of the settings page now — and the
+ * one section every user can reach, admin or not, because an approver without a
+ * signature cannot sign anything.
  */
-export default function MyProfile() {
-  const navigate = useNavigate();
+export default function MySignatureTab() {
 
   const [profile, setProfile] = useState(null);
   const [fullName, setFullName] = useState('');
@@ -87,7 +89,6 @@ export default function MyProfile() {
     if (loadError) {
       return (
         <div className="max-w-2xl space-y-3">
-          <PageHeader title="โปรไฟล์ของฉัน" />
           <div className="card space-y-3 text-center">
             <p className="text-sm text-red-600">โหลดข้อมูลโปรไฟล์ไม่สำเร็จ: {loadError}</p>
             <div><button onClick={load} className="btn-primary">ลองใหม่อีกครั้ง</button></div>
@@ -101,10 +102,6 @@ export default function MyProfile() {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-slate-800">
-        <Icon name="arrowLeft" className="h-4 w-4" /> ย้อนกลับ
-      </button>
-      <PageHeader title="โปรไฟล์ของฉัน" subtitle="ตั้งค่าชื่อ ตำแหน่ง และลายเซ็นที่จะแสดงในเอกสาร" />
 
       <div className="card space-y-4">
         <div>

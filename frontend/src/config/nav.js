@@ -39,12 +39,12 @@ export const apps = [
     color: 'bg-violet-50 text-violet-600',
     enabled: false,
   },
-  // NOTE: E-Memo settings is intentionally NOT a Portal card — it lives inside
-  // the E-Memo module (a "ตั้งค่า" button on the register page → /memos-settings).
+  // Settings is now ONE page for everything (system + per-module + your own
+  // signature), so the Portal shows a single card instead of one per screen.
   {
-    to: '/admin',
-    title: 'ผู้ใช้และสิทธิ์',
-    desc: 'จัดการบัญชีผู้ใช้และสิทธิ์การใช้งานแต่ละโมดูล',
+    to: '/settings',
+    title: 'ตั้งค่า',
+    desc: 'ผู้ใช้และสิทธิ์ · โครงการ/หัวจดหมาย · ประเภทเอกสาร · โปรไฟล์และลายเซ็นของฉัน',
     icon: 'settings',
     color: 'bg-slate-100 text-slate-600',
     roles: ['admin'],
@@ -81,11 +81,10 @@ export const moduleTitles = {
   '/performance': 'บันทึกงานฝ่ายบุคคล',
   '/credit': 'วงเงินสินเชื่อโครงการ',
   '/onboarding': 'แนะแนวพนักงานใหม่',
-  '/memos-settings': 'ตั้งค่า E-Memo',
-  '/admin': 'ผู้ใช้และสิทธิ์',
+  '/settings': 'ตั้งค่า',
   '/sop': 'คู่มือปฏิบัติงาน (SOP)',
   '/dashboard': 'ภาพรวม E-Memo',
-  '/profile': 'โปรไฟล์ของฉัน',
+
 };
 
 export const roleLabels = {

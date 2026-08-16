@@ -51,7 +51,7 @@ export default function ModuleShell() {
   // sci-fi theme elsewhere.
   const navyHeader = location.pathname.startsWith('/memos')
     || location.pathname.startsWith('/dashboard')
-    || location.pathname.startsWith('/admin');
+    || location.pathname.startsWith('/settings');
 
   function handleLogout() {
     logout();
@@ -155,10 +155,10 @@ export default function ModuleShell() {
                   <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>
                 </div>
                 <button
-                  onClick={() => { setMenuOpen(false); navigate('/profile'); }}
+                  onClick={() => { setMenuOpen(false); navigate('/settings?s=signature'); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
                 >
-                  <Icon name="user" className="h-4 w-4 text-slate-400" /> โปรไฟล์ของฉัน
+                  <Icon name="user" className="h-4 w-4 text-slate-400" /> โปรไฟล์และลายเซ็น
                 </button>
                 <button
                   onClick={toggle}

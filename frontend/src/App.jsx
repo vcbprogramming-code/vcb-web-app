@@ -9,13 +9,11 @@ import DocumentRegister from './pages/ememo/DocumentRegister.jsx';
 import DocumentDetail from './pages/ememo/DocumentDetail.jsx';
 import VerifyDocument from './pages/ememo/VerifyDocument.jsx';
 import SharedDocument from './pages/ememo/SharedDocument.jsx';
-import EmemoSettings from './pages/ememo/EmemoSettings.jsx';
-import Settings from './pages/admin/Settings.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
 import Sop from './pages/sop/Sop.jsx';
-import MyProfile from './pages/MyProfile.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { disabledPaths } from './config/nav.js';
 
@@ -65,15 +63,11 @@ export default function App() {
 
           <Route path="memos" element={<DocumentRegister />} />
           <Route path="memos/:id" element={<DocumentDetail />} />
-          <Route
-            path="memos-settings"
-            element={
-              <ProtectedRoute roles={['admin']}>
-                <EmemoSettings />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="profile" element={<MyProfile />} />
+          {/* One settings page now (the client asked for one place). The old
+              paths still resolve so bookmarks and in-app links keep working. */}
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="memos-settings" element={<Navigate to="/settings?s=projects" replace />} />
+          <Route path="profile" element={<Navigate to="/settings?s=signature" replace />} />
 
           <Route path="performance" element={<Feature path="/performance"><Performance /></Feature>} />
 
@@ -92,14 +86,7 @@ export default function App() {
 
           <Route path="sop" element={<Feature path="/sop"><Sop /></Feature>} />
 
-          <Route
-            path="admin"
-            element={
-              <ProtectedRoute roles={['admin']}>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="admin" element={<Navigate to="/settings?s=users" replace />} />
         </Route>
       </Route>
 

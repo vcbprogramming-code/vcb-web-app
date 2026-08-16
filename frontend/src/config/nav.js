@@ -6,6 +6,9 @@ export const apps = [
   {
     to: '/memos',
     title: 'บันทึก & อนุมัติ (E-Memo)',
+    // The sidebar is narrower than a card, and the full title was being cut to
+    // "บันทึก & อนุมัติ (E-Me…" there.
+    navTitle: 'บันทึก & อนุมัติ',
     desc: 'จัดทำหนังสือ ออกเลขอัตโนมัติ และอนุมัติออนไลน์พร้อมลายเซ็น',
     icon: 'document',
     color: 'bg-blue-50 text-blue-600',

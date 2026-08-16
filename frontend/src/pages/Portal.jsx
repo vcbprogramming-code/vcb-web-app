@@ -193,7 +193,7 @@ export default function Portal() {
 
           <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="แอปพลิเคชัน">
             <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">แอปพลิเคชัน</div>
-            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={a.title} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
+            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={a.navTitle || a.title} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
             <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">ช่วยเหลือ</div>
             <NavRow icon="help" label="ช่วยเหลือ / แจ้งปัญหา" onClick={() => { setNavOpen(false); setHelp(true); }} />
           </nav>

@@ -126,7 +126,7 @@ export default function PermissionsTab() {
           เลือกผู้ใช้
           {loading && <Spinner className="h-4 w-4" label="กำลังโหลดรายชื่อ…" />}
         </label>
-        <select value={selectedId} onChange={(e) => selectUser(e.target.value)} disabled={loading} className="field disabled:opacity-60">
+        <select aria-label="เลือกผู้ใช้ที่ต้องการตั้งสิทธิ์" value={selectedId} onChange={(e) => selectUser(e.target.value)} disabled={loading} className="field disabled:opacity-60">
           <option value="">{loading ? 'กำลังโหลด…' : '— เลือกผู้ใช้ —'}</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>{u.full_name} ({u.email}) · {ROLE_LABELS[u.role] || u.role}</option>

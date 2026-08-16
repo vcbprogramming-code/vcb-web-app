@@ -388,10 +388,10 @@ export default function DocumentRegister() {
         {/* date row */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-slate-500">วันที่รับ (ค.ศ.):</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+          <input type="date" aria-label="วันที่รับ ตั้งแต่" value={from} onChange={(e) => setFrom(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
           <Icon name="arrowRight" className="h-3.5 w-3.5 text-slate-400" />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+          <input type="date" aria-label="วันที่รับ ถึง" value={to} onChange={(e) => setTo(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
           <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">7 วันล่าสุด</button>
           <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">30 วันล่าสุด</button>

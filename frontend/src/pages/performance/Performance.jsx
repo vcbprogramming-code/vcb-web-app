@@ -87,7 +87,7 @@ export default function Performance() {
             {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
                 with no bg class the control kept the browser's white default while
                 its text was lifted to near-white (unreadable). */}
-            <select value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
+            <select aria-label="เลือกไซต์งาน" value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
               {boot.sites.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
             </select>

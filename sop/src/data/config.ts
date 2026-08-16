@@ -13,6 +13,7 @@ export const DEV_NAME  = 'Chavananand';
 export const DEV_EMAIL = 'c.chavananand@vcb-con.com';
 export const APP_VERSION = 'build 26 · 2026-06-03';
 export const CHANGELOG = [
+    { th:'แชร์ลิงก์ไปยังกรณีศึกษาแต่ละเรื่องได้โดยตรง (ปุ่ม "แชร์" ในหน้ารายละเอียด)', en:'Share a direct link to any single case study (the "Share" button on its detail page)' },
     { th:'ปรับดีไซน์ใหม่ให้ดูมืออาชีพ ใช้ไอคอนเส้น (SVG) แทนอีโมจิทั้งหมด', en:'Refined-corporate redesign — inline SVG line icons replace all emoji' },
     { th:'อีเมลติดต่อเปลี่ยนเป็นแบบกดเพื่อคัดลอก (ไม่เปิดโปรแกรมอีเมล)', en:'Contact email is now click-to-copy (no longer opens a mail app)' },
     { th:'เมนูทั้งสามรูปแบบเดียวกัน · ผังกระบวนการและกรณีศึกษาเลือกตามหมวดได้ · หัวข้อหลัก = ดูทั้งหมด', en:'Unified 3-branch nav; Process Flows & Case Studies filter by module; root = All' },
@@ -87,6 +88,8 @@ export const I18N: Record<Lang, Dict> = {
       solutionLbl:'แนวทางปฏิบัติ · Solution (SOP)',
       noteLbl:'หมายเหตุ:',
       editBtn:'แก้ไข · Edit',
+      shareBtn:'แชร์',
+      shareCopied:'คัดลอกลิงก์แล้ว',
       newCaseBtn:'เพิ่มกรณีใหม่',
       newReportBtn:'เพิ่มรายงานใหม่',
       newReportTitle:'เพิ่มรายการ Report ใหม่',
@@ -146,6 +149,8 @@ export const I18N: Record<Lang, Dict> = {
       solutionLbl:'Solution (SOP)',
       noteLbl:'Note:',
       editBtn:'Edit',
+      shareBtn:'Share',
+      shareCopied:'Link copied',
       newCaseBtn:'New case',
       newReportBtn:'New report',
       newReportTitle:'Add new report row',

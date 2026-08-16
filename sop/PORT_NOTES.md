@@ -4,8 +4,38 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 `../index.html` (UI) + `../apps-script/Code.gs` (server contract) + `../data/sop.json`
 (seed data). After **any** change to those, re-sync the affected piece here.
 
-- **Last synced from:** the live `script.google.com` deployment **@76** (2026-07-31).
-  Brought in everything shipped since `@69`: **report-row creation**
+- **Last synced from:** the live `script.google.com` deployment **@82** (2026-08-06).
+  Brought in everything shipped since `@77`: **shareable direct links** — a
+  Share button (`ShareButton` in `DetailPane.tsx`) on both case-study and
+  process-flow detail views copies a URL (`?case=N` / `?flow=ID`, built by
+  `buildShareUrl()` in `store.tsx` from `window.location.origin+pathname`
+  since there's no server to inject an `appUrl` the way `doGet` does) that
+  jumps straight to that item on load. Resolved client-side in `store.tsx`'s
+  `resolveInitialTarget()`/`initialNav()` (mirrors `openInitialCase()` +
+  `SOP_META.initialCase`/`initialFlow`): `?case=N` must match a real scenario,
+  `?flow=ID` falls back to the normal landing view if it doesn't resolve —
+  same intent as canonical's server-validated-case/client-validated-flow
+  split, just both done client-side here since this mock has no real backend
+  distinction to preserve. Also ported: `copyText()` (`src/lib/copy.ts`,
+  races the Clipboard API against a 600ms timeout before falling back to
+  `execCommand('copy')` — strictly safer than a bare `writeText()` call even
+  though this port isn't hosted inside Apps Script's sandboxed iframe where
+  the hang was originally observed), which `ShareButton` and `SettingsModal.tsx`'s
+  `copyEmail()` both now route through instead of each having their own
+  clipboard fallback code. **Mobile layout:** Share/Edit move from the detail
+  title row into the sticky back-bar (`.mback-row` wraps the back button + a
+  `#mbackDetailActions` slot) on mobile only — done via a `createPortal` in
+  `DetailPane.tsx` (`DetailActions`) rather than the canonical's imperative
+  `moveDetailActionsMobile()` DOM-node relocation, since React re-renders
+  instead of moving nodes; desktop keeps the buttons inline in `.d-head`,
+  unchanged. Desktop sidebar/case-list column widths also widened ~1cm
+  (`styles.css`, `.body` grid-template-columns) to match the @75–77 catch-up.
+  **Not ported** (server-only, no client-visible behavior — see the
+  architecture note below): Drive backup snapshots (`backupToDrive_`), the
+  one-time `renumberAllSteps_()` migration, and the `?migrate=1` debug
+  endpoint.
+- **Earlier sync (@76, 2026-07-31):** Brought in everything shipped since `@69`:
+  **report-row creation**
   (`createReport()` — "+ เพิ่มรายงานใหม่" button + `NewReportModal.tsx`, admin-only,
   appended to `reports[]`, no server-assigned id — the `case` number is caller-
   supplied), the **NotebookLM link button** in the Reports detail header
@@ -53,6 +83,16 @@ This folder is a **live mirror** of the canonical app. Source of truth =
   live and clickable even if its backing call was always fake.
   There is still no real database anywhere in this stack — the mock's in-memory
   `store` is the only persistence, same as before.
+- **Architecture note (Drive backups, @78–82):** canonical's `backupToDrive_()`
+  (a timestamped JSON snapshot dropped into a Drive folder after every
+  mutation, for recovery independent of the Doc/Cache/Properties), the
+  one-time `renumberAllSteps_()` migration, and the `?migrate=1` debug
+  endpoint are all **server-only** — no client-visible behavior, nothing for
+  the UI to render or call. This is a mock/preview React app with no real
+  backend (`src/lib/api.ts`), so there's nothing meaningful to port here;
+  intentionally not mirrored. If a real backend is ever wired in (see the
+  Data layer note above), that would be the place to add an equivalent
+  snapshot/backup step, not this app's `src/`.
 - **Stack:** Vite + React 18 + TypeScript (strict). No UI library (original has none).
 - **Data layer:** typed **mock** mirroring the REST contract (see `src/lib/api.ts`),
   seeded from `src/data/sop.json` (copy of `../data/sop.json`) + the 33 bundled flows.
@@ -87,6 +127,10 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 | `#settingsBg` + `updateSettingsModal()` + `copyEmail()` | `src/components/SettingsModal.tsx` (no Sync action — removed from the canonical app, see architecture note above) |
 | `stepsToStorage()`/`stepsFromStorage()`/`stepDepth()` (textarea ⇄ storage conversion) | `src/lib/steps.ts` (shared by EditModal/NewScenarioModal/DetailPane) |
 | `<head>` mobile-detection / pref IIFE                | `index.html` head + `src/store.tsx` effects |
+| `copyText()` (Clipboard API race + `execCommand` fallback) | `src/lib/copy.ts` (`copyText()`, Promise-based; used by `ShareButton` and `SettingsModal.tsx`'s `copyEmail()`) |
+| `shareLink()`/`shareCase()`/`shareFlow()`            | `buildShareUrl()` in `src/store.tsx` + `ShareButton` in `src/components/DetailPane.tsx` |
+| `openInitialCase()` + `SOP_META.initialCase`/`initialFlow` (deep-link init) | `resolveInitialTarget()`/`initialNav()` in `src/store.tsx` (reads `window.location.search` directly — no server bootstrap payload to inject into) |
+| `.mback-row`/`#mbackDetailActions` + `moveDetailActionsMobile()` | `DetailActions` (a `createPortal`) + `MBackDetail` in `src/components/DetailPane.tsx` — React re-renders the buttons into the portal target instead of literally relocating DOM nodes |
 
 ## Behaviour parity notes
 
@@ -112,6 +156,19 @@ per-module displayNo recompute after edit/swap/delete ✓ · multi-module tag +
 stable sort in filtered lists ✓ · tag badge in list cards (all views) ✓ · swap
 two cases ✓ · delete with custom confirm dialog (no native `confirm()`) ✓ ·
 case-detail header alignment at mobile viewport (390×844) ✓.
+
+**@77–82 pass (Share links + mobile action-bar move):** `npm run build` and
+`tsc --noEmit` both pass cleanly — no browser (headless or otherwise) was
+available in this pass, so none of the following were visually confirmed,
+only traced through by reading the code: the Share button copying a working
+`?case=N`/`?flow=ID` URL and flashing "Link copied"; a `?case=N`/`?flow=ID`
+link actually landing on the right item on load (`resolveInitialTarget()`/
+`initialNav()`); the portal correctly relocating Share/Edit into the mobile
+back-bar (`DetailActions`/`#mbackDetailActions`) versus staying inline in
+`.d-head` on desktop; and the `.mback-row`/`.d-edit.copied` CSS rendering as
+intended in both themes. Treat this pass as code-reviewed and type/build-clean,
+not click-tested — worth a manual pass (or a Playwright session) before
+treating the mobile layout or the copy-to-clipboard flash as confirmed.
 
 ## Re-sync checklist
 

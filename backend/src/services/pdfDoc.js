@@ -232,22 +232,22 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
     }
   }
 
-  // Full decision trail for the "บันทึกการพิจารณา" page.
+  // Decision trail for the "บันทึกการพิจารณา" page — the ลำดับการอนุมัติ only.
   //
-  // is_signer is carried through so the trail can drop the ผู้จัดการโครงการ's own
-  // comment: the memo effectively comes FROM the project manager, so a note they
-  // wrote to themselves has no business being read by the executives who sign
-  // after them. Everyone else's reason still prints — for a rejection it is the
-  // whole point of the page.
+  // The ผู้จัดการโครงการ is excluded entirely (is_signer), not merely stripped of
+  // their comment: the memo goes out over their signature, so their own approval
+  // is them signing their own letter, not a step in its review. The page is there
+  // to show the executives' decisions. Their action is still on the document page
+  // and in the audit log — this only governs what the signed letter carries.
+  // letterhead.js skips the whole appendix when nothing is left to print.
   const { rows: auditSteps } = await query(
     // same name resolution as the signature block — the decision page printed raw
     // gmail addresses whenever a step carried no typed name.
     `select coalesce(nullif(pr.full_name,''), nullif(s.approver_name,''), s.approver_email) as approver_name,
-            s.approver_email, s.action, s.acted_at, s.is_signer,
-            case when s.is_signer then null else s.comment end as comment
+            s.approver_email, s.action, s.acted_at, s.comment
        from approval_steps s
        left join profiles pr on pr.id = s.approver_id
-      where s.document_id = $1 order by s.step_no`,
+      where s.document_id = $1 and not coalesce(s.is_signer, false) order by s.step_no`,
     [documentId]
   );
 

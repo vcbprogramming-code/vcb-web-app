@@ -6,6 +6,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
+import UserPermissions from './UserPermissions.jsx';
 
 const ROLE_CHIP = {
   admin: 'bg-purple-50 text-purple-700',
@@ -89,6 +90,11 @@ function UserModal({ user, onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null); // { email, password } → credential hand-off panel
+  // สิทธิ์ used to be a separate settings menu with its own "pick a user" list.
+  // It belongs to the person being edited, so it lives here as a second tab and
+  // saves on the same button.
+  const [tab, setTab] = useState('info'); // info | perms
+  const permsRef = useRef(null);
   const errRef = useRef(null);
 
   const isGoogle = loginMethod === 'google';
@@ -108,18 +114,25 @@ function UserModal({ user, onClose, onSaved }) {
       if (editing) {
         await adminApi.updateUser(user.id, { fullName, email, role, loginMethod });
         if (!isGoogle && password) await adminApi.resetPassword(user.id, password);
+        // after the account: a role change re-baselines permissions server-side,
+        // so these overrides must be written on top of the NEW role, not the old
+        await permsRef.current?.save(user.id);
         onSaved();
       } else {
-        await adminApi.createUser({
+        const res = await adminApi.createUser({
           fullName, email, role, loginMethod,
           password: isGoogle ? undefined : password,
         });
+        // one click, two calls: the account has to exist before permissions can
+        // hang off it, but the admin shouldn't have to come back for a second pass
+        await permsRef.current?.save(res?.data?.id);
         // hand off the credentials for a NEW email account (admin must relay them)
         if (!isGoogle) setCreated({ email: email.trim(), password });
         else onSaved();
       }
     } catch (err) {
       setError(err.message);
+      setTab('info');
     } finally {
       setBusy(false);
     }
@@ -155,6 +168,19 @@ function UserModal({ user, onClose, onSaved }) {
         </>
       }
     >
+        <div className="mb-4 flex gap-2 border-b border-slate-200 pb-2">
+          {[['info', 'ข้อมูลผู้ใช้'], ['perms', 'สิทธิ์การใช้งาน']].map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setTab(k)}
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+                tab === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Both panels stay mounted: the permissions editor holds unsaved edits,
+            and unmounting it on a tab switch would throw them away silently. */}
+        <div className={tab === 'perms' ? 'hidden' : ''}>
         <form id="user-form" onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
@@ -212,6 +238,11 @@ function UserModal({ user, onClose, onSaved }) {
 
           {error && <div ref={errRef} className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
         </form>
+        </div>
+
+        <div className={tab === 'perms' ? '' : 'hidden'}>
+          <UserPermissions ref={permsRef} userId={user?.id || null} role={role} />
+        </div>
     </Modal>
   );
 }

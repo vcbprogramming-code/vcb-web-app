@@ -278,11 +278,18 @@ router.post(
 // Permissions (action-level, backlog round 2 #3)
 // ===========================================================================
 
-/** GET /api/admin/permissions/catalog — the module/action catalogue for the UI. */
+/** GET /api/admin/permissions/catalog — the module/action catalogue for the UI.
+ *  roleDefaults comes along so the ADD-user form can show the baseline for the
+ *  role being picked: permissions are set in the same modal now, and a user that
+ *  does not exist yet has no id to look defaults up by. */
 router.get(
   '/permissions/catalog',
   asyncHandler(async (req, res) => {
-    res.json({ data: PERMISSION_CATALOG });
+    const roleDefaults = {};
+    for (const role of ['admin', 'executive', 'hr']) {
+      roleDefaults[role] = effectivePermissions({ role, permissions: {} });
+    }
+    res.json({ data: PERMISSION_CATALOG, roleDefaults });
   })
 );
 

@@ -363,9 +363,10 @@ export function generateLetterPdf(doc, letter = {}, opts = {}) {
     // letter. What remains is one appendix laid out like the on-screen audit
     // trail — date/time, who, what they did, and the reason where there is one.
     //
-    // The ผู้จัดการโครงการ's own comment never reaches this page (filtered out in
-    // pdfDoc.js): the memo comes from them, so a note they wrote to themselves is
-    // not for the executives who sign afterwards.
+    // The ผู้จัดการโครงการ never appears here at all (filtered out in pdfDoc.js):
+    // the memo goes out over their signature, so this page carries the ลำดับ
+    // การอนุมัติ — the executives' decisions — and nothing else. With no one left
+    // to list, the appendix is not printed.
     const trail = Array.isArray(opts.auditSteps) ? opts.auditSteps.filter((s) => s.action && s.action !== 'pending') : [];
     if (opts.commentBox !== false && trail.length) {
       const actionTH = { approved: 'อนุมัติ', returned: 'ส่งกลับแก้ไข', rejected: 'ไม่อนุมัติ' };

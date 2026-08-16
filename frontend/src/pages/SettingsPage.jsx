@@ -5,7 +5,6 @@ import { PageHeader } from '../components/ui/index.js';
 import Icon from '../components/Icon.jsx';
 
 import UsersTab from './admin/UsersTab.jsx';
-import PermissionsTab from './admin/PermissionsTab.jsx';
 import AnnouncementsTab from './admin/AnnouncementsTab.jsx';
 import ProjectsTab from './admin/ProjectsTab.jsx';
 import CompaniesTab from './admin/CompaniesTab.jsx';
@@ -39,7 +38,6 @@ const GROUPS = [
     label: 'ระบบ',
     items: [
       { key: 'users', label: 'ผู้ใช้และสังกัดโครงการ', icon: 'people', Comp: UsersTab },
-      { key: 'permissions', label: 'สิทธิ์การใช้งาน', icon: 'lock', Comp: PermissionsTab },
       { key: 'announcements', label: 'ประกาศ', icon: 'bell', Comp: AnnouncementsTab },
     ],
   },
@@ -69,7 +67,10 @@ export default function SettingsPage() {
     [isAdmin]
   );
   const all = groups.flatMap((g) => g.items);
-  const wanted = sp.get('s');
+  // สิทธิ์การใช้งาน is no longer a menu of its own — it is a tab inside each user,
+  // so an old ?s=permissions link belongs on the user list.
+  const ALIASES = { permissions: 'users' };
+  const wanted = ALIASES[sp.get('s')] || sp.get('s');
   const [fallback, setFallback] = useState(null);
   const activeKey = all.some((i) => i.key === wanted) ? wanted : (fallback || all[0]?.key);
   const active = all.find((i) => i.key === activeKey) || all[0];

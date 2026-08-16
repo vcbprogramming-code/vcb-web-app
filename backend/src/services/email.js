@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 import { ensureShareToken } from './docShare.js';
+import { query } from '../config/db.js';
 
 /**
  * Email delivery. Three modes, picked at send time:
@@ -197,7 +198,7 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
        <td style="padding:8px 0;color:#0f172a;font-weight:500">${value}</td>
      </tr>`;
 
-  const body = (url) => `
+  const body = (url, inApp) => `
   <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
       <div style="background:${accent};background:linear-gradient(135deg,${accent2},${accent});padding:24px 28px;color:#fff">
@@ -219,7 +220,9 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
           </a>
         </div>
         <p style="margin:14px 0 0;font-size:12px;color:#94a3b8;text-align:center">
-          เปิดได้จากลิงก์นี้โดยไม่ต้องเข้าสู่ระบบ · ลิงก์นี้เป็นของท่านโดยเฉพาะ กรุณาอย่าส่งต่อ
+          ${inApp
+            ? 'เข้าสู่ระบบด้วยอีเมลฉบับนี้เพื่อเปิดเอกสาร · ท่านร่วมแสดงความเห็นได้ในหน้าเดียวกับผู้อนุมัติ'
+            : 'เปิดได้จากลิงก์นี้โดยไม่ต้องเข้าสู่ระบบ · ลิงก์นี้เป็นของท่านโดยเฉพาะ กรุณาอย่าส่งต่อ'}
         </p>
       </div>
       <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
@@ -228,19 +231,35 @@ export async function sendCcNotification({ toEmails, doc, actorName, stage = 'su
     </div>
   </div>`;
 
+  // Who among these addresses actually holds an account? สำเนาเรียน is picked from
+  // real accounts now (the client's decision), and those people belong on the SAME
+  // document page as everyone else — read it, and take part in the conversation.
+  // The read-only /doc/:token page survives only for the free-text addresses left
+  // on older documents, where there is no account to log in with.
+  const withAccount = new Set();
+  if (emails.length) {
+    const { rows } = await query(
+      'select lower(email) as email from profiles where is_active = true and lower(email) = any($1)',
+      [emails.map((e) => String(e).toLowerCase())]
+    ).catch(() => ({ rows: [] }));
+    rows.forEach((r) => withAccount.add(r.email));
+  }
+
   const results = [];
   for (const to of emails) {
-    // Each recipient gets THEIR OWN read-only link. It used to be /memos/:id for
-    // everyone — a page behind the login wall, which a copied-in person outside
-    // the provisioned account list could never get past. Falls back to the
-    // in-app page if the token can't be minted, so the notice still goes out.
-    const token = await ensureShareToken(doc.id, to);
-    const url = token ? `${env.appBaseUrl}/doc/${token}` : `${env.appBaseUrl}/memos/${doc.id}`;
+    const inApp = withAccount.has(String(to).toLowerCase());
+    // ?for= names the account the link belongs to, so a phone signed into several
+    // Google accounts opens the right one instead of failing silently
+    let url = `${env.appBaseUrl}/memos/${doc.id}?for=${encodeURIComponent(to)}`;
+    if (!inApp) {
+      const token = await ensureShareToken(doc.id, to);
+      if (token) url = `${env.appBaseUrl}/doc/${token}`;
+    }
     const r = await sendEmail({
       to,
       subject: `[${tag}] ${doc.doc_number} — ${doc.subject}`,
-      html: body(url),
-      text: `${done ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่านได้รับการอนุมัติครบทุกลำดับแล้ว' : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)'}\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\nเปิดดู (ไม่ต้องเข้าสู่ระบบ): ${url}`,
+      html: body(url, inApp),
+      text: `${done ? 'เรียนเพื่อทราบ — เอกสารที่ส่งสำเนาถึงท่านได้รับการอนุมัติครบทุกลำดับแล้ว' : 'เรียนเพื่อทราบ — มีเอกสารส่งสำเนาถึงท่านเพื่อทราบ/ปรึกษา (ไม่ต้องอนุมัติ)'}\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n${actorName ? `ผู้ส่งเรื่อง: ${actorName}\n` : ''}\n${inApp ? 'เปิดดูและร่วมแสดงความเห็น (เข้าสู่ระบบด้วยอีเมลนี้)' : 'เปิดดู (ไม่ต้องเข้าสู่ระบบ)'}: ${url}`,
     }).catch((e) => ({ error: e.message, to }));
     results.push(r);
   }

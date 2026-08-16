@@ -16,6 +16,34 @@ change to the GAS source, diff it against this folder and update only what chang
 - **Synced at:** 2026-08-16
 - **Live deployment referenced:** `@148` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+- **What changed in a follow-up 2026-08-16 audit pass** (after the editor-tier
+  sync below — a full GAS-vs-React drift audit turned up two older,
+  pre-existing gaps neither introduced by nor related to the editor-tier
+  work; both fixed here):
+  - **Attachment section placement.** GAS moved the attachments block from
+    before `.frame-wrap` to *inside* it, after the `<iframe>` (2026-07-22,
+    `.attach-footer` class, so it scrolls as a trailing appendix instead of
+    eating screen space above the actual content — especially on mobile).
+    `MeetingDetail.tsx` had never picked this up: attachments still rendered
+    in the old `.attendees`-styled block before `.frame-wrap`. Moved inside
+    `.frame-wrap` (after the iframe) and switched to `.attach-footer` — the
+    CSS rule already existed in `styles.css` from the verbatim extract, it
+    was just never referenced by any component (confirmed dead CSS via grep
+    before this fix).
+  - **Standalone "History" button missing from the meeting detail bar.** GAS
+    has two entry points to Edit History: a standalone `d_history` button in
+    `.detail-bar` (admin-only, `JavaScript.html` line ~1081/1328) for
+    checking history without opening the content editor, and the in-app
+    editor's own history button (editor-or-admin, since opening the editor
+    itself requires that). Only the second was ported — `MeetingDetail.tsx`
+    had no detail-bar history button at all, so an admin had to open the
+    (editor-or-admin-gated) content editor just to check history. Added a
+    `historyOpen`/`previewRequest` state pair + admin-gated `🕘 History`
+    button to `MeetingDetail.tsx`, with its own `EditHistoryModal`/
+    `VersionPreviewModal` instances (same pattern `EditorModal.tsx` already
+    used for its own copy — GAS reuses one shared `#ehBg` DOM node for both
+    entry points; React components are per-instance, so this is a second,
+    independent pair rather than a shared one, with identical behavior).
 - **What changed 2026-08-16 sync:**
   - **Self-service "editor" permission tier (new).** A tier between admin and
     viewer — can edit meeting content, create/delete meetings, add/remove

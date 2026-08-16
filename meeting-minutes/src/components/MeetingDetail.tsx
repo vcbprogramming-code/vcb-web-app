@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Project, MeetingFull, Theme } from '../types'
+import type { AuditEntry, Project, MeetingFull, Theme } from '../types'
 import { fmtDate, fmtTime, fmtThaiDate } from '../lib/i18n'
 import { buildMeetingSrcdoc } from '../lib/docRender'
 import { fetchMeeting, getCached, setCached } from '../api/contentCache'
 import { api, getToken } from '../api/client'
 import { applyMobileScale, isMobile, fileIconKind, fmtFileSize, fileToBase64 } from '../lib/ui'
 import TagPickerModal from './TagPickerModal'
+import EditHistoryModal from './EditHistoryModal'
+import VersionPreviewModal from './VersionPreviewModal'
 import { useConfirm } from './ConfirmPrompt'
 
 const ATTACH_ACCEPT = '.pdf,.ppt,.pptx,.xls,.xlsx,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv'
@@ -39,6 +41,8 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
   const [loading, setLoading] = useState(!getCached(id))
   const [err, setErr] = useState('')
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [previewRequest, setPreviewRequest] = useState<{ meetingId: string; seq: string } | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
   const [commentPosting, setCommentPosting] = useState(false)
@@ -110,6 +114,11 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
     } catch (e) { onToast('Failed to load latest content: ' + (e instanceof Error ? e.message : String(e))) }
     finally { onBusy(null) }
   }
+  // Standalone admin-only history entry point — mirrors d_history in
+  // JavaScript.html, which calls the same openEditHistory() the in-app
+  // editor's own history button uses. Lets an admin check history without
+  // first opening the (editor-or-admin-gated) content editor.
+  const fetchHistory = (mid: string): Promise<AuditEntry[]> => api.getAuditHistory(mid, getToken())
   function share(): void {
     const base = (execUrl || '').split('?')[0]
     const link = base ? base + '?meeting=' + encodeURIComponent(m!.id) : m!.id
@@ -217,6 +226,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
         )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
         {editable && <button className="dbtn primary" id="d_editapp" onClick={openEditFresh}>✎ Edit here</button>}
+        {isAdmin && <button className="dbtn" id="d_history" title="See who edited this and when" onClick={() => setHistoryOpen(true)}>🕘 <span className="blbl">History</span></button>}
         <button className={'dbtn' + (commentsOpen ? ' active' : '')} id="d_comments" title="Comments" onClick={() => setCommentsOpen(v => !v)}>💬 <span className="blbl">Comments</span></button>
         <button className="dbtn" id="d_share" title="Share link" onClick={share}>🔗 <span className="blbl">Share link</span></button>
         <button className="dbtn" id="d_print" onClick={print}>🖨 Print / PDF</button>
@@ -253,35 +263,52 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
         </div>
       )}
 
-      {(m.attachments.length > 0 || canEdit) && (
-        <div className="attendees">
-          <span className="atl">Attachments{m.attachments.length ? ' · ' + m.attachments.length : ''}</span>
-          {m.attachments.map(a => {
-            const { cls, label } = fileIconKind(a.mimeType, a.name)
-            return (
-              <span key={a.fileId} className="chip attachchip">
-                <a href={a.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit' }}>
-                  <span className={'fi ' + cls}>{label}</span>
-                  <span className="cm"><b>{a.name}</b><small>{fmtFileSize(a.size)}</small></span>
-                </a>
-                {canEdit && <button type="button" className="chip-x" title="Remove attachment" onClick={() => removeAttachment(a.fileId)}>✕</button>}
-              </span>
-            )
-          })}
-          {canEdit && <button type="button" className="attach-upload-btn" onClick={() => fileInputRef.current?.click()}>＋ Attach file</button>}
-        </div>
-      )}
-
       <div className="frame-wrap">
         <div className="paper">
           <iframe className="render" id="renderFrame" ref={frameRef} srcDoc={srcdoc} onLoad={onFrameLoad} title="meeting" />
         </div>
+        {/* Attachments render AFTER the meeting content, inside .frame-wrap
+            (its only scrolling region) — an appendix at the end of the
+            document, not a strip eating mobile's limited screen height
+            above the actual summary. Mirrors JavaScript.html (2026-07-22). */}
+        {(m.attachments.length > 0 || canEdit) && (
+          <div className="attach-footer">
+            <span className="atl">Attachments{m.attachments.length ? ' · ' + m.attachments.length : ''}</span>
+            {m.attachments.map(a => {
+              const { cls, label } = fileIconKind(a.mimeType, a.name)
+              return (
+                <span key={a.fileId} className="chip attachchip">
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit' }}>
+                    <span className={'fi ' + cls}>{label}</span>
+                    <span className="cm"><b>{a.name}</b><small>{fmtFileSize(a.size)}</small></span>
+                  </a>
+                  {canEdit && <button type="button" className="chip-x" title="Remove attachment" onClick={() => removeAttachment(a.fileId)}>✕</button>}
+                </span>
+              )
+            })}
+            {canEdit && <button type="button" className="attach-upload-btn" onClick={() => fileInputRef.current?.click()}>＋ Attach file</button>}
+          </div>
+        )}
       </div>
       <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept={ATTACH_ACCEPT} onChange={onFilePicked} />
 
       <TagPickerModal
         open={tagPickerOpen} meeting={m} projects={projects}
         onClose={() => setTagPickerOpen(false)} onTagged={onTagged} onBusy={onBusy} onToast={onToast}
+      />
+      <EditHistoryModal
+        meeting={historyOpen ? m : null}
+        fetchHistory={fetchHistory}
+        onClose={() => setHistoryOpen(false)}
+        onViewOriginal={mid => setPreviewRequest({ meetingId: mid, seq: 'current-original' })}
+        onViewVersion={(mid, seq) => setPreviewRequest({ meetingId: mid, seq })}
+      />
+      <VersionPreviewModal
+        request={previewRequest}
+        meeting={m}
+        projectName={p.name || ''}
+        fetchHtml={(mid, seq) => seq === 'current-original' ? api.getOriginalContent(mid, getToken()) : api.getVersionContent(mid, seq, getToken())}
+        onClose={() => setPreviewRequest(null)}
       />
       {confirmNode}
 

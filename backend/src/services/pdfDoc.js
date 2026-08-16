@@ -26,9 +26,17 @@ async function loadDocAndLetter(documentId) {
   );
   // The signature block shows the *signer* (may differ from the preparer). When
   // no explicit signer is set on the doc, fall back to the author (preparer).
+  //
+  // The TITLE may only be borrowed from the preparer when the preparer IS the
+  // signer. Borrowing it unconditionally printed one person's name above another
+  // person's job title, and — because doc.signer_title wins over the letterhead
+  // downstream — it also overrode the ตำแหน่งผู้ลงนาม configured on the project.
+  // Left blank here, the letterhead's own value (else "ผู้จัดการโครงการ") applies.
   if (doc) {
+    const signerIsPreparer = !doc.signer_name || doc.signer_name === doc.author_name;
+    doc.signer_title_borrowed = !doc.signer_title && signerIsPreparer && Boolean(doc.author_title);
     doc.signer_name = doc.signer_name || doc.author_name;
-    doc.signer_title = doc.signer_title || doc.author_title;
+    doc.signer_title = doc.signer_title || (signerIsPreparer ? doc.author_title : null);
     doc.preparer_name = doc.author_name; // always the logged-in creator
   }
   if (!doc) throw new Error('Document not found');
@@ -212,8 +220,13 @@ export async function generateApprovedPdf(documentId, uploadedBy = null) {
       // Whoever actually signed step 1 IS the ผู้ลงนาม. loadDocAndLetter falls back
       // to the preparer when signer_name is blank, which printed the clerk's name
       // above the project manager's signature.
-      doc.signer_name = s.approver_name || doc.signer_name;
-      doc.signer_title = s.approver_title || doc.signer_title;
+      const actualSigner = s.approver_name || doc.signer_name;
+      // Same rule as loadDocAndLetter: a title borrowed from the preparer has to
+      // go once the signer turns out to be somebody else, or the letter shows the
+      // manager's name over the clerk's title.
+      if (s.approver_title) doc.signer_title = s.approver_title;
+      else if (doc.signer_title_borrowed && actualSigner !== doc.preparer_name) doc.signer_title = null;
+      doc.signer_name = actualSigner;
     } else {
       signatures.push({ image, name: s.approver_name, title: s.approver_title || '' });
     }

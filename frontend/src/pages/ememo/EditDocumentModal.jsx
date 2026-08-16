@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
 import ReferencePicker from './ReferencePicker.jsx';
+import CcPicker from './CcPicker.jsx';
 
 /**
  * Edit a document's content (subject / recipient / body / remarks / type /
@@ -15,6 +16,8 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
     reference: doc.reference || '',
     referenceDocId: doc.reference_doc_id || '',
     cc: doc.cc_recipients || '',
+    // account-backed สำเนาเรียน; the text field above is kept for what prints
+    ccProfileIds: (doc.cc_people || []).map((p) => p.id),
     signerName: doc.signer_name || '',
     signerTitle: doc.signer_title || '',
     body: doc.body || '',
@@ -50,6 +53,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
         reference: form.reference || null,
         referenceDocId: form.referenceDocId || null,
         cc: form.cc || null,
+        ccProfileIds: form.ccProfileIds,
         signerName: form.signerName || null,
         signerTitle: form.signerTitle || null,
         body: form.body || null,
@@ -110,7 +114,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>
-            <input value={form.cc} onChange={(e) => set('cc', e.target.value)} placeholder="เช่น ฝ่ายบัญชี, somchai@vcb.co.th" className="field" />
+            <CcPicker value={form.ccProfileIds} onChange={(v) => set('ccProfileIds', v)} />
             <p className="mt-1 text-xs text-slate-400">ใส่อีเมลได้ — จะส่ง “เพื่อทราบ” ให้ตอนส่งอนุมัติ (ไม่ต้องอนุมัติ)</p>
           </div>
           <div>

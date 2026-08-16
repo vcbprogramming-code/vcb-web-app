@@ -336,3 +336,53 @@ export async function sendAuthorNotification({ toEmail, authorName, doc, outcome
     text: `เรียน ${authorName || 'ผู้จัดทำ'}\n\nเอกสารเลขที่ ${doc.doc_number} เรื่อง ${doc.subject} ${meta.label}${actorName ? ` โดย ${actorName}` : ''}\n${comment ? `เหตุผล: ${comment}\n` : ''}\nเปิดดู: ${url}`,
   });
 }
+
+/**
+ * Tell someone they were @mentioned in a document's conversation.
+ *
+ * The client asked for this so a discussion can pull a colleague in without
+ * leaving the system. Mentions only ever target real accounts, so the link goes
+ * to the document page itself (with the ?for= hint that fixes the
+ * multi-account-browser trap — see sendApprovalRequest).
+ */
+export async function sendMentionNotification({ toEmail, toName, doc, authorName, body }) {
+  if (!toEmail) return { skipped: true };
+  const url = `${env.appBaseUrl}/memos/${doc.id}?for=${encodeURIComponent(toEmail)}`;
+  const quoted = String(body || '').slice(0, 400);
+  const html = `
+  <div style="margin:0;padding:24px 12px;background:#f1f5f9;font-family:'Tahoma','Segoe UI',Arial,sans-serif">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:#7c3aed;background:linear-gradient(135deg,#8b5cf6,#6d28d9);padding:24px 28px;color:#fff">
+        <div style="font-size:13px;letter-spacing:.5px;opacity:.85">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">มีผู้กล่าวถึงท่านในเอกสาร</div>
+      </div>
+      <div style="padding:28px">
+        <p style="margin:0 0 4px;font-size:15px;color:#0f172a">เรียน <b>${esc(toName || 'ท่าน')}</b></p>
+        <p style="margin:0 0 18px;font-size:15px;color:#334155">
+          <b>${esc(authorName || 'ผู้ใช้')}</b> กล่าวถึงท่านในบันทึกของเอกสารต่อไปนี้
+        </p>
+        <table style="border-collapse:collapse;width:100%;font-size:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:16px">
+          <tr><td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">เลขที่หนังสือ</td>
+              <td style="padding:8px 0;color:#0f172a;font-weight:500"><b style="font-size:15px">${esc(doc.doc_number)}</b></td></tr>
+          <tr><td style="padding:8px 16px 8px 0;color:#64748b;white-space:nowrap;vertical-align:top">เรื่อง</td>
+              <td style="padding:8px 0;color:#0f172a;font-weight:500">${esc(doc.subject)}</td></tr>
+        </table>
+        <div style="border-left:3px solid #8b5cf6;padding:6px 0 6px 14px;margin:0 0 22px;color:#334155;font-size:14px;white-space:pre-wrap">${esc(quoted)}</div>
+        <div style="text-align:center">
+          <a href="${url}" style="display:inline-block;background:#6d28d9;color:#fff;font-size:15px;font-weight:600;padding:12px 30px;border-radius:10px;text-decoration:none">
+            เปิดเอกสารและตอบกลับ
+          </a>
+        </div>
+      </div>
+      <div style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center">
+        อีเมลฉบับนี้ส่งโดยอัตโนมัติ · กรุณาอย่าตอบกลับ
+      </div>
+    </div>
+  </div>`;
+  return sendEmail({
+    to: toEmail,
+    subject: `[กล่าวถึงท่าน] ${doc.doc_number} — ${doc.subject}`,
+    html,
+    text: `${authorName || 'ผู้ใช้'} กล่าวถึงท่านในเอกสาร\nเลขที่: ${doc.doc_number}\nเรื่อง: ${doc.subject}\n\n"${quoted}"\n\nเปิดเอกสาร: ${url}`,
+  });
+}

@@ -6,6 +6,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 import ReferencePicker from './ReferencePicker.jsx';
+import CcPicker from './CcPicker.jsx';
 
 // stable per-row id so removable input rows keep a key tied to the row, not its
 // index — deleting a middle row then doesn't re-point the surviving DOM inputs
@@ -27,6 +28,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
   const [reference, setReference] = useState(initial?.reference || '');
   const [referenceDocId, setReferenceDocId] = useState(initial?.reference_doc_id || '');
   const [cc, setCc] = useState(initial?.cc_recipients || '');
+  // สำเนาเรียน as accounts (the free-text `cc` above is still sent so the letter
+  // keeps printing what it always did, and old documents are unaffected)
+  const [ccIds, setCcIds] = useState(initial?.cc_profile_ids || []);
   // สิ่งที่ส่งมาด้วย — multiple rows { name, qty }
   const [enclosures, setEnclosures] = useState(
     Array.isArray(initial?.enclosures) && initial.enclosures.length
@@ -326,6 +330,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           reference: reference.trim() || undefined,
           referenceDocId: referenceDocId || undefined,
           cc: cc.trim() || undefined,
+          ccProfileIds: ccIds,
           signerName: signerName.trim() || undefined,
           signerTitle: signerTitle.trim() || undefined,
           enclosures: enclList.length ? enclList : undefined,
@@ -590,7 +595,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
-              <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="เช่น ฝ่ายบัญชี, somchai@vcb.co.th" className={field} />
+              <CcPicker value={ccIds} onChange={setCcIds} />
               <p className="mt-1 text-xs text-slate-400">ถ้าใส่อีเมล ระบบจะส่ง “เพื่อทราบ/ปรึกษา” ให้ตอนส่งอนุมัติ (ผู้รับสำเนาไม่ต้องอนุมัติ)</p>
             </div>
           </div>

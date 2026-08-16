@@ -28,9 +28,13 @@ export const ememoApi = {
   companyLogoUrl: (companyId) => apiBlobUrl(`/documents/companies/${companyId}/logo`),
   createDocument: (body) => api('/documents', { method: 'POST', body }),
   combineDocument: (id) => api(`/documents/${id}/combine`, { method: 'POST' }),
-  postMessage: (id, body) => api(`/documents/${id}/messages`, { method: 'POST', body: { body } }),
+  // mentions = profile ids to @tag; each gets an email pointing at the document
+  postMessage: (id, body, mentions) =>
+    api(`/documents/${id}/messages`, { method: 'POST', body: { body, ...(mentions?.length ? { mentions } : {}) } }),
   attachMessageFile: (id, msgId, file) => apiUpload(`/documents/${id}/messages/${msgId}/attachments`, file),
   listApprovers: () => api('/documents/approvers'),
+  // accounts that can be CC'd or @mentioned (needs only ememo.view)
+  listPeople: () => api('/documents/people'),
   // documents waiting for the logged-in user to approve (home/register alert) (#8)
   awaitingMe: () => api('/documents/awaiting-me'),
   // search existing documents by number/subject (for the อ้างถึง picker) (#3)
@@ -142,6 +146,11 @@ export const adminApi = {
   updateCompany: (id, body) => api(`/admin/companies/${id}`, { method: 'PATCH', body }),
   deleteCompany: (id) => api(`/admin/companies/${id}`, { method: 'DELETE' }),
   uploadCompanyLogo: (file) => apiUpload('/admin/companies/logo', file),
+
+  // an admin may put a signature on file for someone else (every change is audited)
+  uploadUserSignature: (id, file) => apiUpload(`/admin/users/${id}/signature`, file),
+  userSignatureBlobUrl: (id) => apiBlobUrl(`/admin/users/${id}/signature`),
+  clearUserSignature: (id) => api(`/admin/users/${id}/signature`, { method: 'DELETE' }),
   companyLogoBlobUrl: (id) => apiBlobUrl(`/documents/companies/${id}/logo`),
 
   // letterhead

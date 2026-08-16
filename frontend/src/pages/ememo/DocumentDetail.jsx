@@ -92,6 +92,12 @@ export default function DocumentDetail() {
 
   // message composer
   const [msgText, setMsgText] = useState('');
+  // @mentions — people tagged in the message being written. Each one gets an
+  // email pointing at this document, which is what the client asked for.
+  const [people, setPeople] = useState([]);
+  const [mentions, setMentions] = useState([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
   const [msgFile, setMsgFile] = useState(null);
   const [posting, setPosting] = useState(false);
   const [canceling, setCanceling] = useState(false); // ยกเลิกเอกสาร in flight
@@ -131,6 +137,7 @@ export default function DocumentDetail() {
   }, [id]);
 
   useEffect(load, [load]);
+  useEffect(() => { ememoApi.listPeople().then((r) => setPeople(r.data || [])).catch(() => setPeople([])); }, []);
 
   // The combined "one file" PDF is built in the background (a few seconds after
   // create/edit), so a freshly-opened document may still show only the letter.
@@ -298,7 +305,8 @@ export default function DocumentDetail() {
     setPosting(true); setError(null);
     try {
       const body = msgText.trim() || `แนบไฟล์: ${msgFile.name}`;
-      const { data } = await ememoApi.postMessage(id, body);
+      const { data } = await ememoApi.postMessage(id, body, mentions.map((m) => m.id));
+      setMentions([]);
       if (msgFile) await ememoApi.attachMessageFile(id, data.id, msgFile);
       setMsgText(''); setMsgFile(null);
       load();
@@ -461,7 +469,13 @@ export default function DocumentDetail() {
                 ) : doc.reference}
               </MetaItem>
             )}
-            {doc.cc_recipients && <MetaItem icon="people" label="สำเนาเรียน">{doc.cc_recipients}</MetaItem>}
+            {(doc.cc_people?.length > 0 || doc.cc_recipients) && (
+              <MetaItem icon="people" label="สำเนาเรียน">
+                {doc.cc_people?.length > 0
+                  ? doc.cc_people.map((p) => p.full_name || p.email).join(' · ')
+                  : doc.cc_recipients}
+              </MetaItem>
+            )}
             {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
               <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">
                 {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
@@ -651,13 +665,71 @@ export default function DocumentDetail() {
             {/* composer */}
             <div ref={composerRef} className={`mt-4 rounded-xl border bg-slate-50 p-3 ${consultForMe ? 'border-brand/40 ring-2 ring-brand/15' : 'border-slate-200'}`}>
               {consultForMe && <div className="mb-1.5 text-xs font-semibold text-brand">ให้ความเห็นของคุณที่นี่</div>}
-              <textarea
-                value={msgText}
-                onChange={(e) => setMsgText(e.target.value)}
-                rows={2}
-                placeholder={consultForMe ? 'พิมพ์ความเห็นของคุณ…' : 'เขียนข้อความ / บันทึก / สอบถาม…'}
-                className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              />
+              <div className="relative">
+                <textarea
+                  value={msgText}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setMsgText(v);
+                    // open the picker on the "@word" the caret is sitting in
+                    const upto = v.slice(0, e.target.selectionStart ?? v.length);
+                    const m = /(?:^|\s)@([^\s@]*)$/.exec(upto);
+                    setMentionOpen(Boolean(m));
+                    setMentionQuery(m ? m[1] : '');
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setMentionOpen(false); }}
+                  rows={2}
+                  placeholder={consultForMe ? 'พิมพ์ความเห็นของคุณ…' : 'เขียนข้อความ / บันทึก / สอบถาม…  (พิมพ์ @ เพื่อกล่าวถึงเพื่อนร่วมงาน)'}
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+                {mentionOpen && (() => {
+                  const term = mentionQuery.trim().toLowerCase();
+                  const opts = people.filter((p) => p.id !== profile?.id
+                    && !mentions.some((m) => m.id === p.id)
+                    && (!term || (p.full_name || '').toLowerCase().includes(term) || p.email.toLowerCase().includes(term)));
+                  if (!opts.length) return null;
+                  return (
+                    <div className="absolute bottom-full z-30 mb-1 max-h-52 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                      {opts.slice(0, 20).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setMentions((prev) => [...prev, p]);
+                            // replace the half-typed "@xxx" with the person's name
+                            setMsgText((t) => t.replace(/(^|\s)@[^\s@]*$/, `$1@${p.full_name || p.email} `));
+                            setMentionOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                            {(p.full_name || p.email).slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm text-slate-800">{p.full_name || p.email}</span>
+                            <span className="block truncate text-[11px] text-slate-400">{p.email}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+              {mentions.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-500">แจ้งเตือนถึง:</span>
+                  {mentions.map((m) => (
+                    <span key={m.id} className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 font-medium text-violet-700">
+                      {m.full_name || m.email}
+                      <button type="button" onClick={() => setMentions((prev) => prev.filter((x) => x.id !== m.id))}
+                        title="เอาออก" className="text-violet-400 hover:text-red-600">
+                        <Icon name="x" className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <span className="text-slate-400">· จะได้รับอีเมลพร้อมลิงก์มาที่เอกสารนี้</span>
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-slate-500 hover:text-brand">
                   <Icon name="paperclip" className="h-4 w-4" />
@@ -880,6 +952,15 @@ function Timeline({ doc, openAttachment }) {
                 <span className="text-[11px] text-slate-500">{formatThaiDateTime(m.created_at)}</span>
               </div>
               <div className={`mt-1 whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
+              {Array.isArray(m.mentions) && m.mentions.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {m.mentions.map((x) => (
+                    <span key={x.id} className="rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                      @{x.full_name}
+                    </span>
+                  ))}
+                </div>
+              )}
               {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                 <div className="mt-1.5 space-y-1">
                   {m.attachments.map((a) => (

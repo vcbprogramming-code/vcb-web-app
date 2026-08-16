@@ -20,7 +20,7 @@ import { generateOriginalPdf, generateApprovedPdf, regenerateOriginalWithAudit }
 import { generateCombinedPdf, autoCombine } from '../services/pdfMerge.js';
 import { parseXlsxToSheets } from '../services/sheetPdf.js';
 import { createApprovalChain, sendApprovalRequest, applyApprovalAction } from '../services/approval.js';
-import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsultRequest } from '../services/email.js';
+import { sendCcNotification, extractCcEmails, sendAuthorNotification, sendConsultRequest, sendMentionNotification } from '../services/email.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -176,6 +176,11 @@ async function assertCanView(profile, doc) {
   // only the CURRENTLY-active approver (their step is issued a token) bypasses view
   // scope — a later approver in the chain shouldn't see the doc before it's their turn (#C7)
   if (approver) return;
+  // Being copied in (สำเนาเรียน) is itself permission to read this one document
+  // and join its conversation — otherwise a CC recipient outside the sender's
+  // project scope would be handed a link they cannot open.
+  const cc = await queryOne('select 1 from document_cc where document_id = $1 and profile_id = $2', [doc.id, profile.id]);
+  if (cc) return;
   if (!hasPermission(profile, 'ememo', 'view')) throw new ApiError(403, 'ไม่มีสิทธิ์ดูเอกสาร');
   await assertDocVisible(profile, doc);
 }
@@ -381,7 +386,23 @@ router.get(
   requirePermission('ememo', 'submit'),
   asyncHandler(async (req, res) => {
     const { rows } = await query(
-      `select full_name, email from profiles where is_active = true order by full_name`
+      `select id, full_name, email from profiles where is_active = true order by full_name`
+    );
+    res.json({ data: rows });
+  })
+);
+
+/** GET /api/documents/people — accounts that can be CC'd or @mentioned.
+ *  Gated on ememo.view like the company list: anyone who can read documents can
+ *  address one to a colleague, but the staff directory stays closed to accounts
+ *  with no E-Memo access at all (#C8). */
+router.get(
+  '/people',
+  requirePermission('ememo', 'view'),
+  asyncHandler(async (req, res) => {
+    const { rows } = await query(
+      `select id, full_name, email, job_title from profiles
+        where is_active = true order by full_name`
     );
     res.json({ data: rows });
   })
@@ -653,6 +674,11 @@ router.get(
     const { rows: audit } = await query(
       `select action, actor_label, detail, created_at
          from audit_log where document_id = $1 order by created_at`, [req.params.id]);
+    // สำเนาเรียน as accounts — the UI shows them as people, and they can comment
+    const { rows: ccList } = await query(
+      `select p.id, p.full_name, p.email from document_cc c
+         join profiles p on p.id = c.profile_id
+        where c.document_id = $1 order by p.full_name`, [req.params.id]);
     // conversation thread: messages + each message's file attachments
     const { rows: messages } = await query(
       `select m.id, m.body, m.author_label, m.created_at, m.kind, m.consult_email,
@@ -660,7 +686,12 @@ router.get(
               coalesce(
                 (select json_agg(json_build_object('id', a.id, 'file_name', a.file_name, 'content_type', a.content_type) order by a.created_at)
                    from document_attachments a where a.message_id = m.id), '[]'
-              ) as attachments
+              ) as attachments,
+              coalesce(
+                (select json_agg(json_build_object('id', mp.id, 'full_name', mp.full_name) order by mp.full_name)
+                   from document_message_mentions mm join profiles mp on mp.id = mm.profile_id
+                  where mm.message_id = m.id), '[]'
+              ) as mentions
          from document_messages m
          left join profiles pr on pr.id = m.author_id
         where m.document_id = $1
@@ -681,13 +712,39 @@ router.get(
       }
     }
 
-    res.json({ data: { ...doc, attachments, approval_steps: steps, audit, messages, reference_doc: referenceDoc } });
+    res.json({ data: { ...doc, attachments, approval_steps: steps, audit, messages, cc_people: ccList, reference_doc: referenceDoc } });
   })
 );
 
 // ── conversation messages (2-way communication) ──────────────────────────────
 
-const messageSchema = z.object({ body: z.string().trim().min(1) });
+/**
+ * Every address that should receive the "สำเนาเรียน" notice.
+ *
+ * CC recipients are accounts now, so document_cc is the real source. The old
+ * free-text field is still scanned as well, because documents created before
+ * that change only have addresses there — dropping it would silently stop
+ * notifying people on existing documents.
+ */
+async function ccEmailsFor(documentId, ccText) {
+  const { rows } = await query(
+    `select p.email from document_cc c join profiles p on p.id = c.profile_id
+      where c.document_id = $1 and p.is_active = true`, [documentId]);
+  const seen = new Set();
+  const out = [];
+  for (const e of [...rows.map((r) => r.email), ...extractCcEmails(ccText)]) {
+    const k = String(e || '').toLowerCase();
+    if (k && !seen.has(k)) { seen.add(k); out.push(e); }
+  }
+  return out;
+}
+
+const messageSchema = z.object({
+  body: z.string().trim().min(1),
+  // @tagged colleagues. They get an email pointing at this document — the client
+  // asked for it so a conversation can actually pull someone in.
+  mentions: z.array(z.string().uuid()).max(20).optional(),
+});
 
 /** POST /api/documents/:id/messages — post a text message to the thread. */
 router.post(
@@ -702,7 +759,35 @@ router.post(
        values ($1,$2,$3,$4) returning id, body, author_label, created_at`,
       [doc.id, req.profile.id, req.profile.full_name || req.profile.email, parsed.data.body.trim()]
     );
-    res.status(201).json({ data: { ...row, author_name: req.profile.full_name || null, attachments: [] } });
+
+    // Record the @mentions, then email each of them. Never notify the author of
+    // their own message, and never let a failed send lose the message itself.
+    let mentioned = [];
+    const wanted = [...new Set((parsed.data.mentions || []).filter((id) => id && id !== req.profile.id))];
+    if (wanted.length) {
+      const { rows: people } = await query(
+        `select id, full_name, email from profiles where id = any($1::uuid[]) and is_active = true`, [wanted]);
+      mentioned = people;
+      if (people.length) {
+        await query(
+          `insert into document_message_mentions (message_id, profile_id)
+             select $1, unnest($2::uuid[]) on conflict do nothing`,
+          [row.id, people.map((p) => p.id)]
+        ).catch((e) => console.error('mention insert failed:', e.message));
+        for (const p of people) {
+          await sendMentionNotification({
+            toEmail: p.email, toName: p.full_name, doc,
+            authorName: req.profile.full_name || req.profile.email, body: parsed.data.body.trim(),
+          }).catch((e) => console.error('mention email failed:', e.message));
+        }
+      }
+    }
+    res.status(201).json({
+      data: {
+        ...row, author_name: req.profile.full_name || null, attachments: [],
+        mentions: mentioned.map((p) => ({ id: p.id, full_name: p.full_name, email: p.email })),
+      },
+    });
   })
 );
 
@@ -781,6 +866,28 @@ router.post(
 const ymdField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)')
   .refine((s) => { const d = new Date(`${s}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; }, 'วันที่ไม่ถูกต้อง');
 
+/**
+ * Replace a document's สำเนาเรียน account list.
+ *
+ * `undefined` means "the caller didn't mention CC" and leaves the list alone —
+ * only an explicit array (including an empty one) rewrites it. Runs on the
+ * caller's transaction client when there is one, so a failed create doesn't
+ * leave CC rows behind.
+ */
+async function syncCc(client, documentId, profileIds) {
+  if (profileIds === undefined) return;
+  const run = client ? (t, p) => client.query(t, p) : (t, p) => query(t, p);
+  await run('delete from document_cc where document_id = $1', [documentId]);
+  const ids = [...new Set(profileIds.filter(Boolean))];
+  if (!ids.length) return;
+  await run(
+    `insert into document_cc (document_id, profile_id)
+       select $1, id from profiles where id = any($2::uuid[]) and is_active = true
+     on conflict do nothing`,
+    [documentId, ids]
+  );
+}
+
 const createSchema = z.object({
   projectId: z.string().uuid(),
   companyId: z.string().uuid().optional().nullable(),
@@ -790,6 +897,10 @@ const createSchema = z.object({
   reference: z.string().optional(),
   referenceDocId: z.string().uuid().optional().nullable(),
   cc: z.string().optional(),
+  // สำเนาเรียน as real accounts (the client's decision: CC recipients must have a
+  // login so they can read and comment on the document itself). `cc` above stays
+  // for the text printed on the letter and for every document created before this.
+  ccProfileIds: z.array(z.string().uuid()).max(30).optional(),
   signerName: z.string().optional(),
   signerTitle: z.string().optional(),
   authorSignatureUrl: z.string().optional(),
@@ -835,6 +946,7 @@ router.post(
          input.dateReceived || null, input.workUnit || null, JSON.stringify(input.enclosures || []), req.profile.id]
       );
       const doc = rows[0];
+      await syncCc(client, doc.id, input.ccProfileIds);
       await client.query(
         `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'created',$4)`,
         [doc.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ doc_number: doc.doc_number })]
@@ -856,6 +968,7 @@ const editSchema = z.object({
   reference: z.string().optional().nullable(),
   referenceDocId: z.string().uuid().optional().nullable(),
   cc: z.string().optional().nullable(),
+  ccProfileIds: z.array(z.string().uuid()).max(30).optional(),
   signerName: z.string().optional().nullable(),
   signerTitle: z.string().optional().nullable(),
   body: z.string().optional().nullable(),
@@ -921,9 +1034,14 @@ router.patch(
     if (f.docTypeId !== undefined) add('doc_type_id', f.docTypeId || null); // id change — not human-meaningful in the trail
     if (f.dateReceived !== undefined) add('date_received', f.dateReceived || null, '::date', 'วันที่รับ', doc.date_received, dateText);
     if (f.enclosures !== undefined) add('enclosures', JSON.stringify(f.enclosures), '::jsonb', 'สิ่งที่ส่งมาด้วย', doc.enclosures, enclText);
-    if (!sets.length) throw new ApiError(400, 'No fields to update');
-    vals.push(req.params.id);
-    await query(`update documents set ${sets.join(', ')} where id = $${vals.length}`, vals);
+    // CC accounts live in their own table, so an edit that ONLY changes them has
+    // no column to set — don't reject it as "nothing to update".
+    if (!sets.length && f.ccProfileIds === undefined) throw new ApiError(400, 'No fields to update');
+    if (sets.length) {
+      vals.push(req.params.id);
+      await query(`update documents set ${sets.join(', ')} where id = $${vals.length}`, vals);
+    }
+    await syncCc(null, req.params.id, f.ccProfileIds);
     await query(
       `insert into audit_log (document_id, actor_id, actor_label, action, detail) values ($1,$2,$3,'edited',$4)`,
       [req.params.id, req.profile.id, req.profile.full_name || req.profile.email, JSON.stringify({ changes })]
@@ -1223,7 +1341,7 @@ router.post(
     // was under review, so they must also be told it finished. Without this a CC
     // recipient never learns the outcome.
     if (result.finalized) {
-      const ccEmails = extractCcEmails(result.document.cc_recipients);
+      const ccEmails = await ccEmailsFor(result.document.id, result.document.cc_recipients);
       if (ccEmails.length) {
         await sendCcNotification({
           toEmails: ccEmails,
@@ -1424,7 +1542,7 @@ router.post(
 
     // CC "for your information / please advise" — send a copy to any email in the
     // สำเนาเรียน field. CC recipients are consulted, NOT in the approval chain.
-    const ccEmails = extractCcEmails(doc.cc_recipients);
+    const ccEmails = await ccEmailsFor(doc.id, doc.cc_recipients);
     if (ccEmails.length) {
       await sendCcNotification({
         toEmails: ccEmails,

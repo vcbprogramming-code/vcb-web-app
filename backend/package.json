@@ -11,7 +11,9 @@
     "migrate": "node scripts/db.mjs migrate",
     "seed": "node scripts/db.mjs seed",
     "create-admin": "node scripts/db.mjs create-admin",
-    "list-users": "node scripts/db.mjs list-users"
+    "list-users": "node scripts/db.mjs list-users",
+    "test:ememo": "node tests/run.mjs",
+    "test:ememo:api": "node tests/run.mjs --api"
   },
   "engines": {
     "node": ">=20"
@@ -35,5 +37,8 @@
     "pg": "^8.13.1",
     "qrcode": "^1.5.4",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.7.0"
   }
 }

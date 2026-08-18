@@ -8,6 +8,7 @@ interface Props {
   meetings: MeetingListItem[]
   byId: Record<string, Project>
   isAdmin: boolean
+  isEditor: boolean
   loaded: boolean
   active: ProjectId
   onPick: (id: ProjectId) => void
@@ -24,7 +25,8 @@ interface Row { id: ProjectId; name: string; nameEn: string; color: string; coun
 // "All meetings" aggregates the tracked projects only — Fathom Inbox and
 // Transkriptor Inbox are standalone review queues with their own tile/count,
 // never folded into ALL (mirrors isInboxProject_ throughout JavaScript.html).
-export default function Sidebar({ projects, meetings, byId, isAdmin, loaded, active, onPick, onOpen, onNew, onNewProject, onRenameProject, onTimeline, tr }: Props) {
+export default function Sidebar({ projects, meetings, byId, isAdmin, isEditor, loaded, active, onPick, onOpen, onNew, onNewProject, onRenameProject, onTimeline, tr }: Props) {
+  const canEdit = isAdmin || isEditor
   const total = projects.reduce((a, p) => isInboxProject(p.id) ? a : a + p.count, 0)
   const rows: Row[] = [
     { id: 'ALL', name: tr('allMeetings'), nameEn: tr('allMeetingsSub'), color: '#0b3d62', count: total },
@@ -56,7 +58,7 @@ export default function Sidebar({ projects, meetings, byId, isAdmin, loaded, act
           </div>
         ))}
       </div>
-      {isAdmin && <button className="newbtn" onClick={onNew}>{tr('newMeeting')}</button>}
+      {canEdit && <button className="newbtn" onClick={onNew}>{tr('newMeeting')}</button>}
       {isAdmin && <button className="newbtn secondary" onClick={onNewProject}>＋ New project</button>}
     </aside>
   )

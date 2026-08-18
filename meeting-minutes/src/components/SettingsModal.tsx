@@ -30,7 +30,7 @@ export default function SettingsModal({ open, onClose, session, theme, lang, set
         <div className="form">
           <div className="set-group">
             <div className="set-mini-label">{tr('signedInAs')}</div>
-            <div className="set-who">{(session.user || 'Signed in with Google') + (session.isAdmin ? ' · admin' : '')}</div>
+            <div className="set-who">{(session.user || 'Signed in with Google') + (session.isAdmin ? ' · admin' : (session.isEditor ? ' · editor' : ''))}</div>
           </div>
 
           <div className="set-group">

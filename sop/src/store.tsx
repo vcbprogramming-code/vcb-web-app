@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SopData, Scenario, ScenarioEdit, ScenarioCreate, ScenarioSwap, ReportCreate } from './data/types';
 import { MODULES, MODULES_EN, tr, type Lang } from './data/config';
+import { SOP_FLOWS } from './data/flows';
 import {
   bootstrap,
   getSopDataForClient,
@@ -52,8 +53,43 @@ interface NavState {
   navCollapsed: boolean;
 }
 
-/** Build the initial nav state by applying the saved default view. */
-function initialNav(mobile: boolean): NavState {
+/**
+ * Deep-link target resolved from `?case=N` / `?flow=ID` in the current URL —
+ * mirrors SOP_META.initialCase/initialFlow, which the canonical server
+ * validates (case) or passes through (flow) in doGet. This mock has no real
+ * backend distinction to preserve, so both are resolved/validated client-side
+ * here: `?case=N` must match a real scenario, `?flow=ID` falls back gracefully
+ * (via the caller returning null) if it doesn't match anything, same intent
+ * as the canonical client's openInitialCase().
+ */
+type InitialTarget = { kind: 'case'; module: string; no: number } | { kind: 'flow'; module: string; id: string };
+
+function resolveInitialTarget(scenarios: Scenario[]): InitialTarget | null {
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(window.location.search);
+  } catch {
+    return null;
+  }
+  const caseParam = params.get('case');
+  if (caseParam != null) {
+    const no = parseInt(caseParam, 10);
+    const s = !isNaN(no) ? scenarios.find((x) => x.no === no) : undefined;
+    if (s) return { kind: 'case', module: s.module, no: s.no };
+  }
+  const flowParam = params.get('flow');
+  if (flowParam != null) {
+    const f = SOP_FLOWS.find((x) => x.id === flowParam);
+    if (f) return { kind: 'flow', module: f.module, id: f.id };
+  }
+  return null;
+}
+
+/** Build the initial nav state by applying the saved default view — unless a
+ * `?case=N`/`?flow=ID` deep link resolves, in which case it takes priority
+ * (someone opening a shared link wants that exact case/flow, not their own
+ * last-used tab), mirroring `if (!openedFromShareLink) applyDefaultView()`. */
+function initialNav(mobile: boolean, initial: InitialTarget | null): NavState {
   const base: NavState = {
     view: 'sop',
     mod: 'ALL',
@@ -63,6 +99,21 @@ function initialNav(mobile: boolean): NavState {
     q: '',
     navCollapsed: false,
   };
+  if (initial) {
+    if (initial.kind === 'case') {
+      base.view = 'sop';
+      base.mod = initial.module;
+      base.sel = initial.no;
+    } else {
+      base.view = 'flows';
+      base.flowMod = initial.module;
+      base.selFlow = initial.id;
+    }
+    // Phones normally open to the HOME menu collapsed — except a share link
+    // opened a specific item, which should jump straight to its detail pane
+    // instead of stranding the user on the branch menu.
+    return base;
+  }
   const dv = getDefaultView();
   if (dv === 'reports') base.view = 'reports';
   else if (dv === 'flows') {
@@ -99,6 +150,11 @@ export interface Store {
   t: (key: string) => any;
   labels: Record<string, string>;
   getDefaultView: () => string;
+  /** Builds a shareable deep link (current origin+path + `?case=N`/`?flow=ID`).
+   * Mirrors shareLink()'s URL construction in the canonical app, using
+   * window.location instead of a server-injected SOP_META.appUrl since this
+   * mock has no backend to inject one from. */
+  buildShareUrl: (queryParam: 'case' | 'flow', value: string | number) => string;
   // actions
   selectModule: (m: string) => void;
   selectReports: () => void;
@@ -130,9 +186,18 @@ export interface Store {
 }
 
 export function useStore(): Store {
-  const [data, setData] = useState<SopData>(() => bootstrap());
+  // bootstrap() + the deep-link resolution are read together once at mount so
+  // both the data and the initial nav/mobile-view states agree on the same
+  // snapshot (mirrors doGet baking SOP_META.initialCase/initialFlow into the
+  // same payload the client boots with).
+  const [boot] = useState(() => {
+    const bootData = bootstrap();
+    const initialTarget = resolveInitialTarget(bootData.scenarios);
+    return { data: bootData, initialTarget };
+  });
+  const [data, setData] = useState<SopData>(() => boot.data);
   const [isMobile, setIsMobile] = useState<boolean>(detectMobile());
-  const [nav, setNav] = useState<NavState>(() => initialNav(detectMobile()));
+  const [nav, setNav] = useState<NavState>(() => initialNav(detectMobile(), boot.initialTarget));
   const [lang, setLangState] = useState<Lang>(() => {
     try {
       const sl = localStorage.getItem('sop-lang');
@@ -143,7 +208,9 @@ export function useStore(): Store {
     return 'th';
   });
   const [dark, setDark] = useState<boolean>(() => document.documentElement.classList.contains('dark'));
-  const [mobileView, setMobileViewState] = useState<MobileView>(() => (detectMobile() ? null : null));
+  const [mobileView, setMobileViewState] = useState<MobileView>(() =>
+    boot.initialTarget && detectMobile() ? 'detail' : null,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editNo, setEditNo] = useState<number | null>(null);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
@@ -151,6 +218,11 @@ export function useStore(): Store {
 
   const t = useCallback((key: string) => tr(lang, key), [lang]);
   const labels = (lang === 'en' ? MODULES_EN : MODULES) as Record<string, string>;
+
+  const buildShareUrl = useCallback((queryParam: 'case' | 'flow', value: string | number) => {
+    const base = window.location.origin + window.location.pathname;
+    return base + (base.indexOf('?') >= 0 ? '&' : '?') + queryParam + '=' + encodeURIComponent(value);
+  }, []);
 
   /* ----- side effects: reflect state onto <html>/<body> classes ----- */
   useEffect(() => {
@@ -421,6 +493,7 @@ export function useStore(): Store {
       t,
       labels,
       getDefaultView,
+      buildShareUrl,
       selectModule,
       selectReports,
       selectItem,
@@ -462,6 +535,7 @@ export function useStore(): Store {
       newReportOpen,
       t,
       labels,
+      buildShareUrl,
       selectModule,
       selectReports,
       selectItem,

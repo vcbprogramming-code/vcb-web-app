@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Store } from '../store';
 import { Icon } from '../lib/icons';
 import { APP_VERSION, CHANGELOG, DEV_EMAIL, MODULES, MODULES_EN } from '../data/config';
+import { copyText } from '../lib/copy';
 
 export default function SettingsModal({ s }: { s: Store }) {
   const isDark = s.dark;
@@ -30,33 +31,12 @@ export default function SettingsModal({ s }: { s: Store }) {
   }
 
   function copyEmail() {
-    function flash() {
+    copyText(DEV_EMAIL).then((ok) => {
+      if (!ok) return;
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 1500);
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(DEV_EMAIL).then(flash, fallback);
-    } else {
-      fallback();
-    }
-    function fallback() {
-      let ok = false;
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = DEV_EMAIL;
-        ta.style.position = 'fixed';
-        ta.style.top = '-1000px';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-      } catch {
-        ok = false;
-      }
-      if (ok) flash();
-    }
+    });
   }
 
   return (

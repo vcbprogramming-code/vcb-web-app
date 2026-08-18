@@ -1,24 +1,77 @@
 /** Right detail pane: welcome placeholder, scenario detail, reports table, or a
  *  process-flow diagram. Mirrors renderDetail(), placeholder(),
  *  renderFlowDetail(), and stepsHtml() in index.html. */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Store } from '../store';
 import type { Scenario } from '../data/types';
 import { Icon } from '../lib/icons';
 import FlowDiagram from './FlowDiagram';
 import { SOP_FLOWS } from '../data/flows';
 import { classifyStep } from '../lib/steps';
+import { copyText } from '../lib/copy';
 
-function MBackDetail({ s }: { s: Store }) {
+/** Back button + (on mobile only) a slot the Share/Edit buttons portal into —
+ *  mirrors `.mback-row` / `#mbackDetailActions` + moveDetailActionsMobile()
+ *  in the canonical app. Desktop keeps Share/Edit in the title row instead
+ *  (see ScenarioDetail/FlowDetail below), so the slot is simply absent there. */
+function MBackDetail({ s, actionsSlotRef }: { s: Store; actionsSlotRef: (el: HTMLDivElement | null) => void }) {
   const label = s.nav.view === 'reports' ? s.t('backModules') : s.t('backList');
   return (
-    <button className="mback" type="button" onClick={s.mobileBack} aria-label="ย้อนกลับ">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <polyline points="15 18 9 12 15 6" />
-      </svg>
-      <span id="mbackDetailLabel">{label}</span>
+    <div className="mback-row">
+      <button className="mback" type="button" onClick={s.mobileBack} aria-label="ย้อนกลับ">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        <span id="mbackDetailLabel">{label}</span>
+      </button>
+      <div id="mbackDetailActions" ref={actionsSlotRef}></div>
+    </div>
+  );
+}
+
+/** Copies a `?case=N` / `?flow=ID` deep link via copyText(), flashing a
+ *  "Link copied" state on success. Mirrors shareCase()/shareFlow() (thin
+ *  wrappers over shareLink()) in the canonical app. */
+function ShareButton({ s, queryParam, value }: { s: Store; queryParam: 'case' | 'flow'; value: string | number }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function onClick() {
+    const url = s.buildShareUrl(queryParam, value);
+    copyText(url).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <button className={'d-edit' + (copied ? ' copied' : '')} type="button" onClick={onClick}>
+      <span className="d-share-ico">
+        <Icon name={copied ? 'check' : 'link'} />
+      </span>
+      <span className="d-share-label">{copied ? s.t('shareCopied') : s.t('shareBtn')}</span>
     </button>
   );
+}
+
+/** Renders Share/Edit-row children inline in the title row on desktop, or
+ *  portals them into the sticky back-bar slot on mobile — mirrors
+ *  moveDetailActionsMobile() relocating `.d-edit` buttons from `.d-head`
+ *  into `#mbackDetailActions` on mobile only (a no-op on desktop). */
+function DetailActions({
+  s,
+  slot,
+  children,
+}: {
+  s: Store;
+  slot: HTMLDivElement | null;
+  children: React.ReactNode;
+}) {
+  if (s.isMobile && slot) return createPortal(children, slot);
+  return <>{children}</>;
 }
 
 /** The welcome / home page shown when nothing is selected (sop & flows views). */
@@ -105,7 +158,7 @@ function Steps({ steps }: { steps: string[] }) {
   );
 }
 
-function ScenarioDetail({ s, sc }: { s: Store; sc: Scenario }) {
+function ScenarioDetail({ s, sc, actionsSlot }: { s: Store; sc: Scenario; actionsSlot: HTMLDivElement | null }) {
   const primaryTitle = s.lang === 'en' && sc.titleEN ? sc.titleEN : sc.titleTH;
   const secondaryTitle = s.lang === 'en' && sc.titleEN ? sc.titleTH : sc.titleEN || '';
   return (
@@ -116,12 +169,15 @@ function ScenarioDetail({ s, sc }: { s: Store; sc: Scenario }) {
           <div className="d-th">{primaryTitle}</div>
           <div className="d-en">{secondaryTitle}</div>
         </div>
-        {s.isAdmin && (
-          <button className="d-edit" onClick={() => s.openEditModal(sc.no)}>
-            <Icon name="edit" />
-            <span>{s.t('editBtn')}</span>
-          </button>
-        )}
+        <DetailActions s={s} slot={actionsSlot}>
+          <ShareButton s={s} queryParam="case" value={sc.no} />
+          {s.isAdmin && (
+            <button className="d-edit" onClick={() => s.openEditModal(sc.no)}>
+              <Icon name="edit" />
+              <span>{s.t('editBtn')}</span>
+            </button>
+          )}
+        </DetailActions>
       </div>
       <div className="d-sec">
         <p className="lbl accent">{s.t('problemLbl')}</p>
@@ -227,7 +283,7 @@ function ReportsDetail({ s }: { s: Store }) {
   );
 }
 
-function FlowDetail({ s }: { s: Store }) {
+function FlowDetail({ s, actionsSlot }: { s: Store; actionsSlot: HTMLDivElement | null }) {
   if (s.nav.selFlow == null) return <Welcome s={s} />;
   const f = SOP_FLOWS.find((x) => x.id === s.nav.selFlow);
   if (!f) return <Welcome s={s} />;
@@ -241,6 +297,9 @@ function FlowDetail({ s }: { s: Store }) {
           <div className="d-th">{title}</div>
           <div className="d-en">{sub}</div>
         </div>
+        <DetailActions s={s} slot={actionsSlot}>
+          <ShareButton s={s} queryParam="flow" value={f.id} />
+        </DetailActions>
         <span className="d-badge">{f.module}</span>
       </div>
       <FlowDiagram s={s} f={f} />
@@ -249,17 +308,23 @@ function FlowDetail({ s }: { s: Store }) {
 }
 
 export default function DetailPane({ s }: { s: Store }) {
+  // A plain ref wouldn't trigger a re-render when the slot div first mounts,
+  // so the portal target would stay stale at null for that render — a state
+  // + callback ref makes mounting the slot itself trigger the re-render that
+  // lets Share/Edit portal into it.
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
+  const actionsSlotRef = useCallback((el: HTMLDivElement | null) => setActionsSlot(el), []);
   let body: React.ReactNode;
   if (s.nav.view === 'reports') body = <ReportsDetail s={s} />;
-  else if (s.nav.view === 'flows') body = <FlowDetail s={s} />;
+  else if (s.nav.view === 'flows') body = <FlowDetail s={s} actionsSlot={actionsSlot} />;
   else if (s.nav.sel === null) body = <Welcome s={s} />;
   else {
     const sc = s.scenarios.find((x) => x.no === s.nav.sel);
-    body = sc ? <ScenarioDetail s={s} sc={sc} /> : <Welcome s={s} />;
+    body = sc ? <ScenarioDetail s={s} sc={sc} actionsSlot={actionsSlot} /> : <Welcome s={s} />;
   }
   return (
     <main className="detail">
-      <MBackDetail s={s} />
+      <MBackDetail s={s} actionsSlotRef={actionsSlotRef} />
       <div id="detail">{body}</div>
     </main>
   );

@@ -46,3 +46,6 @@ supabase/.branches/
 # misc
 coverage/
 *.local
+
+# Claude Code local overrides (personal, not team-shared)
+.claude/settings.local.json

@@ -6134,41 +6134,51 @@ function ensureMasterIndex_(){
     sh.getRange(1,1,1,HEADERS.MasterIndex.length).setFontWeight('bold').setBackground('#1d4e89').setFontColor('#ffffff');
     sh.setColumnWidth(1,55); sh.setColumnWidth(2,90); sh.setColumnWidth(3,280); sh.setColumnWidth(4,340); sh.setColumnWidth(5,140); sh.setColumnWidth(6,220);
   }
+  // Purge BEFORE ensureJobCodes_, not after. ensureJobCodes_ assigns a numeric
+  // code (001, 002, …) to any row lacking one, so if it ran first it would
+  // stamp codes onto the legacy junk rows and they would no longer match the
+  // "no code" rule that identifies them — making them permanent.
+  purgeUncodedIndexRows_(sh);
   // Always backfill missing job codes — cheap, idempotent, and catches rows
   // that were inserted before the codification rule existed.
   ensureJobCodes_();
-  if(getConfig_('MASTER_INDEX_VERSION') === FULL_ROSTER_VERSION) return;
-  if(typeof FULL_ROSTER === 'undefined' || !FULL_ROSTER.sites) return;
-  var existing = readObjects_(sh).rows;
-  var have={}, maxId=0;
-  existing.forEach(function(r){ have[String(r.name||'').trim().toLowerCase()]=r; var n=Number(r.id)||0; if(n>maxId) maxId=n; });
-  var perName={};   // name -> { desc, sites:[siteName, ...] }
-  FULL_ROSTER.sites.forEach(function(s){
-    (s.teams||[]).forEach(function(t){
-      var name=String(t.name||'').trim(); if(!name) return;
-      var bucket = perName[name] || { desc:'', sites:[] };
-      if(!bucket.desc && t.desc) bucket.desc = t.desc;
-      if(bucket.sites.indexOf(s.name) < 0) bucket.sites.push(s.name);
-      perName[name]=bucket;
-    });
-  });
-  var rowsToAdd=[];
-  Object.keys(perName).forEach(function(name){
-    var k = name.toLowerCase();
-    if(have[k]) return;
-    maxId++;
-    rowsToAdd.push([maxId, '', name, perName[name].desc||'', '', perName[name].sites.join(', ')]);
-  });
-  if(rowsToAdd.length){
-    rowsToAdd.sort(function(a,b){ return String(a[2]).localeCompare(String(b[2]),'th'); });
-    sh.getRange(sh.getLastRow()+1,1,rowsToAdd.length,6).setValues(rowsToAdd);
-    ensureJobCodes_();   // codify the newly-appended rows
-  }
-  var cfgSh=sh_(SHEETS.CONFIG);
-  var found=false; readObjects_(cfgSh).rows.forEach(function(r){
-    if(r.key==='MASTER_INDEX_VERSION'){ cfgSh.getRange(r._row,2).setValue(FULL_ROSTER_VERSION); found=true; }
-  });
-  if(!found) cfgSh.appendRow(['MASTER_INDEX_VERSION', FULL_ROSTER_VERSION]);
+  // The index is now EXACTLY the curated VCB_WORK_TYPES set (44 rows, all
+  // coded A-1, B-2, …) loaded by loadVcbIndexes_().
+  //
+  // This function used to also scrape every team NAME out of FULL_ROSTER and
+  // append it as an extra index row with an EMPTY code. That produced ~126
+  // uncoded entries — site-specific job titles, not work types — which is not
+  // what the index is for, and it re-created them on every boot. They also
+  // carried FULL_ROSTER's mojibake (single Thai characters lost to a
+  // byte-level truncation in the original import, e.g. "ช่าง�ฟ" for "ช่างไฟ"),
+  // so the corrupt text visible in the index came in through here.
+  //
+  // Removed deliberately. The purgeUncodedIndexRows_ call above clears any
+  // that a previous deploy already wrote; without also dropping this
+  // generator they would simply come back on the next load.
+}
+/* Deletes MasterIndex rows that carry no รหัสงาน (code).
+
+   Every legitimate work type has one (A-1 … Z-2) because loadVcbIndexes_
+   writes it from VCB_WORK_TYPES. A codeless row can therefore only be legacy
+   clutter from the old FULL_ROSTER team-name scrape.
+
+   Deletes bottom-up so earlier deletions cannot shift the row numbers of
+   later ones. Runs on the boot path, but it is a no-op after the first pass
+   (nothing left to match) and reads one column, so it stays cheap. */
+function purgeUncodedIndexRows_(sh){
+  try{
+    sh = sh || sh_(SHEETS.INDEX); if(!sh) return 0;
+    var last = sh.getLastRow(); if(last < 2) return 0;
+    var codes = sh.getRange(2, 2, last-1, 1).getValues();   // column B = code
+    var kill = [];
+    for(var i=0;i<codes.length;i++){
+      if(String(codes[i][0]||'').trim()==='') kill.push(i+2);
+    }
+    if(!kill.length) return 0;
+    kill.sort(function(a,b){ return b-a; }).forEach(function(rowNum){ sh.deleteRow(rowNum); });
+    return kill.length;
+  } catch(e){ return 0; }
 }
 
 function api_masterList(){

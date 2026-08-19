@@ -2,12 +2,6 @@
 
 *Written 2026-08-19, live @200.*
 
-> **This is a copy of the GAS project's PAGINATION.md.** The React mirror
-> implements the same design: `src/lib/docRender.ts` holds `OVERRIDE_CSS`,
-> `PAGED_PREVIEW_JS` / `PAGED_PREVIEW_CSS` and the preview/print srcdoc split,
-> and `src/components/MeetingDetail.tsx` holds the settle-and-reveal load logic.
-> Keep both in step: a change to one is a change to the other.
-
 **Read this before changing anything about how meetings are displayed, printed,
 or edited.** Getting the reading view to break pages exactly where the PDF
 breaks them took many failed attempts. This document records what the design is,
@@ -176,6 +170,47 @@ editor used to do, and every copy drifted: the font stack, `h4`, the letterhead,
 body padding. Each drift moved every page break below it. `Stylesheet.html` now
 describes only the *sheet* — width, page margins, background, shadow.
 
+### 7. `@page` declares the page size and ALL four margins, explicitly
+
+This is the single most important rule, and its absence caused the 2026-08-19
+regression.
+
+Two different engines paginate this document:
+
+- the **screen** preview, via Paged.js;
+- the **PDF**, via Chrome's own print engine.
+
+Anything either engine is left to *default* is a place they can disagree. Chrome
+takes its page size from the **print dialog's destination**, which varies by the
+user's locale and printer — so an identical document paginated differently on
+different machines. A4 is 18mm taller than US Letter: ~68px more content per
+page, enough to pull a whole item onto the previous page.
+
+Therefore `OVERRIDE_CSS` states everything:
+
+```css
+@page { size: A4; margin: 2.7cm 17mm 2cm; }
+h1,h2,h3,h4 { break-after: avoid; break-inside: avoid; }
+p,li        { orphans: 3; widows: 3; }
+tr,img,li   { break-inside: avoid; }
+```
+
+`orphans/widows: 3` rather than the CSS default of 2: at 2, a four-line
+paragraph may split 2+2, and Chrome takes that option where Paged.js does not.
+
+**Geometry goes on `@page`, never on `body`.** Paged.js applies `body` padding
+inside its own page-margin box while Chrome applies it inside the page box, so
+identical CSS yields different text columns. `body` is now
+`{padding:0;max-width:none;margin:0}`.
+
+**Known residual limitation.** At ~99.7% agreement (1077/1080 blocks over 24
+generated documents) a block whose height lands within a few pixels of the page
+boundary can still differ: Chrome tolerates a slight overflow past the content
+box where Paged.js does not. This is internal engine rounding, not a stylesheet
+value — four separate attempts to close it (wider bottom margin, integer
+line-height, `break-inside` on `li`, `content-box` sizing) each failed or made
+it worse. Do not chase it by tuning margins.
+
 ---
 
 ## Known-bad approaches — do not retry these
@@ -189,6 +224,10 @@ describes only the *sheet* — width, page margins, background, shadow.
 | CSS multi-column, cloned per page | Right engine, wrong plumbing: produced nested sheets with text overflowing. |
 | `::marker { content: '✓' }` for the tick | Not portably supported; silently fell back to a plain black disc. |
 | `::before` for the tick | The class lands in the DOM, but inside `contenteditable` the pseudo-element is not reliably repainted on class toggle. |
+| Omitting `size` from `@page` | **The 2026-08-19 bug.** Paged.js then used its own default paper while Chrome used the *print dialog's destination*. On an A4 destination the PDF fit ~68px more per page than the screen showed, so items slid a page earlier (item 4.4 ended page 2 in the PDF, 4.3 on screen). Reproduced: 4/30 blocks disagreed on A4, 0/30 once pinned. |
+| Putting side padding / `max-width` on `body` | Paged.js applies `body` padding *inside* its own page margin box; Chrome does not. The on-screen text column came out 64px narrower, re-wrapping every paragraph. `max-width:816px` was also a US-**Letter** width silently contradicting an A4 page. Geometry belongs on `@page`. |
+| `body{padding-bottom}` as page-edge protection | Paged.js reserves it on **every** page; Chrome applies it once, after the last element. Drifted the final page break. The `@page` bottom margin already guards the printer's unprintable edge. |
+| Tuning the bottom margin to fix a stray break | 2.1cm gave 450/450 and 2.2cm regressed to 449/450 — it is sub-pixel rounding, not a size to tune. Chasing the magic number is luck, not a fix. |
 
 The tick marker is now `list-style-type: '✓  '` — a **real** marker box, painted
 by the same code path as a bullet, so it cannot fail to repaint or drift.
@@ -220,12 +259,17 @@ iframe.height >= innerDoc.body.scrollHeight  // no inner scrollbar
 
 | | value | where |
 |---|---|---|
-| Sheet | A4, 210×297mm | `@page` in `OVERRIDE_CSS` |
-| Page margins | 2.7cm top, 2cm bottom | `@page` |
-| Text column | **688px** (816 − 64×2) | `body{max-width:816px;padding:0 64px}` |
+| Sheet | A4, 210×297mm = 794×1123px | `@page{size:A4}` in `OVERRIDE_CSS` |
+| Page margins | 2.7cm top, 17mm sides, 2cm bottom | `@page{margin:2.7cm 17mm 2cm}` |
+| Text column | **665px** (794 − 64×2, from the 17mm side margins) | `@page` — *not* `body` |
 | Usable height | **945px** per page | 1123 − 102 − 76 |
 | Body type | 15px / 1.55 Sarabun | `OVERRIDE_CSS` |
+| Editor sheet | `width:210mm; padding:2.7cm 17mm 2cm` | `.ed-area` in `Stylesheet.html` |
+
+`body` contributes **no** geometry — `body{padding:0;max-width:none;margin:0}`.
+All of it lives on `@page`, the only place both pagination engines read it from.
 
 These three views share every one of those numbers. Change them in
-`OVERRIDE_CSS` and the editor follows automatically; change them anywhere else
-and the views drift apart.
+`OVERRIDE_CSS` and the reading view and PDF follow automatically; the editor's
+`.ed-area` in `Stylesheet.html` **must be changed by hand to match** — it is the
+one place the numbers are duplicated.

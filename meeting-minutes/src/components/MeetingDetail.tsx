@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditEntry, Project, MeetingFull, Theme } from '../types'
 import { fmtDate, fmtTime, fmtThaiDate } from '../lib/i18n'
-import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint } from '../lib/docRender'
+import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint, pdfDateSuffix } from '../lib/docRender'
 import { fetchMeeting, getCached, setCached } from '../api/contentCache'
 import { api, getToken } from '../api/client'
 import { applyMobileScale, isMobile, fileIconKind, fmtFileSize, fileToBase64 } from '../lib/ui'
@@ -256,6 +256,7 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
     isDark: theme === 'dark',
     aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor',
     pdfTitle: m.title,
+    pdfDate: pdfDateSuffix(m),
     execUrl,
     meetingId: m.id
   }

@@ -13,9 +13,43 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-08-19
-- **Live deployment referenced:** `@200` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-20
+- **Live deployment referenced:** `@203` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+
+- **2026-08-20 — page size pinned, and dated PDF filenames.**
+
+  `@page` had no `size`, so Paged.js (the on-screen preview) and Chrome's print
+  engine chose different paper — Chrome follows the **print dialog's
+  destination** — and every page break drifted. A4 is 18mm taller than US
+  Letter (~68px more content per page), so items landed a page earlier in the
+  PDF than on screen. `body{max-width:816px}` was a US-Letter width all along,
+  contradicting the A4 the comments claimed.
+
+  Ported to React (`src/lib/docRender.ts` — `OVERRIDE_CSS`):
+  - `@page{size:A4;margin:2.7cm 17mm 2cm}` — size and **all four** margins
+    explicit, so neither engine is left to default anything.
+  - `body{padding:0;max-width:none;margin:0}` — **all** geometry moved to
+    `@page`. Paged.js applies `body` padding *inside* its own page-margin box
+    while Chrome applies it inside the page box, so identical CSS produced a
+    64px narrower text column on screen and re-wrapped every paragraph.
+    `padding-bottom:100px` also went: Paged.js reserved it on every page,
+    Chrome applied it once after the last element.
+  - `h1,h2,h3,h4{break-after:avoid;break-inside:avoid}`, `p,li{orphans:3;widows:3}`,
+    `tr,img,li{break-inside:avoid}` — the engines' *defaults* differ, which is a
+    second drift source independent of page size. `orphans/widows:3` because at
+    the CSS default of 2 a four-line paragraph may split 2+2, which Chrome does
+    and Paged.js does not.
+
+  `OVERRIDE_CSS` is verified **byte-identical** between GAS and React (2247
+  chars). The React mirror has no A4 editing surface, so the matching
+  `.ed-area` geometry change (`210mm`, `2.7cm 17mm 2cm`) is GAS-only.
+
+  Also ported: **`pdfDateSuffix()`** in `docRender.ts` + `pdfDate` on
+  `SrcdocOpts`, wired from `MeetingDetail.tsx`. Exported PDFs are named
+  `<title> <d.m.yy>` (`VCB Meeting Minutes 18.8.69`) — dot-separated, unpadded,
+  2-digit Buddhist year, matching the convention already in the export folder.
+  Undated meetings keep the plain title rather than rendering `NaN-NaN-NaN`.
 
 - **2026-08-19 — page-accurate rendering (the big one).** The reading view, the
   PDF and the editor now break pages in identical places. **Read

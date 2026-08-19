@@ -40,24 +40,33 @@ export const OVERRIDE_CSS =
   // applied by mistake to screen too, leaving the AI-disclaimer flush
   // against the iframe's top edge with zero breathing room, mirrors
   // JavaScript.html's 2026-07-24 fix).
-  "@media screen{body{padding-top:48px;}}" +
+  // NO screen-only top padding: the on-screen view is a page preview and must
+  // start at the same origin as the printed page. 48px of screen-only padding
+  // shifted every page boundary relative to the PDF. See PAGINATION.md.
+  "" +
   // Print top margin — tall enough to fully contain the anti-tampering QR
   // stamp (see buildQrPageCss below) with headroom to spare, instead of
   // letting it push past the margin box into body content.
-  "@page{margin-top:2.7cm;margin-bottom:1.5cm;}" +
+  "@page{margin-top:2.7cm;margin-bottom:2cm;}" +
   "body,p,span,td,th,li,h1,h2,h3,h4,a,div{font-family:'Sarabun','Noto Sans Thai',sans-serif !important;}" +
   "body{color:#1f2328;font-size:15px;line-height:1.55;}" +
   "h1{font-size:21px;color:#0b3d62;font-weight:700;margin:18px 0 10px;}" +
   "h2{font-size:17px;color:#0b3d62;font-weight:700;margin:14px 0 8px;}" +
   "h3{font-size:16px;color:#24486b;font-weight:700;margin:12px 0 6px;}" +
   "h4{font-size:15px;color:#24486b;font-weight:700;margin:10px 0 6px;}" +
-  "p{margin:6px 0;}" +
+  // Same row spacing as list rows, so a line keeps its height whether it is a
+  // paragraph or a list item.
+  "p{margin:0;padding:4px 0;}" +
   "img{max-width:100%;height:auto;}a{color:#1f6feb;}" +
   "table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;}" +
   "td,th{border:1px solid #d8dee4;padding:7px 10px;vertical-align:top;}" +
   "th,tr:first-child td{background:#f1f5f9;font-weight:700;}" +
-  "ul,ol{padding-left:22px;margin:6px 0;}li{margin:3px 0;}" +
-  ".tick-list,.tick-list li{list-style:none;}.tick-list{padding-left:24px;}.tick-list li{position:relative;}.tick-list li:before{content:'✓';position:absolute;left:-22px;color:#1a7f37;font-weight:700;}" +
+  // Row height must not depend on nesting: the container contributes nothing
+  // vertically and each row owns its spacing (padding, which does not collapse).
+  "ul,ol{margin:0;padding-left:26px;}li{margin:0;padding:4px 0;}" +
+  // The tick is a REAL list marker (list-style-type), not ::marker content or a
+  // ::before glyph — both of those failed to render portably. See PAGINATION.md.
+  "li.tick-list{list-style-type:'✓  ';}li.tick-list::marker{color:#1a7f37;font-weight:700;}" +
   ".chip-file{display:inline-flex;align-items:center;gap:7px;border:1px solid #d8dee4;border-radius:8px;padding:4px 11px 4px 6px;margin:3px 7px 3px 0;text-decoration:none;color:#1f2328;background:#fff;font-size:13px;line-height:1.3;}" +
   ".chip-file:hover{border-color:#1f6feb;background:#f3f8ff;box-shadow:0 1px 4px rgba(27,31,36,.12);}" +
   ".chip-file .fi{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:18px;border-radius:3px;color:#fff;font-size:9px;font-weight:700;padding:0 3px;flex:none;}" +
@@ -70,7 +79,11 @@ export const OVERRIDE_CSS =
   // header, worst on mobile where the extra block ate scarce vertical space
   // for zero new information (2026-07-21 fix). Hidden on screen, kept fully
   // intact for print via the @media screen/print split below.
-  "@media screen{.vcb-letterhead,.vcb-letterdate{display:none;}}" +
+  // The letterhead and date are shown ON SCREEN too. They occupy real height on
+  // the printed page, so hiding them made the on-screen document SHORTER than the
+  // printed one — page 1 held more body text and every later break drifted.
+  // A page preview must contain exactly what the page contains.
+  "" +
   "@media print{a[href]:after{content:'';}.chip-file{border-color:#bbb;}}"
 
 // Dark-mode variant of the A4 preview — wrapped entirely in @media screen so
@@ -255,10 +268,45 @@ export interface SrcdocOpts {
   pdfTitle?: string
   execUrl?: string
   meetingId?: string
+  /** Omit Paged.js and the preview chrome — used for print/PDF output only. */
+  forPrint?: boolean
 }
 
 // Build the iframe srcdoc for a rendered meeting (letterhead + OVERRIDE_CSS
 // [+ DARK_OVERRIDE_CSS] [+ AI disclaimer banner] [+ anti-tampering QR print stamp]).
+/* ---------------- Real page preview, via Paged.js ------------------------
+   The browser fragments a document into pages only while printing, and does
+   not expose the result to JavaScript — there is no way to ask "where does
+   page 2 begin?". Computing it by hand is an approximation: it misses the
+   engine's widow/orphan control and its rule that a heading is never left
+   stranded at the foot of a page, so a heading sat on page 1 on screen but
+   page 2 in the PDF.
+
+   Paged.js reads the same @page rules the printer uses and lays the document
+   out into real page elements, so the boundaries shown on screen are the
+   boundaries the PDF will have. It runs ONLY in the preview iframe; printing
+   uses buildMeetingSrcdocForPrint below, which has no Paged.js at all, so PDF
+   output is byte-for-byte what it was before.
+
+   See PAGINATION.md in the GAS project for the full design and the list of
+   approaches already tried and found not to work. */
+export const PAGED_PREVIEW_JS =
+  '<script src="https://unpkg.com/pagedjs@0.4.3/dist/paged.polyfill.js"><\/script>'
+
+/* Chrome around the paginated preview. Every rule needs `html` for extra
+   specificity AND !important, because Paged.js injects its own stylesheet at
+   runtime — after this one — and its rules would otherwise win. Without these
+   the pages render as one continuous white column, exactly as if pagination
+   never ran. Verified in a real browser. */
+export const PAGED_PREVIEW_CSS =
+  '<style>@media screen{' +
+    'html body{background:#eef1f4 !important;}' +
+    'html .pagedjs_pages{display:flex !important;flex-direction:column !important;' +
+      'align-items:center !important;gap:22px !important;padding:22px 0 !important;}' +
+    'html .pagedjs_page{background:#fff !important;position:relative !important;' +
+      'box-shadow:0 2px 10px rgba(0,0,0,.18) !important;}' +
+  '}<\/style>'
+
 export function buildMeetingSrcdoc(html: string, css: string, thaiDate: string, opts: SrcdocOpts = {}): string {
   const docHtml = html || '<p>(no content)</p>'
   const leadsWithCompany = String(docHtml).replace(/<[^>]*>/g, ' ').slice(0, 220).indexOf('วิจิตรภัณฑ์ก่อสร้าง') !== -1
@@ -273,11 +321,24 @@ export function buildMeetingSrcdoc(html: string, css: string, thaiDate: string, 
   // exactly, even though only this SPA can actually make use of it.
   const pdfTitle = (opts.pdfTitle || 'Meeting').replace(/[\\/:*?"<>|]/g, '').trim() || 'Meeting'
   const qrPageCss = (opts.execUrl && opts.meetingId) ? buildQrPageCss(verifyQrDataUri(opts.execUrl, opts.meetingId)) : ''
-  return '<!DOCTYPE html><html><head><meta charset="utf-8"><base target="_blank">' +
+  const head = '<!DOCTYPE html><html><head><meta charset="utf-8"><base target="_blank">' +
     '<title>' + esc(pdfTitle) + '</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">' +
     '<style>' + (css || '') + '</style><style>' + OVERRIDE_CSS + '</style>' +
     (opts.isDark ? '<style>' + DARK_OVERRIDE_CSS + '</style>' : '') +
-    (qrPageCss ? '<style>' + qrPageCss + '</style>' : '') + '</head>' +
-    '<body>' + letterhead + aiDisclaimer + docHtml + '</body></html>'
+    (qrPageCss ? '<style>' + qrPageCss + '</style>' : '') + '</head>'
+  const body = letterhead + aiDisclaimer + docHtml
+  // Preview gets Paged.js + its chrome; print gets neither.
+  return opts.forPrint
+    ? head + '<body>' + body + '</body></html>'
+    : head + '<body>' + body + PAGED_PREVIEW_JS + PAGED_PREVIEW_CSS + '</body></html>'
 }
+
+/* The document exactly as it has always been produced — no Paged.js, no preview
+   chrome. Printing MUST use this: Paged.js has already split the preview into
+   page elements, so handing that to the print engine would paginate an
+   already-paginated document. */
+export function buildMeetingSrcdocForPrint(html: string, css: string, thaiDate: string, opts: SrcdocOpts = {}): string {
+  return buildMeetingSrcdoc(html, css, thaiDate, { ...opts, forPrint: true })
+}
+

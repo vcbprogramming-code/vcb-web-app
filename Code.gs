@@ -1292,16 +1292,6 @@ var T = {
   'อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?': { en: 'Approve this leave request and record it on the schedule?' },
   'ไม่อนุมัติคำขอลานี้หรือไม่?': { en: 'Reject this leave request?' },
   'ดำเนินการไม่สำเร็จ':        { en: 'Action failed' },
-  'ข้อมูลตัวอย่าง (เดโม)':      { en: 'Sample Data (Demo)' },
-  'เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างตลอดทั้งเดือนที่เลือก (เว้นวันหยุดสุดสัปดาห์) เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว':
-    { en: 'Fill empty cells across the whole chosen month (weekends excluded) for demo purposes · never overwrites existing real data' },
-  'เติมข้อมูลตัวอย่าง':         { en: 'Fill sample data' },
-  'กำลังเติมข้อมูล…':           { en: 'Filling…' },
-  'เติมข้อมูลตัวอย่างแล้ว':     { en: 'Sample data added' },
-  'เติมข้อมูลไม่สำเร็จ':        { en: 'Could not add sample data' },
-  'ปีหรือเดือนไม่ถูกต้อง':      { en: 'Invalid year or month' },
-  'เติมข้อมูลตัวอย่างสำหรับเดือนนี้ทุกหน่วยงานหรือไม่? ช่องที่มีข้อมูลอยู่แล้วจะไม่ถูกแก้ไข':
-    { en: 'Fill sample data for this month across all sites? Cells that already contain data are left untouched.' },
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
@@ -1968,6 +1958,19 @@ function boot(){
       try { go('dashboard'); }
       catch(e3){ fatal('VIEW: '+(e2&&e2.message||e2)+' / '+(e3&&e3.stack||e3)); }
     }
+    // One-shot demo fill, fired AFTER the app has rendered so it never delays
+    // boot. The server no-ops on every call after the first, so this costs one
+    // cheap round trip per visit thereafter. Redraw only when it actually
+    // wrote something, so a normal load is untouched.
+    try { maybeAutoSeed_(); } catch(e4){}
+  });
+}
+function maybeAutoSeed_(){
+  if(!BOOT || !BOOT.isAdmin) return;
+  call('api_autoSeedDemoOnce', [], function(r){
+    if(!r || !r.ok || !r.detail) return;   // skipped / failed → leave the view alone
+    // Data landed after the dashboard already drew, so redraw it.
+    try { if(window._curView==='dashboard') go('dashboard'); } catch(e){}
   });
 }
 // Data layer is unreachable (see api_bootstrap's catch). Still show the real
@@ -4491,21 +4494,6 @@ function renderSettings(target, opts){
           +'<button class="btn sec" id="lockDaysSave" disabled>'+t('บันทึก')+'</button>'
         +'</div>'
       +'</div>';
-  // Demo seeding. Admin-only and deliberately explicit about what it does:
-  // it fills EMPTY day cells for a chosen month so the dashboard has something
-  // to show, and never overwrites a cell that already holds real work.
-  var demoSect = BOOT.isAdmin
-    ? '<div class="sect">'
-        +'<h2>'+t('ข้อมูลตัวอย่าง (เดโม)')+'</h2>'
-        +'<p class="desc">'+esc(t('เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างตลอดทั้งเดือนที่เลือก (เว้นวันหยุดสุดสัปดาห์) เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว'))+'</p>'
-        +'<div class="lockrow">'
-          +'<input id="demoYear" type="number" min="2000" max="2999" step="1" value="'+String(CUR.y)+'" style="width:6.5rem">'
-          +'<input id="demoMonth" type="number" min="1" max="12" step="1" value="'+String(CUR.m)+'" style="width:4.5rem">'
-          +'<button class="btn sec" id="demoSeed">'+t('เติมข้อมูลตัวอย่าง')+'</button>'
-        +'</div>'
-        +'<div class="hint" id="demoOut" style="margin-top:.4rem"></div>'
-      +'</div>'
-    : '';
   var auditSect =
       '<div class="sect">'
         +'<h2>'+t('ประวัติการแก้ไข')+'</h2>'
@@ -4558,35 +4546,10 @@ function renderSettings(target, opts){
       +'</div>'
       +'<div class="settings-cols">'
         +'<div class="settings-col">'+ themeSect + langSect + yearSect + dashSect + weeklySect + lockSect +'</div>'
-        +'<div class="settings-col">'+ sitesSect + usersSect + auditSect + demoSect + aboutSect +'</div>'
+        +'<div class="settings-col">'+ sitesSect + usersSect + auditSect + aboutSect +'</div>'
       +'</div>'
     + bodyClose
     + closeTag;
-
-  // ----- demo seeder -----
-  var dBtn = $('demoSeed');
-  if(dBtn) dBtn.onclick = function(){
-    var y = Number($('demoYear').value), m = Number($('demoMonth').value);
-    if(!y || m<1 || m>12){ flash(t('ปีหรือเดือนไม่ถูกต้อง'),'error'); return; }
-    uiConfirm({ message: t('เติมข้อมูลตัวอย่างสำหรับเดือนนี้ทุกหน่วยงานหรือไม่? ช่องที่มีข้อมูลอยู่แล้วจะไม่ถูกแก้ไข'),
-                okText: t('เติมข้อมูลตัวอย่าง') }, function(){
-      withBtnLoading(dBtn, t('กำลังเติมข้อมูล…'), function(done){
-        call('api_seedDemoMonth',[y,m],function(r){
-          done();
-          var out = $('demoOut');
-          if(r && r.ok){
-            flash(t('เติมข้อมูลตัวอย่างแล้ว'),'ok');
-            // Show the per-site cell counts the seeder reports, so it is
-            // obvious which sites actually received data.
-            if(out) out.textContent = String(r.detail||'');
-          } else {
-            flash(t('เติมข้อมูลไม่สำเร็จ'),'error');
-            if(out) out.textContent = (r && r.error) ? String(r.error) : '';
-          }
-        });
-      });
-    });
-  };
 
   // ----- close button (modal mode) -----
   if(isModal){
@@ -6311,19 +6274,45 @@ function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
   sh.getRange(1,1,values.length,width).setValues(values);   // ONE batched write
   return site.key+': '+writes+' cells, '+roster.length+' emp';
 }
-// Client entry point for the demo seeder. Admin only, and NON-DESTRUCTIVE:
-// overwrite is hard-coded false, so it fills empty cells and never touches a
-// cell that already holds real work. That matters because this runs against
-// the live DB — a demo fill must not be able to eat genuine records.
-function api_seedDemoMonth(year, month){
+/* ---------------------------------------------------------------------------
+   ONE-SHOT DEMO FILL
+
+   Fills DEMO_SEED_MONTHS with sample work so the dashboard has figures to
+   show. Runs at most once ever: the first run writes a marker into Config and
+   every later call returns immediately on seeing it, so a public page that
+   many people load cannot re-run the fill or pile up concurrent writes.
+
+   Deliberately NOT on the boot path — api_bootstrap/doGet must stay light or
+   the app hangs while loading. The client calls this AFTER boot has already
+   rendered, so a slow fill costs nothing visible.
+
+   Non-destructive: overwrite is false, so it only ever fills empty cells and
+   cannot eat real records.
+--------------------------------------------------------------------------- */
+var DEMO_SEED_FLAG_ = 'demo_seed_done';
+var DEMO_SEED_MONTHS_ = [[2026,6],[2026,7],[2026,8]];
+function api_autoSeedDemoOnce(){
   try{
     rcReset_();
-    var u=resolveUser_(currentEmail_());
-    if(u.role!=='admin') throw new Error('FORBIDDEN');
-    year=Number(year); month=Number(month);
-    if(!year || month<1 || month>12) return { ok:false, error:'BAD_MONTH' };
-    var detail=seedDemoAllSites(year, month, false, true);
-    return { ok:true, detail:String(detail) };
+    if(getConfig_(DEMO_SEED_FLAG_)) return { ok:true, skipped:'already' };
+    // Claim the marker BEFORE doing the work. Two visitors can land here at
+    // the same moment; whoever writes second still writes the same value, and
+    // the guard above stops any third. Worst case the fill runs twice, which
+    // is harmless because it only fills empty cells.
+    var lock=LockService.getScriptLock();
+    try{ lock.waitLock(5000); } catch(e){ return { ok:true, skipped:'busy' }; }
+    try{
+      if(getConfig_(DEMO_SEED_FLAG_)) return { ok:true, skipped:'already' };
+      setConfigIfEmpty_(DEMO_SEED_FLAG_,
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+    } finally { lock.releaseLock(); }
+    var out=[];
+    for(var i=0;i<DEMO_SEED_MONTHS_.length;i++){
+      var y=DEMO_SEED_MONTHS_[i][0], m=DEMO_SEED_MONTHS_[i][1];
+      try{ out.push(y+'-'+m+': '+seedDemoAllSites(y, m, false, true)); }
+      catch(e){ out.push(y+'-'+m+': ERR '+(e&&e.message||e)); }
+    }
+    return { ok:true, detail:out.join(' || ') };
   } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
 // Seed the same month across every site (one batched write each).

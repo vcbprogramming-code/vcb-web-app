@@ -6181,11 +6181,30 @@ function ensureMasterIndex_(){
    This version does ONE read and ONE write — it keeps the surviving rows,
    rewrites the sheet with them, and clears the leftover tail — so it finishes
    in a single pass regardless of how many rows are dropped. */
+/* The Apps Script editor runs a function but does NOT print its return value,
+   so PURGE_INDEX's result was invisible in the Execution log. Log it as well
+   as returning it, so the operator can see what happened. */
+function purgeSay_(msg){ try{ Logger.log(msg); }catch(e){} return msg; }
+/* READ-ONLY companion: reports what the index currently holds without changing
+   anything. Run it to confirm the state before or after PURGE_INDEX. */
+function CHECK_INDEX(){
+  var sh = sh_(SHEETS.INDEX);
+  if(!sh) return purgeSay_('NO MASTERINDEX SHEET');
+  var last = sh.getLastRow(); if(last < 2) return purgeSay_('EMPTY');
+  var vals = sh.getRange(2, 1, last-1, Math.min(3, sh.getLastColumn())).getValues();
+  var coded = 0, uncoded = 0, bad = 0;
+  for(var i=0;i<vals.length;i++){
+    if(String(vals[i][1]||'').trim()==='') uncoded++; else coded++;
+    if(String(vals[i][2]||'').indexOf('�') >= 0) bad++;   // mojibake in the name
+  }
+  return purgeSay_('index rows: ' + (coded+uncoded) +
+    ' · coded ' + coded + ' · UNCODED ' + uncoded + ' · names with garbled text ' + bad);
+}
 function PURGE_INDEX(){
   var sh = sh_(SHEETS.INDEX);
-  if(!sh) return 'NO MASTERINDEX SHEET';
+  if(!sh) return purgeSay_('NO MASTERINDEX SHEET');
   var last = sh.getLastRow(), width = sh.getLastColumn();
-  if(last < 2) return 'EMPTY';
+  if(last < 2) return purgeSay_('EMPTY');
   var all = sh.getRange(1, 1, last, width).getValues();
   var header = all[0];
   var keep = [];
@@ -6193,12 +6212,12 @@ function PURGE_INDEX(){
     if(String(all[i][1] || '').trim() !== '') keep.push(all[i]);   // col B = code
   }
   var removed = (all.length - 1) - keep.length;
-  if(!removed) return 'ALREADY CLEAN · ' + keep.length + ' rows';
+  if(!removed) return purgeSay_('ALREADY CLEAN · ' + keep.length + ' rows');
   var out = [header].concat(keep);
   sh.getRange(1, 1, out.length, width).setValues(out);
   // Blank whatever the shorter list left behind at the bottom.
   if(out.length < last) sh.getRange(out.length + 1, 1, last - out.length, width).clearContent();
-  return 'REMOVED ' + removed + ' uncoded rows · ' + keep.length + ' remain';
+  return purgeSay_('REMOVED ' + removed + ' uncoded rows · ' + keep.length + ' remain');
 }
 
 function api_masterList(){

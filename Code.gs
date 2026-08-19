@@ -995,7 +995,9 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 .lv-type{ font-size:.82rem; line-height:1.35; padding-right:.7rem }
 .lv-why{ font-size:.82rem; line-height:1.35; color:var(--muted); padding-right:.7rem }
 .lv-side{ display:flex; align-items:center; justify-content:flex-end; gap:.5rem; overflow:visible }
-.lv-badge{ display:flex; justify-content:flex-end; width:5.2rem }
+.lv-badge{ display:flex; flex-direction:column; align-items:flex-end; gap:.1rem; width:7.5rem }
+.lv-by{ font-size:.68rem; color:var(--muted); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; max-width:100% }
 .lv-acts{ display:flex; gap:.25rem }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }
 /* Heading row: same grid, no card chrome — just small caps labels and a rule. */
@@ -1281,6 +1283,10 @@ var T = {
   'อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?': { en: 'Approve this leave request and record it on the schedule?' },
   'ไม่อนุมัติคำขอลานี้หรือไม่?': { en: 'Reject this leave request?' },
   'ดำเนินการไม่สำเร็จ':        { en: 'Action failed' },
+  'ประวัติการพิจารณา':         { en: 'Decision History' },
+  'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
+  'ทั้งหมด':                   { en: 'All' },
+  'แสดง':                      { en: 'showing' },
   'ยกเลิกคำขอ':                { en: 'Cancel request' },
   'ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้': { en: 'Cancel this leave request? This cannot be undone.' },
   'ยกเลิกคำขอแล้ว':            { en: 'Request cancelled' },
@@ -3583,6 +3589,12 @@ var LEAVE_TYPES = [
   { code:'ordination',th:'ลาบวช' },
   { code:'other',     th:'อื่นๆ' }
 ];
+// Approvers are recorded by email. The local part is what identifies them at
+// a glance; the full address stays in the tooltip.
+function lvShortBy_(v){
+  var s=String(v||''); var at=s.indexOf('@');
+  return at>0 ? s.slice(0,at) : s;
+}
 function leaveTypeLabel_(code){
   for(var i=0;i<LEAVE_TYPES.length;i++) if(LEAVE_TYPES[i].code===code) return t(LEAVE_TYPES[i].th);
   return t('ไม่ระบุ');
@@ -3820,6 +3832,17 @@ function renderRequestsHub(){
           '<div class="card" style="margin-top:.8rem">'
             +'<h2 style="margin:0 0 .5rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
             +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
+          +'</div>'
+          +'<div class="card" style="margin-top:.8rem">'
+            +'<div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">'
+              +'<h2 style="margin:0">'+t('ประวัติการพิจารณา')+'</h2>'
+              +'<div class="seg" id="lvHistFilter">'
+                +'<button class="on" data-f="all">'+t('ทั้งหมด')+'</button>'
+                +'<button data-f="approved">'+t('อนุมัติแล้ว')+'</button>'
+                +'<button data-f="rejected">'+t('ไม่อนุมัติ')+'</button>'
+              +'</div>'
+            +'</div>'
+            +'<div id="lvHistTickets" style="margin-top:.5rem"><div class="spinner"></div></div>'
           +'</div>' : '')
       +'</div>'
     +'</div>';
@@ -3836,6 +3859,17 @@ function renderRequestsHub(){
     });
   };
   $('lvEmp').onchange=function(){ LV.eid=this.value; renderMyTickets_(); };
+  if($('lvHistFilter')){
+    Array.prototype.forEach.call($('lvHistFilter').querySelectorAll('button'),function(b){
+      b.onclick=function(){
+        LV_HIST.filter=b.getAttribute('data-f');
+        Array.prototype.forEach.call($('lvHistFilter').querySelectorAll('button'),function(x){
+          x.className = (x===b) ? 'on' : '';
+        });
+        renderHistoryTickets_();
+      };
+    });
+  }
   // Single-day leave is the common case — pre-fill End with Start so most
   // requests need only one date picked; the user can still change End freely.
   $('lvFrom').onchange=function(){
@@ -3861,7 +3895,7 @@ function renderRequestsHub(){
     });
   };
   renderMyTickets_();
-  if(BOOT.canEntry) loadPendingTickets_();
+  if(BOOT.canEntry){ loadPendingTickets_(); loadHistoryTickets_(); }
 }
 // One compact ticket. Everything that used to stack vertically (dates, then
 // reason, then a button row) now shares a single line: the status bar and
@@ -3902,7 +3936,11 @@ function leaveTicketHtml_(r, opts){
     +'<div class="lv-type">'+esc(leaveTypeLabel_(r.leave_type))+'</div>'
     +'<div class="lv-why" title="'+esc(r.reason||'')+'">'+esc(r.reason||'')+'</div>'
     +'<div class="lv-side">'
-      +'<span class="lv-badge">'+leaveStatusBadge_(r.status)+'</span>'
+      +'<span class="lv-badge">'+leaveStatusBadge_(r.status)
+        + (opts.showDecided && r.decided_by
+            ? '<span class="lv-by" title="'+esc(r.decided_by)+' · '+esc(r.decided_at||'')+'">'
+              +esc(lvShortBy_(r.decided_by))+' · '+esc(lvFmtDate_(r.decided_at))+'</span>' : '')
+      +'</span>'
       +'<div class="lv-acts">'
         +'<button class="btn sec" data-print="'+esc(r.id)+'" style="'+btn+'" title="'+esc(t('พิมพ์'))+'">🖨</button>'
         + (opts.showActions ? '<button class="btn" data-act="approve" data-id="'+esc(r.id)+'" style="'+btn+'">'+t('อนุมัติ')+'</button>'
@@ -3944,7 +3982,7 @@ function wireTicketButtons_(container){
         call('api_decideLeaveRequest',[String(id),approve],function(r){
           if(r&&r.ok){
             flash(approve?t('อนุมัติแล้ว'):t('ไม่อนุมัติแล้ว'),'ok');
-            loadPendingTickets_(); refreshPendingLeaveBadge_(); renderMyTickets_();
+            loadPendingTickets_(); refreshPendingLeaveBadge_(); renderMyTickets_(); loadHistoryTickets_();
           }
           else flash(t('ดำเนินการไม่สำเร็จ'),'error');
         });
@@ -3971,6 +4009,40 @@ function renderMyTickets_(){
       + '</div>';
     wireTicketButtons_(box);
   });
+}
+// Decided requests, cached client-side so the approved/rejected filter is
+// instant and does not re-hit the server for a list it already has.
+var LV_HIST = { rows:[], total:0, filter:'all' };
+function loadHistoryTickets_(){
+  var box=$('lvHistTickets'); if(!box) return;
+  call('api_decidedLeaveRequests',[200],function(res){
+    box=$('lvHistTickets'); if(!box) return;
+    LV_HIST.rows = (res&&res.rows)||[];
+    LV_HIST.total = (res&&res.total)||0;
+    LV_HIST.rows.forEach(function(r){ LV_ROWS[r.id]=r; });
+    renderHistoryTickets_();
+  });
+}
+function renderHistoryTickets_(){
+  var box=$('lvHistTickets'); if(!box) return;
+  var list=LV_HIST.rows.filter(function(r){
+    return LV_HIST.filter==='all' ? true : r.status===LV_HIST.filter;
+  });
+  if(!list.length){ box.innerHTML='<p class="muted">'+t('ยังไม่มีประวัติการพิจารณา')+'</p>'; return; }
+  var nA=0,nR=0;
+  LV_HIST.rows.forEach(function(r){ if(r.status==='approved') nA++; else if(r.status==='rejected') nR++; });
+  var summary='<div class="hint" style="margin-bottom:.4rem">'
+    + t('อนุมัติแล้ว')+' '+nA+' · '+t('ไม่อนุมัติ')+' '+nR
+    // Say plainly when the server capped the list, rather than letting a
+    // truncated history look like the whole record.
+    + (LV_HIST.total>LV_HIST.rows.length
+        ? ' · <b>'+t('แสดง')+' '+LV_HIST.rows.length+'/'+LV_HIST.total+'</b>' : '')
+    +'</div>';
+  box.innerHTML = summary + '<div class="lv-list">'
+    + lvHeadHtml_(true)
+    + list.map(function(r){ return leaveTicketHtml_(r, {showName:true, showSite:true, showDecided:true}); }).join('')
+    + '</div>';
+  wireTicketButtons_(box);
 }
 function loadPendingTickets_(){
   var box=$('lvPendingTickets'); if(!box) return;
@@ -6679,6 +6751,39 @@ function _api_cancelLeaveRequest_(id, eid){
     sh.deleteRow(rn);
     return { ok:true };
   } finally { lock.releaseLock(); }
+}
+// Decided requests across the caller's scoped sites — the approver's audit
+// trail. Approve/reject only stamp status/decided_by/decided_at onto the row,
+// so nothing was ever lost; it simply had no view, because the pending queue
+// filters status==='pending' and a decided row therefore disappeared from it.
+// Newest decision first: this is read to answer "what did we just do", not to
+// page through the whole year.
+function api_decidedLeaveRequests(limit){
+  rcReset_(); var u=requireEntry_();
+  var scoped=scopedSiteKeys_(u);
+  var n=Number(limit)||200;
+  var all=readObjects_(ensureLeaveSheet_()).rows
+    .filter(function(r){
+      var st=String(r.status||'').trim();
+      return (st==='approved'||st==='rejected') && scoped.indexOf(String(r.site_key).trim())>=0;
+    })
+    .map(leaveRowOut_)
+    // decided_at is "yyyy-MM-dd HH:mm", so a plain string compare orders it
+    // correctly. Rows with no stamp (decided before that column was written)
+    // sort to the BOTTOM rather than falling back to the id: ids begin with
+    // "LV", which compares ABOVE any "2026-..." timestamp and would float
+    // undated rows to the top as though they were the newest decisions.
+    .sort(function(a,b){
+      var x=String(a.decided_at||''), y=String(b.decided_at||'');
+      if(!x && !y) return a.id<b.id?1:a.id>b.id?-1:0;
+      if(!x) return 1;
+      if(!y) return -1;
+      return x<y?1:x>y?-1:0;
+    });
+  var out=all.slice(0,n);
+  // Tell the client what it is NOT seeing, so a truncated list can say so
+  // instead of silently looking complete.
+  return { rows:out, total:all.length, shown:out.length };
 }
 function findLeaveRow_(sh, id){
   var last=sh.getLastRow(); if(last<2) return 0;

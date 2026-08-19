@@ -4071,13 +4071,16 @@ function wireTicketButtons_(container){
         var done=lvTicketBusy_(btn,'');
         // Send the eid too: with no login it's what proves the row is ours.
         call('api_cancelLeaveRequest',[String(id), String(LV.eid)],function(r){
-          done();
+          // Same as the approve/reject path: the row only goes when the
+          // reloaded list renders, so hold the spinner until then rather than
+          // handing back a row that is already deleted server-side. Both
+          // branches that re-render deliberately skip done().
           if(r&&r.ok){
             flash(t('ยกเลิกคำขอแล้ว'),'ok');
             renderMyTickets_(); refreshPendingLeaveBadge_(); if(BOOT.canEntry) loadPendingTickets_();
           }
           else if(r&&r.error==='ALREADY_DECIDED'){ flash(t('คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้'),'error'); renderMyTickets_(); }
-          else flash(t('ยกเลิกไม่สำเร็จ'),'error');
+          else { done(); flash(t('ยกเลิกไม่สำเร็จ'),'error'); }
         });
       });
     };
@@ -4089,12 +4092,17 @@ function wireTicketButtons_(container){
       uiConfirm({message:msg, okText: approve?t('อนุมัติ'):t('ไม่อนุมัติ'), danger:!approve}, function(){
         var done=lvTicketBusy_(btn, t('กำลังดำเนินการ…'));
         call('api_decideLeaveRequest',[String(id),approve],function(r){
-          done();
           if(r&&r.ok){
+            // Do NOT call done() here. The decision is committed, but the row
+            // only leaves the queue when the reloaded list renders — a second
+            // round trip. Releasing the spinner now makes the row look ready
+            // to click again for a second or two while its fate is already
+            // sealed. Keep it busy until the refresh replaces it; that render
+            // discards this node, so there is nothing left to restore.
             flash(approve?t('อนุมัติแล้ว'):t('ไม่อนุมัติแล้ว'),'ok');
             loadPendingTickets_(); refreshPendingLeaveBadge_(); renderMyTickets_(); loadHistoryTickets_();
           }
-          else flash(t('ดำเนินการไม่สำเร็จ'),'error');
+          else { done(); flash(t('ดำเนินการไม่สำเร็จ'),'error'); }
         });
       });
     };

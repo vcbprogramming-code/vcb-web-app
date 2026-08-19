@@ -256,15 +256,31 @@
   .attachchip .cm small { text-transform: none; }
   .attach-upload-btn { border: 1px dashed var(--line); background: transparent; color: var(--ink-soft); border-radius: 22px; padding: 5px 14px; font-size: 12.5px; cursor: pointer; }
   .attach-upload-btn:hover { border-color: var(--brand-2); color: var(--brand-2); }
-  .frame-wrap { flex: 1; overflow: auto; background: #eef1f4; padding: 22px; }
-  .paper { max-width: 860px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: var(--shadow); }
+  /* Does NOT scroll on its own: the iframe is sized to its full paginated
+     height, so a scrollable .frame-wrap produced a second scrollbar floating in
+     the middle of the pane instead of one at the window edge. Scrolling belongs
+     to the outer detail pane. */
+  .frame-wrap { background: #eef1f4; padding: 22px; }
+  /* The single scroll container for the reading pane. */
+  #detailContent { overflow: auto; }
+  /* Transparent, with no sheet styling: Paged.js renders each page as its own
+     white sheet with a shadow, so a white panel behind them shows as a page
+     inside a page. This is now just a centring box. */
+  .paper { max-width: 860px; margin: 0 auto; background: transparent; }
   /* Sits below .paper inside .frame-wrap's own scroll area — same max-width/
      centering as .paper so it lines up with the document above it, own card
      chrome (white, rounded, shadowed) so it reads as a distinct trailing
      section rather than a continuation of the paper or a floating strip. */
-  .attach-footer { max-width: 860px; margin: 16px auto 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  /* Hidden until the document has paginated, then revealed with the sheet —
+     otherwise it painted at the top of an empty pane and jumped down. */
+  .attach-footer { max-width: 860px; margin: 16px auto 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; visibility: hidden; }
+  .frame-wrap.ready .attach-footer { visibility: visible; }
+  html.is-mobile .attach-footer { visibility: visible; }
   .attach-footer .atl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 700; margin-right: 4px; flex-basis: 100%; }
-  iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 400px; }
+  /* Starts hidden AND already full-height: Paged.js paginates asynchronously,
+     so without both the pane painted as a short box and then jumped to full
+     size. JS sets the exact height and reveals it once the page count settles. */
+  iframe.render { width: 100%; border: 0; display: block; border-radius: 8px; min-height: 80vh; visibility: hidden; }
   .placeholder { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--ink-faint); flex-direction: column; gap: 10px; text-align: center; padding: 40px; }
   .placeholder .big { font-size: 40px; opacity: .4; }
 
@@ -510,7 +526,7 @@
   html.theme-dark .chip { background: var(--panel); border-color: var(--line); color: var(--ink); }
   html.theme-dark .chip-x:hover { background: #3a1d23; color: #ff7a85; }
   html.theme-dark .frame-wrap { background: #1a1f26; }
-  html.theme-dark .paper { background: #161b22; }
+  /* .paper is transparent now; Paged.js sheets carry their own background. */
   html.theme-dark .mobile-backbar { background: var(--panel); border-bottom-color: var(--line); }
   html.theme-dark .mobile-back-btn { background: transparent; border-color: var(--line); color: var(--brand-2); }
   html.theme-dark.is-mobile .ml-item { background: var(--panel); border-color: var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 4px 12px rgba(0,0,0,.3); }

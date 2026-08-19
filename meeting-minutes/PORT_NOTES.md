@@ -13,9 +13,52 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-08-16
-- **Live deployment referenced:** `@148` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-19
+- **Live deployment referenced:** `@200` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+
+- **2026-08-19 — page-accurate rendering (the big one).** The reading view, the
+  PDF and the editor now break pages in identical places. **Read
+  [PAGINATION.md](PAGINATION.md) before touching display, print or editor
+  layout** — it records the design, the rules that must hold, and six approaches
+  already tried and found not to work.
+
+  Ported to React:
+  - **`src/lib/docRender.ts`**
+    - `OVERRIDE_CSS` synced with GAS: `@page` bottom margin `1.5cm → 2cm`;
+      `p{margin:0;padding:4px 0}`; `ul,ol{margin:0;padding-left:26px}` with
+      `li{margin:0;padding:4px 0}` (row spacing belongs to the ROW, not the
+      container, or height depends on nesting depth); tick marker is now a real
+      `list-style-type:'✓  '` (both `::marker{content}` and a `::before` glyph
+      failed to render portably).
+    - **Two `@media screen` divergences removed.** The letterhead/date were
+      hidden on screen but present in print (~63px), and the screen had 48px of
+      padding print lacked. Screen and print must render the *same document* or
+      every page boundary after the difference shifts.
+    - New `PAGED_PREVIEW_JS` / `PAGED_PREVIEW_CSS`, and `buildMeetingSrcdoc`
+      split into a preview build (with Paged.js) and
+      `buildMeetingSrcdocForPrint` (without). The preview CSS must load *after*
+      the Paged.js script and use `!important` — Paged.js injects its own
+      stylesheet at runtime and otherwise wins, silently rendering the pages as
+      one continuous column.
+  - **`src/components/MeetingDetail.tsx`**
+    - `onFrameLoad` waits for the Paged.js page count to **settle** (three equal
+      reads) rather than first appearance — reading too early reported 2 pages
+      for a 7-page document — then sizes the frame and reveals it.
+    - `print()` now prints from a hidden iframe built from the *un-paginated*
+      srcdoc. Printing the preview would paginate an already-paginated document.
+  - **`src/styles.css`**
+    - `.frame-wrap` no longer scrolls (it produced a second scrollbar in the
+      middle of the pane); `#detailContent` is the single scroll container.
+    - `.paper` is transparent — Paged.js draws each page as its own white
+      sheet, so a white panel behind them reads as a page inside a page.
+    - `iframe.render` starts `visibility:hidden` with `min-height:80vh`, and
+      `.attach-footer` is hidden until `.frame-wrap.ready`, so the document and
+      its attachments appear together instead of painting and then jumping.
+
+  Not ported (GAS-only, by design): the editor's hidden-iframe measuring pass
+  (`measureRealPageBreaks_`), because the React mirror has no contenteditable
+  page-break markers to place.
 - **What changed in a follow-up 2026-08-16 audit pass** (after the editor-tier
   sync below — a full GAS-vs-React drift audit turned up two older,
   pre-existing gaps neither introduced by nor related to the editor-tier

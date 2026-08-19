@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditEntry, Project, MeetingFull, Theme } from '../types'
 import { fmtDate, fmtTime, fmtThaiDate } from '../lib/i18n'
-import { buildMeetingSrcdoc } from '../lib/docRender'
+import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint } from '../lib/docRender'
 import { fetchMeeting, getCached, setCached } from '../api/contentCache'
 import { api, getToken } from '../api/client'
 import { applyMobileScale, isMobile, fileIconKind, fmtFileSize, fileToBase64 } from '../lib/ui'
@@ -72,8 +72,38 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
         const d = frame.contentWindow?.document
         if (d?.fonts?.ready) d.fonts.ready.then(() => applyMobileScale(frame))
       } else {
-        const h = frame.contentWindow!.document.body.scrollHeight
-        frame.style.height = (h + 48) + 'px'
+        /* Paged.js lays the document out asynchronously after load, so the
+           height must be taken once it FINISHES — and the frame stays hidden
+           until then, or the un-paginated document paints as a blank pane and
+           jumps to full size a moment later.
+
+           Wait for the page count to SETTLE, not merely to become non-zero:
+           Paged.js adds pages progressively, and reading at first sight of a
+           page reported 2 pages for a document that actually had 7. */
+        let revealed = false
+        const fitFrame = (): void => {
+          try {
+            const d = frame.contentWindow!.document
+            frame.style.height = (d.body.scrollHeight + 48) + 'px'
+            if (!revealed) {
+              revealed = true
+              frame.style.visibility = 'visible'
+              const wrap = frame.closest('.frame-wrap') as HTMLElement | null
+              if (wrap) { wrap.classList.add('ready'); wrap.style.visibility = '' }
+            }
+          } catch { /* cross-origin or torn down */ }
+        }
+        frame.style.visibility = 'hidden'
+        let tries = 0, lastCount = -1, stable = 0
+        const poll = window.setInterval(() => {
+          let d: Document | null = null
+          try { d = frame.contentWindow!.document } catch { /* not ready */ }
+          if (!d || ++tries > 80) { window.clearInterval(poll); fitFrame(); return }
+          const count = d.querySelectorAll('.pagedjs_page').length
+          if (count > 0 && count === lastCount) {
+            if (++stable >= 3) { window.clearInterval(poll); fitFrame() }
+          } else { stable = 0; lastCount = count }
+        }, 100)
       }
     } catch { frame.style.height = '1400px' }
   }
@@ -144,9 +174,24 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
     fetchMeeting(id).then(full => { setM(full); onMutated() })
     onToast('Now also showing in ' + projectName)
   }
+  /* Printing must NOT use the preview iframe: Paged.js has already split that
+     document into page elements, so handing it to the print engine would
+     paginate an already-paginated document. Print from a hidden iframe holding
+     the untouched srcdoc instead — byte-for-byte what produced the PDF before
+     Paged.js existed, so exports are unchanged. */
   function print(): void {
-    const f = frameRef.current
-    try { f!.contentWindow!.focus(); f!.contentWindow!.print() } catch { window.print() }
+    try {
+      const old = document.getElementById('printFrame')
+      if (old) old.remove()
+      const pf = document.createElement('iframe')
+      pf.id = 'printFrame'
+      pf.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;'
+      pf.srcdoc = printSrcdoc
+      pf.onload = () => {
+        try { pf.contentWindow!.focus(); pf.contentWindow!.print() } catch { window.print() }
+      }
+      document.body.appendChild(pf)
+    } catch { window.print() }
   }
   async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = e.target.files?.[0]
@@ -207,13 +252,15 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
   const p = byId[m.projectId] || ({} as Project)
   const canEdit = isAdmin || isEditor
   const editable = canEdit && m.source !== 'doc-import'
-  const srcdoc = buildMeetingSrcdoc(m.html, m.css, fmtThaiDate(m), {
+  const srcdocOpts = {
     isDark: theme === 'dark',
     aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor',
     pdfTitle: m.title,
     execUrl,
     meetingId: m.id
-  })
+  }
+  const srcdoc = buildMeetingSrcdoc(m.html, m.css, fmtThaiDate(m), srcdocOpts)
+  const printSrcdoc = buildMeetingSrcdocForPrint(m.html, m.css, fmtThaiDate(m), srcdocOpts)
 
   return (
     <>

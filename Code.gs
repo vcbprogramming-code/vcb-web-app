@@ -968,41 +968,58 @@ html.is-mobile .statrow .viewseg button,
 html.is-mobile .statrow .seg button{ flex:1 1 0 }
 html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 @media(max-width:900px){ .req-grid{ grid-template-columns:1fr !important } }
-/* Leave tickets. The old card stacked dates / reason / buttons on three rows,
-   so eight requests became a very tall column with a mostly-empty right half.
-   Each ticket is now ONE row (dates+reason left, status+actions right) and the
-   list is an auto-fitting grid, so wide screens pack 2-3 tickets per row and
-   the page uses the horizontal space it already had. */
-.lv-list{ display:flex; flex-direction:column; gap:.4rem }
-.lv-ticket{ display:flex; align-items:center; gap:.75rem; min-width:0;
+/* Leave tickets — one full-width row per request, read as a table.
+   The fields were previously packed left-to-right with flex, so each row's
+   columns began wherever the previous field happened to end and nothing
+   aligned between rows. The row is now a GRID with fixed tracks, so name,
+   project, dates and reason each start at the same x-position on every row
+   and the eye can scan straight down a column. Column widths are shared by
+   every ticket in the list because each row uses the same template. */
+.lv-list{ display:flex; flex-direction:column; gap:.35rem }
+.lv-ticket{ display:grid; align-items:center; gap:0; min-width:0;
   padding:.4rem .7rem; background:var(--card); border:1px solid var(--line);
-  border-left-width:4px; border-radius:9px }
+  border-left-width:4px; border-radius:9px;
+  /* name | project | dates | days | reason | status+actions */
+  grid-template-columns:minmax(0,15rem) minmax(0,12rem) 13.5rem 4.5rem minmax(0,1fr) auto }
+/* My Requests has no name/project columns — drop those two tracks so the
+   dates still start hard left instead of behind two empty gutters. */
+.lv-list.lv-mine .lv-ticket{ grid-template-columns:13.5rem 4.5rem minmax(0,1fr) auto }
 .lv-ticket:hover{ box-shadow:0 1px 4px rgba(0,0,0,.08) }
-/* One row: the three text parts sit side by side and the reason takes the
-   slack, so the row stays a single line however wide the screen is. */
-.lv-main{ flex:1 1 auto; min-width:0; display:flex; align-items:baseline; gap:.75rem }
-.lv-who{ flex:0 0 auto; font-size:.9rem; line-height:1.35; white-space:nowrap;
-  overflow:hidden; text-overflow:ellipsis; max-width:34ch }
-.lv-when{ flex:0 0 auto; font-size:.9rem; line-height:1.35; white-space:nowrap }
-/* Reason is free text up to 300 chars — clamp it to one line so a long note
-   can never make the row taller than the others. Full text on hover. */
-.lv-why{ flex:1 1 auto; min-width:0; font-size:.82rem; line-height:1.35;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.lv-side{ flex:0 0 auto; display:flex; align-items:center; gap:.5rem }
+/* Every cell is one line, clipped with an ellipsis, so no row can grow taller
+   than its neighbours and break the column rhythm. Full text on hover. */
+.lv-ticket > *{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.lv-who{ font-size:.9rem; line-height:1.35; font-weight:700; padding-right:.7rem }
+.lv-site{ font-size:.82rem; line-height:1.35; color:var(--muted); padding-right:.7rem }
+.lv-when{ font-size:.9rem; line-height:1.35; font-variant-numeric:tabular-nums }
+.lv-days{ font-size:.82rem; line-height:1.35; color:var(--muted); text-align:right; padding-right:.9rem }
+.lv-why{ font-size:.82rem; line-height:1.35; color:var(--muted); padding-right:.7rem }
+.lv-side{ display:flex; align-items:center; justify-content:flex-end; gap:.5rem; overflow:visible }
+.lv-badge{ display:flex; justify-content:flex-end; width:5.2rem }
 .lv-acts{ display:flex; gap:.25rem }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }
-/* Phones: one ticket per row, and let the reason wrap to two lines since
-   there is no neighbouring card whose height it could throw off. */
-html.is-mobile .lv-ticket{ align-items:flex-start; flex-wrap:wrap }
-html.is-mobile .lv-main{ flex-direction:column; align-items:flex-start; gap:.1rem; width:100% }
-html.is-mobile .lv-who{ max-width:100%; white-space:normal }
-html.is-mobile .lv-why{ white-space:normal }
-html.is-mobile .lv-side{ width:100%; justify-content:space-between; margin-top:.35rem }
-@media(max-width:900px){
-  .lv-main{ flex-direction:column; align-items:flex-start; gap:.1rem }
-  .lv-who{ max-width:100%; white-space:normal }
-  .lv-why{ white-space:normal }
+/* Heading row: same grid, no card chrome — just small caps labels and a rule. */
+.lv-head{ background:transparent; border:0; border-bottom:1px solid var(--line);
+  border-radius:0; padding:0 .7rem .25rem; margin-bottom:.1rem;
+  font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--muted) }
+.lv-head:hover{ box-shadow:none }
+.lv-head .lv-side{ justify-content:flex-start }
+/* Narrow viewports can't hold six tracks. Collapse to a stack: each field on
+   its own line, wrapping allowed, actions on a full-width row underneath. */
+@media(max-width:1100px){
+  .lv-ticket,
+  .lv-list.lv-mine .lv-ticket{ grid-template-columns:1fr auto }
+  .lv-who{ grid-column:1 }
+  .lv-site,.lv-when,.lv-days,.lv-why{ grid-column:1; white-space:normal }
+  .lv-days{ text-align:left; padding-right:0 }
+  .lv-side{ grid-column:2; grid-row:1 / span 5; align-items:center }
+  .lv-ticket > *{ white-space:normal }
+  .lv-head{ display:none }
 }
+html.is-mobile .lv-head{ display:none }
+html.is-mobile .lv-ticket,
+html.is-mobile .lv-list.lv-mine .lv-ticket{ grid-template-columns:1fr }
+html.is-mobile .lv-side{ grid-column:1; grid-row:auto; justify-content:space-between; margin-top:.35rem }
 
 /* Slim down the dashboard "filter" card (title + subtitle + view-toggle +
    month-picker). It was eating ~1cm of vertical that the user can't get back
@@ -3688,6 +3705,18 @@ function renderRequestsHub(){
 // dates on the left, reason in the middle, actions on the right. Cards are
 // laid out by .lv-list as a responsive multi-column grid, so a wide screen
 // shows several per row instead of one tall column of mostly-empty cards.
+// Column headings for a ticket list. Shares .lv-ticket's grid template (via
+// .lv-head) so each label sits exactly above its column. Hidden once the
+// layout collapses to a stack, where headings would be meaningless.
+function lvHeadHtml_(withName){
+  return '<div class="lv-ticket lv-head">'
+    + (withName ? '<div>'+esc(t('ชื่อพนักงาน'))+'</div><div>'+esc(t('หน่วยงาน'))+'</div>' : '')
+    +'<div>'+esc(t('ช่วงวันที่ลา'))+'</div>'
+    +'<div class="lv-days">'+esc(t('วัน'))+'</div>'
+    +'<div>'+esc(t('เหตุผล'))+'</div>'
+    +'<div class="lv-side">'+esc(t('สถานะ'))+'</div>'
+  +'</div>';
+}
 function leaveTicketHtml_(r, opts){
   opts = opts || {};
   var days = (function(){
@@ -3697,15 +3726,18 @@ function leaveTicketHtml_(r, opts){
   var barColor = r.status==='approved' ? '#1f9d55' : r.status==='rejected' ? '#e0533a' : '#e8b500';
   var range = esc(r.from_date)+(r.from_date!==r.to_date?' – '+esc(r.to_date):'');
   var btn = 'padding:.22rem .55rem;font-size:.8rem;line-height:1.35';
+  var site = opts.showSite ? siteNameFor_(r.site_key) : '';
+  // Each field is its own grid cell, emitted in a fixed order so the columns
+  // line up across rows. The reason cell is always emitted (empty when there
+  // is none) — skipping it would shift the following cells into its track.
   return '<div class="lv-ticket" data-id="'+esc(r.id)+'" style="border-left:4px solid '+barColor+'">'
-    +'<div class="lv-main">'
-      + (opts.showName ? '<div class="lv-who" title="'+esc(r.emp_name)+'"><b>'+esc(r.emp_name)+'</b>'
-          + (opts.showSite ? ' <span class="hint">· '+esc(siteNameFor_(r.site_key))+'</span>' : '')+'</div>' : '')
-      +'<div class="lv-when"><b>'+range+'</b> <span class="hint">('+days+' '+esc(t('วัน'))+')</span></div>'
-      + (r.reason ? '<div class="lv-why hint" title="'+esc(r.reason)+'">'+esc(r.reason)+'</div>' : '')
-    +'</div>'
+    + (opts.showName ? '<div class="lv-who" title="'+esc(r.emp_name)+'">'+esc(r.emp_name)+'</div>'
+        +'<div class="lv-site" title="'+esc(site)+'">'+esc(site)+'</div>' : '')
+    +'<div class="lv-when">'+range+'</div>'
+    +'<div class="lv-days">'+days+' '+esc(t('วัน'))+'</div>'
+    +'<div class="lv-why" title="'+esc(r.reason||'')+'">'+esc(r.reason||'')+'</div>'
     +'<div class="lv-side">'
-      + leaveStatusBadge_(r.status)
+      +'<span class="lv-badge">'+leaveStatusBadge_(r.status)+'</span>'
       +'<div class="lv-acts">'
         +'<button class="btn sec" data-print="'+esc(r.id)+'" style="'+btn+'" title="'+esc(t('พิมพ์'))+'">🖨</button>'
         + (opts.showActions ? '<button class="btn" data-act="approve" data-id="'+esc(r.id)+'" style="'+btn+'">'+t('อนุมัติ')+'</button>'
@@ -3768,7 +3800,8 @@ function renderMyTickets_(){
     var summary='<div class="hint" style="margin-bottom:.5rem">'
       + t('รอดำเนินการ')+' '+counts.pending+' · '+t('อนุมัติแล้ว')+' '+counts.approved+' · '+t('ไม่อนุมัติ')+' '+counts.rejected
       +'</div>';
-    box.innerHTML = summary + '<div class="lv-list">'
+    box.innerHTML = summary + '<div class="lv-list lv-mine">'
+      + lvHeadHtml_(false)
       + list.map(function(r){ return leaveTicketHtml_(r, {showCancel:true}); }).join('')
       + '</div>';
     wireTicketButtons_(box);
@@ -3781,6 +3814,7 @@ function loadPendingTickets_(){
     if(!list||!list.length){ box.innerHTML='<p class="muted">'+t('ไม่มีคำขอลาที่รอดำเนินการ')+'</p>'; return; }
     list.forEach(function(r){ LV_ROWS[r.id]=r; });
     box.innerHTML = '<div class="lv-list">'
+      + lvHeadHtml_(true)
       + list.map(function(r){ return leaveTicketHtml_(r, {showName:true, showSite:true, showActions:true}); }).join('')
       + '</div>';
     wireTicketButtons_(box);

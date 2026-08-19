@@ -6134,11 +6134,10 @@ function ensureMasterIndex_(){
     sh.getRange(1,1,1,HEADERS.MasterIndex.length).setFontWeight('bold').setBackground('#1d4e89').setFontColor('#ffffff');
     sh.setColumnWidth(1,55); sh.setColumnWidth(2,90); sh.setColumnWidth(3,280); sh.setColumnWidth(4,340); sh.setColumnWidth(5,140); sh.setColumnWidth(6,220);
   }
-  // Purge BEFORE ensureJobCodes_, not after. ensureJobCodes_ assigns a numeric
-  // code (001, 002, …) to any row lacking one, so if it ran first it would
-  // stamp codes onto the legacy junk rows and they would no longer match the
-  // "no code" rule that identifies them — making them permanent.
-  purgeUncodedIndexRows_(sh);
+  // NOT purged here. Deleting the legacy rows is a one-time repair, and doing
+  // it on the boot path timed out api_bootstrap (deleteRow is one Sheets call
+  // per row, ~82 of them). Run PURGE_INDEX() once from the Apps Script editor
+  // instead — see its comment. Boot must stay light.
   // Always backfill missing job codes — cheap, idempotent, and catches rows
   // that were inserted before the codification rule existed.
   ensureJobCodes_();
@@ -6153,8 +6152,8 @@ function ensureMasterIndex_(){
   // byte-level truncation in the original import, e.g. "ช่าง�ฟ" for "ช่างไฟ"),
   // so the corrupt text visible in the index came in through here.
   //
-  // Removed deliberately. The purgeUncodedIndexRows_ call above clears any
-  // that a previous deploy already wrote; without also dropping this
+  // Removed deliberately. Rows a previous deploy already wrote are cleared by
+  // running PURGE_INDEX() once from the editor; without also dropping this
   // generator they would simply come back on the next load.
 }
 /* Deletes MasterIndex rows that carry no รหัสงาน (code).
@@ -6166,19 +6165,40 @@ function ensureMasterIndex_(){
    Deletes bottom-up so earlier deletions cannot shift the row numbers of
    later ones. Runs on the boot path, but it is a no-op after the first pass
    (nothing left to match) and reads one column, so it stays cheap. */
-function purgeUncodedIndexRows_(sh){
-  try{
-    sh = sh || sh_(SHEETS.INDEX); if(!sh) return 0;
-    var last = sh.getLastRow(); if(last < 2) return 0;
-    var codes = sh.getRange(2, 2, last-1, 1).getValues();   // column B = code
-    var kill = [];
-    for(var i=0;i<codes.length;i++){
-      if(String(codes[i][0]||'').trim()==='') kill.push(i+2);
-    }
-    if(!kill.length) return 0;
-    kill.sort(function(a,b){ return b-a; }).forEach(function(rowNum){ sh.deleteRow(rowNum); });
-    return kill.length;
-  } catch(e){ return 0; }
+/* EDITOR-ONLY one-time repair: drop MasterIndex rows that have no รหัสงาน.
+
+   Every real work type has a code (A-1 … Z-3) because loadVcbIndexes_ writes
+   it from VCB_WORK_TYPES, so a codeless row can only be leftover clutter from
+   the old FULL_ROSTER team-name scrape (removed from ensureMasterIndex_).
+
+   Run once from the Apps Script editor: select PURGE_INDEX, press Run.
+
+   Deliberately NOT called from ensureMasterIndex_ or anything else on the boot
+   path. An earlier version was, and it timed out api_bootstrap and took the
+   whole app down: deleteRow costs one Sheets round trip per row, and there
+   were ~82 to remove.
+
+   This version does ONE read and ONE write — it keeps the surviving rows,
+   rewrites the sheet with them, and clears the leftover tail — so it finishes
+   in a single pass regardless of how many rows are dropped. */
+function PURGE_INDEX(){
+  var sh = sh_(SHEETS.INDEX);
+  if(!sh) return 'NO MASTERINDEX SHEET';
+  var last = sh.getLastRow(), width = sh.getLastColumn();
+  if(last < 2) return 'EMPTY';
+  var all = sh.getRange(1, 1, last, width).getValues();
+  var header = all[0];
+  var keep = [];
+  for(var i = 1; i < all.length; i++){
+    if(String(all[i][1] || '').trim() !== '') keep.push(all[i]);   // col B = code
+  }
+  var removed = (all.length - 1) - keep.length;
+  if(!removed) return 'ALREADY CLEAN · ' + keep.length + ' rows';
+  var out = [header].concat(keep);
+  sh.getRange(1, 1, out.length, width).setValues(out);
+  // Blank whatever the shorter list left behind at the bottom.
+  if(out.length < last) sh.getRange(out.length + 1, 1, last - out.length, width).clearContent();
+  return 'REMOVED ' + removed + ' uncoded rows · ' + keep.length + ' remain';
 }
 
 function api_masterList(){

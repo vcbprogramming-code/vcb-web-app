@@ -1351,6 +1351,9 @@ var T = {
   'รหัสพนักงาน':               { en: 'Employee ID' },
   'ตำแหน่ง':                   { en: 'Position' },
   'เบอร์ติดต่อระหว่างลา':      { en: 'Contact During Leave' },
+  // Short form used on the printed slip: the long label wrapped onto two lines
+  // inside its 34mm grid column and broke the row's baseline alignment.
+  'เบอร์ติดต่อ':               { en: 'Contact No.' },
   'ผู้ปฏิบัติงานแทน':          { en: 'Covering Duties' },
   'บันทึกการทำงานรายวัน':      { en: 'HR Daily Work Log' },
   'เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน': { en: 'Printed from the HR Daily Work Log system' },
@@ -3851,7 +3854,7 @@ function printLeaveSlip(id){
   var empId = same ? (emp.emp_id||'') : '';
   var empPos = same ? (emp.position||'') : '';
   var companyKey = same ? slipCompanyKey_(emp.company||'') : '';
-  function fill(v){ return v ? esc(v) : '<span class="blank"></span>'; }
+  function fill(v){ return v ? '<b>'+esc(v)+'</b>' : '<span class="rule"></span>'; }
   function companyRadios(){
     return SLIP_COMPANIES.map(function(c){
       var on = (c.key===companyKey);
@@ -3870,104 +3873,122 @@ function printLeaveSlip(id){
   var html = '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">'
     +'<title>'+esc(t('ใบขอลา'))+' — '+esc(r.emp_name)+' — '+docNo+'</title>'
     +'<style>'
-      +'@page{ size:A4; margin:12mm 14mm }'
+      +'@page{ size:A4; margin:14mm 15mm }'
       +'*{ box-sizing:border-box }'
-      // The sheet is a flex column of fixed height, so the signature block can
-      // be pushed to the bottom of the page instead of stopping a third of the
-      // way down and leaving the rest of the A4 blank.
+      /* ONE type scale for the whole form. The previous version used eleven
+         different sizes, which is what made it read as unstructured. Body text
+         is 10.5pt everywhere; only the document title and section headings
+         step up, and only the footer steps down. Nothing else varies. */
       +'html,body{ height:100% }'
       +'body{ font-family:"Sarabun","TH Sarabun New","Segoe UI",sans-serif; color:#111;'
-        +'margin:0; font-size:12pt; line-height:1.6; display:flex; flex-direction:column;'
-        +'min-height:100%; padding:0 }'
-      +'.head{ display:flex; justify-content:space-between; align-items:flex-start;'
-        +'border-bottom:2.5px solid #1d4e89; padding-bottom:.55rem; gap:1.2rem }'
-      +'.org{ font-weight:700; font-size:1.25rem; color:#1d4e89; line-height:1.3 }'
-      +'.orgsub{ font-size:.85rem; color:#555; font-weight:400 }'
-      +'h1{ font-size:1.45rem; margin:.35rem 0 0; font-weight:700 }'
-      +'.docmeta{ text-align:right; font-size:.88rem; color:#444; white-space:nowrap; line-height:1.7 }'
-      +'.docno{ font-family:Consolas,monospace; font-weight:700; color:#111 }'
-      +'.stat{ display:inline-block; margin-top:.3rem; padding:.2rem .7rem; border-radius:3px;'
-        +'font-size:.85rem; font-weight:700; border:1px solid }'
+        +'margin:0; font-size:10.5pt; line-height:1.55; display:flex; flex-direction:column;'
+        +'min-height:100% }'
+      /* Letterhead: a 2-column grid so the org block and the doc metadata sit
+         on a shared baseline instead of floating against each other. */
+      +'.head{ display:grid; grid-template-columns:1fr auto; align-items:start;'
+        +'gap:10mm; border-bottom:2pt solid #1d4e89; padding-bottom:3mm }'
+      +'.org{ font-weight:700; font-size:13pt; color:#1d4e89; line-height:1.25 }'
+      +'.orgsub{ font-size:10.5pt; color:#555; font-weight:400; line-height:1.4 }'
+      +'h1{ font-size:15pt; margin:2mm 0 0; font-weight:700; letter-spacing:.01em }'
+      /* Metadata is a label/value grid so the values right-align to one edge. */
+      +'.docmeta{ display:grid; grid-template-columns:auto auto; gap:.6mm 3mm;'
+        +'font-size:10.5pt; color:#333; white-space:nowrap; justify-items:end; align-content:start }'
+      +'.docmeta .k{ color:#666 }'
+      +'.docmeta .v{ font-weight:700 }'
+      +'.stat{ grid-column:1 / -1; justify-self:end; margin-top:1.5mm;'
+        +'padding:.8mm 3mm; border-radius:2pt; font-size:10.5pt; font-weight:700; border:.75pt solid }'
       +'.stat.ok{ background:#e7f6ec; color:#13744a; border-color:#9bd4b4 }'
       +'.stat.no{ background:#fdecea; color:#b3261e; border-color:#efb4ac }'
       +'.stat.wait{ background:#fdf3d3; color:#8a6100; border-color:#e6cd8a }'
-      // No letter-spacing or uppercase: both mangle Thai, which has no case
-      // and whose glyphs join. Size and weight carry the hierarchy instead.
-      +'.sec{ font-size:.95rem; font-weight:700; color:#1d4e89;'
-        +'margin:1.1rem 0 .45rem; padding-bottom:.2rem; border-bottom:1px solid #d7dee8 }'
-      +'table{ width:100%; border-collapse:collapse }'
-      +'td{ padding:.45rem .3rem; vertical-align:baseline }'
-      +'td.lbl{ width:38mm; color:#555; font-size:.92rem }'
-      +'td.val{ font-weight:700 }'
-      +'.blank{ display:inline-block; min-width:55mm; border-bottom:1px dotted #999; height:1.15em }'
-      // Company radios and leave-type checkboxes share this chip layout so the
-      // two rows read as the same kind of control.
-      +'.pick{ display:inline-block; margin-right:1.4rem; white-space:nowrap; font-size:.95rem;'
-        +'line-height:2 }'
-      +'.dot{ display:inline-block; width:1.05em; height:1.05em; border:1.4px solid #444;'
-        +'border-radius:50%; margin-right:.4rem; vertical-align:-.18em; position:relative }'
-      +'.dot.on::after{ content:""; position:absolute; left:50%; top:50%; width:.55em; height:.55em;'
+      /* No letter-spacing or uppercase: both mangle Thai, which has no case and
+         whose glyphs join. Weight and the rule carry the hierarchy. */
+      +'.sec{ font-size:11.5pt; font-weight:700; color:#1d4e89;'
+        +'margin:5mm 0 2mm; padding-bottom:1mm; border-bottom:.75pt solid #c9d4e3 }'
+      /* The field grid. Fixed 34mm label columns and equal 1fr value columns
+         make the two halves of every row symmetrical, and the labels are wide
+         enough that none of them wrap. */
+      +'.fields{ display:grid; grid-template-columns:34mm 1fr 34mm 1fr;'
+        +'gap:2.6mm 3mm; align-items:baseline }'
+      +'.fields .k{ color:#555; white-space:nowrap }'
+      +'.fields .v{ min-width:0 }'
+      +'.fields .wide{ grid-column:2 / -1 }'
+      +'.fields .full{ grid-column:1 / -1 }'
+      /* A fill-in rule that spans its whole cell, so every rule on the form
+         ends at the same two x-positions instead of at a min-width. */
+      +'.rule{ display:block; border-bottom:.75pt dotted #8a93a0; height:5mm }'
+      /* Choice chips: fixed-width so the two rows of options line up in
+         columns rather than sitting wherever the previous label ended. */
+      +'.picks{ display:grid; grid-template-columns:repeat(3, 1fr); gap:1.5mm 3mm }'
+      +'.pick{ white-space:nowrap; line-height:1.5 }'
+      +'.dot{ display:inline-block; width:3.2mm; height:3.2mm; border:.75pt solid #444;'
+        +'border-radius:50%; margin-right:1.6mm; vertical-align:-.5mm; position:relative }'
+      +'.dot.on::after{ content:""; position:absolute; left:50%; top:50%; width:1.7mm; height:1.7mm;'
         +'background:#1d4e89; border-radius:50%; transform:translate(-50%,-50%) }'
-      +'.box{ display:inline-block; width:1.05em; height:1.05em; border:1.4px solid #444;'
-        +'margin-right:.4rem; text-align:center; line-height:1em; font-weight:700; vertical-align:-.18em }'
-      +'.reason{ border:1px solid #d7dee8; border-radius:3px; padding:.6rem .7rem;'
-        +'background:#fbfcfd; font-size:.98rem; flex:1 1 auto; min-height:28mm }'
-      // flex:1 on the reason box makes it absorb the leftover page height, so
-      // the form fills the sheet rather than bunching at the top.
+      +'.box{ display:inline-block; width:3.2mm; height:3.2mm; border:.75pt solid #444;'
+        +'margin-right:1.6mm; text-align:center; line-height:3mm; font-weight:700;'
+        +'vertical-align:-.5mm; font-size:9pt }'
+      +'.reason{ border:.75pt solid #c9d4e3; border-radius:2pt; padding:2.5mm 3mm;'
+        +'background:#fcfdfe; flex:1 1 auto; min-height:26mm }'
       +'.grow{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0 }'
-      +'.sign{ display:flex; gap:16mm; margin-top:10mm; padding-top:2mm;'
-        +'break-inside:avoid; page-break-inside:avoid }'
-      +'.sign > div{ flex:1; text-align:center }'
-      +'.sigline{ border-top:1px dotted #333; padding-top:.4rem; font-size:.92rem; font-weight:700 }'
-      +'.sigsub{ font-size:.82rem; color:#666; margin-top:.15rem; min-height:1.2em }'
-      +'.eappr{ font-size:.82rem; color:#13744a; margin-top:.2rem; font-weight:700 }'
-      +'.foot{ margin-top:6mm; border-top:1px solid #d7dee8; padding-top:.4rem;'
-        +'font-size:.75rem; color:#888; display:flex; justify-content:space-between; gap:1rem }'
+      /* Signatures: an equal 3-column grid (requester · approver · spare) keeps
+         the block symmetrical about the page centre. */
+      +'.sign{ display:grid; grid-template-columns:1fr 1fr; gap:16mm; margin-top:8mm;'
+        +'padding-top:2mm; break-inside:avoid; page-break-inside:avoid }'
+      +'.sign > div{ text-align:center }'
+      +'.sigspace{ height:16mm }'
+      +'.sigline{ border-top:.75pt dotted #333; padding-top:1.5mm; font-weight:700 }'
+      +'.sigsub{ color:#666; margin-top:.8mm; min-height:5mm }'
+      +'.eappr{ color:#13744a; margin-top:.8mm; font-weight:700 }'
+      +'.foot{ margin-top:6mm; border-top:.75pt solid #c9d4e3; padding-top:1.5mm;'
+        +'font-size:9pt; color:#888; display:flex; justify-content:space-between; gap:6mm }'
       +'@media print{ .stat{ -webkit-print-color-adjust:exact; print-color-adjust:exact }'
         +' .dot.on::after{ -webkit-print-color-adjust:exact; print-color-adjust:exact } }'
     +'</style></head><body>'
     +'<div class="head">'
       +'<div>'
-        +'<div class="org">VCB Group<div class="orgsub">'+esc(t('บันทึกการทำงานรายวัน'))+'</div></div>'
+        +'<div class="org">VCB Group'
+          +'<div class="orgsub">'+esc(t('บันทึกการทำงานรายวัน'))+'</div></div>'
         +'<h1>'+esc(t('ใบขอลา'))+'</h1>'
       +'</div>'
       +'<div class="docmeta">'
-        +esc(t('เลขที่'))+' <span class="docno">'+docNo+'</span><br>'
-        +esc(t('วันที่ยื่นคำขอ'))+' '+esc(lvFmtStampLong_(r.requested_at))+'<br>'
+        +'<span class="k">'+esc(t('เลขที่'))+'</span><span class="v">'+docNo+'</span>'
+        +'<span class="k">'+esc(t('วันที่ยื่นคำขอ'))+'</span><span class="v">'+esc(lvFmtStampLong_(r.requested_at))+'</span>'
         +'<span class="stat '+statusCls+'">'+esc(statusTh)+'</span>'
       +'</div>'
     +'</div>'
     +'<div class="sec">'+esc(t('บริษัท'))+'</div>'
-    +'<div>'+companyRadios()+'</div>'
+    +'<div class="picks">'+companyRadios()+'</div>'
     +'<div class="sec">'+esc(t('ข้อมูลผู้ขอลา'))+'</div>'
-    +'<table>'
-      +'<tr><td class="lbl">'+esc(t('ชื่อพนักงาน'))+'</td><td class="val">'+esc(r.emp_name)+'</td>'
-        +'<td class="lbl">'+esc(t('รหัสพนักงาน'))+'</td><td class="val">'+fill(empId)+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('ตำแหน่ง'))+'</td><td class="val">'+fill(empPos)+'</td>'
-        +'<td class="lbl">'+esc(t('หน่วยงาน'))+'</td><td class="val">'+esc(siteNameFor_(r.site_key))+'</td></tr>'
-    +'</table>'
+    +'<div class="fields">'
+      +'<span class="k">'+esc(t('ชื่อพนักงาน'))+'</span><span class="v"><b>'+esc(r.emp_name)+'</b></span>'
+      +'<span class="k">'+esc(t('รหัสพนักงาน'))+'</span><span class="v">'+fill(empId)+'</span>'
+      +'<span class="k">'+esc(t('ตำแหน่ง'))+'</span><span class="v">'+fill(empPos)+'</span>'
+      +'<span class="k">'+esc(t('หน่วยงาน'))+'</span><span class="v"><b>'+esc(siteNameFor_(r.site_key))+'</b></span>'
+    +'</div>'
     +'<div class="sec">'+esc(t('รายละเอียดการลา'))+'</div>'
-    +'<table>'
-      +'<tr><td class="lbl">'+esc(t('ประเภทการลา'))+'</td><td colspan="3">'+typeBoxes()+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('ช่วงวันที่ลา'))+'</td><td class="val" colspan="3">'
+    +'<div class="fields">'
+      +'<span class="k">'+esc(t('ประเภทการลา'))+'</span>'
+      +'<span class="v wide"><span class="picks">'+typeBoxes()+'</span></span>'
+      +'<span class="k">'+esc(t('ช่วงวันที่ลา'))+'</span>'
+      +'<span class="v wide"><b>'
         +esc(lvFmtDateLong_(r.from_date))+(r.from_date!==r.to_date?' – '+esc(lvFmtDateLong_(r.to_date)):'')
-        +' <span style="font-weight:400;color:#555">('+days+' '+esc(t('วัน'))+')</span></td></tr>'
-      +'<tr><td class="lbl">'+esc(t('เบอร์ติดต่อระหว่างลา'))+'</td><td>'+fill('')+'</td>'
-        +'<td class="lbl">'+esc(t('ผู้ปฏิบัติงานแทน'))+'</td><td>'+fill('')+'</td></tr>'
-    +'</table>'
-    +'<div class="grow" style="margin-top:.6rem">'
-      +'<div style="color:#555;font-size:.92rem;margin-bottom:.25rem">'+esc(t('เหตุผล'))+'</div>'
+        +'</b> <span style="font-weight:400;color:#555">('+days+' '+esc(t('วัน'))+')</span></span>'
+      +'<span class="k">'+esc(t('เบอร์ติดต่อ'))+'</span><span class="v">'+fill('')+'</span>'
+      +'<span class="k">'+esc(t('ผู้ปฏิบัติงานแทน'))+'</span><span class="v">'+fill('')+'</span>'
+    +'</div>'
+    +'<div class="grow" style="margin-top:4mm">'
+      +'<div style="color:#555;margin-bottom:1.5mm">'+esc(t('เหตุผล'))+'</div>'
       +'<div class="reason">'+(r.reason?esc(r.reason):'')+'</div>'
     +'</div>'
     +'<div class="sign">'
       +'<div>'
-        +'<div style="height:18mm"></div>'
+        +'<div class="sigspace"></div>'
         +'<div class="sigline">'+esc(t('ลายเซ็นพนักงาน'))+'</div>'
         +'<div class="sigsub">'+esc(r.emp_name)+'</div>'
         +'<div class="sigsub">'+esc(t('วันที่'))+' ......../......../........</div>'
       +'</div>'
       +'<div>'
-        +'<div style="height:18mm"></div>'
+        +'<div class="sigspace"></div>'
         +'<div class="sigline">'+esc(t('ลายเซ็นผู้อนุมัติ'))+'</div>'
         +'<div class="sigsub">'+(r.status!=='pending' && r.decided_by ? esc(r.decided_by) : '')+'</div>'
         + (r.status!=='pending'
@@ -3977,7 +3998,7 @@ function printLeaveSlip(id){
     +'</div>'
     +'<div class="foot">'
       +'<span>'+esc(t('เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน'))+'</span>'
-      +'<span class="docno">'+docNo+'</span>'
+      +'<span>'+docNo+'</span>'
     +'</div>'
     +'<script>window.onload=function(){setTimeout(function(){window.print();},250);};</'+'script>'
     +'</body></html>';

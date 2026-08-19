@@ -1004,9 +1004,14 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 /* A ticket whose decision is in flight: dimmed and click-through disabled, so
    the row visibly reads as "working" instead of looking idle until it vanishes. */
 .lv-busy{ opacity:.55; pointer-events:none; transition:opacity .12s ease }
+/* The Requests tab labels name the same kind of thing as the "ขอลาใหม่" card
+   heading beside them, so they should read at the same weight — .idx-tab's
+   default .92rem looked subordinate next to a 1.1rem h2. Scoped to this tab
+   strip rather than changing .idx-tab, which Work Index also uses. */
+#lvQTabs .idx-tab{ font-size:1.1rem; padding:.5rem 1rem }
 /* Count beside a queue/history tab label. */
-.qcount{ display:inline-block; margin-left:.4rem; padding:0 .4rem; border-radius:999px;
-  background:var(--line); color:var(--muted); font-size:.72rem; font-weight:700; vertical-align:1px }
+.qcount{ display:inline-block; margin-left:.4rem; padding:0 .45rem; border-radius:999px;
+  background:var(--line); color:var(--muted); font-size:.78rem; font-weight:700; vertical-align:2px }
 .idx-tab.on .qcount{ background:var(--blue); color:#fff }
 .lv-acts{ display:flex; gap:.25rem }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }

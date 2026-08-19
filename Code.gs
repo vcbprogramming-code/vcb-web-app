@@ -973,25 +973,36 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
    Each ticket is now ONE row (dates+reason left, status+actions right) and the
    list is an auto-fitting grid, so wide screens pack 2-3 tickets per row and
    the page uses the horizontal space it already had. */
-.lv-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:.5rem }
-.lv-ticket{ display:flex; align-items:center; gap:.6rem; min-width:0;
-  padding:.45rem .6rem; background:var(--card); border:1px solid var(--line);
+.lv-list{ display:flex; flex-direction:column; gap:.4rem }
+.lv-ticket{ display:flex; align-items:center; gap:.75rem; min-width:0;
+  padding:.4rem .7rem; background:var(--card); border:1px solid var(--line);
   border-left-width:4px; border-radius:9px }
 .lv-ticket:hover{ box-shadow:0 1px 4px rgba(0,0,0,.08) }
-.lv-main{ flex:1 1 auto; min-width:0 }
-.lv-who,.lv-when{ font-size:.9rem; line-height:1.3 }
+/* One row: the three text parts sit side by side and the reason takes the
+   slack, so the row stays a single line however wide the screen is. */
+.lv-main{ flex:1 1 auto; min-width:0; display:flex; align-items:baseline; gap:.75rem }
+.lv-who{ flex:0 0 auto; font-size:.9rem; line-height:1.35; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; max-width:34ch }
+.lv-when{ flex:0 0 auto; font-size:.9rem; line-height:1.35; white-space:nowrap }
 /* Reason is free text up to 300 chars — clamp it to one line so a long note
-   can never stretch a ticket taller than its neighbours. Full text on hover. */
-.lv-why{ font-size:.82rem; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.lv-side{ flex:0 0 auto; display:flex; align-items:center; gap:.4rem }
+   can never make the row taller than the others. Full text on hover. */
+.lv-why{ flex:1 1 auto; min-width:0; font-size:.82rem; line-height:1.35;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.lv-side{ flex:0 0 auto; display:flex; align-items:center; gap:.5rem }
 .lv-acts{ display:flex; gap:.25rem }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }
 /* Phones: one ticket per row, and let the reason wrap to two lines since
    there is no neighbouring card whose height it could throw off. */
-html.is-mobile .lv-list{ grid-template-columns:1fr }
 html.is-mobile .lv-ticket{ align-items:flex-start; flex-wrap:wrap }
+html.is-mobile .lv-main{ flex-direction:column; align-items:flex-start; gap:.1rem; width:100% }
+html.is-mobile .lv-who{ max-width:100%; white-space:normal }
 html.is-mobile .lv-why{ white-space:normal }
 html.is-mobile .lv-side{ width:100%; justify-content:space-between; margin-top:.35rem }
+@media(max-width:900px){
+  .lv-main{ flex-direction:column; align-items:flex-start; gap:.1rem }
+  .lv-who{ max-width:100%; white-space:normal }
+  .lv-why{ white-space:normal }
+}
 
 /* Slim down the dashboard "filter" card (title + subtitle + view-toggle +
    month-picker). It was eating ~1cm of vertical that the user can't get back
@@ -3607,7 +3618,7 @@ function renderRequestsHub(){
       +'<h1 style="margin:0">'+t('คำขอ')+'</h1>'
       +'<div class="sub" style="margin:.1rem 0 0">'+t('ขอลาและติดตามสถานะคำขอของคุณ')+'</div>'
     +'</div>'
-    +'<div class="req-grid" style="display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr);gap:.8rem;margin-top:.8rem;align-items:start">'
+    +'<div class="req-grid" style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(0,2fr);gap:.8rem;margin-top:.8rem;align-items:start">'
       +'<div class="card">'
         +'<h2 style="margin:0 0 .3rem">'+t('ขอลาใหม่')+'</h2>'
         +'<div class="fld"><label>'+t('หน่วยงาน')+'</label><select id="lvSite">'
@@ -3622,13 +3633,13 @@ function renderRequestsHub(){
         +'<button class="btn" id="lvSubmit" style="margin-top:.7rem;width:100%">'+t('ส่งคำขอลา')+'</button>'
       +'</div>'
       +'<div>'
-        +'<div class="card" style="padding:.75rem .85rem;margin-bottom:0">'
-          +'<h2 style="margin:0 0 .4rem">'+t('คำขอของฉัน')+'</h2>'
+        +'<div class="card">'
+          +'<h2 style="margin:0 0 .5rem">'+t('คำขอของฉัน')+'</h2>'
           +'<div id="lvTickets"><p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p></div>'
         +'</div>'
         + (BOOT.canEntry ?
-          '<div class="card" style="margin-top:.8rem;padding:.75rem .85rem;margin-bottom:0">'
-            +'<h2 style="margin:0 0 .4rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
+          '<div class="card" style="margin-top:.8rem">'
+            +'<h2 style="margin:0 0 .5rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
             +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
           +'</div>' : '')
       +'</div>'
@@ -3688,7 +3699,7 @@ function leaveTicketHtml_(r, opts){
   var btn = 'padding:.22rem .55rem;font-size:.8rem;line-height:1.35';
   return '<div class="lv-ticket" data-id="'+esc(r.id)+'" style="border-left:4px solid '+barColor+'">'
     +'<div class="lv-main">'
-      + (opts.showName ? '<div class="lv-who"><b>'+esc(r.emp_name)+'</b>'
+      + (opts.showName ? '<div class="lv-who" title="'+esc(r.emp_name)+'"><b>'+esc(r.emp_name)+'</b>'
           + (opts.showSite ? ' <span class="hint">· '+esc(siteNameFor_(r.site_key))+'</span>' : '')+'</div>' : '')
       +'<div class="lv-when"><b>'+range+'</b> <span class="hint">('+days+' '+esc(t('วัน'))+')</span></div>'
       + (r.reason ? '<div class="lv-why hint" title="'+esc(r.reason)+'">'+esc(r.reason)+'</div>' : '')

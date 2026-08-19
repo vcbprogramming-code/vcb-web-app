@@ -1293,8 +1293,8 @@ var T = {
   'ไม่อนุมัติคำขอลานี้หรือไม่?': { en: 'Reject this leave request?' },
   'ดำเนินการไม่สำเร็จ':        { en: 'Action failed' },
   'ข้อมูลตัวอย่าง (เดโม)':      { en: 'Sample Data (Demo)' },
-  'เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างของเดือนที่เลือก เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว':
-    { en: 'Fill empty day cells for the chosen month for demo purposes · never overwrites existing real data' },
+  'เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างตลอดทั้งเดือนที่เลือก (เว้นวันหยุดสุดสัปดาห์) เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว':
+    { en: 'Fill empty cells across the whole chosen month (weekends excluded) for demo purposes · never overwrites existing real data' },
   'เติมข้อมูลตัวอย่าง':         { en: 'Fill sample data' },
   'กำลังเติมข้อมูล…':           { en: 'Filling…' },
   'เติมข้อมูลตัวอย่างแล้ว':     { en: 'Sample data added' },
@@ -4497,7 +4497,7 @@ function renderSettings(target, opts){
   var demoSect = BOOT.isAdmin
     ? '<div class="sect">'
         +'<h2>'+t('ข้อมูลตัวอย่าง (เดโม)')+'</h2>'
-        +'<p class="desc">'+esc(t('เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างของเดือนที่เลือก เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว'))+'</p>'
+        +'<p class="desc">'+esc(t('เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างตลอดทั้งเดือนที่เลือก (เว้นวันหยุดสุดสัปดาห์) เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว'))+'</p>'
         +'<div class="lockrow">'
           +'<input id="demoYear" type="number" min="2000" max="2999" step="1" value="'+String(CUR.y)+'" style="width:6.5rem">'
           +'<input id="demoMonth" type="number" min="1" max="12" step="1" value="'+String(CUR.m)+'" style="width:4.5rem">'
@@ -6243,7 +6243,7 @@ function siteName_(key){ var n=key; rows_(SHEETS.SITES).forEach(function(s){ if(
    of June 2569, so the Overview/dashboard show data. Non-destructive: never
    overwrites a cell that already has a value. NOT on the boot path. ----------*/
 function rnd_(s){ var x=Math.sin(s)*10000; return x-Math.floor(x); }
-function seedDemoData(siteMatch, year, month, overwrite){
+function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
   siteMatch = siteMatch || 'บางเตย'; year = year || 2026; month = month || 6;
   var site=null;
   rows_(SHEETS.SITES).forEach(function(s){ if((s.key===siteMatch || String(s.name||'').indexOf(siteMatch)>=0) && !site) site=s; });
@@ -6272,15 +6272,21 @@ function seedDemoData(siteMatch, year, month, overwrite){
       values.push(row); rowIdx[String(e.eid)]=values.length-1;
     }
   });
-  // fill days = all weekdays of the month up to today (no weekends, no future)
+  // fill days = weekdays of the month (never weekends). Normally stops at
+  // today, because filling the future would claim work that has not happened.
+  // wholeMonth lifts that for a demo, where the point is a complete month on
+  // the dashboard rather than a month in progress.
   var today=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
   var dim=new Date(year, month, 0).getDate();
   var fillDays=[];
   for(var d=1; d<=dim; d++){
     var dow=new Date(year, month-1, d).getDay();      // 0 Sun … 6 Sat
-    if(dow===0 || dow===6) continue;
+    // Sunday only — Saturday is a normal working day in this system (see
+    // daysInMonth_), so skipping it would leave a gap the completion
+    // percentage counts against us.
+    if(dow===0) continue;
     var ds=year+'-'+('0'+month).slice(-2)+'-'+('0'+d).slice(-2);
-    if(ds>today) continue;
+    if(!wholeMonth && ds>today) continue;
     fillDays.push(d);
   }
   var writes=0;
@@ -6316,14 +6322,14 @@ function api_seedDemoMonth(year, month){
     if(u.role!=='admin') throw new Error('FORBIDDEN');
     year=Number(year); month=Number(month);
     if(!year || month<1 || month>12) return { ok:false, error:'BAD_MONTH' };
-    var detail=seedDemoAllSites(year, month, false);
+    var detail=seedDemoAllSites(year, month, false, true);
     return { ok:true, detail:String(detail) };
   } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
 // Seed the same month across every site (one batched write each).
-function seedDemoAllSites(year, month, overwrite){
+function seedDemoAllSites(year, month, overwrite, wholeMonth){
   year=year||2026; month=month||6;
-  return rows_(SHEETS.SITES).map(function(s){ try { return seedDemoData(s.key, year, month, overwrite); } catch(e){ return s.key+': ERR '+(e&&e.message||e); } }).join(' | ');
+  return rows_(SHEETS.SITES).map(function(s){ try { return seedDemoData(s.key, year, month, overwrite, wholeMonth); } catch(e){ return s.key+': ERR '+(e&&e.message||e); } }).join(' | ');
 }
 
 /* ============================ WEB APP ENTRY ============================ */

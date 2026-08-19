@@ -5,6 +5,7 @@ import { useSettings } from './settings'
 import Dashboard from './Dashboard'
 import Entry from './Entry'
 import WorkIndex from './WorkIndex'
+import Requests from './Requests'
 import SettingsPage from './SettingsPage'
 
 // Demo "today" — the live app uses the real date; we pin it inside the sample
@@ -26,7 +27,7 @@ export function MonthNav({ cur, setCur }: { cur: YMonth; setCur: (c: YMonth) => 
   )
 }
 
-type View = 'dashboard' | 'entry' | 'index' | 'settings'
+type View = 'dashboard' | 'entry' | 'index' | 'requests' | 'settings'
 type EntryMode = 'coverage' | 'week'
 
 export default function App() {
@@ -40,6 +41,7 @@ export default function App() {
     ['dashboard', t('แดชบอร์ด')],
     ...(BOOT.canEntry ? [['entry', t('บันทึกงาน')] as [View, string]] : []),
     ...(BOOT.isAdmin ? [['index', t('ดัชนีงาน')] as [View, string]] : []),
+    ['requests', t('คำขอ')],
     ...(BOOT.isAdmin ? [['settings', '⚙'] as [View, string]] : []),
   ]
 
@@ -73,6 +75,7 @@ export default function App() {
             mode={entryMode} setMode={setEntryMode} />
         )}
         {view === 'index' && <WorkIndex />}
+        {view === 'requests' && <Requests />}
         {view === 'settings' && <SettingsPage />}
       </div>
     </>

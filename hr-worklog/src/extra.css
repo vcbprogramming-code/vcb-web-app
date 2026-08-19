@@ -10,3 +10,80 @@ td.cellfocus{box-shadow:inset 0 0 0 2px var(--site,#1d4e89);border-radius:6px}
 tr.rowfocus td.emp-col{box-shadow:inset 3px 0 0 var(--site,#1d4e89)}
 .cov-cell{cursor:pointer}
 body.dark .mnav{background:#0f1722}
+
+/* ===========================================================================
+   Requests hub ("คำขอ") — mirrors the leave-request styles in Code.gs.
+   =========================================================================== */
+.req-grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(0,2fr);
+  gap:.8rem;margin-top:.8rem;align-items:start}
+@media(max-width:900px){.req-grid{grid-template-columns:1fr}}
+
+/* The Requests tab labels name the same kind of thing as the card heading
+   beside them, so they read at the same size rather than .idx-tab's default. */
+#lvQTabs .idx-tab{font-size:1.1rem;padding:.5rem 1rem}
+.qcount{display:inline-block;margin-left:.4rem;padding:0 .45rem;border-radius:999px;
+  background:var(--line);color:var(--muted);font-size:.78rem;font-weight:700;vertical-align:2px}
+.idx-tab.on .qcount{background:var(--blue);color:#fff}
+
+/* One full-width row per request. The fields were previously packed
+   left-to-right, so each row's columns began wherever the previous field
+   ended and nothing lined up; fixed grid tracks make the list read as a
+   table. Every cell is emitted on every row — a skipped one would shift the
+   rest into the wrong track. */
+.lv-list{display:flex;flex-direction:column;gap:.35rem}
+.lv-ticket{display:grid;align-items:center;gap:0;min-width:0;padding:.4rem .7rem;
+  background:var(--card);border:1px solid var(--line);border-left-width:4px;border-radius:9px;
+  grid-template-columns:minmax(0,13rem) minmax(0,10rem) 9.5rem 4.5rem 7rem minmax(0,1fr) auto}
+/* My Requests has no name/project columns — drop those tracks so the dates
+   start hard left instead of behind two empty gutters. */
+.lv-list.lv-mine .lv-ticket{grid-template-columns:9.5rem 4.5rem 7rem minmax(0,1fr) auto}
+.lv-ticket.pending{border-left-color:#e8b500}
+.lv-ticket.approved{border-left-color:#1f9d55}
+.lv-ticket.rejected{border-left-color:#e0533a}
+.lv-ticket:hover{box-shadow:0 1px 4px rgba(0,0,0,.08)}
+/* Single-line cells: no row can grow taller than its neighbours and break the
+   column rhythm. Full text on hover. */
+.lv-ticket>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-who{font-size:.9rem;line-height:1.35;font-weight:700;padding-right:.7rem}
+.lv-site{font-size:.82rem;line-height:1.35;color:var(--muted);padding-right:.7rem}
+.lv-when{font-size:.9rem;line-height:1.35;font-variant-numeric:tabular-nums}
+.lv-days{font-size:.82rem;line-height:1.35;color:var(--muted);text-align:right;padding-right:.9rem}
+.lv-type{font-size:.82rem;line-height:1.35;padding-right:.7rem}
+.lv-why{font-size:.82rem;line-height:1.35;color:var(--muted);padding-right:.7rem}
+.lv-side{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;overflow:visible}
+.lv-badge{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;width:7.5rem}
+.lv-by{font-size:.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:100%}
+.lv-acts{display:flex;gap:.25rem}
+.lv-acts .btn{padding:.22rem .55rem;font-size:.8rem;line-height:1.35}
+.lv-del:hover{border-color:#e0533a;color:#b3261e}
+/* A row whose decision is in flight: dimmed and click-through disabled, so it
+   reads as "working" instead of looking idle until it vanishes. */
+.lv-busy{opacity:.55;pointer-events:none;transition:opacity .12s ease}
+
+/* Pending is amber, matching the bar on the row's left edge — grey read as
+   "inactive" rather than "awaiting action". */
+.lv-badge-chip{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.8rem}
+.lv-badge-chip.pending{background:#fdf3d3;color:#8a6100}
+.lv-badge-chip.approved{background:#e7f6ec;color:#13744a}
+.lv-badge-chip.rejected{background:#fdecea;color:#b3261e}
+
+/* Column headings. No letter-spacing or uppercase: both mangle Thai, which has
+   no case and whose glyphs join. Size and weight carry the hierarchy. */
+.lv-head{background:transparent;border:0;border-bottom:1px solid var(--line);
+  border-radius:0;padding:0 .7rem .3rem;margin-bottom:.15rem;
+  font-size:.82rem;font-weight:700;color:var(--muted)}
+.lv-head:hover{box-shadow:none}
+.lv-head .lv-side{justify-content:flex-start}
+
+/* Narrow viewports can't hold seven tracks. Collapse to a stack, where
+   labelled columns would be meaningless. */
+@media(max-width:1100px){
+  .lv-ticket,.lv-list.lv-mine .lv-ticket{grid-template-columns:1fr auto}
+  .lv-who,.lv-site,.lv-when,.lv-days,.lv-type,.lv-why{grid-column:1;white-space:normal}
+  .lv-days{text-align:left;padding-right:0}
+  .lv-side{grid-column:2;grid-row:1 / span 6;align-items:center}
+  .lv-ticket>*{white-space:normal}
+  .lv-head{display:none}
+}
+body.dark .lv-ticket{background:#131b26}

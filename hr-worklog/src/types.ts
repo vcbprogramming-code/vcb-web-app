@@ -110,3 +110,68 @@ export interface AdminSummary {
 }
 
 export interface YMonth { y: number; m: number }
+
+/* ---------------------------------------------------------------------------
+   Leave requests ("คำขอ")
+
+   Mirrors the LeaveRequests sheet and the api_myLeaveRequests /
+   api_pendingLeaveRequests / api_decidedLeaveRequests return shapes.
+
+   Every field is a plain string on purpose. The GAS server normalises before
+   returning because Sheets hands back Date objects for anything date-shaped
+   and rounds long numeric ids — see leaveRowOut_ in Code.gs. Typing these as
+   Date here would misrepresent what actually crosses the wire.
+--------------------------------------------------------------------------- */
+export type LeaveStatus = 'pending' | 'approved' | 'rejected'
+export type LeaveTypeCode =
+  | 'sick' | 'personal' | 'vacation' | 'maternity' | 'ordination' | 'other'
+
+export interface LeaveType { code: LeaveTypeCode; th: string }
+
+export interface LeaveRequest {
+  id: string                 // string, not number: Sheets keeps only 15 significant digits
+  eid: string
+  site_key: string
+  emp_name: string
+  from_date: string          // ISO yyyy-MM-dd (displayed dd/mm/yy)
+  to_date: string
+  reason: string
+  status: LeaveStatus
+  requested_at: string       // 'yyyy-MM-dd HH:mm'
+  decided_by: string
+  decided_at: string
+  leave_type: LeaveTypeCode | ''   // '' on rows written before the column existed
+}
+
+// api_decidedLeaveRequests — an object, never an array carrying extra props:
+// attaching a property to a returned Array makes google.script.run resolve null.
+export interface DecidedLeaveResult {
+  rows: LeaveRequest[]
+  total: number              // may exceed rows.length when the server caps the list
+  shown: number
+}
+
+// api_rosterForLeave — identity fields the printed slip needs.
+export interface LeaveRosterEntry {
+  eid: string
+  name: string
+  kind: EmpKind
+  emp_id: string
+  position: string
+  department: string
+  company: string
+}
+
+// Sites gained an `active` flag: closed projects stay visible on the dashboard
+// but are not offered for new entries. Optional so a client that booted before
+// the column existed still type-checks.
+export interface SiteRefActive extends SiteRef { active?: boolean }
+
+// Admin project list (api_adminListSites).
+export interface SiteAdminRow {
+  key: string
+  name: string
+  company: string
+  active: boolean
+  emps: number               // still-assigned employees, shown when closing a project
+}

@@ -5,6 +5,7 @@
 import type {
   Activity, Category, Boot, Employee, DayInfo, Entries, CellValue,
   SiteMonth, AdminSummary, SiteSummary, TopItem, DayFill,
+  LeaveRequest, LeaveType, LeaveTypeCode, LeaveRosterEntry, DecidedLeaveResult,
 } from './types'
 
 export interface SiteMeta { key: string; name: string; company: string }
@@ -240,4 +241,151 @@ export function adminSummary(year: number, month: number, today: string): AdminS
 export const BOOT: Boot = {
   ok: true, email: '(guest)', role: 'admin', isAdmin: true, canEntry: true,
   sites: SITES.map((s) => ({ key: s.key, name: s.name })),
+}
+
+/* ---------------------------------------------------------------------------
+   Leave requests — mock layer
+
+   Mirrors api_myLeaveRequests / api_pendingLeaveRequests /
+   api_decidedLeaveRequests. Kept in module-level state so the preview behaves
+   like the real thing: approving a request moves it out of the queue and into
+   the decision history instead of just disappearing.
+--------------------------------------------------------------------------- */
+
+export const LEAVE_TYPES: LeaveType[] = [
+  { code: 'sick', th: 'ลาป่วย' },
+  { code: 'personal', th: 'ลากิจ' },
+  { code: 'vacation', th: 'ลาพักผ่อน' },
+  { code: 'maternity', th: 'ลาคลอด' },
+  { code: 'ordination', th: 'ลาบวช' },
+  { code: 'other', th: 'อื่นๆ' },
+]
+
+// Ids are strings and look like the server's: Sheets keeps only 15 significant
+// digits, so a 16-digit numeric id silently lost its last digit.
+let leaveSeq = 1
+function newLeaveId(): string {
+  return 'LV2026081914' + String(3000 + leaveSeq++).padStart(4, '0') + '-047'
+}
+
+let LEAVE_ROWS: LeaveRequest[] = [
+  {
+    id: 'LV20260817231200-101', eid: '1', site_key: 'bangtoei',
+    emp_name: 'นางประกอบแก้ว บุตรสืบสาย',
+    from_date: '2026-08-18', to_date: '2026-08-19', reason: 'ป่วย',
+    status: 'pending', requested_at: '2026-08-17 23:12',
+    decided_by: '', decided_at: '', leave_type: 'sick',
+  },
+  {
+    id: 'LV20260817231500-102', eid: '2', site_key: 'bangwua',
+    emp_name: 'น.ส.จิตย์ใจ ศรีบุญเรือง',
+    from_date: '2026-08-12', to_date: '2026-08-18', reason: 'ไปงานบวชลูก',
+    status: 'pending', requested_at: '2026-08-17 23:15',
+    decided_by: '', decided_at: '', leave_type: 'ordination',
+  },
+  {
+    id: 'LV20260816104100-103', eid: '1', site_key: 'bangtoei',
+    emp_name: 'นางประกอบแก้ว บุตรสืบสาย',
+    from_date: '2026-08-20', to_date: '2026-08-21', reason: 'ลาพักผ่อน',
+    status: 'approved', requested_at: '2026-08-15 09:02',
+    decided_by: 'hr@vcb-con.com', decided_at: '2026-08-16 10:41', leave_type: 'vacation',
+  },
+  {
+    id: 'LV20260816090500-104', eid: '3', site_key: 'bangtoei',
+    emp_name: 'นางรัตนาภรณ์ ทุมวรรณ',
+    from_date: '2026-08-13', to_date: '2026-08-15', reason: '',
+    status: 'rejected', requested_at: '2026-08-12 16:20',
+    decided_by: '(guest)', decided_at: '2026-08-16 09:05', leave_type: 'personal',
+  },
+]
+
+// The roster comes from siteMonth(), which is where this mock builds employees.
+// Any month works — the roster does not vary by month here.
+function rosterOf(siteKey: string): Employee[] {
+  if (!siteKey) return []
+  return siteMonth(siteKey, 2026, 5, '2026-05-18').employees
+}
+export function rosterForLeave(siteKey: string): LeaveRosterEntry[] {
+  const site = SITES.find((s) => s.key === siteKey)
+  return rosterOf(siteKey)
+    .map((e) => ({
+      eid: e.eid, name: e.name, kind: e.kind, emp_id: e.emp_id,
+      position: e.position, department: e.department,
+      company: site ? site.company : '',
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'th'))
+}
+// Which site an employee belongs to — needed because the request form only
+// sends an eid, exactly like the live app.
+function siteOfEid(eid: string): SiteMeta | undefined {
+  return SITES.find((s) => rosterOf(s.key).some((e) => e.eid === eid))
+}
+
+export function myLeaveRequests(eid: string): LeaveRequest[] {
+  return LEAVE_ROWS.filter((r) => r.eid === eid)
+    .slice()
+    .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+}
+
+export function pendingLeaveRequests(): LeaveRequest[] {
+  return LEAVE_ROWS.filter((r) => r.status === 'pending')
+    .slice()
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
+export function decidedLeaveRequests(limit = 200): DecidedLeaveResult {
+  const all = LEAVE_ROWS.filter((r) => r.status !== 'pending')
+    .slice()
+    // Undated rows sort LAST, not by id: ids start with "LV", which compares
+    // above any "2026-…" timestamp and would float them up as if newest.
+    .sort((a, b) => {
+      const x = a.decided_at, y = b.decided_at
+      if (!x && !y) return a.id < b.id ? 1 : a.id > b.id ? -1 : 0
+      if (!x) return 1
+      if (!y) return -1
+      return x < y ? 1 : x > y ? -1 : 0
+    })
+  const rows = all.slice(0, limit)
+  return { rows, total: all.length, shown: rows.length }
+}
+
+export function requestLeave(
+  eid: string, from: string, to: string, reason: string, leaveType: LeaveTypeCode,
+): { ok: true; id: string } | { ok: false; error: string } {
+  const site = siteOfEid(eid)
+  const emp = site ? rosterForLeave(site.key).find((e) => e.eid === eid) : undefined
+  if (!emp) return { ok: false, error: 'NOT_FOUND' }
+  if (to < from) return { ok: false, error: 'BAD_RANGE' }
+  const id = newLeaveId()
+  LEAVE_ROWS = LEAVE_ROWS.concat({
+    id, eid, site_key: site ? site.key : '', emp_name: emp.name,
+    from_date: from, to_date: to, reason, status: 'pending',
+    requested_at: '2026-08-19 19:30', decided_by: '', decided_at: '',
+    leave_type: leaveType,
+  })
+  return { ok: true, id }
+}
+
+export function decideLeaveRequest(id: string, approve: boolean): { ok: boolean; error?: string } {
+  const row = LEAVE_ROWS.find((r) => r.id === id)
+  if (!row) return { ok: false, error: 'NOT_FOUND' }
+  if (row.status !== 'pending') return { ok: false, error: 'ALREADY_DECIDED' }
+  LEAVE_ROWS = LEAVE_ROWS.map((r) =>
+    r.id === id
+      ? { ...r, status: approve ? 'approved' : 'rejected',
+          decided_by: '(guest)', decided_at: '2026-08-19 19:30' }
+      : r,
+  )
+  return { ok: true }
+}
+
+// Cancel is the requester's own escape hatch and only exists while pending —
+// once decided the row is a record, not a draft.
+export function cancelLeaveRequest(id: string, eid: string): { ok: boolean; error?: string } {
+  const row = LEAVE_ROWS.find((r) => r.id === id)
+  if (!row) return { ok: false, error: 'NOT_FOUND' }
+  if (row.eid !== eid) return { ok: false, error: 'FORBIDDEN' }
+  if (row.status !== 'pending') return { ok: false, error: 'ALREADY_DECIDED' }
+  LEAVE_ROWS = LEAVE_ROWS.filter((r) => r.id !== id)
+  return { ok: true }
 }

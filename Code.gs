@@ -1295,6 +1295,11 @@ var T = {
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
+  'สุ่มข้อมูลใหม่':             { en: 'Regenerate data' },
+  'กำลังสร้าง…':                { en: 'Generating…' },
+  'สร้างข้อมูลใหม่แล้ว':        { en: 'Data regenerated' },
+  'สร้างข้อมูลตัวอย่างใหม่สำหรับเดือนนี้ (ทุกหน่วยงาน)? ข้อมูลเดิมของเดือนนี้จะถูกแทนที่':
+    { en: 'Regenerate sample data for this month (all sites)? Existing data for this month will be replaced.' },
   'กำลังดำเนินการ…':           { en: 'Working…' },
   'รออนุมัติ':                 { en: 'Pending Approval' },
   'ทุกหน่วยงานในสิทธิ์ของคุณ':  { en: 'All sites in your access' },
@@ -1958,19 +1963,6 @@ function boot(){
       try { go('dashboard'); }
       catch(e3){ fatal('VIEW: '+(e2&&e2.message||e2)+' / '+(e3&&e3.stack||e3)); }
     }
-    // One-shot demo fill, fired AFTER the app has rendered so it never delays
-    // boot. The server no-ops on every call after the first, so this costs one
-    // cheap round trip per visit thereafter. Redraw only when it actually
-    // wrote something, so a normal load is untouched.
-    try { maybeAutoSeed_(); } catch(e4){}
-  });
-}
-function maybeAutoSeed_(){
-  if(!BOOT || !BOOT.isAdmin) return;
-  call('api_autoSeedDemoOnce', [], function(r){
-    if(!r || !r.ok || !r.detail) return;   // skipped / failed → leave the view alone
-    // Data landed after the dashboard already drew, so redraw it.
-    try { if(window._curView==='dashboard') go('dashboard'); } catch(e){}
   });
 }
 // Data layer is unreachable (see api_bootstrap's catch). Still show the real
@@ -3250,12 +3242,31 @@ function renderDashboard(){
           +'</div>'
           +'<div class="fld"><div id="dMonth">'+monthNav()+'</div></div>'
           +'<div class="fld"><button class="btn xls-btn" id="dExport" title="'+esc(t('ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)'))+'">⬇ '+(isMobile()?t('รายงาน'):t('รายงานวันทำงาน'))+'</button></div>'
+          // TEMPORARY demo control — regenerates this month's sample data with
+          // a realistic activity mix. Remove once the demo data is settled.
+          + (BOOT.isAdmin ? '<div class="fld"><button class="btn sec" id="dReseed">🎲 '+t('สุ่มข้อมูลใหม่')+'</button></div>' : '')
         +'</div>'
       +'</div>'
     +'</div>'
     +'<div id="histSlot"></div>'
     +'<div id="dBody"><div class="spinner"></div></div>';
   wireMonthNav(function(){ $('dMonth').innerHTML=monthNav(); wireMonthNav(arguments.callee); loadDash(); });
+  // TEMPORARY demo control. withBtnLoading keeps any failure contained to this
+  // button — an earlier attempt called the seeder through the boot path, where
+  // a timeout surfaced as a fatal error and took the whole app down.
+  var rsBtn = $('dReseed');
+  if(rsBtn) rsBtn.onclick = function(){
+    uiConfirm({ message: t('สร้างข้อมูลตัวอย่างใหม่สำหรับเดือนนี้ (ทุกหน่วยงาน)? ข้อมูลเดิมของเดือนนี้จะถูกแทนที่'),
+                okText: t('สุ่มข้อมูลใหม่'), danger:true }, function(){
+      withBtnLoading(rsBtn, t('กำลังสร้าง…'), function(done){
+        call('api_reseedMonth',[CUR.y, CUR.m], function(r){
+          done();
+          if(r && r.ok){ flash(t('สร้างข้อมูลใหม่แล้ว'),'ok'); loadDash(); }
+          else flash((r && r.error) ? String(r.error) : t('ดำเนินการไม่สำเร็จ'),'error');
+        });
+      });
+    });
+  };
   Array.prototype.forEach.call($('dView').querySelectorAll('button'), function(b){
     b.onclick = function(){
       DASH.view = b.getAttribute('data-v');
@@ -3887,22 +3898,26 @@ function renderRequestsHub(){
         +'<button class="btn" id="lvSubmit" style="margin-top:.7rem;width:100%">'+t('ส่งคำขอลา')+'</button>'
       +'</div>'
       +'<div>'
-        +'<div class="card">'
-          +'<h2 style="margin:0 0 .5rem">'+t('คำขอของฉัน')+'</h2>'
-          +'<div id="lvTickets"><p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p></div>'
-        +'</div>'
-        + (BOOT.canEntry ?
-          '<div class="card" style="margin-top:.8rem">'
-            // Queue and history are peers — two states of the same list — so
-            // they are tabs in one card rather than a second card pushed far
-            // below the fold. Reuses the .idx-tab pattern from Work Index.
+          // All three lists are peers — the same tickets seen from different
+          // angles — so they share ONE tab strip in ONE card. My Requests used
+          // to sit in a separate card above, which made it read as a different
+          // kind of thing and pushed the other two down the page.
+          +'<div class="card">'
             +'<div class="idx-tabs" id="lvQTabs" style="margin-bottom:.6rem">'
-              +'<button class="idx-tab on" data-qtab="pending">'+t('รออนุมัติ')
-                +'<span class="qcount" id="lvQCountPending"></span></button>'
-              +'<button class="idx-tab" data-qtab="history">'+t('ประวัติการพิจารณา')
-                +'<span class="qcount" id="lvQCountHist"></span></button>'
+              +'<button class="idx-tab on" data-qtab="mine">'+t('คำขอของฉัน')
+                +'<span class="qcount" id="lvQCountMine"></span></button>'
+            + (BOOT.canEntry
+              ? '<button class="idx-tab" data-qtab="pending">'+t('รออนุมัติ')
+                  +'<span class="qcount" id="lvQCountPending"></span></button>'
+                +'<button class="idx-tab" data-qtab="history">'+t('ประวัติการพิจารณา')
+                  +'<span class="qcount" id="lvQCountHist"></span></button>'
+              : '')
             +'</div>'
-            +'<div id="lvQPanePending">'
+            +'<div id="lvQPaneMine">'
+              +'<div id="lvTickets"><p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p></div>'
+            +'</div>'
+        + (BOOT.canEntry ?
+            '<div id="lvQPanePending" hidden>'
               +'<div class="hint" style="margin-bottom:.4rem">'+t('ทุกหน่วยงานในสิทธิ์ของคุณ')+'</div>'
               +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
             +'</div>'
@@ -3913,8 +3928,11 @@ function renderRequestsHub(){
                 +'<button data-f="rejected">'+t('ไม่อนุมัติ')+'</button>'
               +'</div>'
               +'<div id="lvHistTickets"><div class="spinner"></div></div>'
-            +'</div>'
-          +'</div>' : '')
+            +'</div>' : '')
+          // Closes the single card. Kept OUTSIDE the canEntry conditional —
+          // when it lived inside, a user without entry rights got a card that
+          // was never closed.
+          +'</div>'
       +'</div>'
     +'</div>';
   $('lvSite').onchange=function(){
@@ -3937,8 +3955,10 @@ function renderRequestsHub(){
         Array.prototype.forEach.call($('lvQTabs').querySelectorAll('.idx-tab'),function(x){
           x.className='idx-tab'+(x===b?' on':'');
         });
-        $('lvQPanePending').hidden = (want!=='pending');
-        $('lvQPaneHistory').hidden = (want!=='history');
+        // Pending/history panes only exist for users with entry rights.
+        if($('lvQPaneMine'))    $('lvQPaneMine').hidden    = (want!=='mine');
+        if($('lvQPanePending')) $('lvQPanePending').hidden = (want!=='pending');
+        if($('lvQPaneHistory')) $('lvQPaneHistory').hidden = (want!=='history');
       };
     });
   }
@@ -4106,10 +4126,14 @@ function wireTicketButtons_(container){
 }
 function renderMyTickets_(){
   var box=$('lvTickets'); if(!box) return;
-  if(!LV.eid){ box.innerHTML='<p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p>'; return; }
+  if(!LV.eid){
+    lvSetTabCount_('lvQCountMine', 0);
+    box.innerHTML='<p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p>'; return;
+  }
   box.innerHTML='<div class="spinner"></div>';
   call('api_myLeaveRequests',[LV.eid],function(list){
     if(!box) return;
+    lvSetTabCount_('lvQCountMine', (list||[]).length);
     if(!list||!list.length){ box.innerHTML='<p class="muted">'+t('ยังไม่มีคำขอลา')+'</p>'; return; }
     list.forEach(function(r){ LV_ROWS[r.id]=r; });
     var counts={pending:0, approved:0, rejected:0};
@@ -6206,6 +6230,50 @@ function siteName_(key){ var n=key; rows_(SHEETS.SITES).forEach(function(s){ if(
    of June 2569, so the Overview/dashboard show data. Non-destructive: never
    overwrites a cell that already has a value. NOT on the boot path. ----------*/
 function rnd_(s){ var x=Math.sin(s)*10000; return x-Math.floor(x); }
+/* Pick a work code the way real activity is distributed, not uniformly.
+
+   Two effects combine:
+
+   1. POPULARITY. Codes are ranked once (deterministically, by a hash of the
+      code itself so the ranking is stable across runs and months) and drawn
+      with weight 1/(rank+1) — a Zipf-like curve. The top few activities take
+      a large share, the long tail is occasional. Uniform picking gave every
+      one of ~44 codes an identical ~2-3%, which is what made the dashboard
+      look synthetic.
+
+   2. SPECIALIZATION. Each employee has a small set of codes they mostly do,
+      derived from their row index, and sticks to it ~75% of the time. People
+      have jobs; a crane operator does not do a uniformly random activity each
+      day. This also makes per-person history read consistently.
+*/
+function codeRank_(code, n){
+  // Stable hash -> rank. Same code always lands in the same band, so the
+  // popular activities stay popular from month to month.
+  var h=0;
+  for(var i=0;i<code.length;i++) h=(h*31+code.charCodeAt(i))%100000;
+  return h%n;
+}
+function pickWorkCode_(codes, rowIdx, day, seed){
+  var n=codes.length;
+  if(n<2) return codes[0];
+  // Employee's specialty set: 3 codes, stable per row.
+  var C=Math.max(8, Math.round(n*0.55));
+  var s1=codes[(rowIdx*7)%C], s2=codes[(rowIdx*13+5)%C], s3=codes[(rowIdx*29+11)%n];
+  var r=rnd_(seed+0.11);
+  if(r<0.45) return s1;               // primary duty
+  if(r<0.65) return s2;
+  if(r<0.75) return s3;
+  // Otherwise draw from the popularity curve: build a weighted pick over
+  // 1/(rank+1) without allocating a cumulative table every call.
+  var total=0, i;
+  for(i=0;i<n;i++) total += 1/(codeRank_(codes[i], n)+1);
+  var target=rnd_(seed+0.37)*total, acc=0;
+  for(i=0;i<n;i++){
+    acc += 1/(codeRank_(codes[i], n)+1);
+    if(acc>=target) return codes[i];
+  }
+  return codes[n-1];
+}
 function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
   siteMatch = siteMatch || 'บางเตย'; year = year || 2026; month = month || 6;
   var site=null;
@@ -6262,7 +6330,7 @@ function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
       var chosen = rnd_(seed) <= 0.82;                 // ~82% of weekdays worked
       if(!chosen){ if(overwrite) values[ri][col-1]=''; return; }   // gaps -> empty
       if(!overwrite && String(values[ri][col-1]||'').trim()) return;
-      var wc=workCodes[Math.floor(rnd_(seed+0.11)*workCodes.length)];
+      var wc=pickWorkCode_(workCodes, ri, d, seed);
       var meta=workMeta[wc]||{mapping:'one-to-many',fixed:''};
       var composite = (meta.mapping==='one-to-one')
         ? (meta.fixed ? (wc+' / '+meta.fixed) : wc)
@@ -6274,45 +6342,25 @@ function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
   sh.getRange(1,1,values.length,width).setValues(values);   // ONE batched write
   return site.key+': '+writes+' cells, '+roster.length+' emp';
 }
-/* ---------------------------------------------------------------------------
-   ONE-SHOT DEMO FILL
+/* Re-seed ONE month across every site, overwriting what is already there.
 
-   Fills DEMO_SEED_MONTHS with sample work so the dashboard has figures to
-   show. Runs at most once ever: the first run writes a marker into Config and
-   every later call returns immediately on seeing it, so a public page that
-   many people load cannot re-run the fill or pile up concurrent writes.
+   Deliberately one month per call: three months x eight sites in a single
+   request exceeded the Apps Script execution limit, and because that failure
+   surfaced through the app's fatal-error path it took the whole page down
+   with it. The client drives this one month at a time so each request stays
+   small enough to finish.
 
-   Deliberately NOT on the boot path — api_bootstrap/doGet must stay light or
-   the app hangs while loading. The client calls this AFTER boot has already
-   rendered, so a slow fill costs nothing visible.
-
-   Non-destructive: overwrite is false, so it only ever fills empty cells and
-   cannot eat real records.
---------------------------------------------------------------------------- */
-var DEMO_SEED_FLAG_ = 'demo_seed_done';
-var DEMO_SEED_MONTHS_ = [[2026,6],[2026,7],[2026,8]];
-function api_autoSeedDemoOnce(){
+   overwrite=true here, unlike the normal seeder — the point is to REPLACE an
+   earlier fill whose activity mix came out flat. Only aim this at demo data.
+*/
+function api_reseedMonth(year, month){
   try{
     rcReset_();
-    if(getConfig_(DEMO_SEED_FLAG_)) return { ok:true, skipped:'already' };
-    // Claim the marker BEFORE doing the work. Two visitors can land here at
-    // the same moment; whoever writes second still writes the same value, and
-    // the guard above stops any third. Worst case the fill runs twice, which
-    // is harmless because it only fills empty cells.
-    var lock=LockService.getScriptLock();
-    try{ lock.waitLock(5000); } catch(e){ return { ok:true, skipped:'busy' }; }
-    try{
-      if(getConfig_(DEMO_SEED_FLAG_)) return { ok:true, skipped:'already' };
-      setConfigIfEmpty_(DEMO_SEED_FLAG_,
-        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
-    } finally { lock.releaseLock(); }
-    var out=[];
-    for(var i=0;i<DEMO_SEED_MONTHS_.length;i++){
-      var y=DEMO_SEED_MONTHS_[i][0], m=DEMO_SEED_MONTHS_[i][1];
-      try{ out.push(y+'-'+m+': '+seedDemoAllSites(y, m, false, true)); }
-      catch(e){ out.push(y+'-'+m+': ERR '+(e&&e.message||e)); }
-    }
-    return { ok:true, detail:out.join(' || ') };
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    year=Number(year); month=Number(month);
+    if(!year || month<1 || month>12) return { ok:false, error:'BAD_MONTH' };
+    return { ok:true, detail:String(seedDemoAllSites(year, month, true, true)) };
   } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
 // Seed the same month across every site (one batched write each).

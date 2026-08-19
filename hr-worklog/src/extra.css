@@ -87,3 +87,12 @@ body.dark .mnav{background:#0f1722}
   .lv-head{display:none}
 }
 body.dark .lv-ticket{background:#131b26}
+
+/* Day written by an approved leave request, not typed by hand. Follows the
+   same shape as the migration markers: a coloured inset edge plus a small
+   caption, so the grid keeps one visual language for "this cell has a story".
+   Indigo distinguishes it from the amber retro-edit and green moved-in marks. */
+.mgrid td.cell.fromleave{box-shadow:inset 0 3px 0 #6366f1}
+.mgrid td.cell .lvmark{margin-top:2px;font-size:.58rem;font-weight:800;color:#4f46e5;
+  line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help}
+body.dark .mgrid td.cell .lvmark{color:#a5b4fc}

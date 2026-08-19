@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { BOOT, SITES } from './mock'
+import type { SiteAdminRow } from './types'
+import { BOOT, SITES, allSitesAdmin, addSite, setSiteActive } from './mock'
 import { useSettings } from './settings'
 
 function Seg<T extends string>({ value, onChange, options }:
@@ -28,6 +30,10 @@ function Row({ title, desc, children }: { title: string; desc?: string; children
 export default function SettingsPage() {
   const s = useSettings()
   const { t } = s
+  const [projects, setProjects] = useState<SiteAdminRow[]>(() => allSitesAdmin())
+  const [newName, setNewName] = useState('')
+  const [newCompany, setNewCompany] = useState('')
+  const [err, setErr] = useState('')
   return (
     <div className="wrap narrow" style={{ padding: 0 }}>
       <div className="card" style={{ padding: '.85rem 1.1rem' }}>
@@ -55,6 +61,40 @@ export default function SettingsPage() {
           <Seg value={s.cellNames} onChange={s.setCellNames} options={[['code', t('รหัส')], ['name', t('ชื่อเต็ม')]]} />
         </Row>
       </div>
+
+      {/* Projects. Admins switch a project off for EVERYONE; the older
+          per-device show/hide below is all a non-admin could ever do — it
+          writes to localStorage, so it only affects the browser that set it.
+          Closing a project stops NEW entries but keeps its dashboard history. */}
+      {BOOT.isAdmin && (
+        <div className="card">
+          <h2>{t('โครงการ / หน่วยงาน')}</h2>
+          <div className="sub">
+            {t('เพิ่มโครงการใหม่ หรือปิดโครงการที่จบแล้ว · โครงการที่ปิดจะไม่ให้บันทึกงานใหม่ แต่ประวัติเดิมยังอยู่ในแดชบอร์ด')}
+          </div>
+          {projects.map((p) => (
+            <Row key={p.key}
+              title={p.active ? p.name : `${p.name} · ${t('ปิดโครงการ')}`}
+              desc={`${p.company}${p.emps ? ` · ${p.emps} ${t('คน')}` : ''}`}>
+              <Seg value={p.active ? 'on' : 'off'}
+                onChange={(v) => { setSiteActive(p.key, v === 'on'); setProjects(allSitesAdmin()) }}
+                options={[['on', t('แสดง')], ['off', t('ปิดโครงการ')]]} />
+            </Row>
+          ))}
+          <div style={{ display: 'flex', gap: '.5rem', marginTop: '.6rem', flexWrap: 'wrap' }}>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)}
+              placeholder={t('ชื่อโครงการใหม่')} maxLength={120} style={{ flex: '1 1 12rem' }} />
+            <input value={newCompany} onChange={(e) => setNewCompany(e.target.value)}
+              placeholder={t('บริษัท (ถ้ามี)')} maxLength={160} style={{ flex: '1 1 10rem' }} />
+            <button className="btn sec" onClick={() => {
+              const r = addSite(newName, newCompany)
+              if (r.ok) { setNewName(''); setNewCompany(''); setProjects(allSitesAdmin()); setErr('') }
+              else setErr(r.error === 'DUPLICATE' ? t('มีโครงการชื่อนี้อยู่แล้ว') : t('กรุณาระบุชื่อโครงการ'))
+            }}>+ {t('เพิ่มโครงการ')}</button>
+          </div>
+          {err && <div className="hint" style={{ marginTop: '.4rem', color: '#b3261e' }}>{err}</div>}
+        </div>
+      )}
 
       <div className="card">
         <h2>{t('หน่วยงานที่แสดง')}</h2>

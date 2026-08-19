@@ -63,7 +63,10 @@ export interface Employee {
 
 // One filled cell. Stored value is a composite code like "A-1 / 5".
 // op cells use `team`, support cells use `detail`; `pm` is the optional 2nd task.
-export interface CellValue { team?: string; detail?: string; pm?: string }
+// `note` is the per-cell remark column. An approved leave request writes it as
+// '[LV] <type> · <doc no>', which is how the grid tells a day that came from a
+// request apart from a hand-typed Z-2 — the cell VALUE is identical either way.
+export interface CellValue { team?: string; detail?: string; pm?: string; note?: string }
 export type Entries = Record<string, Record<string, CellValue>>
 
 export interface RetroEdit { ms: number; date: string; by: string }

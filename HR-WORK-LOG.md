@@ -376,6 +376,12 @@ way `withBtnLoading` does — or not be reachable from the client at all.
   queue into history rather than just deleting it.
 - `Requests.tsx` — the full hub: submit form, three tabs, column-aligned tickets, day-first
   dates, amber pending badge, busy rows, cancel on own pending requests.
+- `Entry.tsx` — `parseLeaveNote()` plus the indigo provenance marker, so the preview grid
+  distinguishes an approved-leave day from a hand-typed `Z-2` exactly as the live app does.
+  `CellValue` gained `note`, and the mock now emits ~4% leave days so the marker is visible.
+- `SettingsPage.tsx` — the projects admin (add / close / reopen, employee counts, derived
+  ASCII-or-hash keys, duplicate-name reject). Closed projects drop out of the entry and
+  leave-request pickers via `siteIsOpen()` but stay on the dashboard.
 - `extra.css` — the ticket grid, tab, and badge styles.
 - `i18n_data.ts` **re-extracted from `Code.gs`** as that file's own header instructs
   (228 → 318 keys, **0 lost**).

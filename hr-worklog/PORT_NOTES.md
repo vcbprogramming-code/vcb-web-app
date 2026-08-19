@@ -10,9 +10,9 @@ re-extract the CSS + `T` dictionary verbatim → bump the row below).
 | Field | Value |
 |---|---|
 | GAS source | `../Code.gs` |
-| Size at sync | 490,758 bytes |
-| GAS mtime at sync | 2026-06-28 |
-| Deployed version referenced | `@189` (per README) |
+| Size at sync | 599,620 bytes |
+| GAS mtime at sync | 2026-08-19 |
+| Deployed version referenced | `@49` |
 | Stack | Vite + React 18 + TypeScript (strict) |
 | Data layer | **Typed mock** mirroring the GAS API (`src/mock.ts`) — visual/UX parity, no backend |
 
@@ -21,7 +21,7 @@ re-extract the CSS + `T` dictionary verbatim → bump the row below).
 | Artifact | Source in Code.gs | React file |
 |---|---|---|
 | Stylesheet | `<style>…</style>` block | `src/app.css` |
-| i18n dictionary | `var T = {…}` (~470 entries) | `src/i18n_data.ts` |
+| i18n dictionary | `var T = {…}` (318 entries as of 2026-08-19) | `src/i18n_data.ts` |
 
 `src/extra.css` is the ONLY hand-written CSS — it covers elements the GAS code
 built inline via JS (month-nav arrows, Overview→Weekly focus ring).
@@ -41,6 +41,11 @@ built inline via JS (month-nav arrows, Overview→Weekly focus ring).
 | `api_bootstrap` | `BOOT` in `src/mock.ts` | ✅ shape-faithful |
 | `api_siteMonth` | `siteMonth()` in `src/mock.ts` | ✅ shape-faithful |
 | `api_adminSummary` | `adminSummary()` in `src/mock.ts` | ✅ shape-faithful |
+| `renderRequestsHub` (leave hub) | `src/Requests.tsx` | ✅ submit form, 3 sibling tabs, column-aligned tickets, dd/mm/yy dates, cancel, busy rows |
+| `api_myLeaveRequests` / `api_pendingLeaveRequests` / `api_decidedLeaveRequests` | `myLeaveRequests()` / `pendingLeaveRequests()` / `decidedLeaveRequests()` | ✅ shape-faithful, **stateful** (approving moves a row queue→history) |
+| `api_requestLeave` / `api_decideLeaveRequest` / `api_cancelLeaveRequest` | same names in `src/mock.ts` | ✅ incl. pending-only cancel + ownership check |
+| `api_adminListSites` / `api_addSite` / `api_setSiteActive` | `allSitesAdmin()` / `addSite()` / `setSiteActive()` | ✅ incl. derived ASCII/hash keys, duplicate-name reject, employee counts |
+| leave provenance marker (`[LV]` note → `.fromleave`/`.lvmark`) | `parseLeaveNote()` in `src/Entry.tsx` | ✅ matches the ASCII marker, not the Thai wording |
 
 ## Parity checklist
 
@@ -54,8 +59,19 @@ built inline via JS (month-nav arrows, Overview→Weekly focus ring).
 - [x] Settings: theme (light/dark/auto), language (th/en), year (BE/CE),
       dashboard default, cell display (code/name), hidden sites
 - [x] i18n via verbatim `T` dictionary; verbatim CSS; mobile `.is-mobile` class
+- [x] Requests hub: submit form (site → name → leave type → dates → reason),
+      three sibling tabs (My Requests / Pending Approval / Decision History) with
+      counts, column-aligned ticket rows, dd/mm/yy day-first dates with range
+      collapsing, amber pending badge, busy rows held until the list re-renders,
+      cancel on own still-pending requests
+- [x] Projects admin: add a project (derived ASCII/hash key, duplicate-name
+      reject), close/reopen one, employee counts; closed projects leave the entry
+      and leave-request pickers but stay in the dashboard
+- [x] Schedule shows which days came from an approved leave request
+      (indigo inset edge + caption, doc number in the tooltip)
 - [ ] **Stubbed (visual only, no backend):** Excel export, + เพิ่มพนักงาน dialog,
-      ⇄ transfer flow, Master Index import, autosave to a real store, history import
+      ⇄ transfer flow, Master Index import, autosave to a real store, history import,
+      printed leave slip (the GAS version opens a print window; not ported)
 
 ## Known intentional differences
 
@@ -65,3 +81,14 @@ built inline via JS (month-nav arrows, Overview→Weekly focus ring).
   endpoint, or rebuild the API — keep the `src/types.ts` contracts either way.
 - **"Today"** is pinned to `2026-05-18` (`TODAY` in `src/App.tsx`) so the sample
   month shows a realistic locked/editable/future mix. Real app uses the live date.
+- **Leave-request state is in-memory** (module-level in `src/mock.ts`), so submits,
+  approvals and cancels behave correctly within a session but reset on reload. The
+  GAS app persists to the `LeaveRequests` sheet.
+- **Dates are typed `string`, never `Date`**, throughout the leave models. The GAS
+  server normalises before returning (Sheets hands back Date objects for anything
+  date-shaped and rounds long numeric ids — see `leaveRowOut_`), so typing them as
+  `Date` here would misrepresent what actually crosses the wire.
+- **36 `t()` keys in `Entry.tsx`/`Picker.tsx`/`SettingsPage.tsx` have no entry in
+  the `T` dictionary** — they are mirror-only strings that never existed in
+  `Code.gs`. Harmless (`translate()` falls back to the Thai source string), but they
+  will not switch to English. Pre-existing, not introduced by the 2026-08-19 sync.

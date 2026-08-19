@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { LeaveRequest, LeaveRosterEntry, LeaveStatus, LeaveTypeCode } from './types'
 import {
   BOOT, SITES, LEAVE_TYPES, rosterForLeave, myLeaveRequests, pendingLeaveRequests,
-  decidedLeaveRequests, requestLeave, decideLeaveRequest, cancelLeaveRequest,
+  decidedLeaveRequests, requestLeave, decideLeaveRequest, cancelLeaveRequest, siteIsOpen,
 } from './mock'
 import { useSettings } from './settings'
 
@@ -210,7 +210,7 @@ export default function Requests() {
               <option value="">{t('— เลือกหน่วยงาน —')}</option>
               {/* Closed projects are not offered: a leave request is new work
                   against a project. They stay on the dashboard regardless. */}
-              {BOOT.sites.map((s) => (
+              {BOOT.sites.filter((s) => siteIsOpen(s.key)).map((s) => (
                 <option key={s.key} value={s.key}>{s.name}</option>
               ))}
             </select>

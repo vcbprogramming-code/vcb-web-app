@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import type { YMonth, SiteMonth, Entries, CellValue, CellNames } from './types'
-import { siteMonth, siteAccent, BOOT, ACTIVITIES, CATEGORIES } from './mock'
+import { siteMonth, siteAccent, BOOT, ACTIVITIES, CATEGORIES, siteIsOpen } from './mock'
 import { useSettings } from './settings'
 import { TODAY, MonthNav } from './App'
 import Picker from './Picker'
@@ -10,6 +10,24 @@ function isoPlus(iso: string, n: number): string { const d = new Date(iso + 'T00
 
 const ACT_BY_CODE = Object.fromEntries(ACTIVITIES.map((a) => [a.code, a.name]))
 const CAT_BY_CODE = Object.fromEntries(CATEGORIES.map((c) => [c.code, c.name]))
+
+/* Reads a cell's note and reports whether that day was written by an approved
+   leave request rather than typed by hand.
+
+   Server-written notes look like "[LV] ลาป่วย · LV20260819143210-047". The
+   ASCII marker is what we match on — the Thai wording after it is display text
+   that may be reworded or translated, so matching that would silently break
+   the indicator. Returns null for a hand-typed note, so an ordinary remark
+   never shows the badge. */
+export function parseLeaveNote(note?: string): { label: string; doc: string } | null {
+  const s = String(note ?? '').trim()
+  if (s.indexOf('[LV]') !== 0) return null
+  const rest = s.slice(4).trim()
+  const dot = rest.lastIndexOf('·')
+  const label = (dot >= 0 ? rest.slice(0, dot) : rest).trim() || 'ลา'
+  const doc = dot >= 0 ? rest.slice(dot + 1).trim() : ''
+  return { label, doc }
+}
 
 function cellTitle(v: string): string {
   if (!v) return ''
@@ -203,11 +221,22 @@ function Weekly({ d, today, lockDays, weekStart, focus, openPicker }:
                     const locked = day.date < cutoff || day.date > ahead
                     const cls = 'cell ' + (day.weekend ? 'weekend ' : '') + (day.date === today ? 'today ' : '') + (locked ? 'locked ' : '') + (day.date > ahead ? 'future ' : '')
                     const isFocus = !!focus && focus.eid === e.eid && focus.date === day.date
+                    const lv = parseLeaveNote(v.note)
                     const onOpen = (field: keyof CellValue, anchor: HTMLElement) => openPicker(e.eid, day.date, field, anchor)
                     return (
-                      <td key={day.date} className={cls.trim() + (isFocus ? ' cellfocus' : '')}>
+                      <td key={day.date}
+                        className={cls.trim() + (isFocus ? ' cellfocus' : '') + (lv ? ' fromleave' : '')}>
                         <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked} onOpen={onOpen} />
                         <Slot val={v.pm || ''} field="pm" isSecond={true} weekend={day.weekend} locked={locked} onOpen={onOpen} />
+                        {/* An approval writes plain Z-2 — the same value HR would
+                            type — so without this the request behind the day is
+                            invisible on the grid. */}
+                        {lv && (
+                          <div className="lvmark"
+                            title={t('บันทึกอัตโนมัติจากคำขอลาที่อนุมัติแล้ว') + (lv.doc ? ' · ' + lv.doc : '')}>
+                            ✓ {t(lv.label)}
+                          </div>
+                        )}
                       </td>
                     )
                   })}
@@ -234,7 +263,9 @@ export default function Entry({ cur, setCur, site, setSite, mode, setMode }:
   const [picker, setPicker] = useState<PickerState>(null)
   const [flash, setFlash] = useState('')
   const flashTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const sites = BOOT.sites
+  // Closed projects accept no NEW work, so they drop out of the entry picker.
+  // They remain in BOOT.sites and keep their dashboard history.
+  const sites = BOOT.sites.filter((s) => siteIsOpen(s.key))
 
   const base = useMemo<SiteMonth | null>(() => (site ? siteMonth(site, cur.y, cur.m, TODAY) : null), [site, cur])
   const acc = siteAccent(site)

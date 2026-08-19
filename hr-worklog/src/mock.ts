@@ -6,6 +6,7 @@ import type {
   Activity, Category, Boot, Employee, DayInfo, Entries, CellValue,
   SiteMonth, AdminSummary, SiteSummary, TopItem, DayFill,
   LeaveRequest, LeaveType, LeaveTypeCode, LeaveRosterEntry, DecidedLeaveResult,
+  SiteAdminRow,
 } from './types'
 
 export interface SiteMeta { key: string; name: string; company: string }
@@ -153,6 +154,16 @@ export function siteMonth(siteKey: string, year: number, month: number, today: s
       if (day.weekend) return
       if (day.date > today) return
       if (rnd() < 0.12) return // ~12% genuinely missing
+      // ~4% of days are approved leave, written by the request workflow rather
+      // than typed. Z-2 is the leave work code; the '[LV]' note is what makes
+      // the grid show the provenance marker — the cell value alone is
+      // indistinguishable from a hand-typed Z-2.
+      if (rnd() < 0.04) {
+        const lt = LEAVE_TYPES[Math.floor(rnd() * LEAVE_TYPES.length)]
+        const note = `[LV] ${lt.th} · LV202608${String(10 + Math.floor(rnd() * 9))}000000-0${Math.floor(rnd() * 90) + 10}`
+        by[day.date] = e.kind === 'operation' ? { team: 'Z-2', note } : { detail: 'Z-2', note }
+        return
+      }
       if (e.kind === 'operation') {
         const a = opActs[Math.floor(rnd() * opActs.length)]
         const cost = a.mapping === 'one-to-one' ? a.fixed_cost! : CATEGORIES[3 + Math.floor(rnd() * (CATEGORIES.length - 4))].code
@@ -388,4 +399,52 @@ export function cancelLeaveRequest(id: string, eid: string): { ok: boolean; erro
   if (row.status !== 'pending') return { ok: false, error: 'ALREADY_DECIDED' }
   LEAVE_ROWS = LEAVE_ROWS.filter((r) => r.id !== id)
   return { ok: true }
+}
+
+/* Projects administration (api_adminListSites / api_addSite / api_setSiteActive).
+
+   Sites gained an `active` flag: a closed project stops being offered for NEW
+   work but keeps its dashboard history. Blank/absent counts as ACTIVE, so rows
+   written before the column existed keep working. */
+let SITE_ACTIVE: Record<string, boolean> = {}
+let EXTRA_SITES: SiteMeta[] = []
+
+export function allSitesAdmin(): SiteAdminRow[] {
+  return SITES.concat(EXTRA_SITES).map((s) => ({
+    key: s.key, name: s.name, company: s.company,
+    active: SITE_ACTIVE[s.key] !== false,
+    // Employee count, so closing a project can warn how many people are still
+    // assigned. It warns rather than blocks: projects routinely end before HR
+    // moves staff.
+    emps: rosterOf(s.key).length,
+  }))
+}
+export function siteIsOpen(key: string): boolean { return SITE_ACTIVE[key] !== false }
+
+export function setSiteActive(key: string, active: boolean): { ok: boolean } {
+  SITE_ACTIVE = { ...SITE_ACTIVE, [key]: active }
+  return { ok: true }
+}
+
+export function addSite(name: string, company: string):
+  { ok: true; key: string } | { ok: false; error: string } {
+  const nm = name.trim()
+  if (!nm) return { ok: false, error: 'MISSING_NAME' }
+  const all = SITES.concat(EXTRA_SITES)
+  if (all.some((s) => s.name.trim() === nm)) return { ok: false, error: 'DUPLICATE' }
+  // The key is DERIVED, never typed: it is a permanent internal id (wide-tab
+  // suffix, Users.site_key), so it must be ASCII and unique. Thai names yield
+  // no ASCII, so they fall back to a stable hash of the name rather than
+  // site2/site3, which would say nothing when read in the sheet.
+  let base = nm.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  if (!base) {
+    let h = 0
+    for (let i = 0; i < nm.length; i++) h = (h * 31 + nm.charCodeAt(i)) % 1000000
+    base = 'site' + h
+  }
+  const taken = new Set(all.map((s) => s.key))
+  let key = base, n = 2
+  while (taken.has(key)) key = base + n++
+  EXTRA_SITES = EXTRA_SITES.concat({ key, name: nm, company: company.trim() })
+  return { ok: true, key }
 }

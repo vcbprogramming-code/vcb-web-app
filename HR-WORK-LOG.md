@@ -472,6 +472,54 @@ parses the outer file without ever parsing the client JS. Extract the literal, p
 `<script>` blocks, and `node --check` those separately; also count `{`/`}` in the `<style>`
 blocks. Both checks caught real breakage this session.
 
+### Google Drive vs `.git/` — the recurring "corruption"
+
+This repo sits inside a Google Drive File Stream path. Drive writes a
+`desktop.ini` into **every folder it syncs** (it sets the folder icon), and that
+includes `.git/refs/`. Git treats any file under `refs/` as a ref, so
+`refs/desktop.ini` produces:
+
+```
+fatal: bad object refs/desktop.ini
+error: ... did not send all necessary objects
+```
+
+which breaks `fetch` / `push` / `log` until the file is deleted. It has recurred
+across sessions and is the single mechanism behind every "corruption" seen so
+far — not several unrelated problems.
+
+**`.gitignore` cannot fix this.** It governs the working tree only, never `.git/`
+internals. The `desktop.ini` rule in `.gitignore` correctly keeps the ~766
+working-tree copies out of commits — zero are tracked — so that part was never
+the problem.
+
+**The containment is a hook.** `.githooks/` holds `pre-commit`, `pre-push` and
+`post-checkout`, each deleting any `desktop.ini` under `.git/` before the
+operation runs. Cheap (one `find`, no network) and safe: `desktop.ini` is never a
+legitimate git file, so deleting it inside `.git/` can lose nothing.
+
+Enable once per clone — `core.hooksPath` is machine-local and is **not** carried
+by git:
+
+```
+git config core.hooksPath .githooks
+```
+
+Manual repair, if git ever breaks anyway:
+
+```
+find .git -name desktop.ini -delete
+```
+
+**The durable fix is outside git:** stop Drive from syncing `.git/`, or move the
+repo off the Drive path. Until then the hook contains the damage rather than
+preventing it.
+
+Also cleaned up 2026-08-19: 16 orphaned worktree registrations under
+`.git/worktrees/` (`sop-push-worktree*`, left by an earlier session — `git
+worktree list` showed only the real one) that made `git gc` fail with permission
+errors. Removed; `git fsck` is clean and the object store is fully packed.
+
 **Standalone script migration history:** this app was moved off a container-bound script
 (attached to the `Employees` sheet) to the current standalone project on 2026-07-18. See
 git history / prior session notes if you need that context again.

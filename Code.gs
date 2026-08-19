@@ -272,6 +272,15 @@ body.dark .mgrid td.cell.away{background:repeating-linear-gradient(45deg,#1a1f29
 .mgrid td.cell.movedin{box-shadow:inset 0 3px 0 #16a34a}
 .mgrid td.cell .inmark{margin-top:2px;font-size:.58rem;font-weight:800;color:#15803d;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.dark .mgrid td.cell .inmark{color:#4ade80}
+/* Day written by an approved leave request, not typed by hand. Follows the
+   same shape as the migration markers above: a coloured inset edge plus a
+   small caption, so the grid keeps one visual language for "this cell has a
+   story". Indigo distinguishes it from the amber retro-edit and green
+   moved-in marks. */
+.mgrid td.cell.fromleave{box-shadow:inset 0 3px 0 #6366f1}
+.mgrid td.cell .lvmark{margin-top:2px;font-size:.58rem;font-weight:800;color:#4f46e5;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help}
+body.dark .mgrid td.cell .lvmark{color:#a5b4fc}
 /* emp-col: per-employee migrate/remove actions (reveal on row hover) + move note */
 .mgrid .emp-col .emp-acts{float:right;display:inline-flex;gap:2px;opacity:0;transition:opacity .12s}
 .mgrid tbody tr:hover .emp-col .emp-acts{opacity:1}
@@ -1321,6 +1330,8 @@ var T = {
   'ลาคลอด':                    { en: 'Maternity Leave' },
   'ลาบวช':                     { en: 'Ordination Leave' },
   'ไม่ระบุ':                   { en: 'Unspecified' },
+  'ลา':                        { en: 'Leave' },
+  'บันทึกอัตโนมัติจากคำขอลาที่อนุมัติแล้ว': { en: 'Filled automatically from an approved leave request' },
   /* ---- printed slip ---- */
   'เลขที่':                    { en: 'No.' },
   'บริษัท':                    { en: 'Company' },
@@ -2774,8 +2785,15 @@ function renderGrid(){
           // Migration-in marker: the exact day this employee joined THIS site.
           var inMark = (day.date===e.movedIn)
             ? '<div class="inmark" title="'+esc(t('ย้ายเข้าจาก')+' '+e.movedInFrom+' '+e.movedIn)+'">→ '+t('ย้ายเข้า')+'</div>' : '';
-          return '<td class="cell '+cls.trim()+(ed?' redited':'')+(day.date===e.movedIn?' movedin':'')+'" data-date="'+day.date+'">'
-            + slot(amVal, amF, false) + slot(pmVal, 'pm', true) + rmark + inMark
+          // Approved-leave marker. The cell value is plain Z-2 whether HR typed
+          // it or an approval wrote it, so without this the two are
+          // indistinguishable and the request behind the day is invisible.
+          var lv = parseLeaveNote_(v && v.note);
+          var lvMark = lv
+            ? '<div class="lvmark" title="'+esc(t('บันทึกอัตโนมัติจากคำขอลาที่อนุมัติแล้ว')+(lv.doc?(' · '+lv.doc):''))+'">✓ '
+              + esc(lv.label) + '</div>' : '';
+          return '<td class="cell '+cls.trim()+(ed?' redited':'')+(day.date===e.movedIn?' movedin':'')+(lv?' fromleave':'')+'" data-date="'+day.date+'">'
+            + slot(amVal, amF, false) + slot(pmVal, 'pm', true) + rmark + inMark + lvMark
             + '</td>';
         }).join('')
       +'</tr>';
@@ -3048,6 +3066,25 @@ function cellTitle_(v){
 // "A-1 / 5". When the user turns on full names (Settings), the ACTIVITY part is
 // swapped for its full name while the Work Category stays a number: "งานผูกเหล็ก / 5".
 // The stored value never changes — only the display text — so saving is unaffected.
+/* Reads the note a cell carries and reports whether that day was written by
+   an approved leave request rather than typed by hand.
+
+   Server-written notes look like "[LV] ลาป่วย · LV20260819143210-047". The
+   ASCII marker is what we match on — the Thai wording after it is display
+   text and may be reworded or translated, so matching that instead would
+   silently break the indicator.
+
+   Returns null for a hand-typed note, so an ordinary remark never shows the
+   badge. */
+function parseLeaveNote_(note){
+  var s = String(note==null ? '' : note).trim();
+  if(s.indexOf('[LV]') !== 0) return null;
+  var rest = s.slice(4).trim();
+  var dot = rest.lastIndexOf('·');
+  var label = (dot >= 0 ? rest.slice(0, dot) : rest).trim() || t('ลา');
+  var doc = dot >= 0 ? rest.slice(dot+1).trim() : '';
+  return { label:label, doc:doc };
+}
 function cellDisplay_(v){
   v = String(v||'').trim(); if(!v) return '';
   if(CELL_NAMES !== 'name') return v;                 // show the code (default)
@@ -6808,6 +6845,25 @@ var LEAVE_TYPES = [
   { code:'ordination',th:'ลาบวช' },
   { code:'other',     th:'อื่นๆ' }
 ];
+/* The note written into a schedule cell when a leave request is approved.
+
+   It starts with LEAVE_MARK_ so the grid can tell "this day came from an
+   approved request" apart from "someone typed Z-2 by hand" — the cell value
+   is identical either way, so without a marker the two are indistinguishable
+   and the request's paper trail is invisible on the schedule.
+
+   The marker is a fixed ASCII token, not the Thai wording: the wording is
+   display text that could be reworded or translated, and matching on it would
+   silently break the indicator.
+
+   The doc number is appended so a cell can be traced back to the exact
+   request that produced it. */
+var LEAVE_MARK_ = '[LV]';
+function leaveNote_(row){
+  var th = leaveTypeTh_(String(row && row.leave_type || '').trim()) || 'ลา';
+  var id = String(row && row.id || '').trim();
+  return LEAVE_MARK_ + ' ' + th + (id ? ' · ' + id : '');
+}
 function leaveTypeTh_(code){
   for(var i=0;i<LEAVE_TYPES.length;i++) if(LEAVE_TYPES[i].code===code) return LEAVE_TYPES[i].th;
   return '';
@@ -7018,7 +7074,7 @@ function _api_decideLeaveRequest_(id, approve){
         var items=[], d=new Date(lvDate_(row.from_date)+'T00:00:00'), end=new Date(lvDate_(row.to_date)+'T00:00:00');
         while(d<=end){
           items.push({ date:Utilities.formatDate(d,Session.getScriptTimeZone(),'yyyy-MM-dd'), eid:row.eid,
-            kind:e.kind, fields: (e.kind==='operation') ? {team:'Z-2', note:'ลา (อนุมัติ)'} : {detail:'Z-2', note:'ลา (อนุมัติ)'} });
+            kind:e.kind, fields: (e.kind==='operation') ? {team:'Z-2', note:leaveNote_(row)} : {detail:'Z-2', note:leaveNote_(row)} });
           d.setDate(d.getDate()+1);
         }
         writeWideCells_(String(row.site_key), items);

@@ -720,12 +720,14 @@ body.dark .settings-card .users-toggle .chev{ color:#9dc4f0; background:rgba(157
 .site-vis{display:flex;flex-direction:column}
 .vis-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.5rem .1rem;border-bottom:1px solid var(--line);cursor:pointer}
 .vis-row:last-child{border-bottom:0}
+/* A closed project stays listed but reads as inactive. */
+.vis-name.off{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
 .vis-name{font-size:.9rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vis-tog{appearance:none;-webkit-appearance:none;width:46px;height:26px;border-radius:13px;background:#cfd6e0;position:relative;cursor:pointer;transition:background .15s;flex:0 0 46px;margin:0;padding:0;border:0}
-.vis-tog::before{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
-.vis-tog:checked{background:var(--blue)}
-.vis-tog:checked::before{left:22px}
-body.dark .vis-tog{background:#33404f}
+.site-act,.vis-tog{appearance:none;-webkit-appearance:none;width:46px;height:26px;border-radius:13px;background:#cfd6e0;position:relative;cursor:pointer;transition:background .15s;flex:0 0 46px;margin:0;padding:0;border:0}
+.site-act::before,.vis-tog::before{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.site-act:checked,.vis-tog:checked{background:var(--blue)}
+.site-act:checked::before,.vis-tog:checked::before{left:22px}
+body.dark .site-act,body.dark .vis-tog{background:#33404f}
 /* how-to button — full width above the two columns */
 .settings-card .howto-sect{background:none;border:0;box-shadow:none;padding:0;margin:0 0 .45rem}
 .how-btn{width:100%;background:#eaf1fb;color:var(--blue);border:1px solid #cdddf2;font-weight:700;padding:.48rem;border-radius:10px;font-size:.86rem}
@@ -1229,7 +1231,16 @@ function setSiteHidden(k, hide){
   else if(!hide && i >= 0) HIDDEN_SITES.splice(i,1);
   _lsSet('hr_hidden_sites', JSON.stringify(HIDDEN_SITES));
 }
-function visibleSites(){ return (BOOT.sites||[]).filter(function(s){ return !isSiteHidden(s.key); }); }
+// Sites offered for NEW work: per-device hidden ones drop out, and so do
+// projects an admin has deactivated for everyone. Deactivated projects are
+// still present in BOOT.sites, so the dashboard keeps showing their history —
+// only the places that would create new entries filter them out.
+// s.active is undefined for a client that booted before the flag existed;
+// treat that as active rather than hiding everything.
+function siteIsOpen(s){ return s && s.active !== false; }
+function visibleSites(){
+  return (BOOT.sites||[]).filter(function(s){ return !isSiteHidden(s.key) && siteIsOpen(s); });
+}
 var DASH = { view: DASH_DEFAULT };   // 'progress' (ความคืบหน้า) | 'topact' (งานหลัก)
 
 /* Remember where the user was so an accidental refresh returns them to the same
@@ -1559,6 +1570,25 @@ var T = {
   'วิธีใช้งานหน้านี้ (อ่านก่อนเริ่ม)': { en: 'How to use this page (read first)' },
   'หน่วยงานที่แสดง': { en: 'Visible sites' },
   'ปิดหน่วยงานที่จบแล้วเพื่อซ่อนจากแดชบอร์ดและรายการเลือก (เฉพาะเครื่องนี้)': { en: 'Turn off finished sites to hide them from the dashboard and pickers (this device only)' },
+  'โครงการ / หน่วยงาน':        { en: 'Projects / Sites' },
+  'เพิ่มโครงการใหม่ หรือปิดโครงการที่จบแล้ว · โครงการที่ปิดจะไม่ให้บันทึกงานใหม่ แต่ประวัติเดิมยังอยู่ในแดชบอร์ด':
+    { en: 'Add a new project, or close a finished one · closed projects accept no new entries but keep their history on the dashboard' },
+  'ชื่อโครงการใหม่':            { en: 'New project name' },
+  'บริษัท (ถ้ามี)':             { en: 'Company (optional)' },
+  'เพิ่มโครงการ':               { en: 'Add project' },
+  'กำลังเพิ่ม…':                { en: 'Adding…' },
+  'เพิ่มโครงการแล้ว':           { en: 'Project added' },
+  'เพิ่มโครงการไม่สำเร็จ':      { en: 'Could not add the project' },
+  'มีโครงการชื่อนี้อยู่แล้ว':    { en: 'A project with this name already exists' },
+  'กรุณาระบุชื่อโครงการ':       { en: 'Please enter a project name' },
+  'โหลดรายการโครงการไม่สำเร็จ':  { en: 'Could not load the project list' },
+  'ปิดโครงการ':                { en: 'Close project' },
+  'ปิดโครงการนี้หรือไม่?':      { en: 'Close this project?' },
+  'คนยังอยู่ในโครงการนี้':      { en: 'people are still assigned to it' },
+  'จะไม่สามารถบันทึกงานใหม่ได้ แต่ประวัติเดิมยังอยู่':
+    { en: 'No new entries can be logged, but existing history is kept.' },
+  'ปิดโครงการแล้ว':             { en: 'Project closed' },
+  'เปิดโครงการแล้ว':            { en: 'Project reopened' },
   'ไม่มีหน่วยงาน': { en: 'No sites' },
   'ประวัติการแก้ไข': { en: 'Edit history' },
   'ดูบันทึกว่าใครแก้ไขอะไร เมื่อไร พร้อมค้นหาและกรอง': { en: 'See who changed what and when, with search and filters' },
@@ -3485,6 +3515,91 @@ function _handleHistoryStatus(r){
     next();
 }
 
+/* ======================= PROJECTS / SITES (admin) =======================
+   Sites previously came only from SETUP() seeding — there was no way to add
+   one, and the only "hide site" control wrote to localStorage, so it affected
+   a single browser. These make the roster editable and SHARED.
+
+   Deactivating is not deletion. The site keeps its rows and its past months
+   keep appearing on the dashboard, because a finished project's history is
+   exactly what you still need to report on. It only stops being offered for
+   NEW entries.
+------------------------------------------------------------------------- */
+function api_adminListSites(){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    ensureSitesColumns_();
+    rcReset_();
+    // Employee counts come along so the UI can warn before deactivating a
+    // project that still has people on it.
+    var byKey={};
+    rows_(SHEETS.EMP).forEach(function(e){
+      var k=String(e.site_key||'').trim(); if(k) byKey[k]=(byKey[k]||0)+1;
+    });
+    return { ok:true, rows: rows_(SHEETS.SITES).map(function(r){
+      return { key:String(r.key||''), name:String(r.name||''), company:String(r.company||''),
+               active: siteIsActive_(r), emps: byKey[String(r.key||'').trim()]||0 };
+    }) };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+function api_addSite(name, company){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    name=String(name||'').trim().slice(0,120);
+    company=String(company||'').trim().slice(0,160);
+    if(!name) return { ok:false, error:'MISSING_NAME' };
+    var sh=ensureSitesColumns_(); if(!sh) return { ok:false, error:'NO_SHEET' };
+    var rows=readObjects_(sh).rows;
+    // Names must be unique — two projects sharing a display name is a
+    // reporting trap even though the keys would differ.
+    for(var i=0;i<rows.length;i++){
+      if(String(rows[i].name||'').trim()===name) return { ok:false, error:'DUPLICATE' };
+    }
+    // The key is DERIVED, never typed: it is a permanent internal id used as
+    // the wide-tab suffix and in Users.site_key, so it must be ASCII and
+    // unique. Thai names yield no ASCII, hence the numeric fallback.
+    var base=name.toLowerCase().replace(/[^a-z0-9]+/g,'');
+    // A Thai-only name leaves no ASCII to work with. Rather than 'site2',
+    // 'site3'... which say nothing when read in the sheet, derive a short
+    // stable suffix from the name so the key traces back to it.
+    if(!base){
+      var h=0;
+      for(var c=0;c<name.length;c++) h=(h*31+name.charCodeAt(c))%1000000;
+      base='site'+h;
+    }
+    var taken={}; rows.forEach(function(r){ taken[String(r.key||'').trim()]=1; });
+    var key=base, n=2;
+    while(taken[key]) key=base+(n++);
+    sh.appendRow([key, name, company, 'yes']);
+    bustBootCache_();
+    return { ok:true, key:key, name:name };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+function api_setSiteActive(key, active){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    key=String(key||'').trim(); if(!key) return { ok:false, error:'MISSING' };
+    var sh=ensureSitesColumns_(); if(!sh) return { ok:false, error:'NO_SHEET' };
+    var data=readObjects_(sh);
+    var col=data.headers.indexOf('active')+1;
+    if(col<1) return { ok:false, error:'NO_COLUMN' };
+    for(var i=0;i<data.rows.length;i++){
+      if(String(data.rows[i].key||'').trim()===key){
+        sh.getRange(data.rows[i]._row, col).setValue(active ? 'yes' : 'no');
+        bustBootCache_();
+        return { ok:true, key:key, active:!!active };
+      }
+    }
+    return { ok:false, error:'NOT_FOUND' };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+
 /* ============================ USERS (admin) ============================ */
 /* ============================ MASTER WORK INDEX (admin) ============================ */
 function renderMasterIndex(){
@@ -3892,7 +4007,9 @@ function updateDaysHint_(){
 // causing "My History" to show stale/unsynced selections.
 function renderRequestsHub(){
   var v=$('view');
-  var siteOpts = (BOOT.sites||[]).map(function(s){ return '<option value="'+esc(s.key)+'"'+(LV.site===s.key?' selected':'')+'>'+esc(s.name)+'</option>'; }).join('');
+  // A leave request is new work against a project, so closed projects are not
+  // offered here either.
+  var siteOpts = (BOOT.sites||[]).filter(siteIsOpen).map(function(s){ return '<option value="'+esc(s.key)+'"'+(LV.site===s.key?' selected':'')+'>'+esc(s.name)+'</option>'; }).join('');
   v.innerHTML =
     '<div class="card" style="padding:.85rem 1.1rem">'
       +'<h1 style="margin:0">'+t('คำขอ')+'</h1>'
@@ -4455,6 +4572,84 @@ function _howtoEsc(e){ if(e.key==='Escape') closeHowTo(); }
    arg is supplied (legacy "go('settings')" / "go('users')" routes still
    work) — but the gear button now calls openSettings() which renders into
    a modal body instead. */
+/* Admin project list: one row per project with a shared active switch.
+   Rendered from the server every time rather than from BOOT.sites, so it
+   reflects what other admins have changed since this page loaded. */
+function loadSiteAdmin_(){
+  var box=$('siteAdmin'); if(!box) return;
+  call('api_adminListSites',[],function(r){
+    box=$('siteAdmin'); if(!box) return;
+    if(!r || !r.ok){ box.innerHTML='<p class="muted" style="margin:0">'+t('โหลดรายการโครงการไม่สำเร็จ')+'</p>'; return; }
+    var rows=r.rows||[];
+    if(!rows.length){ box.innerHTML='<p class="muted" style="margin:0">'+t('ไม่มีหน่วยงาน')+'</p>'; return; }
+    box.innerHTML = rows.map(function(s){
+      return '<label class="vis-row">'
+        +'<span class="vis-name'+(s.active?'':' off')+'">'+esc(s.name)
+          + (s.emps ? ' <span class="hint">· '+s.emps+' '+esc(t('คน'))+'</span>' : '')
+          + (s.active ? '' : ' <span class="hint">· '+esc(t('ปิดโครงการ'))+'</span>')
+        +'</span>'
+        +'<input type="checkbox" class="site-act" data-key="'+esc(s.key)+'" data-name="'+esc(s.name)+'"'
+          +' data-emps="'+s.emps+'"'+(s.active?' checked':'')+'></label>';
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.site-act'), function(tg){
+      tg.onchange = function(){
+        var on = tg.checked, key = tg.getAttribute('data-key');
+        var nm = tg.getAttribute('data-name'), emps = Number(tg.getAttribute('data-emps'))||0;
+        // Deactivating is the consequential direction, so it confirms and
+        // names how many people are still on the roster. Reactivating is
+        // harmless and applies immediately.
+        var go = function(){
+          tg.disabled = true;
+          call('api_setSiteActive',[key,on],function(res){
+            tg.disabled = false;
+            if(res && res.ok){
+              flash(on ? t('เปิดโครงการแล้ว') : t('ปิดโครงการแล้ว'),'ok');
+              // BOOT.sites drives the entry pickers; keep it in step so the
+              // change takes effect without a reload.
+              (BOOT.sites||[]).forEach(function(x){ if(x.key===key) x.active = on; });
+              _sitesVisChanged = true;
+              loadSiteAdmin_();
+            } else {
+              tg.checked = !on;          // put the switch back
+              flash((res && res.error) ? String(res.error) : t('ดำเนินการไม่สำเร็จ'),'error');
+            }
+          });
+        };
+        if(on) return go();
+        // uiConfirm has no cancel callback, so the switch is put back FIRST and
+        // only the confirmed path re-applies it. Otherwise dismissing the
+        // dialog would leave the toggle showing "off" for a project that is
+        // still active.
+        tg.checked = true;
+        uiConfirm({ message: t('ปิดโครงการนี้หรือไม่?')+' — '+nm
+                      + (emps ? ' · '+emps+' '+t('คนยังอยู่ในโครงการนี้') : '')
+                      + ' — ' + t('จะไม่สามารถบันทึกงานใหม่ได้ แต่ประวัติเดิมยังอยู่'),
+                    okText: t('ปิดโครงการ'), danger:true },
+          function(){ tg.checked = false; go(); });
+      };
+    });
+  });
+  var add=$('addSiteBtn');
+  if(add) add.onclick = function(){
+    var nm=($('newSiteName').value||'').trim(), co=($('newSiteCompany').value||'').trim();
+    if(!nm){ flash(t('กรุณาระบุชื่อโครงการ'),'error'); return; }
+    withBtnLoading(add, t('กำลังเพิ่ม…'), function(done){
+      call('api_addSite',[nm,co],function(r){
+        done();
+        if(r && r.ok){
+          flash(t('เพิ่มโครงการแล้ว'),'ok');
+          $('newSiteName').value=''; $('newSiteCompany').value='';
+          // Make it selectable straight away instead of after a reload.
+          (BOOT.sites=BOOT.sites||[]).push({ key:r.key, name:r.name, active:true });
+          _sitesVisChanged = true;
+          loadSiteAdmin_();
+        }
+        else if(r && r.error==='DUPLICATE') flash(t('มีโครงการชื่อนี้อยู่แล้ว'),'error');
+        else flash((r && r.error) ? String(r.error) : t('เพิ่มโครงการไม่สำเร็จ'),'error');
+      });
+    });
+  };
+}
 function renderSettings(target, opts){
   var v = target || $('view');
   var isModal = !!(opts && opts.asModal);
@@ -4550,8 +4745,23 @@ function renderSettings(target, opts){
         +'<p class="desc">'+esc(t('ดูบันทึกว่าใครแก้ไขอะไร เมื่อไร พร้อมค้นหาและกรอง'))+'</p>'
         +'<button class="btn sec" id="auditOpen">'+t('เปิดประวัติการแก้ไข')+' →</button>'
       +'</div>';
-  var sitesSect =
-      '<div class="sect">'
+  // Projects. This replaces the old per-device visibility toggle, which wrote
+  // to localStorage and so only ever hid sites on the browser that set it —
+  // it looked like project administration without being it. Admins now switch
+  // a project off for EVERYONE, and can add new ones. Non-admins keep the
+  // local show/hide behaviour, which is all they could ever do anyway.
+  var sitesSect = BOOT.isAdmin
+    ? '<div class="sect">'
+        +'<h2>'+t('โครงการ / หน่วยงาน')+'</h2>'
+        +'<p class="desc">'+esc(t('เพิ่มโครงการใหม่ หรือปิดโครงการที่จบแล้ว · โครงการที่ปิดจะไม่ให้บันทึกงานใหม่ แต่ประวัติเดิมยังอยู่ในแดชบอร์ด'))+'</p>'
+        +'<div id="siteAdmin"><div class="spinner"></div></div>'
+        +'<div class="lockrow" style="margin-top:.6rem;flex-wrap:wrap">'
+          +'<input id="newSiteName" placeholder="'+esc(t('ชื่อโครงการใหม่'))+'" maxlength="120" style="flex:1 1 12rem">'
+          +'<input id="newSiteCompany" placeholder="'+esc(t('บริษัท (ถ้ามี)'))+'" maxlength="160" style="flex:1 1 10rem">'
+          +'<button class="btn sec" id="addSiteBtn">+ '+t('เพิ่มโครงการ')+'</button>'
+        +'</div>'
+      +'</div>'
+    : '<div class="sect">'
         +'<h2>'+t('หน่วยงานที่แสดง')+'</h2>'
         +'<p class="desc">'+esc(t('ปิดหน่วยงานที่จบแล้วเพื่อซ่อนจากแดชบอร์ดและรายการเลือก (เฉพาะเครื่องนี้)'))+'</p>'
         +'<div class="site-vis" id="siteVis">'
@@ -4638,6 +4848,9 @@ function renderSettings(target, opts){
       };
     });
   }
+
+  // ----- projects (admin): shared add / activate / deactivate -----
+  if($('siteAdmin')) loadSiteAdmin_();
 
   // ----- lock-days editor -----
   var lockInput = $('lockDaysInput'), lockBtn = $('lockDaysSave');
@@ -4962,7 +5175,7 @@ var LEGACY = { SUP:'SupportEntries', OP:'OperationEntries' };
 
 var HEADERS = {
   Config:      ['key','value'],
-  Sites:       ['key','name','company'],
+  Sites:       ['key','name','company','active'],
   Teams:       ['site_key','name','desc'],
   Employees:   ['eid','site_key','emp_id','name','position','department','kind','division','email'],
   Users:       ['email','role','site_key','eid'],
@@ -6249,6 +6462,44 @@ function requireView_(){
   return u;
 }
 function empByEid_(eid){ var f=null; rows_(SHEETS.EMP).forEach(function(e){ if(String(e.eid)===String(eid)) f=e; }); return f; }
+/* A site is active unless explicitly switched off. Blank counts as ACTIVE so
+   every row written before this column existed keeps working — defaulting the
+   other way would empty the whole app on upgrade. */
+function siteIsActive_(row){
+  var v=String(row && row.active!=null ? row.active : '').trim().toLowerCase();
+  return !(v==='0' || v==='false' || v==='no' || v==='inactive');
+}
+/* Appends any header this sheet is missing (currently 'active') without
+   touching existing data or column order. */
+function ensureSitesColumns_(){
+  var sh=sh_(SHEETS.SITES); if(!sh) return null;
+  try{
+    var lastCol=sh.getLastColumn();
+    var have=lastCol ? sh.getRange(1,1,1,lastCol).getValues()[0].map(String) : [];
+    for(var i=0;i<HEADERS.Sites.length;i++){
+      var want=HEADERS.Sites[i];
+      if(have.indexOf(want)<0){
+        sh.getRange(1, have.length+1).setValue(want);
+        have.push(want);
+      }
+    }
+  }catch(e){}
+  return sh;
+}
+/* api_bootstrap caches its payload for 300s per user. Adding or deactivating a
+   project has to show up immediately, so drop that cache after a write. */
+function bustBootCache_(){
+  try{
+    var c=CacheService.getUserCache();
+    if(!c) return;
+    // Keys must match _api_bootstrap_ exactly: 'boot|<email>', or 'boot|anon'
+    // when Apps Script hides the address. Clear both — which one this session
+    // wrote depends on whether the email resolved.
+    var em=currentEmail_()||'';
+    c.remove('boot|'+em);
+    c.remove('boot|anon');
+  }catch(e){}
+}
 function siteName_(key){ var n=key; rows_(SHEETS.SITES).forEach(function(s){ if(s.key===key) n=s.name; }); return n; }
 
 /* ----- ONE-TIME demo data seeder (run from editor or `clasp run`) -----------
@@ -6433,8 +6684,12 @@ function _api_bootstrap_(){
   var keys = _anon
     ? rows_(SHEETS.SITES).map(function(s){ return s.key; })   // demo: all sites
     : scopedSiteKeys_(u);
+  // Inactive projects stay in this list and keep their dashboard history; the
+  // flag rides along so the client can drop them from the ENTRY picker only.
+  // Filtering them out here would erase finished projects from past months,
+  // which is the opposite of what deactivating should mean.
   var sites=rows_(SHEETS.SITES).filter(function(s){ return keys.indexOf(s.key)>=0; })
-    .map(function(s){ return { key:s.key, name:s.name }; });
+    .map(function(s){ return { key:s.key, name:s.name, active: siteIsActive_(s) }; });
   var result = { ok:true, email:_email, role:u.role,
     isAdmin: u.role==='admin',
     canEntry: u.role==='admin' || u.role==='manager',
@@ -7215,6 +7470,84 @@ function api_adminSummary(year,month){
   var result = { rows:rows, today:today, days:days, lockDays:Number(getConfig_('LOCK_DAYS')||3) };
   if(_cache){ try { _cache.put(_cacheKey, JSON.stringify(result), 60); } catch(e){} }
   return result;
+}
+
+/* ======================= PROJECTS / SITES (admin) =======================
+   Sites previously came only from SETUP() seeding — there was no way to add
+   one, and the only "hide site" control wrote to localStorage, so it affected
+   a single browser. These make the roster editable and SHARED.
+
+   Deactivating is not deletion. The site keeps its rows and its past months
+   keep appearing on the dashboard, because a finished project's history is
+   exactly what you still need to report on. It only stops being offered for
+   NEW entries.
+------------------------------------------------------------------------- */
+function api_adminListSites(){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    ensureSitesColumns_();
+    rcReset_();
+    // Employee counts come along so the UI can warn before deactivating a
+    // project that still has people on it.
+    var byKey={};
+    rows_(SHEETS.EMP).forEach(function(e){
+      var k=String(e.site_key||'').trim(); if(k) byKey[k]=(byKey[k]||0)+1;
+    });
+    return { ok:true, rows: rows_(SHEETS.SITES).map(function(r){
+      return { key:String(r.key||''), name:String(r.name||''), company:String(r.company||''),
+               active: siteIsActive_(r), emps: byKey[String(r.key||'').trim()]||0 };
+    }) };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+function api_addSite(name, company){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    name=String(name||'').trim().slice(0,120);
+    company=String(company||'').trim().slice(0,160);
+    if(!name) return { ok:false, error:'MISSING_NAME' };
+    var sh=ensureSitesColumns_(); if(!sh) return { ok:false, error:'NO_SHEET' };
+    var rows=readObjects_(sh).rows;
+    // Names must be unique — two projects sharing a display name is a
+    // reporting trap even though the keys would differ.
+    for(var i=0;i<rows.length;i++){
+      if(String(rows[i].name||'').trim()===name) return { ok:false, error:'DUPLICATE' };
+    }
+    // The key is DERIVED, never typed: it is a permanent internal id used as
+    // the wide-tab suffix and in Users.site_key, so it must be ASCII and
+    // unique. Thai names yield no ASCII, hence the numeric fallback.
+    var base=name.toLowerCase().replace(/[^a-z0-9]+/g,'');
+    if(!base) base='site';
+    var taken={}; rows.forEach(function(r){ taken[String(r.key||'').trim()]=1; });
+    var key=base, n=2;
+    while(taken[key]) key=base+(n++);
+    sh.appendRow([key, name, company, 'yes']);
+    bustBootCache_();
+    return { ok:true, key:key, name:name };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+function api_setSiteActive(key, active){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
+    key=String(key||'').trim(); if(!key) return { ok:false, error:'MISSING' };
+    var sh=ensureSitesColumns_(); if(!sh) return { ok:false, error:'NO_SHEET' };
+    var data=readObjects_(sh);
+    var col=data.headers.indexOf('active')+1;
+    if(col<1) return { ok:false, error:'NO_COLUMN' };
+    for(var i=0;i<data.rows.length;i++){
+      if(String(data.rows[i].key||'').trim()===key){
+        sh.getRange(data.rows[i]._row, col).setValue(active ? 'yes' : 'no');
+        bustBootCache_();
+        return { ok:true, key:key, active:!!active };
+      }
+    }
+    return { ok:false, error:'NOT_FOUND' };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
 
 /* ============================ USERS (admin) ============================ */

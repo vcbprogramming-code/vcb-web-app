@@ -968,7 +968,30 @@ html.is-mobile .statrow .viewseg button,
 html.is-mobile .statrow .seg button{ flex:1 1 0 }
 html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 @media(max-width:900px){ .req-grid{ grid-template-columns:1fr !important } }
+/* Leave tickets. The old card stacked dates / reason / buttons on three rows,
+   so eight requests became a very tall column with a mostly-empty right half.
+   Each ticket is now ONE row (dates+reason left, status+actions right) and the
+   list is an auto-fitting grid, so wide screens pack 2-3 tickets per row and
+   the page uses the horizontal space it already had. */
+.lv-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:.5rem }
+.lv-ticket{ display:flex; align-items:center; gap:.6rem; min-width:0;
+  padding:.45rem .6rem; background:var(--card); border:1px solid var(--line);
+  border-left-width:4px; border-radius:9px }
 .lv-ticket:hover{ box-shadow:0 1px 4px rgba(0,0,0,.08) }
+.lv-main{ flex:1 1 auto; min-width:0 }
+.lv-who,.lv-when{ font-size:.9rem; line-height:1.3 }
+/* Reason is free text up to 300 chars — clamp it to one line so a long note
+   can never stretch a ticket taller than its neighbours. Full text on hover. */
+.lv-why{ font-size:.82rem; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.lv-side{ flex:0 0 auto; display:flex; align-items:center; gap:.4rem }
+.lv-acts{ display:flex; gap:.25rem }
+.lv-del:hover{ border-color:#e0533a; color:#b3261e }
+/* Phones: one ticket per row, and let the reason wrap to two lines since
+   there is no neighbouring card whose height it could throw off. */
+html.is-mobile .lv-list{ grid-template-columns:1fr }
+html.is-mobile .lv-ticket{ align-items:flex-start; flex-wrap:wrap }
+html.is-mobile .lv-why{ white-space:normal }
+html.is-mobile .lv-side{ width:100%; justify-content:space-between; margin-top:.35rem }
 
 /* Slim down the dashboard "filter" card (title + subtitle + view-toggle +
    month-picker). It was eating ~1cm of vertical that the user can't get back
@@ -1229,6 +1252,11 @@ var T = {
   'อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?': { en: 'Approve this leave request and record it on the schedule?' },
   'ไม่อนุมัติคำขอลานี้หรือไม่?': { en: 'Reject this leave request?' },
   'ดำเนินการไม่สำเร็จ':        { en: 'Action failed' },
+  'ยกเลิกคำขอ':                { en: 'Cancel request' },
+  'ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้': { en: 'Cancel this leave request? This cannot be undone.' },
+  'ยกเลิกคำขอแล้ว':            { en: 'Request cancelled' },
+  'ยกเลิกไม่สำเร็จ':           { en: 'Could not cancel the request' },
+  'คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้': { en: 'This request has already been decided and cannot be cancelled' },
   'ยังไม่มีคำขอลา':            { en: 'No leave requests yet' },
   'ไม่มีคำขอลาที่รอดำเนินการ':  { en: 'No pending leave requests' },
   'เบราว์เซอร์บล็อกหน้าต่างป็อปอัป': { en: 'Your browser blocked the pop-up window' },
@@ -3579,7 +3607,7 @@ function renderRequestsHub(){
       +'<h1 style="margin:0">'+t('คำขอ')+'</h1>'
       +'<div class="sub" style="margin:.1rem 0 0">'+t('ขอลาและติดตามสถานะคำขอของคุณ')+'</div>'
     +'</div>'
-    +'<div class="req-grid" style="display:grid;grid-template-columns:minmax(300px,1fr) minmax(0,2fr);gap:.8rem;margin-top:.8rem;align-items:start">'
+    +'<div class="req-grid" style="display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr);gap:.8rem;margin-top:.8rem;align-items:start">'
       +'<div class="card">'
         +'<h2 style="margin:0 0 .3rem">'+t('ขอลาใหม่')+'</h2>'
         +'<div class="fld"><label>'+t('หน่วยงาน')+'</label><select id="lvSite">'
@@ -3594,13 +3622,13 @@ function renderRequestsHub(){
         +'<button class="btn" id="lvSubmit" style="margin-top:.7rem;width:100%">'+t('ส่งคำขอลา')+'</button>'
       +'</div>'
       +'<div>'
-        +'<div class="card">'
-          +'<h2 style="margin:0 0 .5rem">'+t('คำขอของฉัน')+'</h2>'
+        +'<div class="card" style="padding:.75rem .85rem;margin-bottom:0">'
+          +'<h2 style="margin:0 0 .4rem">'+t('คำขอของฉัน')+'</h2>'
           +'<div id="lvTickets"><p class="muted">'+t('เลือกหน่วยงานและชื่อทางด้านซ้ายเพื่อดูคำขอของคุณ')+'</p></div>'
         +'</div>'
         + (BOOT.canEntry ?
-          '<div class="card" style="margin-top:.8rem">'
-            +'<h2 style="margin:0 0 .5rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
+          '<div class="card" style="margin-top:.8rem;padding:.75rem .85rem;margin-bottom:0">'
+            +'<h2 style="margin:0 0 .4rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
             +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
           +'</div>' : '')
       +'</div>'
@@ -3644,6 +3672,11 @@ function renderRequestsHub(){
   renderMyTickets_();
   if(BOOT.canEntry) loadPendingTickets_();
 }
+// One compact ticket. Everything that used to stack vertically (dates, then
+// reason, then a button row) now shares a single line: the status bar and
+// dates on the left, reason in the middle, actions on the right. Cards are
+// laid out by .lv-list as a responsive multi-column grid, so a wide screen
+// shows several per row instead of one tall column of mostly-empty cards.
 function leaveTicketHtml_(r, opts){
   opts = opts || {};
   var days = (function(){
@@ -3651,29 +3684,49 @@ function leaveTicketHtml_(r, opts){
     return Math.round((b-a)/86400000)+1;
   })();
   var barColor = r.status==='approved' ? '#1f9d55' : r.status==='rejected' ? '#e0533a' : '#e8b500';
-  return '<div class="lv-ticket" data-id="'+esc(r.id)+'" style="display:flex;border:1px solid var(--line,#e2e2e2);border-radius:10px;overflow:hidden;margin-bottom:.6rem">'
-    +'<div style="width:5px;background:'+barColor+';flex:0 0 auto"></div>'
-    +'<div style="padding:.6rem .8rem;flex:1 1 auto;min-width:0">'
-      +'<div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;flex-wrap:wrap">'
-        +'<div>'
-          + (opts.showName ? '<b>'+esc(r.emp_name)+'</b> · ' : '')
-          + (opts.showSite ? '<span class="hint">'+esc(siteNameFor_(r.site_key))+'</span><br>' : '')
-          +'<b>'+esc(r.from_date)+(r.from_date!==r.to_date?' – '+esc(r.to_date):'')+'</b>'
-          +' <span class="hint">('+days+' '+esc(t('วัน'))+')</span>'
-        +'</div>'
-        + leaveStatusBadge_(r.status)
+  var range = esc(r.from_date)+(r.from_date!==r.to_date?' – '+esc(r.to_date):'');
+  var btn = 'padding:.22rem .55rem;font-size:.8rem;line-height:1.35';
+  return '<div class="lv-ticket" data-id="'+esc(r.id)+'" style="border-left:4px solid '+barColor+'">'
+    +'<div class="lv-main">'
+      + (opts.showName ? '<div class="lv-who"><b>'+esc(r.emp_name)+'</b>'
+          + (opts.showSite ? ' <span class="hint">· '+esc(siteNameFor_(r.site_key))+'</span>' : '')+'</div>' : '')
+      +'<div class="lv-when"><b>'+range+'</b> <span class="hint">('+days+' '+esc(t('วัน'))+')</span></div>'
+      + (r.reason ? '<div class="lv-why hint" title="'+esc(r.reason)+'">'+esc(r.reason)+'</div>' : '')
+    +'</div>'
+    +'<div class="lv-side">'
+      + leaveStatusBadge_(r.status)
+      +'<div class="lv-acts">'
+        +'<button class="btn sec" data-print="'+esc(r.id)+'" style="'+btn+'" title="'+esc(t('พิมพ์'))+'">🖨</button>'
+        + (opts.showActions ? '<button class="btn" data-act="approve" data-id="'+esc(r.id)+'" style="'+btn+'">'+t('อนุมัติ')+'</button>'
+            +'<button class="btn sec" data-act="reject" data-id="'+esc(r.id)+'" style="'+btn+'">'+t('ไม่อนุมัติ')+'</button>' : '')
+        // Cancel is the requester's own escape hatch and only exists while the
+        // request is still pending — once decided the row is a record, not a draft.
+        + (opts.showCancel && r.status==='pending'
+            ? '<button class="btn sec lv-del" data-cancel="'+esc(r.id)+'" style="'+btn+'" title="'+esc(t('ยกเลิกคำขอ'))+'">✕</button>' : '')
       +'</div>'
-      + (r.reason ? '<div class="hint" style="margin-top:.25rem">'+esc(r.reason)+'</div>' : '')
-      +'<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'
-        +'<button class="btn sec" data-print="'+esc(r.id)+'" style="padding:.3rem .7rem;font-size:.85rem">🖨 '+t('พิมพ์')+'</button>'
-        + (opts.showActions ? '<button class="btn" data-act="approve" data-id="'+esc(r.id)+'" style="padding:.3rem .7rem;font-size:.85rem">'+t('อนุมัติ')+'</button>'
-            +'<button class="btn sec" data-act="reject" data-id="'+esc(r.id)+'" style="padding:.3rem .7rem;font-size:.85rem">'+t('ไม่อนุมัติ')+'</button>' : '')
-      +'</div>'
-    +'</div></div>';
+    +'</div>'
+  +'</div>';
 }
 function wireTicketButtons_(container){
   Array.prototype.forEach.call(container.querySelectorAll('button[data-print]'),function(btn){
     btn.onclick=function(){ printLeaveSlip(btn.getAttribute('data-print')); };
+  });
+  Array.prototype.forEach.call(container.querySelectorAll('button[data-cancel]'),function(btn){
+    btn.onclick=function(){
+      var id=btn.getAttribute('data-cancel');
+      uiConfirm({message:t('ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้'),
+                 okText:t('ยกเลิกคำขอ'), danger:true}, function(){
+        // Send the eid too: with no login it's what proves the row is ours.
+        call('api_cancelLeaveRequest',[String(id), String(LV.eid)],function(r){
+          if(r&&r.ok){
+            flash(t('ยกเลิกคำขอแล้ว'),'ok');
+            renderMyTickets_(); refreshPendingLeaveBadge_(); if(BOOT.canEntry) loadPendingTickets_();
+          }
+          else if(r&&r.error==='ALREADY_DECIDED'){ flash(t('คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้'),'error'); renderMyTickets_(); }
+          else flash(t('ยกเลิกไม่สำเร็จ'),'error');
+        });
+      });
+    };
   });
   Array.prototype.forEach.call(container.querySelectorAll('button[data-act]'),function(btn){
     btn.onclick=function(){
@@ -3704,7 +3757,9 @@ function renderMyTickets_(){
     var summary='<div class="hint" style="margin-bottom:.5rem">'
       + t('รอดำเนินการ')+' '+counts.pending+' · '+t('อนุมัติแล้ว')+' '+counts.approved+' · '+t('ไม่อนุมัติ')+' '+counts.rejected
       +'</div>';
-    box.innerHTML = summary + list.map(function(r){ return leaveTicketHtml_(r, {}); }).join('');
+    box.innerHTML = summary + '<div class="lv-list">'
+      + list.map(function(r){ return leaveTicketHtml_(r, {showCancel:true}); }).join('')
+      + '</div>';
     wireTicketButtons_(box);
   });
 }
@@ -3714,7 +3769,9 @@ function loadPendingTickets_(){
     box=$('lvPendingTickets'); if(!box) return;
     if(!list||!list.length){ box.innerHTML='<p class="muted">'+t('ไม่มีคำขอลาที่รอดำเนินการ')+'</p>'; return; }
     list.forEach(function(r){ LV_ROWS[r.id]=r; });
-    box.innerHTML = list.map(function(r){ return leaveTicketHtml_(r, {showName:true, showSite:true, showActions:true}); }).join('');
+    box.innerHTML = '<div class="lv-list">'
+      + list.map(function(r){ return leaveTicketHtml_(r, {showName:true, showSite:true, showActions:true}); }).join('')
+      + '</div>';
     wireTicketButtons_(box);
   });
 }
@@ -6339,6 +6396,35 @@ function api_pendingLeaveRequests(){
     .filter(function(r){ return String(r.status||'').trim()==='pending' && scoped.indexOf(String(r.site_key).trim())>=0; })
     .map(leaveRowOut_)
     .sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; });
+}
+// Requester cancels their OWN still-pending request. No login exists, so the
+// caller proves ownership the same way they proved it when submitting: by
+// passing the eid they picked from the roster. We re-check that eid against
+// the stored row rather than trusting the id alone, so a guessed id can't
+// cancel someone else's leave. Approved/rejected rows are immutable — once a
+// decision is recorded the paper trail stays, and an approved leave has
+// already been written onto the schedule.
+function api_cancelLeaveRequest(id, eid){
+  try { rcReset_(); return _api_cancelLeaveRequest_(id, eid); }
+  catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+}
+function _api_cancelLeaveRequest_(id, eid){
+  eid=String(eid||'').trim(); if(!eid) return { ok:false, error:'MISSING' };
+  var sh=ensureLeaveSheet_(); var rn=findLeaveRow_(sh, id);
+  if(!rn) return { ok:false, error:'NOT_FOUND' };
+  var row=readObjects_(sh).rows.filter(function(r){ return r._row===rn; })[0];
+  if(!row) return { ok:false, error:'NOT_FOUND' };
+  if(String(row.eid).trim()!==eid) return { ok:false, error:'FORBIDDEN' };
+  if(String(row.status||'').trim()!=='pending') return { ok:false, error:'ALREADY_DECIDED' };
+  var lock=LockService.getScriptLock(); lock.waitLock(10000);
+  try{
+    // Re-verify under the lock: an approver may have decided this row between
+    // our read above and acquiring the lock.
+    var cur=String(sh.getRange(rn,8).getValue()||'').trim();
+    if(cur!=='pending') return { ok:false, error:'ALREADY_DECIDED' };
+    sh.deleteRow(rn);
+    return { ok:true };
+  } finally { lock.releaseLock(); }
 }
 function findLeaveRow_(sh, id){
   var last=sh.getLastRow(); if(last<2) return 0;

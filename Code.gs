@@ -1012,9 +1012,8 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }
 /* Heading row: same grid, no card chrome — just small caps labels and a rule. */
 .lv-head{ background:transparent; border:0; border-bottom:1px solid var(--line);
-  border-radius:0; padding:0 .7rem .25rem; margin-bottom:.1rem;
-  font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
-  color:var(--muted) }
+  border-radius:0; padding:0 .7rem .3rem; margin-bottom:.15rem;
+  font-size:.82rem; font-weight:700; color:var(--muted) }
 .lv-head:hover{ box-shadow:none }
 .lv-head .lv-side{ justify-content:flex-start }
 /* Narrow viewports can't hold six tracks. Collapse to a stack: each field on
@@ -1293,6 +1292,16 @@ var T = {
   'อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?': { en: 'Approve this leave request and record it on the schedule?' },
   'ไม่อนุมัติคำขอลานี้หรือไม่?': { en: 'Reject this leave request?' },
   'ดำเนินการไม่สำเร็จ':        { en: 'Action failed' },
+  'ข้อมูลตัวอย่าง (เดโม)':      { en: 'Sample Data (Demo)' },
+  'เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างของเดือนที่เลือก เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว':
+    { en: 'Fill empty day cells for the chosen month for demo purposes · never overwrites existing real data' },
+  'เติมข้อมูลตัวอย่าง':         { en: 'Fill sample data' },
+  'กำลังเติมข้อมูล…':           { en: 'Filling…' },
+  'เติมข้อมูลตัวอย่างแล้ว':     { en: 'Sample data added' },
+  'เติมข้อมูลไม่สำเร็จ':        { en: 'Could not add sample data' },
+  'ปีหรือเดือนไม่ถูกต้อง':      { en: 'Invalid year or month' },
+  'เติมข้อมูลตัวอย่างสำหรับเดือนนี้ทุกหน่วยงานหรือไม่? ช่องที่มีข้อมูลอยู่แล้วจะไม่ถูกแก้ไข':
+    { en: 'Fill sample data for this month across all sites? Cells that already contain data are left untouched.' },
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
@@ -1319,6 +1328,7 @@ var T = {
   'ไม่ระบุ':                   { en: 'Unspecified' },
   /* ---- printed slip ---- */
   'เลขที่':                    { en: 'No.' },
+  'บริษัท':                    { en: 'Company' },
   'ข้อมูลผู้ขอลา':             { en: 'Requester Details' },
   'รายละเอียดการลา':           { en: 'Leave Details' },
   'รหัสพนักงาน':               { en: 'Employee ID' },
@@ -3663,6 +3673,23 @@ function siteNameFor_(key){
 // paper trail (name / site / dates / reason / status / approver line) even
 // though the workflow itself is fully digital. Uses window.open + write
 // (not an iframe) so window.print() targets a document with no app chrome.
+// The three VCB group companies, in the order they appear on the printed
+// form. The slip pre-selects the one on the requester's site when it can be
+// matched; the others print as empty circles to tick by hand, so one blank
+// form works for any of them. Matching is on a distinctive substring because
+// the stored strings vary in spacing.
+var SLIP_COMPANIES = [
+  { key:'vichitbhan', th:'วิจิตรภัณฑ์ก่อสร้าง จำกัด',   match:'วิจิตรภัณฑ์' },
+  { key:'chawana',    th:'ชวนา เอ็นจิเนียร์ริ่ง จำกัด', match:'ชวนา' },
+  { key:'cvn',        th:'ซีวีเอ็น Development จำกัด',  match:'ซีวีเอ็น' }
+];
+function slipCompanyKey_(raw){
+  var s=String(raw||'');
+  for(var i=0;i<SLIP_COMPANIES.length;i++){
+    if(s.indexOf(SLIP_COMPANIES[i].match)>=0) return SLIP_COMPANIES[i].key;
+  }
+  return '';
+}
 function printLeaveSlip(id){
   var r = LV_ROWS[id]; if(!r) return;
   var days = (function(){
@@ -3678,13 +3705,18 @@ function printLeaveSlip(id){
   var same = emp && String(emp.eid)===String(r.eid);
   var empId = same ? (emp.emp_id||'') : '';
   var empPos = same ? (emp.position||'') : '';
-  var company = same ? (emp.company||'') : '';
-  // Print the value when we have one, otherwise a rule to write on.
+  var companyKey = same ? slipCompanyKey_(emp.company||'') : '';
   function fill(v){ return v ? esc(v) : '<span class="blank"></span>'; }
+  function companyRadios(){
+    return SLIP_COMPANIES.map(function(c){
+      var on = (c.key===companyKey);
+      return '<span class="pick"><span class="dot'+(on?' on':'')+'"></span>'+esc(c.th)+'</span>';
+    }).join('');
+  }
   function typeBoxes(){
     return LEAVE_TYPES.map(function(x){
       var on = (r.leave_type===x.code);
-      return '<span class="tick"><span class="box">'+(on?'✓':'')+'</span>'+esc(t(x.th))+'</span>';
+      return '<span class="pick"><span class="box">'+(on?'✓':'')+'</span>'+esc(t(x.th))+'</span>';
     }).join('');
   }
   var docNo = esc(String(r.id||''));
@@ -3693,47 +3725,65 @@ function printLeaveSlip(id){
   var html = '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">'
     +'<title>'+esc(t('ใบขอลา'))+' — '+esc(r.emp_name)+' — '+docNo+'</title>'
     +'<style>'
-      +'@page{ size:A4; margin:14mm 16mm }'
+      +'@page{ size:A4; margin:12mm 14mm }'
       +'*{ box-sizing:border-box }'
+      // The sheet is a flex column of fixed height, so the signature block can
+      // be pushed to the bottom of the page instead of stopping a third of the
+      // way down and leaving the rest of the A4 blank.
+      +'html,body{ height:100% }'
       +'body{ font-family:"Sarabun","TH Sarabun New","Segoe UI",sans-serif; color:#111;'
-        +'margin:0 auto; max-width:180mm; font-size:11.5pt; line-height:1.45 }'
+        +'margin:0; font-size:12pt; line-height:1.6; display:flex; flex-direction:column;'
+        +'min-height:100%; padding:0 }'
       +'.head{ display:flex; justify-content:space-between; align-items:flex-start;'
-        +'border-bottom:2px solid #1d4e89; padding-bottom:.5rem; margin-bottom:.9rem; gap:1rem }'
-      +'.org{ font-weight:700; font-size:1.05rem; color:#1d4e89; line-height:1.25 }'
-      +'.orgsub{ font-size:.8rem; color:#555; font-weight:400 }'
-      +'h1{ font-size:1.15rem; margin:.15rem 0 0 }'
-      +'.docmeta{ text-align:right; font-size:.78rem; color:#444; white-space:nowrap }'
-      +'.docno{ font-family:Consolas,monospace; font-weight:700; color:#111; font-size:.82rem }'
-      +'.stat{ display:inline-block; margin-top:.25rem; padding:.15rem .6rem; border-radius:3px;'
-        +'font-size:.78rem; font-weight:700; border:1px solid }'
+        +'border-bottom:2.5px solid #1d4e89; padding-bottom:.55rem; gap:1.2rem }'
+      +'.org{ font-weight:700; font-size:1.25rem; color:#1d4e89; line-height:1.3 }'
+      +'.orgsub{ font-size:.85rem; color:#555; font-weight:400 }'
+      +'h1{ font-size:1.45rem; margin:.35rem 0 0; font-weight:700 }'
+      +'.docmeta{ text-align:right; font-size:.88rem; color:#444; white-space:nowrap; line-height:1.7 }'
+      +'.docno{ font-family:Consolas,monospace; font-weight:700; color:#111 }'
+      +'.stat{ display:inline-block; margin-top:.3rem; padding:.2rem .7rem; border-radius:3px;'
+        +'font-size:.85rem; font-weight:700; border:1px solid }'
       +'.stat.ok{ background:#e7f6ec; color:#13744a; border-color:#9bd4b4 }'
       +'.stat.no{ background:#fdecea; color:#b3261e; border-color:#efb4ac }'
       +'.stat.wait{ background:#fdf3d3; color:#8a6100; border-color:#e6cd8a }'
-      +'.sec{ font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;'
-        +'color:#1d4e89; margin:.9rem 0 .3rem; padding-bottom:.15rem; border-bottom:1px solid #d7dee8 }'
+      // No letter-spacing or uppercase: both mangle Thai, which has no case
+      // and whose glyphs join. Size and weight carry the hierarchy instead.
+      +'.sec{ font-size:.95rem; font-weight:700; color:#1d4e89;'
+        +'margin:1.1rem 0 .45rem; padding-bottom:.2rem; border-bottom:1px solid #d7dee8 }'
       +'table{ width:100%; border-collapse:collapse }'
-      +'td{ padding:.32rem .3rem; vertical-align:baseline }'
-      +'td.lbl{ width:34mm; color:#555; font-size:.85rem }'
-      +'td.val{ font-weight:600 }'
-      +'.blank{ display:inline-block; min-width:52mm; border-bottom:1px dotted #999; height:1em }'
-      +'.tick{ display:inline-block; margin-right:1.1rem; white-space:nowrap; font-size:.9rem }'
-      +'.box{ display:inline-block; width:1em; height:1em; border:1.2px solid #444; margin-right:.3rem;'
-        +'text-align:center; line-height:.95em; font-weight:700; vertical-align:-.12em }'
-      +'.reason{ border:1px solid #d7dee8; border-radius:3px; padding:.45rem .55rem; min-height:14mm;'
-        +'background:#fbfcfd; font-size:.95rem }'
-      +'.sign{ display:flex; gap:14mm; margin-top:12mm; break-inside:avoid; page-break-inside:avoid }'
+      +'td{ padding:.45rem .3rem; vertical-align:baseline }'
+      +'td.lbl{ width:38mm; color:#555; font-size:.92rem }'
+      +'td.val{ font-weight:700 }'
+      +'.blank{ display:inline-block; min-width:55mm; border-bottom:1px dotted #999; height:1.15em }'
+      // Company radios and leave-type checkboxes share this chip layout so the
+      // two rows read as the same kind of control.
+      +'.pick{ display:inline-block; margin-right:1.4rem; white-space:nowrap; font-size:.95rem;'
+        +'line-height:2 }'
+      +'.dot{ display:inline-block; width:1.05em; height:1.05em; border:1.4px solid #444;'
+        +'border-radius:50%; margin-right:.4rem; vertical-align:-.18em; position:relative }'
+      +'.dot.on::after{ content:""; position:absolute; left:50%; top:50%; width:.55em; height:.55em;'
+        +'background:#1d4e89; border-radius:50%; transform:translate(-50%,-50%) }'
+      +'.box{ display:inline-block; width:1.05em; height:1.05em; border:1.4px solid #444;'
+        +'margin-right:.4rem; text-align:center; line-height:1em; font-weight:700; vertical-align:-.18em }'
+      +'.reason{ border:1px solid #d7dee8; border-radius:3px; padding:.6rem .7rem;'
+        +'background:#fbfcfd; font-size:.98rem; flex:1 1 auto; min-height:28mm }'
+      // flex:1 on the reason box makes it absorb the leftover page height, so
+      // the form fills the sheet rather than bunching at the top.
+      +'.grow{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0 }'
+      +'.sign{ display:flex; gap:16mm; margin-top:10mm; padding-top:2mm;'
+        +'break-inside:avoid; page-break-inside:avoid }'
       +'.sign > div{ flex:1; text-align:center }'
-      +'.sigline{ border-top:1px dotted #333; padding-top:.35rem; font-size:.85rem }'
-      +'.sigsub{ font-size:.72rem; color:#666; margin-top:.1rem; min-height:1.1em }'
-      +'.eappr{ font-size:.72rem; color:#13744a; margin-top:.15rem }'
-      +'.foot{ margin-top:9mm; border-top:1px solid #d7dee8; padding-top:.35rem;'
-        +'font-size:.68rem; color:#888; display:flex; justify-content:space-between; gap:1rem }'
-      +'@media print{ .stat{ -webkit-print-color-adjust:exact; print-color-adjust:exact } }'
+      +'.sigline{ border-top:1px dotted #333; padding-top:.4rem; font-size:.92rem; font-weight:700 }'
+      +'.sigsub{ font-size:.82rem; color:#666; margin-top:.15rem; min-height:1.2em }'
+      +'.eappr{ font-size:.82rem; color:#13744a; margin-top:.2rem; font-weight:700 }'
+      +'.foot{ margin-top:6mm; border-top:1px solid #d7dee8; padding-top:.4rem;'
+        +'font-size:.75rem; color:#888; display:flex; justify-content:space-between; gap:1rem }'
+      +'@media print{ .stat{ -webkit-print-color-adjust:exact; print-color-adjust:exact }'
+        +' .dot.on::after{ -webkit-print-color-adjust:exact; print-color-adjust:exact } }'
     +'</style></head><body>'
     +'<div class="head">'
       +'<div>'
-        +'<div class="org">'+(company?esc(company):'VCB Group')
-          +'<div class="orgsub">'+esc(t('บันทึกการทำงานรายวัน'))+'</div></div>'
+        +'<div class="org">VCB Group<div class="orgsub">'+esc(t('บันทึกการทำงานรายวัน'))+'</div></div>'
         +'<h1>'+esc(t('ใบขอลา'))+'</h1>'
       +'</div>'
       +'<div class="docmeta">'
@@ -3742,6 +3792,8 @@ function printLeaveSlip(id){
         +'<span class="stat '+statusCls+'">'+esc(statusTh)+'</span>'
       +'</div>'
     +'</div>'
+    +'<div class="sec">'+esc(t('บริษัท'))+'</div>'
+    +'<div>'+companyRadios()+'</div>'
     +'<div class="sec">'+esc(t('ข้อมูลผู้ขอลา'))+'</div>'
     +'<table>'
       +'<tr><td class="lbl">'+esc(t('ชื่อพนักงาน'))+'</td><td class="val">'+esc(r.emp_name)+'</td>'
@@ -3758,23 +3810,20 @@ function printLeaveSlip(id){
       +'<tr><td class="lbl">'+esc(t('เบอร์ติดต่อระหว่างลา'))+'</td><td>'+fill('')+'</td>'
         +'<td class="lbl">'+esc(t('ผู้ปฏิบัติงานแทน'))+'</td><td>'+fill('')+'</td></tr>'
     +'</table>'
-    +'<div style="margin-top:.45rem">'
-      +'<div style="color:#555;font-size:.85rem;margin-bottom:.2rem">'+esc(t('เหตุผล'))+'</div>'
+    +'<div class="grow" style="margin-top:.6rem">'
+      +'<div style="color:#555;font-size:.92rem;margin-bottom:.25rem">'+esc(t('เหตุผล'))+'</div>'
       +'<div class="reason">'+(r.reason?esc(r.reason):'')+'</div>'
     +'</div>'
     +'<div class="sign">'
       +'<div>'
-        +'<div style="height:16mm"></div>'
+        +'<div style="height:18mm"></div>'
         +'<div class="sigline">'+esc(t('ลายเซ็นพนักงาน'))+'</div>'
         +'<div class="sigsub">'+esc(r.emp_name)+'</div>'
         +'<div class="sigsub">'+esc(t('วันที่'))+' ......../......../........</div>'
       +'</div>'
       +'<div>'
-        +'<div style="height:16mm"></div>'
+        +'<div style="height:18mm"></div>'
         +'<div class="sigline">'+esc(t('ลายเซ็นผู้อนุมัติ'))+'</div>'
-        // Already decided in-app? Then print who decided it and when, so the
-        // slip records an approval that actually happened instead of implying
-        // it still needs a wet signature.
         +'<div class="sigsub">'+(r.status!=='pending' && r.decided_by ? esc(r.decided_by) : '')+'</div>'
         + (r.status!=='pending'
             ? '<div class="eappr">'+esc(statusTh)+' · '+esc(lvFmtStampLong_(r.decided_at))+'</div>'
@@ -4442,6 +4491,21 @@ function renderSettings(target, opts){
           +'<button class="btn sec" id="lockDaysSave" disabled>'+t('บันทึก')+'</button>'
         +'</div>'
       +'</div>';
+  // Demo seeding. Admin-only and deliberately explicit about what it does:
+  // it fills EMPTY day cells for a chosen month so the dashboard has something
+  // to show, and never overwrites a cell that already holds real work.
+  var demoSect = BOOT.isAdmin
+    ? '<div class="sect">'
+        +'<h2>'+t('ข้อมูลตัวอย่าง (เดโม)')+'</h2>'
+        +'<p class="desc">'+esc(t('เติมข้อมูลตัวอย่างลงในช่องที่ยังว่างของเดือนที่เลือก เพื่อใช้สาธิต · ไม่เขียนทับข้อมูลจริงที่มีอยู่แล้ว'))+'</p>'
+        +'<div class="lockrow">'
+          +'<input id="demoYear" type="number" min="2000" max="2999" step="1" value="'+String(CUR.y)+'" style="width:6.5rem">'
+          +'<input id="demoMonth" type="number" min="1" max="12" step="1" value="'+String(CUR.m)+'" style="width:4.5rem">'
+          +'<button class="btn sec" id="demoSeed">'+t('เติมข้อมูลตัวอย่าง')+'</button>'
+        +'</div>'
+        +'<div class="hint" id="demoOut" style="margin-top:.4rem"></div>'
+      +'</div>'
+    : '';
   var auditSect =
       '<div class="sect">'
         +'<h2>'+t('ประวัติการแก้ไข')+'</h2>'
@@ -4494,10 +4558,35 @@ function renderSettings(target, opts){
       +'</div>'
       +'<div class="settings-cols">'
         +'<div class="settings-col">'+ themeSect + langSect + yearSect + dashSect + weeklySect + lockSect +'</div>'
-        +'<div class="settings-col">'+ sitesSect + usersSect + auditSect + aboutSect +'</div>'
+        +'<div class="settings-col">'+ sitesSect + usersSect + auditSect + demoSect + aboutSect +'</div>'
       +'</div>'
     + bodyClose
     + closeTag;
+
+  // ----- demo seeder -----
+  var dBtn = $('demoSeed');
+  if(dBtn) dBtn.onclick = function(){
+    var y = Number($('demoYear').value), m = Number($('demoMonth').value);
+    if(!y || m<1 || m>12){ flash(t('ปีหรือเดือนไม่ถูกต้อง'),'error'); return; }
+    uiConfirm({ message: t('เติมข้อมูลตัวอย่างสำหรับเดือนนี้ทุกหน่วยงานหรือไม่? ช่องที่มีข้อมูลอยู่แล้วจะไม่ถูกแก้ไข'),
+                okText: t('เติมข้อมูลตัวอย่าง') }, function(){
+      withBtnLoading(dBtn, t('กำลังเติมข้อมูล…'), function(done){
+        call('api_seedDemoMonth',[y,m],function(r){
+          done();
+          var out = $('demoOut');
+          if(r && r.ok){
+            flash(t('เติมข้อมูลตัวอย่างแล้ว'),'ok');
+            // Show the per-site cell counts the seeder reports, so it is
+            // obvious which sites actually received data.
+            if(out) out.textContent = String(r.detail||'');
+          } else {
+            flash(t('เติมข้อมูลไม่สำเร็จ'),'error');
+            if(out) out.textContent = (r && r.error) ? String(r.error) : '';
+          }
+        });
+      });
+    });
+  };
 
   // ----- close button (modal mode) -----
   if(isModal){
@@ -6215,6 +6304,21 @@ function seedDemoData(siteMatch, year, month, overwrite){
   if(values.length > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(), values.length - sh.getMaxRows());
   sh.getRange(1,1,values.length,width).setValues(values);   // ONE batched write
   return site.key+': '+writes+' cells, '+roster.length+' emp';
+}
+// Client entry point for the demo seeder. Admin only, and NON-DESTRUCTIVE:
+// overwrite is hard-coded false, so it fills empty cells and never touches a
+// cell that already holds real work. That matters because this runs against
+// the live DB — a demo fill must not be able to eat genuine records.
+function api_seedDemoMonth(year, month){
+  try{
+    rcReset_();
+    var u=resolveUser_(currentEmail_());
+    if(u.role!=='admin') throw new Error('FORBIDDEN');
+    year=Number(year); month=Number(month);
+    if(!year || month<1 || month>12) return { ok:false, error:'BAD_MONTH' };
+    var detail=seedDemoAllSites(year, month, false);
+    return { ok:true, detail:String(detail) };
+  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
 // Seed the same month across every site (one batched write each).
 function seedDemoAllSites(year, month, overwrite){

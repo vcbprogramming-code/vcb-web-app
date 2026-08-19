@@ -3673,14 +3673,14 @@ function leaveTicketHtml_(r, opts){
 }
 function wireTicketButtons_(container){
   Array.prototype.forEach.call(container.querySelectorAll('button[data-print]'),function(btn){
-    btn.onclick=function(){ printLeaveSlip(Number(btn.getAttribute('data-print'))); };
+    btn.onclick=function(){ printLeaveSlip(btn.getAttribute('data-print')); };
   });
   Array.prototype.forEach.call(container.querySelectorAll('button[data-act]'),function(btn){
     btn.onclick=function(){
       var id=btn.getAttribute('data-id'), approve=btn.getAttribute('data-act')==='approve';
       var msg = approve ? t('อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?') : t('ไม่อนุมัติคำขอลานี้หรือไม่?');
       uiConfirm({message:msg, okText: approve?t('อนุมัติ'):t('ไม่อนุมัติ'), danger:!approve}, function(){
-        call('api_decideLeaveRequest',[Number(id),approve],function(r){
+        call('api_decideLeaveRequest',[String(id),approve],function(r){
           if(r&&r.ok){
             flash(approve?t('อนุมัติแล้ว'):t('ไม่อนุมัติแล้ว'),'ok');
             loadPendingTickets_(); refreshPendingLeaveBadge_(); renderMyTickets_();
@@ -6254,15 +6254,35 @@ function ensureLeaveSheet_(){
     sh=ss.insertSheet(SHEETS.LEAVE);
     sh.appendRow(HEADERS.LeaveRequests); sh.setFrozenRows(1);
     sh.getRange(1,1,1,HEADERS.LeaveRequests.length).setFontWeight('bold').setBackground('#1d4e89').setFontColor('#ffffff');
+    // Plain text for the WHOLE sheet: otherwise Sheets reinterprets the ISO
+    // date strings we write as Date values (and getValues() hands back Date
+    // objects, not strings), and rounds long numeric-looking ids. Setting the
+    // format once at creation keeps every column a faithful string.
+    sh.getRange(1,1,sh.getMaxRows(),HEADERS.LeaveRequests.length).setNumberFormat('@');
+  } else {
+    // Sheets created before the plain-text fix still coerce: their date cells
+    // read back as Date objects and long ids were rounded on write. Re-apply
+    // the format once (cheap, idempotent) so NEW rows land as faithful text.
+    // Rows already written keep their coerced values — leaveRowOut_ normalizes
+    // those on read, so both old and new rows render correctly.
+    try{
+      var rng=sh.getRange(1,1,sh.getMaxRows(),HEADERS.LeaveRequests.length);
+      if(rng.getNumberFormat()!=='@') rng.setNumberFormat('@');
+    }catch(e){}
   }
   return sh;
 }
-// Unique, sortable id with NO LockService dependency: ms timestamp * 1000 +
-// a 3-digit random tiebreaker, so ids stay numeric/sortable like the old
-// sequential counter, but writes never wait on a lock another execution
-// might be holding — a "read max + 1" counter would need that lock to stay
-// collision-safe under concurrent submits; this doesn't.
-function newLeaveId_(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
+// Unique, lexicographically sortable id with NO LockService dependency: a
+// timestamp plus a 3-digit random tiebreaker. A "read max + 1" counter would
+// need a lock to stay collision-safe under concurrent submits; this doesn't.
+// Sheets keeps only 15 SIGNIFICANT DIGITS on a number. Date.now()*1000+rand is
+// 16 digits, so the last digit was silently rounded away on write and the id
+// read back never matched the id handed to print/approve. A string id is
+// stored verbatim, so it round-trips exactly.
+function newLeaveId_(){
+  return 'LV' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss')
+       + '-' + ('00'+Math.floor(Math.random()*1000)).slice(-3);
+}
 // Employee submits their own leave request — no admin/manager role required,
 // since this is the one write path an ordinary employee (picking their own
 // name from the roster, per the fully-public/no-login model) can use.
@@ -6285,30 +6305,46 @@ function _api_requestLeave_(eid, fromDate, toDate, reason){
 // A worker's own request history — no login, so identified by picking
 // themself from the roster same as when they submitted.
 function api_myLeaveRequests(eid){
-  rcReset_(); eid=String(eid||''); if(!eid) return [];
+  rcReset_(); eid=String(eid||'').trim(); if(!eid) return [];
   return readObjects_(ensureLeaveSheet_()).rows
-    .filter(function(r){ return String(r.eid)===eid; })
+    .filter(function(r){ return String(r.eid).trim()===eid && String(r.id||'')!==''; })
     .map(leaveRowOut_)
-    .sort(function(a,b){ return b.id-a.id; });
+    .sort(function(a,b){ return a.id<b.id?1:a.id>b.id?-1:0; });
+}
+// Sheets hands back Date objects for anything date-shaped (from_date, to_date,
+// requested_at, decided_at) — never the strings that were written. Passing
+// those straight through breaks the client, which does r.from_date+'T00:00:00'
+// and plain string compares. Normalize EVERY field to a JSON-safe scalar here.
+function lvDate_(x){
+  if(x instanceof Date) return Utilities.formatDate(x, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  return String(x==null?'':x).slice(0,10);
+}
+function lvStamp_(x){
+  if(x instanceof Date) return Utilities.formatDate(x, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  return String(x==null?'':x);
 }
 function leaveRowOut_(r){
-  return { id:Number(r.id), eid:r.eid, site_key:r.site_key, emp_name:r.emp_name,
-    from_date:r.from_date, to_date:r.to_date, reason:r.reason, status:r.status,
-    requested_at:r.requested_at, decided_by:r.decided_by, decided_at:r.decided_at };
+  return { id:String(r.id), eid:String(r.eid), site_key:String(r.site_key==null?'':r.site_key),
+    emp_name:String(r.emp_name==null?'':r.emp_name),
+    from_date:lvDate_(r.from_date), to_date:lvDate_(r.to_date),
+    reason:String(r.reason==null?'':r.reason), status:String(r.status==null?'':r.status).trim(),
+    requested_at:lvStamp_(r.requested_at), decided_by:String(r.decided_by==null?'':r.decided_by),
+    decided_at:lvStamp_(r.decided_at) };
 }
 // Admin/manager queue — pending requests across the caller's scoped sites.
 function api_pendingLeaveRequests(){
   rcReset_(); var u=requireEntry_();
   var scoped=scopedSiteKeys_(u);
   return readObjects_(ensureLeaveSheet_()).rows
-    .filter(function(r){ return r.status==='pending' && scoped.indexOf(String(r.site_key))>=0; })
+    .filter(function(r){ return String(r.status||'').trim()==='pending' && scoped.indexOf(String(r.site_key).trim())>=0; })
     .map(leaveRowOut_)
-    .sort(function(a,b){ return a.id-b.id; });
+    .sort(function(a,b){ return a.id<b.id?-1:a.id>b.id?1:0; });
 }
 function findLeaveRow_(sh, id){
   var last=sh.getLastRow(); if(last<2) return 0;
   var ids=sh.getRange(2,1,last-1,1).getValues();
-  for(var i=0;i<ids.length;i++){ if(Number(ids[i][0])===Number(id)) return i+2; }
+  var want=String(id);
+  for(var i=0;i<ids.length;i++){ if(String(ids[i][0])===want) return i+2; }
   return 0;
 }
 // Approve fills every day in [from_date, to_date] as Z-2 (Leave) via the same
@@ -6323,7 +6359,7 @@ function _api_decideLeaveRequest_(id, approve){
   var sh=ensureLeaveSheet_(); var rn=findLeaveRow_(sh, id);
   if(!rn) return { ok:false, error:'NOT_FOUND' };
   var row=readObjects_(sh).rows.filter(function(r){ return r._row===rn; })[0];
-  if(!row || row.status!=='pending') return { ok:false, error:'ALREADY_DECIDED' };
+  if(!row || String(row.status||'').trim()!=='pending') return { ok:false, error:'ALREADY_DECIDED' };
   if(scopedSiteKeys_(u).indexOf(String(row.site_key))<0) return { ok:false, error:'FORBIDDEN' };
   var lock=LockService.getScriptLock(); lock.waitLock(10000);
   try{
@@ -6336,13 +6372,13 @@ function _api_decideLeaveRequest_(id, approve){
     if(approve){
       var e=empByEid_(row.eid);
       if(e){
-        var items=[], d=new Date(row.from_date+'T00:00:00'), end=new Date(row.to_date+'T00:00:00');
+        var items=[], d=new Date(lvDate_(row.from_date)+'T00:00:00'), end=new Date(lvDate_(row.to_date)+'T00:00:00');
         while(d<=end){
           items.push({ date:Utilities.formatDate(d,Session.getScriptTimeZone(),'yyyy-MM-dd'), eid:row.eid,
             kind:e.kind, fields: (e.kind==='operation') ? {team:'Z-2', note:'ลา (อนุมัติ)'} : {detail:'Z-2', note:'ลา (อนุมัติ)'} });
           d.setDate(d.getDate()+1);
         }
-        writeWideCells_(row.site_key, items);
+        writeWideCells_(String(row.site_key), items);
       }
     }
     return { ok:true, status:status };

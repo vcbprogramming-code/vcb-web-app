@@ -980,10 +980,10 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
   padding:.4rem .7rem; background:var(--card); border:1px solid var(--line);
   border-left-width:4px; border-radius:9px;
   /* name | project | dates | days | reason | status+actions */
-  grid-template-columns:minmax(0,15rem) minmax(0,12rem) 13.5rem 4.5rem minmax(0,1fr) auto }
+  grid-template-columns:minmax(0,15rem) minmax(0,12rem) 9.5rem 4.5rem minmax(0,1fr) auto }
 /* My Requests has no name/project columns — drop those two tracks so the
    dates still start hard left instead of behind two empty gutters. */
-.lv-list.lv-mine .lv-ticket{ grid-template-columns:13.5rem 4.5rem minmax(0,1fr) auto }
+.lv-list.lv-mine .lv-ticket{ grid-template-columns:9.5rem 4.5rem minmax(0,1fr) auto }
 .lv-ticket:hover{ box-shadow:0 1px 4px rgba(0,0,0,.08) }
 /* Every cell is one line, clipped with an ellipsis, so no row can grow taller
    than its neighbours and break the column rhythm. Full text on hover. */
@@ -3551,10 +3551,39 @@ function costEdit(row){
 // pending-approvals ticket list right there too. New/My Requests are open to
 // anyone (no login model); approve/reject only shows for entry-rights users.
 var LV = { site:'', eid:'', roster:[] };
+// Leave dates are STORED as ISO yyyy-MM-dd (sortable, unambiguous, what the
+// sheet and the API exchange). Thai users read day-first, so every place a
+// leave date is shown to a human goes through here: 2026-08-12 -> 12/08/26.
+// Two-digit year because the full one wastes a lot of width in a date range.
+function lvFmtDate_(iso){
+  var s=String(iso||''); if(s.length<10) return s;
+  return s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(2,4);
+}
+// A from–to pair as one compact string. When both ends fall in the same month
+// and year the leading day is enough: 17–18/08/26 rather than
+// 17/08/26 – 18/08/26. Single-day requests collapse to one date.
+function lvFmtDateLong_(iso){
+  var s=String(iso||''); if(s.length<10) return s;
+  return s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
+}
+// Timestamps are "yyyy-MM-dd HH:mm" — flip the date half, keep the clock.
+function lvFmtStampLong_(v){
+  var s=String(v||''); if(s.length<10) return s;
+  return lvFmtDateLong_(s.slice(0,10)) + s.slice(10);
+}
+function lvFmtRange_(from, to){
+  var f=String(from||''), t2=String(to||'');
+  if(!f) return '';
+  if(!t2 || f===t2) return lvFmtDate_(f);
+  if(f.slice(0,7)===t2.slice(0,7)) return f.slice(8,10)+'–'+lvFmtDate_(t2);
+  return lvFmtDate_(f)+' – '+lvFmtDate_(t2);
+}
 function leaveStatusBadge_(status){
   var label = status==='approved' ? t('อนุมัติแล้ว') : status==='rejected' ? t('ไม่อนุมัติ') : t('รอดำเนินการ');
-  var bg = status==='approved' ? '#e7f6ec' : status==='rejected' ? '#fdecea' : '#eef2f8';
-  var fg = status==='approved' ? '#13744a' : status==='rejected' ? '#b3261e' : '#6b7785';
+  // Amber for pending so the badge matches the yellow bar on the row's left
+  // edge; it was grey, which read as "inactive" instead of "awaiting action".
+  var bg = status==='approved' ? '#e7f6ec' : status==='rejected' ? '#fdecea' : '#fdf3d3';
+  var fg = status==='approved' ? '#13744a' : status==='rejected' ? '#b3261e' : '#8a6100';
   return '<span style="display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.8rem;background:'+bg+';color:'+fg+'">'+esc(label)+'</span>';
 }
 // Cache of leave-request rows keyed by id, so the print button (which only
@@ -3596,11 +3625,11 @@ function printLeaveSlip(id){
     +'<table>'
       +'<tr><td class="lbl">'+esc(t('ชื่อพนักงาน'))+'</td><td>'+esc(r.emp_name)+'</td></tr>'
       +'<tr><td class="lbl">'+esc(t('หน่วยงาน'))+'</td><td>'+esc(siteNameFor_(r.site_key))+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('ช่วงวันที่ลา'))+'</td><td>'+esc(r.from_date)+(r.from_date!==r.to_date?' – '+esc(r.to_date):'')+' ('+days+' '+esc(t('วัน'))+')</td></tr>'
+      +'<tr><td class="lbl">'+esc(t('ช่วงวันที่ลา'))+'</td><td>'+esc(lvFmtDateLong_(r.from_date))+(r.from_date!==r.to_date?' – '+esc(lvFmtDateLong_(r.to_date)):'')+' ('+days+' '+esc(t('วัน'))+')</td></tr>'
       +'<tr><td class="lbl">'+esc(t('เหตุผล'))+'</td><td>'+esc(r.reason||'—')+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('วันที่ยื่นคำขอ'))+'</td><td>'+esc(r.requested_at)+'</td></tr>'
+      +'<tr><td class="lbl">'+esc(t('วันที่ยื่นคำขอ'))+'</td><td>'+esc(lvFmtStampLong_(r.requested_at))+'</td></tr>'
       +'<tr><td class="lbl">'+esc(t('สถานะ'))+'</td><td>'+leaveStatusBadge_(r.status).replace('<span ','<span class="status" ')+'</td></tr>'
-      + (r.status!=='pending' ? '<tr><td class="lbl">'+esc(t('ผู้อนุมัติ'))+'</td><td>'+esc(r.decided_by||'—')+' · '+esc(r.decided_at||'')+'</td></tr>' : '')
+      + (r.status!=='pending' ? '<tr><td class="lbl">'+esc(t('ผู้อนุมัติ'))+'</td><td>'+esc(r.decided_by||'—')+' · '+esc(lvFmtStampLong_(r.decided_at))+'</td></tr>' : '')
     +'</table>'
     +'<div class="sign">'
       +'<div><div class="line">'+esc(t('ลายเซ็นพนักงาน'))+'</div></div>'
@@ -3617,7 +3646,10 @@ function updateDaysHint_(){
   var from=$('lvFrom').value, to=$('lvTo').value;
   if(!from || !to || to<from){ hint.textContent=''; return; }
   var days=Math.round((new Date(to+'T00:00:00')-new Date(from+'T00:00:00'))/86400000)+1;
-  hint.textContent = days+' '+t('วัน');
+  // Echo the picked range day-first. The native date inputs render in the
+  // browser's locale (often mm/dd/yyyy) and HTML gives no way to override
+  // that, so this line is what confirms the dates actually chosen.
+  hint.textContent = lvFmtRange_(from, to)+' · '+days+' '+t('วัน');
 }
 // Single-page layout, no tabs: left = compact submit form, right = your
 // requests as status "tickets" (always visible once a name is picked).
@@ -3724,7 +3756,7 @@ function leaveTicketHtml_(r, opts){
     return Math.round((b-a)/86400000)+1;
   })();
   var barColor = r.status==='approved' ? '#1f9d55' : r.status==='rejected' ? '#e0533a' : '#e8b500';
-  var range = esc(r.from_date)+(r.from_date!==r.to_date?' – '+esc(r.to_date):'');
+  var range = esc(lvFmtRange_(r.from_date, r.to_date));
   var btn = 'padding:.22rem .55rem;font-size:.8rem;line-height:1.35';
   var site = opts.showSite ? siteNameFor_(r.site_key) : '';
   // Each field is its own grid cell, emitted in a fixed order so the columns

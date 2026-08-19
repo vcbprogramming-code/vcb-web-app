@@ -1295,11 +1295,6 @@ var T = {
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
-  'สุ่มข้อมูลใหม่':             { en: 'Regenerate data' },
-  'กำลังสร้าง…':                { en: 'Generating…' },
-  'สร้างข้อมูลใหม่แล้ว':        { en: 'Data regenerated' },
-  'สร้างข้อมูลตัวอย่างใหม่สำหรับเดือนนี้ (ทุกหน่วยงาน)? ข้อมูลเดิมของเดือนนี้จะถูกแทนที่':
-    { en: 'Regenerate sample data for this month (all sites)? Existing data for this month will be replaced.' },
   'กำลังดำเนินการ…':           { en: 'Working…' },
   'รออนุมัติ':                 { en: 'Pending Approval' },
   'ทุกหน่วยงานในสิทธิ์ของคุณ':  { en: 'All sites in your access' },
@@ -3242,31 +3237,12 @@ function renderDashboard(){
           +'</div>'
           +'<div class="fld"><div id="dMonth">'+monthNav()+'</div></div>'
           +'<div class="fld"><button class="btn xls-btn" id="dExport" title="'+esc(t('ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)'))+'">⬇ '+(isMobile()?t('รายงาน'):t('รายงานวันทำงาน'))+'</button></div>'
-          // TEMPORARY demo control — regenerates this month's sample data with
-          // a realistic activity mix. Remove once the demo data is settled.
-          + (BOOT.isAdmin ? '<div class="fld"><button class="btn sec" id="dReseed">🎲 '+t('สุ่มข้อมูลใหม่')+'</button></div>' : '')
         +'</div>'
       +'</div>'
     +'</div>'
     +'<div id="histSlot"></div>'
     +'<div id="dBody"><div class="spinner"></div></div>';
   wireMonthNav(function(){ $('dMonth').innerHTML=monthNav(); wireMonthNav(arguments.callee); loadDash(); });
-  // TEMPORARY demo control. withBtnLoading keeps any failure contained to this
-  // button — an earlier attempt called the seeder through the boot path, where
-  // a timeout surfaced as a fatal error and took the whole app down.
-  var rsBtn = $('dReseed');
-  if(rsBtn) rsBtn.onclick = function(){
-    uiConfirm({ message: t('สร้างข้อมูลตัวอย่างใหม่สำหรับเดือนนี้ (ทุกหน่วยงาน)? ข้อมูลเดิมของเดือนนี้จะถูกแทนที่'),
-                okText: t('สุ่มข้อมูลใหม่'), danger:true }, function(){
-      withBtnLoading(rsBtn, t('กำลังสร้าง…'), function(done){
-        call('api_reseedMonth',[CUR.y, CUR.m], function(r){
-          done();
-          if(r && r.ok){ flash(t('สร้างข้อมูลใหม่แล้ว'),'ok'); loadDash(); }
-          else flash((r && r.error) ? String(r.error) : t('ดำเนินการไม่สำเร็จ'),'error');
-        });
-      });
-    });
-  };
   Array.prototype.forEach.call($('dView').querySelectorAll('button'), function(b){
     b.onclick = function(){
       DASH.view = b.getAttribute('data-v');
@@ -6342,26 +6318,17 @@ function seedDemoData(siteMatch, year, month, overwrite, wholeMonth){
   sh.getRange(1,1,values.length,width).setValues(values);   // ONE batched write
   return site.key+': '+writes+' cells, '+roster.length+' emp';
 }
-/* Re-seed ONE month across every site, overwriting what is already there.
+/* Regenerate demo months. EDITOR-ONLY on purpose: there is deliberately
+   no api_* wrapper and nothing in the UI calls it, so a demo control can
+   never appear in front of an audience. Run it from the Apps Script editor.
 
-   Deliberately one month per call: three months x eight sites in a single
-   request exceeded the Apps Script execution limit, and because that failure
-   surfaced through the app's fatal-error path it took the whole page down
-   with it. The client drives this one month at a time so each request stays
-   small enough to finish.
-
-   overwrite=true here, unlike the normal seeder — the point is to REPLACE an
-   earlier fill whose activity mix came out flat. Only aim this at demo data.
+   Runs ONE month per invocation — three months across eight sites in a
+   single execution exceeded the Apps Script limit, and that failure took
+   the whole app down when it was reachable from the page.
 */
-function api_reseedMonth(year, month){
-  try{
-    rcReset_();
-    var u=resolveUser_(currentEmail_());
-    if(u.role!=='admin') return { ok:false, error:'FORBIDDEN' };
-    year=Number(year); month=Number(month);
-    if(!year || month<1 || month>12) return { ok:false, error:'BAD_MONTH' };
-    return { ok:true, detail:String(seedDemoAllSites(year, month, true, true)) };
-  } catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
+function REGEN_DEMO_MONTH(year, month){
+  rcReset_();
+  return seedDemoAllSites(Number(year), Number(month), true, true);
 }
 // Seed the same month across every site (one batched write each).
 function seedDemoAllSites(year, month, overwrite, wholeMonth){

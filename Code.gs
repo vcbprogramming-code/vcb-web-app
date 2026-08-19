@@ -998,6 +998,13 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 .lv-badge{ display:flex; flex-direction:column; align-items:flex-end; gap:.1rem; width:7.5rem }
 .lv-by{ font-size:.68rem; color:var(--muted); white-space:nowrap; overflow:hidden;
   text-overflow:ellipsis; max-width:100% }
+/* [hidden] loses to any element rule that sets display, so state it once and
+   let it win — the queue/history panes rely on it to switch. */
+[hidden]{ display:none !important }
+/* Count beside a queue/history tab label. */
+.qcount{ display:inline-block; margin-left:.4rem; padding:0 .4rem; border-radius:999px;
+  background:var(--line); color:var(--muted); font-size:.72rem; font-weight:700; vertical-align:1px }
+.idx-tab.on .qcount{ background:var(--blue); color:#fff }
 .lv-acts{ display:flex; gap:.25rem }
 .lv-del:hover{ border-color:#e0533a; color:#b3261e }
 /* Heading row: same grid, no card chrome — just small caps labels and a rule. */
@@ -1286,6 +1293,8 @@ var T = {
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
+  'รออนุมัติ':                 { en: 'Pending Approval' },
+  'ทุกหน่วยงานในสิทธิ์ของคุณ':  { en: 'All sites in your access' },
   'แสดง':                      { en: 'showing' },
   'ยกเลิกคำขอ':                { en: 'Cancel request' },
   'ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้': { en: 'Cancel this leave request? This cannot be undone.' },
@@ -1303,7 +1312,6 @@ var T = {
   'ลาพักผ่อน':                 { en: 'Annual Leave' },
   'ลาคลอด':                    { en: 'Maternity Leave' },
   'ลาบวช':                     { en: 'Ordination Leave' },
-  'อื่นๆ':                     { en: 'Other' },
   'ไม่ระบุ':                   { en: 'Unspecified' },
   /* ---- printed slip ---- */
   'เลขที่':                    { en: 'No.' },
@@ -1313,7 +1321,6 @@ var T = {
   'ตำแหน่ง':                   { en: 'Position' },
   'เบอร์ติดต่อระหว่างลา':      { en: 'Contact During Leave' },
   'ผู้ปฏิบัติงานแทน':          { en: 'Covering Duties' },
-  'วันที่':                    { en: 'Date' },
   'บันทึกการทำงานรายวัน':      { en: 'HR Daily Work Log' },
   'เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน': { en: 'Printed from the HR Daily Work Log system' },
   'ช่วงวันที่ลา':              { en: 'Leave Period' },
@@ -3830,19 +3837,27 @@ function renderRequestsHub(){
         +'</div>'
         + (BOOT.canEntry ?
           '<div class="card" style="margin-top:.8rem">'
-            +'<h2 style="margin:0 0 .5rem">'+t('รออนุมัติ (ทุกหน่วยงานในสิทธิ์ของคุณ)')+'</h2>'
-            +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
-          +'</div>'
-          +'<div class="card" style="margin-top:.8rem">'
-            +'<div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap">'
-              +'<h2 style="margin:0">'+t('ประวัติการพิจารณา')+'</h2>'
-              +'<div class="seg" id="lvHistFilter">'
+            // Queue and history are peers — two states of the same list — so
+            // they are tabs in one card rather than a second card pushed far
+            // below the fold. Reuses the .idx-tab pattern from Work Index.
+            +'<div class="idx-tabs" id="lvQTabs" style="margin-bottom:.6rem">'
+              +'<button class="idx-tab on" data-qtab="pending">'+t('รออนุมัติ')
+                +'<span class="qcount" id="lvQCountPending"></span></button>'
+              +'<button class="idx-tab" data-qtab="history">'+t('ประวัติการพิจารณา')
+                +'<span class="qcount" id="lvQCountHist"></span></button>'
+            +'</div>'
+            +'<div id="lvQPanePending">'
+              +'<div class="hint" style="margin-bottom:.4rem">'+t('ทุกหน่วยงานในสิทธิ์ของคุณ')+'</div>'
+              +'<div id="lvPendingTickets"><div class="spinner"></div></div>'
+            +'</div>'
+            +'<div id="lvQPaneHistory" hidden>'
+              +'<div class="seg" id="lvHistFilter" style="margin-bottom:.5rem">'
                 +'<button class="on" data-f="all">'+t('ทั้งหมด')+'</button>'
                 +'<button data-f="approved">'+t('อนุมัติแล้ว')+'</button>'
                 +'<button data-f="rejected">'+t('ไม่อนุมัติ')+'</button>'
               +'</div>'
+              +'<div id="lvHistTickets"><div class="spinner"></div></div>'
             +'</div>'
-            +'<div id="lvHistTickets" style="margin-top:.5rem"><div class="spinner"></div></div>'
           +'</div>' : '')
       +'</div>'
     +'</div>';
@@ -3859,6 +3874,18 @@ function renderRequestsHub(){
     });
   };
   $('lvEmp').onchange=function(){ LV.eid=this.value; renderMyTickets_(); };
+  if($('lvQTabs')){
+    Array.prototype.forEach.call($('lvQTabs').querySelectorAll('.idx-tab'),function(b){
+      b.onclick=function(){
+        var want=b.getAttribute('data-qtab');
+        Array.prototype.forEach.call($('lvQTabs').querySelectorAll('.idx-tab'),function(x){
+          x.className='idx-tab'+(x===b?' on':'');
+        });
+        $('lvQPanePending').hidden = (want!=='pending');
+        $('lvQPaneHistory').hidden = (want!=='history');
+      };
+    });
+  }
   if($('lvHistFilter')){
     Array.prototype.forEach.call($('lvHistFilter').querySelectorAll('button'),function(b){
       b.onclick=function(){
@@ -4013,6 +4040,13 @@ function renderMyTickets_(){
 // Decided requests, cached client-side so the approved/rejected filter is
 // instant and does not re-hit the server for a list it already has.
 var LV_HIST = { rows:[], total:0, filter:'all' };
+// Count beside a tab label. Hidden at zero — an empty tab reads better
+// unadorned than with a "0" next to it.
+function lvSetTabCount_(id, n){
+  var el=$(id); if(!el) return;
+  el.textContent = n ? String(n) : '';
+  el.style.display = n ? '' : 'none';
+}
 function loadHistoryTickets_(){
   var box=$('lvHistTickets'); if(!box) return;
   call('api_decidedLeaveRequests',[200],function(res){
@@ -4020,6 +4054,7 @@ function loadHistoryTickets_(){
     LV_HIST.rows = (res&&res.rows)||[];
     LV_HIST.total = (res&&res.total)||0;
     LV_HIST.rows.forEach(function(r){ LV_ROWS[r.id]=r; });
+    lvSetTabCount_('lvQCountHist', LV_HIST.total);
     renderHistoryTickets_();
   });
 }
@@ -4048,6 +4083,7 @@ function loadPendingTickets_(){
   var box=$('lvPendingTickets'); if(!box) return;
   call('api_pendingLeaveRequests',[],function(list){
     box=$('lvPendingTickets'); if(!box) return;
+    lvSetTabCount_('lvQCountPending', (list||[]).length);
     if(!list||!list.length){ box.innerHTML='<p class="muted">'+t('ไม่มีคำขอลาที่รอดำเนินการ')+'</p>'; return; }
     list.forEach(function(r){ LV_ROWS[r.id]=r; });
     box.innerHTML = '<div class="lv-list">'

@@ -1001,6 +1001,9 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 /* [hidden] loses to any element rule that sets display, so state it once and
    let it win — the queue/history panes rely on it to switch. */
 [hidden]{ display:none !important }
+/* A ticket whose decision is in flight: dimmed and click-through disabled, so
+   the row visibly reads as "working" instead of looking idle until it vanishes. */
+.lv-busy{ opacity:.55; pointer-events:none; transition:opacity .12s ease }
 /* Count beside a queue/history tab label. */
 .qcount{ display:inline-block; margin-left:.4rem; padding:0 .4rem; border-radius:999px;
   background:var(--line); color:var(--muted); font-size:.72rem; font-weight:700; vertical-align:1px }
@@ -1293,6 +1296,7 @@ var T = {
   'ประวัติการพิจารณา':         { en: 'Decision History' },
   'ยังไม่มีประวัติการพิจารณา':  { en: 'No decisions recorded yet' },
   'ทั้งหมด':                   { en: 'All' },
+  'กำลังดำเนินการ…':           { en: 'Working…' },
   'รออนุมัติ':                 { en: 'Pending Approval' },
   'ทุกหน่วยงานในสิทธิ์ของคุณ':  { en: 'All sites in your access' },
   'แสดง':                      { en: 'showing' },
@@ -3980,6 +3984,33 @@ function leaveTicketHtml_(r, opts){
     +'</div>'
   +'</div>';
 }
+// Put a whole ticket into a working state for the duration of a server call.
+// Approve in particular is slow — it writes a schedule cell for EVERY day in
+// the range — and without this the row just sat there looking idle and then
+// vanished, with no way to tell whether the click had registered. Disabling
+// the row's buttons also stops a second decision being fired mid-flight.
+function lvTicketBusy_(btn, label){
+  var row = btn && btn.closest ? btn.closest('.lv-ticket') : null;
+  var btns = row ? row.querySelectorAll('button') : [btn];
+  var prev = [];
+  Array.prototype.forEach.call(btns,function(b,i){ prev[i]={html:b.innerHTML, dis:b.disabled}; b.disabled=true; });
+  if(row){ row.classList.add('lv-busy'); row.setAttribute('aria-busy','true'); }
+  // Freeze the width first: swapping a text label for a spinner otherwise
+  // makes the button (and the row's action group) visibly jump.
+  try{ btn.style.minWidth = btn.offsetWidth + 'px'; }catch(e){}
+  btn.title = label || btn.title;
+  btn.innerHTML = '<span class="btn-spin"></span>';
+  // Restores the row when the call fails and the row is therefore still here.
+  // On success the list re-renders and this node is discarded, so calling it
+  // is harmless either way.
+  return function done(){
+    if(row){ row.classList.remove('lv-busy'); row.removeAttribute('aria-busy'); }
+    try{ btn.style.minWidth=''; }catch(e){}
+    Array.prototype.forEach.call(btns,function(b,i){
+      if(prev[i]){ b.innerHTML=prev[i].html; b.disabled=prev[i].dis; }
+    });
+  };
+}
 function wireTicketButtons_(container){
   Array.prototype.forEach.call(container.querySelectorAll('button[data-print]'),function(btn){
     btn.onclick=function(){ printLeaveSlip(btn.getAttribute('data-print')); };
@@ -3989,8 +4020,10 @@ function wireTicketButtons_(container){
       var id=btn.getAttribute('data-cancel');
       uiConfirm({message:t('ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้'),
                  okText:t('ยกเลิกคำขอ'), danger:true}, function(){
+        var done=lvTicketBusy_(btn,'');
         // Send the eid too: with no login it's what proves the row is ours.
         call('api_cancelLeaveRequest',[String(id), String(LV.eid)],function(r){
+          done();
           if(r&&r.ok){
             flash(t('ยกเลิกคำขอแล้ว'),'ok');
             renderMyTickets_(); refreshPendingLeaveBadge_(); if(BOOT.canEntry) loadPendingTickets_();
@@ -4006,7 +4039,9 @@ function wireTicketButtons_(container){
       var id=btn.getAttribute('data-id'), approve=btn.getAttribute('data-act')==='approve';
       var msg = approve ? t('อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?') : t('ไม่อนุมัติคำขอลานี้หรือไม่?');
       uiConfirm({message:msg, okText: approve?t('อนุมัติ'):t('ไม่อนุมัติ'), danger:!approve}, function(){
+        var done=lvTicketBusy_(btn, t('กำลังดำเนินการ…'));
         call('api_decideLeaveRequest',[String(id),approve],function(r){
+          done();
           if(r&&r.ok){
             flash(approve?t('อนุมัติแล้ว'):t('ไม่อนุมัติแล้ว'),'ok');
             loadPendingTickets_(); refreshPendingLeaveBadge_(); renderMyTickets_(); loadHistoryTickets_();

@@ -980,10 +980,10 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
   padding:.4rem .7rem; background:var(--card); border:1px solid var(--line);
   border-left-width:4px; border-radius:9px;
   /* name | project | dates | days | reason | status+actions */
-  grid-template-columns:minmax(0,15rem) minmax(0,12rem) 9.5rem 4.5rem minmax(0,1fr) auto }
+  grid-template-columns:minmax(0,13rem) minmax(0,10rem) 9.5rem 4.5rem 7rem minmax(0,1fr) auto }
 /* My Requests has no name/project columns — drop those two tracks so the
    dates still start hard left instead of behind two empty gutters. */
-.lv-list.lv-mine .lv-ticket{ grid-template-columns:9.5rem 4.5rem minmax(0,1fr) auto }
+.lv-list.lv-mine .lv-ticket{ grid-template-columns:9.5rem 4.5rem 7rem minmax(0,1fr) auto }
 .lv-ticket:hover{ box-shadow:0 1px 4px rgba(0,0,0,.08) }
 /* Every cell is one line, clipped with an ellipsis, so no row can grow taller
    than its neighbours and break the column rhythm. Full text on hover. */
@@ -992,6 +992,7 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
 .lv-site{ font-size:.82rem; line-height:1.35; color:var(--muted); padding-right:.7rem }
 .lv-when{ font-size:.9rem; line-height:1.35; font-variant-numeric:tabular-nums }
 .lv-days{ font-size:.82rem; line-height:1.35; color:var(--muted); text-align:right; padding-right:.9rem }
+.lv-type{ font-size:.82rem; line-height:1.35; padding-right:.7rem }
 .lv-why{ font-size:.82rem; line-height:1.35; color:var(--muted); padding-right:.7rem }
 .lv-side{ display:flex; align-items:center; justify-content:flex-end; gap:.5rem; overflow:visible }
 .lv-badge{ display:flex; justify-content:flex-end; width:5.2rem }
@@ -1010,9 +1011,9 @@ html.is-mobile .req-grid{ grid-template-columns:1fr !important }
   .lv-ticket,
   .lv-list.lv-mine .lv-ticket{ grid-template-columns:1fr auto }
   .lv-who{ grid-column:1 }
-  .lv-site,.lv-when,.lv-days,.lv-why{ grid-column:1; white-space:normal }
+  .lv-site,.lv-when,.lv-days,.lv-type,.lv-why{ grid-column:1; white-space:normal }
   .lv-days{ text-align:left; padding-right:0 }
-  .lv-side{ grid-column:2; grid-row:1 / span 5; align-items:center }
+  .lv-side{ grid-column:2; grid-row:1 / span 6; align-items:center }
   .lv-ticket > *{ white-space:normal }
   .lv-head{ display:none }
 }
@@ -1289,6 +1290,26 @@ var T = {
   'ไม่มีคำขอลาที่รอดำเนินการ':  { en: 'No pending leave requests' },
   'เบราว์เซอร์บล็อกหน้าต่างป็อปอัป': { en: 'Your browser blocked the pop-up window' },
   'ใบขอลา':                    { en: 'Leave Request Form' },
+  /* ---- leave types ---- */
+  'ประเภทการลา':               { en: 'Leave Type' },
+  'ลาป่วย':                    { en: 'Sick Leave' },
+  'ลากิจ':                     { en: 'Personal Leave' },
+  'ลาพักผ่อน':                 { en: 'Annual Leave' },
+  'ลาคลอด':                    { en: 'Maternity Leave' },
+  'ลาบวช':                     { en: 'Ordination Leave' },
+  'อื่นๆ':                     { en: 'Other' },
+  'ไม่ระบุ':                   { en: 'Unspecified' },
+  /* ---- printed slip ---- */
+  'เลขที่':                    { en: 'No.' },
+  'ข้อมูลผู้ขอลา':             { en: 'Requester Details' },
+  'รายละเอียดการลา':           { en: 'Leave Details' },
+  'รหัสพนักงาน':               { en: 'Employee ID' },
+  'ตำแหน่ง':                   { en: 'Position' },
+  'เบอร์ติดต่อระหว่างลา':      { en: 'Contact During Leave' },
+  'ผู้ปฏิบัติงานแทน':          { en: 'Covering Duties' },
+  'วันที่':                    { en: 'Date' },
+  'บันทึกการทำงานรายวัน':      { en: 'HR Daily Work Log' },
+  'เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน': { en: 'Printed from the HR Daily Work Log system' },
   'ช่วงวันที่ลา':              { en: 'Leave Period' },
   'วันที่ยื่นคำขอ':            { en: 'Date Requested' },
   'สถานะ':                     { en: 'Status' },
@@ -3551,6 +3572,27 @@ function costEdit(row){
 // pending-approvals ticket list right there too. New/My Requests are open to
 // anyone (no login model); approve/reject only shows for entry-rights users.
 var LV = { site:'', eid:'', roster:[] };
+// Mirrors the server's LEAVE_TYPES. Codes are what travel to the sheet; the
+// Thai strings are i18n source text, so display follows the language toggle
+// while stored data stays put.
+var LEAVE_TYPES = [
+  { code:'sick',      th:'ลาป่วย' },
+  { code:'personal',  th:'ลากิจ' },
+  { code:'vacation',  th:'ลาพักผ่อน' },
+  { code:'maternity', th:'ลาคลอด' },
+  { code:'ordination',th:'ลาบวช' },
+  { code:'other',     th:'อื่นๆ' }
+];
+function leaveTypeLabel_(code){
+  for(var i=0;i<LEAVE_TYPES.length;i++) if(LEAVE_TYPES[i].code===code) return t(LEAVE_TYPES[i].th);
+  return t('ไม่ระบุ');
+}
+// The roster row for whoever is currently selected — carries emp_id, position
+// and company onto the printed slip.
+function lvCurrentEmp_(){
+  for(var i=0;i<LV.roster.length;i++) if(String(LV.roster[i].eid)===String(LV.eid)) return LV.roster[i];
+  return null;
+}
 // Leave dates are STORED as ISO yyyy-MM-dd (sortable, unambiguous, what the
 // sheet and the API exchange). Thai users read day-first, so every place a
 // leave date is shown to a human goes through here: 2026-08-12 -> 12/08/26.
@@ -3605,37 +3647,122 @@ function printLeaveSlip(id){
     return Math.round((b-a)/86400000)+1;
   })();
   var w = window.open('', '_blank'); if(!w) { flash(t('เบราว์เซอร์บล็อกหน้าต่างป็อปอัป'),'error'); return; }
+  // Identity details live on the roster, not on the request row, so they are
+  // only known while the requester themself is printing. When an approver
+  // prints from the pending queue these become blank fill-in rules instead —
+  // better an empty line than someone else's staff number.
+  var emp = lvCurrentEmp_();
+  var same = emp && String(emp.eid)===String(r.eid);
+  var empId = same ? (emp.emp_id||'') : '';
+  var empPos = same ? (emp.position||'') : '';
+  var company = same ? (emp.company||'') : '';
+  // Print the value when we have one, otherwise a rule to write on.
+  function fill(v){ return v ? esc(v) : '<span class="blank"></span>'; }
+  function typeBoxes(){
+    return LEAVE_TYPES.map(function(x){
+      var on = (r.leave_type===x.code);
+      return '<span class="tick"><span class="box">'+(on?'✓':'')+'</span>'+esc(t(x.th))+'</span>';
+    }).join('');
+  }
+  var docNo = esc(String(r.id||''));
+  var statusTh = r.status==='approved' ? t('อนุมัติแล้ว') : r.status==='rejected' ? t('ไม่อนุมัติ') : t('รอดำเนินการ');
+  var statusCls = r.status==='approved' ? 'ok' : r.status==='rejected' ? 'no' : 'wait';
   var html = '<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">'
-    +'<title>'+esc(t('ใบขอลา'))+' — '+esc(r.emp_name)+'</title>'
+    +'<title>'+esc(t('ใบขอลา'))+' — '+esc(r.emp_name)+' — '+docNo+'</title>'
     +'<style>'
-      +'body{font-family:"Sarabun","Segoe UI",sans-serif;padding:2.2rem;color:#1a1a1a;max-width:720px;margin:0 auto}'
-      +'h1{font-size:1.3rem;margin:0 0 .2rem}'
-      +'.sub{color:#666;margin:0 0 1.4rem;font-size:.9rem}'
-      +'table{width:100%;border-collapse:collapse;margin-bottom:1.6rem}'
-      +'td{padding:.5rem .3rem;border-bottom:1px solid #e2e2e2;vertical-align:top}'
-      +'td.lbl{width:180px;color:#666;font-weight:600}'
-      +'.sign{display:flex;justify-content:space-between;margin-top:3rem;gap:2rem}'
-      +'.sign div{flex:1;text-align:center}'
-      +'.sign .line{border-top:1px solid #333;margin-top:2.6rem;padding-top:.4rem;font-size:.85rem;color:#444}'
-      +'.status{display:inline-block;padding:.2rem .7rem;border-radius:999px;font-size:.85rem;font-weight:600}'
-      +'@media print{ body{padding:.5rem} }'
+      +'@page{ size:A4; margin:14mm 16mm }'
+      +'*{ box-sizing:border-box }'
+      +'body{ font-family:"Sarabun","TH Sarabun New","Segoe UI",sans-serif; color:#111;'
+        +'margin:0 auto; max-width:180mm; font-size:11.5pt; line-height:1.45 }'
+      +'.head{ display:flex; justify-content:space-between; align-items:flex-start;'
+        +'border-bottom:2px solid #1d4e89; padding-bottom:.5rem; margin-bottom:.9rem; gap:1rem }'
+      +'.org{ font-weight:700; font-size:1.05rem; color:#1d4e89; line-height:1.25 }'
+      +'.orgsub{ font-size:.8rem; color:#555; font-weight:400 }'
+      +'h1{ font-size:1.15rem; margin:.15rem 0 0 }'
+      +'.docmeta{ text-align:right; font-size:.78rem; color:#444; white-space:nowrap }'
+      +'.docno{ font-family:Consolas,monospace; font-weight:700; color:#111; font-size:.82rem }'
+      +'.stat{ display:inline-block; margin-top:.25rem; padding:.15rem .6rem; border-radius:3px;'
+        +'font-size:.78rem; font-weight:700; border:1px solid }'
+      +'.stat.ok{ background:#e7f6ec; color:#13744a; border-color:#9bd4b4 }'
+      +'.stat.no{ background:#fdecea; color:#b3261e; border-color:#efb4ac }'
+      +'.stat.wait{ background:#fdf3d3; color:#8a6100; border-color:#e6cd8a }'
+      +'.sec{ font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;'
+        +'color:#1d4e89; margin:.9rem 0 .3rem; padding-bottom:.15rem; border-bottom:1px solid #d7dee8 }'
+      +'table{ width:100%; border-collapse:collapse }'
+      +'td{ padding:.32rem .3rem; vertical-align:baseline }'
+      +'td.lbl{ width:34mm; color:#555; font-size:.85rem }'
+      +'td.val{ font-weight:600 }'
+      +'.blank{ display:inline-block; min-width:52mm; border-bottom:1px dotted #999; height:1em }'
+      +'.tick{ display:inline-block; margin-right:1.1rem; white-space:nowrap; font-size:.9rem }'
+      +'.box{ display:inline-block; width:1em; height:1em; border:1.2px solid #444; margin-right:.3rem;'
+        +'text-align:center; line-height:.95em; font-weight:700; vertical-align:-.12em }'
+      +'.reason{ border:1px solid #d7dee8; border-radius:3px; padding:.45rem .55rem; min-height:14mm;'
+        +'background:#fbfcfd; font-size:.95rem }'
+      +'.sign{ display:flex; gap:14mm; margin-top:12mm; break-inside:avoid; page-break-inside:avoid }'
+      +'.sign > div{ flex:1; text-align:center }'
+      +'.sigline{ border-top:1px dotted #333; padding-top:.35rem; font-size:.85rem }'
+      +'.sigsub{ font-size:.72rem; color:#666; margin-top:.1rem; min-height:1.1em }'
+      +'.eappr{ font-size:.72rem; color:#13744a; margin-top:.15rem }'
+      +'.foot{ margin-top:9mm; border-top:1px solid #d7dee8; padding-top:.35rem;'
+        +'font-size:.68rem; color:#888; display:flex; justify-content:space-between; gap:1rem }'
+      +'@media print{ .stat{ -webkit-print-color-adjust:exact; print-color-adjust:exact } }'
     +'</style></head><body>'
-    +'<h1>'+esc(t('ใบขอลา'))+' (Leave Request Form)</h1>'
-    +'<div class="sub">VCB Group · HR Daily Work Log</div>'
-    +'<table>'
-      +'<tr><td class="lbl">'+esc(t('ชื่อพนักงาน'))+'</td><td>'+esc(r.emp_name)+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('หน่วยงาน'))+'</td><td>'+esc(siteNameFor_(r.site_key))+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('ช่วงวันที่ลา'))+'</td><td>'+esc(lvFmtDateLong_(r.from_date))+(r.from_date!==r.to_date?' – '+esc(lvFmtDateLong_(r.to_date)):'')+' ('+days+' '+esc(t('วัน'))+')</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('เหตุผล'))+'</td><td>'+esc(r.reason||'—')+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('วันที่ยื่นคำขอ'))+'</td><td>'+esc(lvFmtStampLong_(r.requested_at))+'</td></tr>'
-      +'<tr><td class="lbl">'+esc(t('สถานะ'))+'</td><td>'+leaveStatusBadge_(r.status).replace('<span ','<span class="status" ')+'</td></tr>'
-      + (r.status!=='pending' ? '<tr><td class="lbl">'+esc(t('ผู้อนุมัติ'))+'</td><td>'+esc(r.decided_by||'—')+' · '+esc(lvFmtStampLong_(r.decided_at))+'</td></tr>' : '')
-    +'</table>'
-    +'<div class="sign">'
-      +'<div><div class="line">'+esc(t('ลายเซ็นพนักงาน'))+'</div></div>'
-      +'<div><div class="line">'+esc(t('ลายเซ็นผู้อนุมัติ'))+'</div></div>'
+    +'<div class="head">'
+      +'<div>'
+        +'<div class="org">'+(company?esc(company):'VCB Group')
+          +'<div class="orgsub">'+esc(t('บันทึกการทำงานรายวัน'))+'</div></div>'
+        +'<h1>'+esc(t('ใบขอลา'))+'</h1>'
+      +'</div>'
+      +'<div class="docmeta">'
+        +esc(t('เลขที่'))+' <span class="docno">'+docNo+'</span><br>'
+        +esc(t('วันที่ยื่นคำขอ'))+' '+esc(lvFmtStampLong_(r.requested_at))+'<br>'
+        +'<span class="stat '+statusCls+'">'+esc(statusTh)+'</span>'
+      +'</div>'
     +'</div>'
-    +'<script>window.onload=function(){setTimeout(function(){window.print();},200);};</'+'script>'
+    +'<div class="sec">'+esc(t('ข้อมูลผู้ขอลา'))+'</div>'
+    +'<table>'
+      +'<tr><td class="lbl">'+esc(t('ชื่อพนักงาน'))+'</td><td class="val">'+esc(r.emp_name)+'</td>'
+        +'<td class="lbl">'+esc(t('รหัสพนักงาน'))+'</td><td class="val">'+fill(empId)+'</td></tr>'
+      +'<tr><td class="lbl">'+esc(t('ตำแหน่ง'))+'</td><td class="val">'+fill(empPos)+'</td>'
+        +'<td class="lbl">'+esc(t('หน่วยงาน'))+'</td><td class="val">'+esc(siteNameFor_(r.site_key))+'</td></tr>'
+    +'</table>'
+    +'<div class="sec">'+esc(t('รายละเอียดการลา'))+'</div>'
+    +'<table>'
+      +'<tr><td class="lbl">'+esc(t('ประเภทการลา'))+'</td><td colspan="3">'+typeBoxes()+'</td></tr>'
+      +'<tr><td class="lbl">'+esc(t('ช่วงวันที่ลา'))+'</td><td class="val" colspan="3">'
+        +esc(lvFmtDateLong_(r.from_date))+(r.from_date!==r.to_date?' – '+esc(lvFmtDateLong_(r.to_date)):'')
+        +' <span style="font-weight:400;color:#555">('+days+' '+esc(t('วัน'))+')</span></td></tr>'
+      +'<tr><td class="lbl">'+esc(t('เบอร์ติดต่อระหว่างลา'))+'</td><td>'+fill('')+'</td>'
+        +'<td class="lbl">'+esc(t('ผู้ปฏิบัติงานแทน'))+'</td><td>'+fill('')+'</td></tr>'
+    +'</table>'
+    +'<div style="margin-top:.45rem">'
+      +'<div style="color:#555;font-size:.85rem;margin-bottom:.2rem">'+esc(t('เหตุผล'))+'</div>'
+      +'<div class="reason">'+(r.reason?esc(r.reason):'')+'</div>'
+    +'</div>'
+    +'<div class="sign">'
+      +'<div>'
+        +'<div style="height:16mm"></div>'
+        +'<div class="sigline">'+esc(t('ลายเซ็นพนักงาน'))+'</div>'
+        +'<div class="sigsub">'+esc(r.emp_name)+'</div>'
+        +'<div class="sigsub">'+esc(t('วันที่'))+' ......../......../........</div>'
+      +'</div>'
+      +'<div>'
+        +'<div style="height:16mm"></div>'
+        +'<div class="sigline">'+esc(t('ลายเซ็นผู้อนุมัติ'))+'</div>'
+        // Already decided in-app? Then print who decided it and when, so the
+        // slip records an approval that actually happened instead of implying
+        // it still needs a wet signature.
+        +'<div class="sigsub">'+(r.status!=='pending' && r.decided_by ? esc(r.decided_by) : '')+'</div>'
+        + (r.status!=='pending'
+            ? '<div class="eappr">'+esc(statusTh)+' · '+esc(lvFmtStampLong_(r.decided_at))+'</div>'
+            : '<div class="sigsub">'+esc(t('วันที่'))+' ......../......../........</div>')
+      +'</div>'
+    +'</div>'
+    +'<div class="foot">'
+      +'<span>'+esc(t('เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน'))+'</span>'
+      +'<span class="docno">'+docNo+'</span>'
+    +'</div>'
+    +'<script>window.onload=function(){setTimeout(function(){window.print();},250);};</'+'script>'
     +'</body></html>';
   w.document.open(); w.document.write(html); w.document.close();
 }
@@ -3674,6 +3801,9 @@ function renderRequestsHub(){
           +'<option value="">'+t('— เลือกหน่วยงาน —')+'</option>'+siteOpts+'</select></div>'
         +'<div class="fld" style="margin-top:.5rem"><label>'+t('ชื่อพนักงาน')+'</label><select id="lvEmp" disabled>'
           +'<option value="">'+t('— เลือกหน่วยงานก่อน —')+'</option></select></div>'
+        +'<div class="fld" style="margin-top:.5rem"><label>'+t('ประเภทการลา')+'</label><select id="lvType">'
+          + LEAVE_TYPES.map(function(x){ return '<option value="'+esc(x.code)+'">'+esc(t(x.th))+'</option>'; }).join('')
+          +'</select></div>'
         +'<div class="fld" style="margin-top:.5rem"><label>'+t('วันที่เริ่มลา')+'</label><input type="date" id="lvFrom"></div>'
         +'<div class="fld" style="margin-top:.5rem"><label>'+t('วันที่สิ้นสุด')+'</label><input type="date" id="lvTo"></div>'
         +'<div class="hint" id="lvDaysHint" style="margin-top:.15rem;min-height:1em"></div>'
@@ -3715,11 +3845,12 @@ function renderRequestsHub(){
   $('lvTo').onchange=updateDaysHint_;
   $('lvSubmit').onclick=function(){
     var eid=LV.eid, from=$('lvFrom').value, to=$('lvTo').value, reason=$('lvReason').value.trim();
+    var ltype=$('lvType').value;
     if(!eid){ flash(t('กรุณาเลือกชื่อพนักงาน'),'error'); return; }
     if(!from || !to){ flash(t('กรุณาระบุช่วงวันที่'),'error'); return; }
     if(to<from){ flash(t('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'),'error'); return; }
     withBtnLoading($('lvSubmit'),t('กำลังส่ง…'),function(done){
-      call('api_requestLeave',[eid,from,to,reason],function(r){
+      call('api_requestLeave',[eid,from,to,reason,ltype],function(r){
         done();
         if(r&&r.ok){
           flash(t('ส่งคำขอลาแล้ว รอการอนุมัติ'),'ok'); $('lvFrom').value=''; $('lvTo').value=''; $('lvReason').value=''; updateDaysHint_();
@@ -3745,6 +3876,7 @@ function lvHeadHtml_(withName){
     + (withName ? '<div>'+esc(t('ชื่อพนักงาน'))+'</div><div>'+esc(t('หน่วยงาน'))+'</div>' : '')
     +'<div>'+esc(t('ช่วงวันที่ลา'))+'</div>'
     +'<div class="lv-days">'+esc(t('วัน'))+'</div>'
+    +'<div>'+esc(t('ประเภทการลา'))+'</div>'
     +'<div>'+esc(t('เหตุผล'))+'</div>'
     +'<div class="lv-side">'+esc(t('สถานะ'))+'</div>'
   +'</div>';
@@ -3767,6 +3899,7 @@ function leaveTicketHtml_(r, opts){
         +'<div class="lv-site" title="'+esc(site)+'">'+esc(site)+'</div>' : '')
     +'<div class="lv-when">'+range+'</div>'
     +'<div class="lv-days">'+days+' '+esc(t('วัน'))+'</div>'
+    +'<div class="lv-type">'+esc(leaveTypeLabel_(r.leave_type))+'</div>'
     +'<div class="lv-why" title="'+esc(r.reason||'')+'">'+esc(r.reason||'')+'</div>'
     +'<div class="lv-side">'
       +'<span class="lv-badge">'+leaveStatusBadge_(r.status)+'</span>'
@@ -4592,7 +4725,7 @@ var HEADERS = {
   AuditLog:    ['ts','email','site','year','month','eid','emp_name','day','field','old_val','new_val'],
   CostIndex:   ['id','code','name','name_en'],
   Migrations:  ['eid','from_site','to_site','date','by','ts'],
-  LeaveRequests: ['id','eid','site_key','emp_name','from_date','to_date','reason','status','requested_at','decided_by','decided_at']
+  LeaveRequests: ['id','eid','site_key','emp_name','from_date','to_date','reason','status','requested_at','decided_by','decided_at','leave_type']
 };
 // every site gets its own daily-log sheet with this header
 var LOG_HEADER = ['date','eid','emp_id','name','kind','work_detail','team','ot_hours','note','updated_by','updated_at'];
@@ -6016,9 +6149,20 @@ function api_employees(siteKey,kind){
 // Returns name/site, never anything an anonymous visitor shouldn't see.
 function api_rosterForLeave(siteKey){
   rcReset_(); siteKey=String(siteKey||'');
+  // emp_id / position / department identify the requester on the printed slip
+  // the way a real HR form does. company comes off the site row. All of it is
+  // roster information an anonymous visitor may already read on the schedule.
+  var company='';
+  rows_(SHEETS.SITES).forEach(function(st){
+    if(String(st.key)===siteKey) company=String(st.company||'');
+  });
   return rows_(SHEETS.EMP)
-    .filter(function(e){ return e.site_key===siteKey; })
-    .map(function(e){ return { eid:e.eid, name:e.name, kind:e.kind }; })
+    .filter(function(e){ return String(e.site_key)===siteKey; })
+    .map(function(e){ return { eid:e.eid, name:e.name, kind:e.kind,
+      emp_id:String(e.emp_id==null?'':e.emp_id),
+      position:String(e.position==null?'':e.position),
+      department:String(e.department==null?'':e.department),
+      company:company }; })
     .sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'th'); });
 }
 
@@ -6382,6 +6526,22 @@ function api_saveMonthFor(eid,year,month,payload){
 }
 
 /* ============================ LEAVE REQUESTS ============================ */
+// Leave types a request can carry. The CODE is what lands in the sheet; the
+// Thai label is the source string that i18n translates for display, so the
+// stored value never changes when the user switches language. 'other' exists
+// so the reason box can still carry anything these six don't cover.
+var LEAVE_TYPES = [
+  { code:'sick',      th:'ลาป่วย' },
+  { code:'personal',  th:'ลากิจ' },
+  { code:'vacation',  th:'ลาพักผ่อน' },
+  { code:'maternity', th:'ลาคลอด' },
+  { code:'ordination',th:'ลาบวช' },
+  { code:'other',     th:'อื่นๆ' }
+];
+function leaveTypeTh_(code){
+  for(var i=0;i<LEAVE_TYPES.length;i++) if(LEAVE_TYPES[i].code===code) return LEAVE_TYPES[i].th;
+  return '';
+}
 function ensureLeaveSheet_(){
   var ss=ss_(), sh=ss.getSheetByName(SHEETS.LEAVE);
   if(!sh){
@@ -6400,6 +6560,18 @@ function ensureLeaveSheet_(){
     // Rows already written keep their coerced values — leaveRowOut_ normalizes
     // those on read, so both old and new rows render correctly.
     try{
+      // Older sheets predate the leave_type column — append any header this
+      // sheet is missing rather than rewriting the row, so existing data and
+      // column order are untouched.
+      var lastCol=sh.getLastColumn();
+      var have=lastCol ? sh.getRange(1,1,1,lastCol).getValues()[0].map(String) : [];
+      for(var hi=0; hi<HEADERS.LeaveRequests.length; hi++){
+        var want=HEADERS.LeaveRequests[hi];
+        if(have.indexOf(want)<0){
+          sh.getRange(1, have.length+1).setValue(want);
+          have.push(want);
+        }
+      }
       var rng=sh.getRange(1,1,sh.getMaxRows(),HEADERS.LeaveRequests.length);
       if(rng.getNumberFormat()!=='@') rng.setNumberFormat('@');
     }catch(e){}
@@ -6420,20 +6592,22 @@ function newLeaveId_(){
 // Employee submits their own leave request — no admin/manager role required,
 // since this is the one write path an ordinary employee (picking their own
 // name from the roster, per the fully-public/no-login model) can use.
-function api_requestLeave(eid, fromDate, toDate, reason){
-  try { rcReset_(); return _api_requestLeave_(eid, fromDate, toDate, reason); }
+function api_requestLeave(eid, fromDate, toDate, reason, leaveType){
+  try { rcReset_(); return _api_requestLeave_(eid, fromDate, toDate, reason, leaveType); }
   catch(e){ return { ok:false, error:'SERVER: '+(e&&e.message?e.message:e) }; }
 }
-function _api_requestLeave_(eid, fromDate, toDate, reason){
+function _api_requestLeave_(eid, fromDate, toDate, reason, leaveType){
   eid=String(eid||''); fromDate=String(fromDate||'').slice(0,10); toDate=String(toDate||'').slice(0,10);
   reason=String(reason||'').trim().slice(0,300);
+  leaveType=String(leaveType||'').trim();
+  if(!leaveTypeTh_(leaveType)) leaveType='other';
   if(!eid || !isISODate_(fromDate) || !isISODate_(toDate)) return { ok:false, error:'MISSING' };
   if(toDate < fromDate) return { ok:false, error:'BAD_RANGE' };
   var e=empByEid_(eid); if(!e) return { ok:false, error:'NOT_FOUND' };
   var sh=ensureLeaveSheet_();
   var now=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm');
   var id=newLeaveId_();
-  sh.appendRow([id, e.eid, e.site_key, e.name||'', fromDate, toDate, reason, 'pending', now, '', '']);
+  sh.appendRow([id, e.eid, e.site_key, e.name||'', fromDate, toDate, reason, 'pending', now, '', '', leaveType]);
   return { ok:true, id:id };
 }
 // A worker's own request history — no login, so identified by picking
@@ -6463,7 +6637,10 @@ function leaveRowOut_(r){
     from_date:lvDate_(r.from_date), to_date:lvDate_(r.to_date),
     reason:String(r.reason==null?'':r.reason), status:String(r.status==null?'':r.status).trim(),
     requested_at:lvStamp_(r.requested_at), decided_by:String(r.decided_by==null?'':r.decided_by),
-    decided_at:lvStamp_(r.decided_at) };
+    decided_at:lvStamp_(r.decided_at),
+    // Blank on rows written before leave_type existed — the client shows those
+    // as "ไม่ระบุ" rather than inventing a category they were never given.
+    leave_type:String(r.leave_type==null?'':r.leave_type).trim() };
 }
 // Admin/manager queue — pending requests across the caller's scoped sites.
 function api_pendingLeaveRequests(){

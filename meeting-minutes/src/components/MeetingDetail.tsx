@@ -84,7 +84,14 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
         const fitFrame = (): void => {
           try {
             const d = frame.contentWindow!.document
-            frame.style.height = (d.body.scrollHeight + 48) + 'px'
+            // Size the frame to its content EXACTLY. An extra +48px pad used to
+            // be added here as clipping insurance, but the document already
+            // ends with .pagedjs_pages' own 22px bottom padding, so the pad
+            // rendered as a bare white strip between the last sheet and the
+            // attachments card. Verified in a real browser across 1–4 page
+            // documents with webfonts loading late: no clipping, no inner
+            // scrollbar. Mirrors JavaScript.html.
+            frame.style.height = d.body.scrollHeight + 'px'
             if (!revealed) {
               revealed = true
               frame.style.visibility = 'visible'

@@ -14,7 +14,7 @@ change to the GAS source, diff it against this folder and update only what chang
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
 - **Synced at:** 2026-08-20
-- **Live deployment referenced:** `@203` (per `PROJECT_SUMMARY.md`); the React build
+- **Live deployment referenced:** `@204` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
 
 - **2026-08-20 — page size pinned, and dated PDF filenames.**
@@ -50,6 +50,13 @@ change to the GAS source, diff it against this folder and update only what chang
   `<title> <d.m.yy>` (`VCB Meeting Minutes 18.8.69`) — dot-separated, unpadded,
   2-digit Buddhist year, matching the convention already in the export folder.
   Undated meetings keep the plain title rather than rendering `NaN-NaN-NaN`.
+
+  Also synced (`MeetingDetail.tsx`): the reading iframe is sized to
+  `d.body.scrollHeight` exactly, dropping a `+48` pad added during the Paged.js
+  work. The document already ends with `.pagedjs_pages`' own 22px bottom
+  padding, so the pad rendered as a bare white strip between the last sheet and
+  the attachments card. Verified across 1–4 page documents with webfonts loading
+  late: nothing clips and no inner scrollbar appears without it.
 
 - **2026-08-19 — page-accurate rendering (the big one).** The reading view, the
   PDF and the editor now break pages in identical places. **Read

@@ -30,25 +30,55 @@ export const SITES: SiteMeta[] = [
   { key: 'suphanburi', name: 'โรงงานสุพรรณบุรี', company: 'บริษัท ชนา เอ็นจิเนียริ่ง จำกัด' },
 ]
 
+// The curated VCB work index — extracted VERBATIM from VCB_WORK_TYPES in
+// Code.gs (sourced from HR_Work_Type_Index_v27.xlsx). Every entry has a code;
+// the live app treats a codeless index row as legacy clutter and drops it.
+// Re-extract on sync rather than hand-editing.
 export const ACTIVITIES: Activity[] = [
-  { code: 'A-1', name: 'งานบุคคล - ธุรการ - บัญชี', category: 'A · งานสำนักงาน', mapping: 'one-to-many' },
-  { code: 'A-2', name: 'งานพัสดุ / คลังสินค้า', category: 'A · งานสำนักงาน', mapping: 'one-to-many' },
-  { code: 'A-3', name: 'งานการเงิน / จัดซื้อ', category: 'A · งานสำนักงาน', mapping: 'one-to-one', fixed_cost: '1' },
-  { code: 'B-1', name: 'ควบคุมงานหน้างาน (โฟร์แมน)', category: 'B · งานควบคุม', mapping: 'one-to-many' },
-  { code: 'B-2', name: 'งานสำรวจ / วางแนว', category: 'B · งานควบคุม', mapping: 'one-to-many' },
-  { code: 'B-3', name: 'งาน Safety / ความปลอดภัย', category: 'B · งานควบคุม', mapping: 'one-to-one', fixed_cost: '4' },
-  { code: 'C-1', name: 'งานปรับพื้นที่ / ดินถม', category: 'C · งานก่อสร้าง', mapping: 'one-to-many' },
-  { code: 'C-2', name: 'งานคอนกรีต / โครงสร้าง', category: 'C · งานก่อสร้าง', mapping: 'one-to-many' },
-  { code: 'C-3', name: 'งานผิวทาง / แอสฟัลต์', category: 'C · งานก่อสร้าง', mapping: 'one-to-many' },
-  { code: 'C-4', name: 'งานระบบระบายน้ำ', category: 'C · งานก่อสร้าง', mapping: 'one-to-many' },
-  { code: 'D-1', name: 'รถเกรดเดอร์', category: 'D · เครื่องจักร', mapping: 'one-to-one', fixed_cost: '8' },
-  { code: 'D-2', name: 'รถขุด / แบ็คโฮ', category: 'D · เครื่องจักร', mapping: 'one-to-one', fixed_cost: '8' },
-  { code: 'D-3', name: 'รถบดสั่นสะเทือน', category: 'D · เครื่องจักร', mapping: 'one-to-one', fixed_cost: '8' },
-  { code: 'D-4', name: 'รถบรรทุก 10 ล้อ', category: 'D · เครื่องจักร', mapping: 'one-to-one', fixed_cost: '9' },
-  { code: 'E-1', name: 'ซ่อมบำรุงเครื่องจักรหนัก', category: 'E · ซ่อมบำรุง', mapping: 'one-to-many' },
-  { code: 'E-2', name: 'ซ่อมบำรุงเครื่องจักรเบา', category: 'E · ซ่อมบำรุง', mapping: 'one-to-many' },
-  { code: 'Z-1', name: 'วันหยุด / หยุดงาน', category: 'Z · ไม่ปฏิบัติงาน', mapping: 'one-to-one', fixed_cost: '20' },
-  { code: 'Z-2', name: 'ลา (ลาป่วย / ลากิจ)', category: 'Z · ไม่ปฏิบัติงาน', mapping: 'one-to-one', fixed_cost: '20' },
+  { code: 'A-1', name: 'งานผูก-ตัด-ดัดเหล็ก', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Rebar Works' },
+  { code: 'A-2', name: 'งานเทคอนกรีต', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Concrete Pouring' },
+  { code: 'A-3', name: 'งานประกอบ / ถอดแบบหล่อ', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Formwork Assembly & Stripping' },
+  { code: 'A-4', name: 'ปฏิบัติงานชุด Launching Gantry (LG)', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Launching Gantry Crew Operation' },
+  { code: 'A-5', name: 'งานรื้อถอน / ทุบทำลาย', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Demolition Works' },
+  { code: 'A-6', name: 'งานขุดดิน / ถมดิน', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Excavation & Earthfill' },
+  { code: 'A-7', name: 'งานบดอัด / ปูพื้นทาง', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Compaction & Paving' },
+  { code: 'A-8', name: 'งานติดตั้งท่อ / ระบบระบายน้ำ', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Pipe & Drainage System Installation' },
+  { code: 'A-9', name: 'งานติดตั้งป้าย / ตีเส้นจราจร', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Traffic Sign & Road Marking Works' },
+  { code: 'A-10', name: 'งานสำรวจ (กลางวัน)', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Survey – Day Shift' },
+  { code: 'A-11', name: 'งานสำรวจ (กลางคืน)', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Survey – Night Shift' },
+  { code: 'A-12', name: 'งานช่างเชื่อมหน้างาน (กลางวัน)', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Site Welding – Day Shift' },
+  { code: 'A-13', name: 'งานช่างเชื่อมหน้างาน (กลางคืน)', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Site Welding – Night Shift' },
+  { code: 'A-14', name: 'งานช่างไฟฟ้าหน้างาน', category: 'A · งานก่อสร้างและติดตั้ง', mapping: 'one-to-many', desc: 'Site Electrical Works' },
+  { code: 'B-1', name: 'งานผลิต Segment (แท่นผลิต)', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Segment Production – Casting Bed' },
+  { code: 'B-2', name: 'งานดึงลวดอัดแรง (Pre-Tensioning)', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Pre-Tensioning – Strand Stressing' },
+  { code: 'B-3', name: 'งานถอดแบบ Segment', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Segment Formwork Stripping' },
+  { code: 'B-4', name: 'งาน QC / LAB คอนกรีต', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Concrete QC & Laboratory Testing' },
+  { code: 'B-5', name: 'งาน Gantry Crane (โรงงาน)', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Gantry Crane – Factory' },
+  { code: 'B-6', name: 'งาน Shuttle Lift (โรงงาน)', category: 'B · งานหล่อและผลิต Segment', mapping: 'one-to-one', fixed_cost: '7', desc: 'Shuttle Lift – Factory' },
+  { code: 'C-1', name: 'ขับรถขุด', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Excavator Operation' },
+  { code: 'C-2', name: 'ขับรถตัก / แทร็คเตอร์', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Wheel Loader / Tractor Operation' },
+  { code: 'C-3', name: 'ขับรถบดสั่นสะเทือน / เกรดเดอร์', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Compactor / Grader Operation' },
+  { code: 'C-4', name: 'ขับรถบรรทุก 10 ล้อ / Dump Truck', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Dump Truck Operation' },
+  { code: 'C-5', name: 'ขับรถเฮี๊ยบ / เครน', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Boom Truck / Crane Operation' },
+  { code: 'C-6', name: 'ขับรถบรรทุกน้ำ', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Water Truck Operation' },
+  { code: 'C-7', name: 'ขับรถเทรลเลอร์', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Trailer Truck Operation' },
+  { code: 'C-8', name: 'ขับรถบริการ / รับ-ส่งพนักงาน', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Service Vehicle Driver' },
+  { code: 'C-9', name: 'เติมน้ำมัน / ออยเลอร์เครื่องจักร', category: 'C · งานเครื่องจักรและยานพาหนะ', mapping: 'one-to-many', desc: 'Fuel & Lubricant Service (Oiler)' },
+  { code: 'D-1', name: 'ตรวจเช็ค / ซ่อมแซมเครื่องจักร', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Equipment Inspection & Repair' },
+  { code: 'D-2', name: 'ซ่อมบำรุงระบบไฟฟ้าเครื่องจักร', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Equipment Electrical Repair' },
+  { code: 'D-3', name: 'งานเชื่อมซ่อม (โรงซ่อม)', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Welding & Fabrication – Workshop' },
+  { code: 'D-4', name: 'งานปะยาง / เปลี่ยนยาง', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Tyre Repair & Replacement' },
+  { code: 'D-5', name: 'ซ่อมบำรุงแบบหล่อ Segment', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Segment Formwork Repair' },
+  { code: 'D-6', name: 'งานติดตั้ง / รื้อแพล้นท์คอนกรีต', category: 'D · งานซ่อมบำรุง', mapping: 'one-to-one', fixed_cost: '18', desc: 'Concrete Plant Setup / Dismantling' },
+  { code: 'E-1', name: 'งาน Safety (กลางวัน)', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'Site Safety – Day Shift' },
+  { code: 'E-2', name: 'งาน Safety (กลางคืน)', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'Site Safety – Night Shift' },
+  { code: 'E-3', name: 'งาน จป.วิชาชีพ / HSE', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'Professional Safety Officer (HSE)' },
+  { code: 'E-4', name: 'งานสำนักงาน DOH / ประสานงานราชการ', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'DOH Office / Government Liaison' },
+  { code: 'E-5', name: 'งานธุรการ / สำนักงาน / จัดซื้อ', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'Administration / Office / Purchasing' },
+  { code: 'E-6', name: 'งานทรัพย์สินและควบคุมคลังพัสดุ', category: 'E · งานความปลอดภัยและสนับสนุน', mapping: 'one-to-one', fixed_cost: '8', desc: 'Asset Management & Inventory Control' },
+  { code: 'Z-1', name: 'Standby', category: 'Z · ไม่ปฏิบัติงาน', mapping: 'one-to-one', desc: 'Standby' },
+  { code: 'Z-2', name: 'ลา', category: 'Z · ไม่ปฏิบัติงาน', mapping: 'one-to-one', desc: 'Leave' },
+  { code: 'Z-3', name: 'ลาออก', category: 'Z · ไม่ปฏิบัติงาน', mapping: 'one-to-one', desc: 'Resignation' },
 ]
 
 export const CATEGORIES: Category[] = [
@@ -103,6 +133,24 @@ export function daysInMonth(year: number, month: number): DayInfo[] {
     out.push({ date: isoDate(year, month, d), dow: dw, weekend: dw === 0 }) // Sunday-only weekend
   }
   return out
+}
+
+/* Builds a cell's stored value, mirroring the GAS rule exactly:
+
+     one-to-one WITH a fixed cost  -> "<code> / <fixedCost>"
+     one-to-one WITHOUT one        -> "<code>"        (Z-1/Z-2/Z-3 are like this)
+     one-to-many                   -> "<code> / <randomCategory>"
+
+   The previous version asserted `a.fixed_cost!` on every one-to-one type, which
+   was safe only while the sample data happened to give them all a fixed cost.
+   The real index does not: the three Z codes (Standby / Leave / Resignation)
+   are one-to-one with an empty fixed cost, so the assertion would have written
+   "Z-2 / undefined" into cells. */
+function composite(a: Activity, rnd: () => number = Math.random): string {
+  if (a.mapping === 'one-to-one') {
+    return a.fixed_cost ? `${a.code} / ${a.fixed_cost}` : a.code
+  }
+  return `${a.code} / ${CATEGORIES[3 + Math.floor(rnd() * (CATEGORIES.length - 4))].code}`
 }
 
 const _siteCache: Record<string, SiteMonth> = {}
@@ -166,13 +214,8 @@ export function siteMonth(siteKey: string, year: number, month: number, today: s
       }
       if (e.kind === 'operation') {
         const a = opActs[Math.floor(rnd() * opActs.length)]
-        const cost = a.mapping === 'one-to-one' ? a.fixed_cost! : CATEGORIES[3 + Math.floor(rnd() * (CATEGORIES.length - 4))].code
-        const cell: CellValue = { team: `${a.code} / ${cost}` }
-        if (rnd() < 0.18) {
-          const a2 = opActs[Math.floor(rnd() * opActs.length)]
-          const c2 = a2.mapping === 'one-to-one' ? a2.fixed_cost! : CATEGORIES[3 + Math.floor(rnd() * 5)].code
-          cell.pm = `${a2.code} / ${c2}`
-        }
+        const cell: CellValue = { team: composite(a, rnd) }
+        if (rnd() < 0.18) cell.pm = composite(opActs[Math.floor(rnd() * opActs.length)], rnd)
         by[day.date] = cell
       } else {
         by[day.date] = { detail: SUP_DETAILS[Math.floor(rnd() * SUP_DETAILS.length)] }

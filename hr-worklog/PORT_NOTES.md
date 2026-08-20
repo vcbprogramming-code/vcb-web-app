@@ -10,9 +10,9 @@ re-extract the CSS + `T` dictionary verbatim → bump the row below).
 | Field | Value |
 |---|---|
 | GAS source | `../Code.gs` |
-| Size at sync | 599,620 bytes |
-| GAS mtime at sync | 2026-08-19 |
-| Deployed version referenced | `@49` |
+| Size at sync | 603,790 bytes |
+| GAS mtime at sync | 2026-08-20 |
+| Deployed version referenced | `@54` |
 | Stack | Vite + React 18 + TypeScript (strict) |
 | Data layer | **Typed mock** mirroring the GAS API (`src/mock.ts`) — visual/UX parity, no backend |
 
@@ -21,6 +21,7 @@ re-extract the CSS + `T` dictionary verbatim → bump the row below).
 | Artifact | Source in Code.gs | React file |
 |---|---|---|
 | Stylesheet | `<style>…</style>` block | `src/app.css` |
+| Work index | `var VCB_WORK_TYPES = […]` (44 rows) | `ACTIVITIES` in `src/mock.ts` |
 | i18n dictionary | `var T = {…}` (318 entries as of 2026-08-19) | `src/i18n_data.ts` |
 
 `src/extra.css` is the ONLY hand-written CSS — it covers elements the GAS code
@@ -81,6 +82,15 @@ built inline via JS (month-nav arrows, Overview→Weekly focus ring).
   endpoint, or rebuild the API — keep the `src/types.ts` contracts either way.
 - **"Today"** is pinned to `2026-05-18` (`TODAY` in `src/App.tsx`) so the sample
   month shows a realistic locked/editable/future mix. Real app uses the live date.
+- **The printed leave slip is not ported.** The GAS version opens a print window and
+  writes a standalone A4 document into it; there is no meaningful React equivalent in a
+  preview that has no backend. Its layout rules (one 10.5pt type scale, a 34mm/1fr field
+  grid, nowrap labels, full-cell fill-in rules, mm/pt units) live only in `Code.gs`.
+- **`Z-1`/`Z-2`/`Z-3` are `one-to-one` with an EMPTY `fixed_cost`.** `composite()` in
+  `mock.ts` must therefore emit the bare code for them, matching the GAS rule
+  (`fixed ? code + ' / ' + fixed : code`). Asserting `fixed_cost!` writes
+  "Z-2 / undefined" into cells — that was a real bug, found when the real index replaced
+  the sample one.
 - **Leave-request state is in-memory** (module-level in `src/mock.ts`), so submits,
   approvals and cancels behave correctly within a session but reset on reload. The
   GAS app persists to the `LeaveRequests` sheet.

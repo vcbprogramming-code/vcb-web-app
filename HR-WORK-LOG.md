@@ -12,7 +12,7 @@
 **Apps Script project (standalone, script ID):** `13GL834YDPhar_j-IZTT_f4mDYPUDMJELPIh2XzWHJr4VfZIybZ0gxVzu`
 Editor: `https://script.google.com/d/13GL834YDPhar_j-IZTT_f4mDYPUDMJELPIh2XzWHJr4VfZIybZ0gxVzu/edit`
 
-**Live deployment status as of this session's last push:** version `@49` (2026-08-19).
+**Live deployment status as of this session's last push:** version `@54` (2026-08-20).
 
 ---
 
@@ -387,6 +387,101 @@ way `withBtnLoading` does — or not be reachable from the client at all.
   (228 → 318 keys, **0 lost**).
 
 `npm run typecheck` and `vite build` both pass.
+
+---
+
+## 2B. Session 2026-08-19/20 (later) — index cleanup, slip standardisation, repo hygiene
+
+Deployed `@50` → `@54`.
+
+### 2B.1 The Work Index had 126 rows; it should have 44
+
+`ensureMasterIndex_` scraped every team **name** out of `FULL_ROSTER` and appended it to
+`MasterIndex` with an **empty code**. Those are site-specific job titles ("Survey 1 กลางวัน",
+"Maintenance", "Opertion"), not work types, and it re-created them on **every boot** — which is
+why deleting them by hand never stuck.
+
+They also carried `FULL_ROSTER`'s mojibake, which is where the `���` in the index came from.
+
+**On the mojibake specifically:** it is a byte-level truncation from the original import — single
+Thai characters replaced by `U+FFFD` inside otherwise-perfect text (`ช่าง�ฟ` for `ช่างไฟ`,
+`นา�สาว` for `นางสาว`), 84 occurrences in `Code.gs` and 467 in `History.gs`. At **0.2% of Thai
+characters** it is far too sparse to be a wrong-codepage problem, which would corrupt every Thai
+character. `U+FFFD` is lossy: the original byte is gone and no decoding recovers it.
+
+Verified the sources are clean: `HR_Work_Type_Index_v27.xlsx` has **231 shared strings, zero
+`U+FFFD`**, and `VCB_WORK_TYPES` has **44 rows, all coded, zero `U+FFFD`**. Only the derived
+roster copy was damaged.
+
+Fix: dropped the scrape, and added **`PURGE_INDEX()`** to delete rows with no code — the only
+rows that can be legacy clutter, since `loadVcbIndexes_` always writes one. `CHECK_INDEX()` is a
+read-only companion that reports coded/uncoded counts without changing anything.
+
+> **Both are editor-only** — no `api_*` wrapper, no caller in the app. See §2B.2 for why that
+> matters. Run `PURGE_INDEX` from the Apps Script editor; it logs its result, because the editor
+> does not print a function's return value.
+
+### 2B.2 Incident: the index purge took the app down
+
+The first version called the purge from `ensureMasterIndex_`, which runs inside `api_bootstrap`.
+`deleteRow` costs one Sheets round trip **per row** and there were ~82, so bootstrap exceeded its
+limit and every visitor got the fatal `หมดเวลาเชื่อมต่อเซิร์ฟเวอร์ (api_bootstrap)` page.
+
+**This is the second time in one session I broke the app the same way** (the first was an
+auto-seeder, §2A.8). The rule as previously written — "keep heavy work off the boot path" — was
+not enough, because I told myself a *one-time repair* was an exception. It is not.
+
+**Restated:** a one-time repair belongs in a function the operator runs, never in a code path
+every visitor triggers. Anything reachable from `call()` can take the whole app down when it
+fails, regardless of when it is invoked.
+
+The rewritten `PURGE_INDEX` is also **one read and one write** — it keeps the coded rows,
+rewrites the sheet, and clears the tail — instead of N deletes.
+
+### 2B.3 Printed leave slip standardised
+
+The slip looked unstructured because nothing was: **eleven different font sizes**, a 38mm label
+column that wrapped "เบอร์ติดต่อระหว่างลา" onto two lines and broke that row's baseline, and
+fill-in rules sized by `min-width` so no two ended at the same place.
+
+Now:
+
+| | Before | After |
+|---|---|---|
+| Font sizes | 11 | **5** (only 3 carry body content) |
+| Fields | 2-col table, 38mm labels | **`34mm 1fr 34mm 1fr`** grid |
+| Options | inline, ragged | **`repeat(3, 1fr)`** |
+| Blank rules | elastic `min-width` | **full-cell**, all end at the same x |
+| Units | `rem` / `px` | **`mm` / `pt`**, hairlines `.75pt` |
+
+Every field, label, chip and signature line is **10.5pt**; only section headings (11.5pt), the
+title (13/15pt) and the footer (9pt) differ. `white-space:nowrap` on labels, metadata and chips.
+The slip label is shortened to "เบอร์ติดต่อ" — the long form stays in the dictionary for other
+screens.
+
+### 2B.4 Repo hygiene — the recurring git "corruption"
+
+Root-caused to a single mechanism and contained. See §"Google Drive vs `.git/`" in §4 for the
+full explanation, the hook, and the manual repair. Also removed 16 orphaned worktree
+registrations that were making `git gc` fail, and deleted two i18n keys that were defined twice
+(the later definition wins in an object literal, so `'entries'` and `'Remove failed'` could never
+render).
+
+### 2B.5 React mirror
+
+- **`ACTIVITIES` now carries the real 44-row index**, extracted verbatim from `VCB_WORK_TYPES`,
+  replacing 24 invented samples. Work Index in the preview now shows what the live app shows.
+- **Fixed a latent bug this exposed.** The mock asserted `a.fixed_cost!` on every `one-to-one`
+  activity — safe only while the sample data happened to give them all a fixed cost. The real
+  index does not: `Z-1`/`Z-2`/`Z-3` are one-to-one with an *empty* fixed cost, so the assertion
+  would have written `"Z-2 / undefined"` into cells. `composite()` now mirrors the GAS rule
+  exactly (`fixed ? code + ' / ' + fixed : code`).
+- Verified by execution: 44 activities all coded, 140 generated cell values with **zero
+  `undefined`**, every code resolving to the index, `Z-2` rendering as a bare code, and output
+  still deterministic across calls.
+
+The printed slip is **not** mirrored — the GAS version opens a print window, which has no
+meaningful React equivalent. Recorded in `PORT_NOTES.md`.
 
 ---
 

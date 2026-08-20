@@ -23,6 +23,44 @@ export interface Project {
 }
 
 /** sessionState() / getPublicBootstrap() return. */
+/** One row of the admin's editor list, with whether that person can actually
+ *  sign in. Mirrors getEditorAccounts in Auth.js — deliberately carries no
+ *  hash or salt. */
+export interface EditorAccount {
+  email: string
+  /** False means they are allow-listed but have no PIN, so they still cannot
+   *  get in — the gap that used to strand employees silently. */
+  hasPassword: boolean
+  /** True while the PIN is one an admin chose; the employee is forced to
+   *  replace it on first sign-in so the admin stops knowing it. */
+  mustChange: boolean
+  setAt: string
+}
+
+/** Result of a successful editor sign-in. Mirrors editorLogin in Auth.js. */
+export interface EditorSession {
+  token: string
+  user: string
+  /** Always false: a PIN is the right bar for editing content, never for
+   *  managing access, projects or API keys. Admin stays behind the Google
+   *  account or ADMIN_PASSWORD. */
+  isAdmin: boolean
+  isEditor: boolean
+  mustChange: boolean
+  /** True when the SHARED team PIN was used rather than a personal one. Such a
+   *  session is never asked to change its PIN — that would lock out everyone
+   *  else holding it. */
+  usedSharedPin: boolean
+}
+
+/** Shared-PIN state for the admin panel. `pin` is present only when explicitly
+ *  revealed. */
+export interface SharedPinStatus {
+  enabled: boolean
+  setAt: string
+  pin?: string
+}
+
 export interface SessionState {
   appTitle: string
   appDisplayTitle: string
@@ -244,6 +282,31 @@ export interface ServerApi {
   /** Removes an email from the editor tier. Admin only. Returns the full
    *  updated list. Mirrors removeEditor in Auth.js. */
   removeEditor(email: string, token: string): Promise<string[]>
+
+  /* ---- editor sign-in (see Auth.js) ----
+     The live app is ANYONE_ANONYMOUS, so Google never tells the server who a
+     visitor is: an employee on EDITOR_EMAILS is indistinguishable from a
+     stranger until they present a credential. Hence a login of the app's own. */
+
+  /** Editor accounts with whether each can actually sign in yet — being on the
+   *  editor list is only half of it. Never returns hashes. Admin only.
+   *  Mirrors getEditorAccounts in Auth.js. */
+  getEditorAccounts(token: string): Promise<EditorAccount[]>
+  /** Sets an editor's 4-digit PIN. The employee must change it on first
+   *  sign-in. Admin only. Mirrors setEditorPassword in Auth.js. */
+  setEditorPassword(email: string, pin: string, token: string): Promise<{ ok: true }>
+  /** Signs in with email + PIN (either the person's own, or the shared team
+   *  PIN if enabled). Mirrors editorLogin in Auth.js. */
+  editorLogin(email: string, pin: string): Promise<EditorSession>
+  /** Whether a shared team PIN is configured; `reveal` also returns its value.
+   *  The shared PIN is stored recoverably ON PURPOSE (its point is to be told
+   *  to people); a PERSONAL PIN is one-way hashed and can never be read back.
+   *  Admin only. Mirrors getSharedPinStatus in Auth.js. */
+  getSharedPinStatus(token: string, reveal?: boolean): Promise<SharedPinStatus>
+  /** Sets the optional shared team PIN. Admin only. */
+  setSharedEditorPin(pin: string, token: string): Promise<{ ok: true }>
+  /** Turns the shared team PIN off. Admin only. */
+  clearSharedEditorPin(token: string): Promise<{ ok: true }>
   /** Editor or admin. Adds projectId to the recording's tag list (does not remove existing tags). Returns the full updated list. Works for either inbox pseudo-project's rows. */
   setFathomTag(id: string, projectId: ProjectId, token: string): Promise<ProjectId[]>
   /** Editor or admin. Removes just projectId from the recording's tag list, leaving other tags intact. Returns the full updated list. */

@@ -14,8 +14,50 @@ change to the GAS source, diff it against this folder and update only what chang
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
 - **Synced at:** 2026-08-20
-- **Live deployment referenced:** `@204` (per `PROJECT_SUMMARY.md`); the React build
+- **Live deployment referenced:** `@216` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+
+- **2026-08-20 — editor sign-in, PINs, and the shared team PIN.**
+
+  The live app is `ANYONE_ANONYMOUS` + `USER_DEPLOYING`, so Google never tells
+  the server who a visitor is (probed on the live deployment: an anonymous
+  visitor yields `{"activeUser":"","effectiveUser":"<owner>"}`). `EDITOR_EMAILS`
+  therefore cannot be matched against anything on its own — which is why an
+  allow-listed employee saw no ✎ Edit button and had no way to discover one.
+
+  Ported to React:
+  - **`MeetingDetail.tsx`** — ✎ Edit is now shown to **everyone** (except on
+    `doc-import` meetings, which nobody can edit). A visitor who is not yet an
+    editor is routed to the sign-in dialog via the new `onSignIn` prop, instead
+    of the button being hidden.
+  - **`EditorSignInModal.tsx`** (new) — email + 4-digit PIN, including the
+    forced "choose your own PIN" step when an admin created the account, so the
+    admin stops knowing it.
+  - **`AccessModal.tsx`** — editor rows now show whether each person can
+    actually sign in (`can sign in` / `must change` / `no PIN`). Being on the
+    list is only half of it, and hiding that is exactly what stranded
+    employees. Plus Set/Reset PIN per person, and the optional **shared team
+    PIN** with a Show/Hide toggle.
+  - **`types.ts` / `mock.ts` / `client.ts`** — new `EditorAccount`,
+    `EditorSession`, `SharedPinStatus`, and six server contracts mirroring
+    Auth.js with the same authorization rules: 4 digits, allow-list re-checked
+    at login, lockout after 5 failures, and the shared PIN is **not** a
+    skeleton key (the email must still be on the list).
+  - **`styles.css`** — `.modal` 560→598px and `.ac-list` 160px→`min(320px, 34vh)`,
+    matching the GAS panel resize.
+
+  **Deliberately NOT ported — the hashing.** The mock keeps PINs in plain
+  memory because it is a throwaway in-memory store with no persistence and no
+  real secrets; reproducing salted, iterated SHA-256 there would only obscure
+  the authorization rules this mock exists to exercise. The live app hashes —
+  see `hashPassword_` in Auth.js, and the measured work-factor note in
+  PROJECT_SUMMARY (12000 rounds took 11.8s per login on Apps Script, hence
+  1200).
+
+  **Also GAS-only: Google Sign-In.** It needs a real OAuth client ID and a
+  server that can verify the ID token with Google, neither of which a mock
+  backend has. The React mirror keeps simulating identity via the `?admin=1` /
+  `?editor=1` URL flags.
 
 - **2026-08-20 — page size pinned, and dated PDF filenames.**
 

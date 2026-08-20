@@ -14,7 +14,8 @@
 
 import type {
   Attachment, AuditEntry, Comment, CreatedProject, MeetingFull, MeetingListItem, Project, ProjectAccess, SaveEditMeta, SaveEditResult,
-  SaveMeetingInput, ServerApi, SessionState, ProjectId, VersionContent
+  SaveMeetingInput, ServerApi, SessionState, ProjectId, VersionContent,
+  EditorAccount, EditorSession, SharedPinStatus
 } from '../types'
 import { isInboxProject } from '../types'
 import {
@@ -164,6 +165,15 @@ function requireAdmin(): void {
 // resolveIdentity); this store only backs the getEditors/addEditor/
 // removeEditor management calls themselves.
 const editorEmails: string[] = []
+
+// Editor sign-in state. See the editorLogin block below for why these hold
+// plain values where the live app stores salted hashes.
+const PIN_RE = /^[0-9]{4}$/
+const EDITOR_LOCK_TRIES = 5      // matches EDITOR_LOCK_TRIES in Auth.js
+interface EditorPin { pin: string; mustChange: boolean; setAt: string }
+const editorPins: Record<string, EditorPin> = {}
+const editorFails: Record<string, number> = {}
+const sharedPin: { pin: string; setAt: string } = { pin: '', setAt: '' }
 
 function requireEditorOrAdmin(): void {
   const { isAdmin, isEditor } = resolveIdentity()
@@ -368,6 +378,91 @@ export const mockApi: ServerApi = {
     const idx = editorEmails.findIndex(x => x.toLowerCase() === String(email).toLowerCase())
     if (idx !== -1) editorEmails.splice(idx, 1)
     return editorEmails.slice()
+  },
+
+  /* ---- editor sign-in. Mirrors Auth.js ----
+     The PINs here are stored in plain memory, unlike the live app which salts
+     and iteratively hashes them: this is a throwaway in-memory mock with no
+     persistence and no real secrets, and reproducing the hashing would only
+     obscure the AUTHORIZATION rules this mock exists to exercise. The rules
+     themselves are mirrored exactly — 4 digits, allow-list re-checked at
+     login, lockout after 5 failures, shared PIN is not a skeleton key. */
+
+  async getEditorAccounts(): Promise<EditorAccount[]> {
+    requireAdmin()
+    return editorEmails.map(e => {
+      const c = editorPins[e.toLowerCase()]
+      return { email: e, hasPassword: !!c, mustChange: !!(c && c.mustChange), setAt: c ? c.setAt : '' }
+    })
+  },
+
+  async setEditorPassword(email, pin): Promise<{ ok: true }> {
+    requireAdmin()
+    const e = String(email || '').trim().toLowerCase()
+    if (!EMAIL_RE.test(e)) throw new Error('Please enter a valid email address.')
+    if (!PIN_RE.test(String(pin || '').trim())) throw new Error('PIN must be exactly 4 digits (0-9).')
+    // An account only exists for someone already on the list, so the two
+    // cannot drift apart.
+    if (!editorEmails.some(x => x.toLowerCase() === e)) throw new Error('Add this email as an editor first.')
+    editorPins[e] = { pin: String(pin).trim(), mustChange: true, setAt: new Date().toISOString() }
+    delete editorFails[e]
+    return { ok: true }
+  },
+
+  async editorLogin(email, pin): Promise<EditorSession> {
+    const e = String(email || '').trim().toLowerCase()
+    const given = String(pin || '').trim()
+    if ((editorFails[e] || 0) >= EDITOR_LOCK_TRIES) {
+      throw new Error('Too many failed attempts. Try again in 15 minutes, or ask an admin to reset your password.')
+    }
+    const own = editorPins[e]
+    let ok = !!(own && own.pin === given)
+    let usedShared = false
+    // The SHARED team PIN: a convenience so one number can be given to several
+    // trusted people. Still requires the email to be on the list, so it is not
+    // a skeleton key.
+    if (!ok && sharedPin.pin && given === sharedPin.pin) { ok = true; usedShared = true }
+    // Re-checked at login, not just when set: an admin may have removed them.
+    if (ok && !editorEmails.some(x => x.toLowerCase() === e)) {
+      throw new Error('This email no longer has edit access.')
+    }
+    if (!ok) {
+      editorFails[e] = (editorFails[e] || 0) + 1
+      throw new Error('Incorrect email or password.')
+    }
+    delete editorFails[e]
+    return {
+      token: 'mock-editor-token', user: e,
+      isAdmin: false, isEditor: true,
+      // Never force a change on the shared PIN — it would lock out everyone
+      // else holding it.
+      mustChange: !usedShared && !!(own && own.mustChange),
+      usedSharedPin: usedShared
+    }
+  },
+
+  async getSharedPinStatus(_token, reveal): Promise<SharedPinStatus> {
+    requireAdmin()
+    const out: SharedPinStatus = { enabled: !!sharedPin.pin, setAt: sharedPin.setAt }
+    // Only ever returned when explicitly asked for, so it is not sitting in
+    // every payload. Recoverable by design — see the type doc.
+    if (reveal) out.pin = sharedPin.pin
+    return out
+  },
+
+  async setSharedEditorPin(pin): Promise<{ ok: true }> {
+    requireAdmin()
+    if (!PIN_RE.test(String(pin || '').trim())) throw new Error('PIN must be exactly 4 digits (0-9).')
+    sharedPin.pin = String(pin).trim()
+    sharedPin.setAt = new Date().toISOString()
+    return { ok: true }
+  },
+
+  async clearSharedEditorPin(): Promise<{ ok: true }> {
+    requireAdmin()
+    sharedPin.pin = ''
+    sharedPin.setAt = ''
+    return { ok: true }
   },
 
   // Adds projectId to the recording's tag list (never removes existing tags,

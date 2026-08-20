@@ -31,7 +31,15 @@ export const OVERRIDE_CSS =
   // entirely depending on the printer's own unprintable margin. Paired with
   // an explicit @page bottom margin below (body padding alone isn't always
   // honored consistently by every browser's print pagination engine).
-  "body{padding:0 64px 100px;max-width:816px;margin:0 auto;}" +
+    // ALL page geometry now lives on @page below — the only place both
+  // pagination engines agree to read it from. body contributes nothing.
+  // Side padding here was applied by Paged.js INSIDE its own default page
+  // margin (a 64px narrower text column on screen, which re-wrapped every
+  // paragraph); max-width:816px was a US-Letter width contradicting an A4
+  // page; and padding-bottom:100px was reserved by Paged.js on EVERY page
+  // but applied by Chrome only after the last element, drifting the final
+  // break. Mirrors JavaScript.html — see PAGINATION.md.
+  "body{padding:0;max-width:none;margin:0;}" +
   // This same srcdoc/iframe is used for BOTH the on-screen live preview
   // (MeetingDetail's <iframe>, visible in the normal app) AND print/PDF
   // output — a single OVERRIDE_CSS governs both, split via @media
@@ -47,7 +55,20 @@ export const OVERRIDE_CSS =
   // Print top margin — tall enough to fully contain the anti-tampering QR
   // stamp (see buildQrPageCss below) with headroom to spare, instead of
   // letting it push past the margin box into body content.
-  "@page{margin-top:2.7cm;margin-bottom:2cm;}" +
+    // PAGE SIZE MUST BE EXPLICIT. Without `size`, Paged.js (the on-screen
+  // preview) and Chrome's print engine pick DIFFERENT paper — Chrome uses
+  // whatever the print dialog's destination is set to — and every page
+  // break drifts. A4 is 18mm taller than Letter, so an A4 print fits ~68px
+  // more per page and items slide a page earlier than the screen showed.
+  // Left/right margins are stated too: without them Paged.js applied its own
+  // default side margin while Chrome applied none.
+  "@page{size:A4;margin:2.7cm 17mm 2cm;}" +
+  // Fragmentation rules stated explicitly rather than left to each engine's
+  // differing defaults: a heading is never stranded from its text, no
+  // paragraph splits leaving fewer than 3 lines, and rows never tear.
+  "h1,h2,h3,h4{break-after:avoid;page-break-after:avoid;break-inside:avoid;page-break-inside:avoid;}" +
+  "p,li{orphans:3;widows:3;}" +
+  "tr,img,li{break-inside:avoid;page-break-inside:avoid;}" +
   "body,p,span,td,th,li,h1,h2,h3,h4,a,div{font-family:'Sarabun','Noto Sans Thai',sans-serif !important;}" +
   "body{color:#1f2328;font-size:15px;line-height:1.55;}" +
   "h1{font-size:21px;color:#0b3d62;font-weight:700;margin:18px 0 10px;}" +
@@ -262,10 +283,42 @@ export function summaryHtml(html: string, excerpt: string): string {
  *  - execUrl+meetingId (both required together) build the anti-tampering QR
  *    print stamp via verifyQrDataUri/buildQrPageCss — omit either to render
  *    without a QR (e.g. no execUrl configured). */
+/* Date suffix for an exported PDF's filename: "d.m.yy" in the Buddhist
+   era, matching how dates are shown everywhere else in the app. Mirrors
+   pdfDateSuffix_ in the GAS JavaScript.html exactly.
+
+   Falls back to parsing dateLabel when the ISO `date` field is empty (older
+   rows, and anything the importer could not parse), and returns '' when there
+   is no usable date at all — the filename then simply omits it rather than
+   carrying something misleading like "NaN-NaN-NaN". */
+export function pdfDateSuffix(m: { date?: string; dateLabel?: string }): string {
+  let y = 0, mo = 0, d = 0
+  if (m.date) {
+    const p = String(m.date).split('-')
+    if (p.length === 3) { y = +p[0]; mo = +p[1]; d = +p[2] }
+  }
+  if (!(y && mo >= 1 && mo <= 12 && d)) {
+    // dateLabel is free text ("18 Aug 2569", "18/08/2569"); take the first
+    // d-m-y triple it yields.
+    const mm = String(m.dateLabel || '').match(/(\d{1,2})\s*[/.\-]\s*(\d{1,2})\s*[/.\-]\s*(\d{2,4})/)
+    if (mm) { d = +mm[1]; mo = +mm[2]; y = +mm[3] }
+  }
+  if (!(y && mo >= 1 && mo <= 12 && d)) return ''
+  // Stored years may be Gregorian or already Buddhist; normalise to Buddhist.
+  if (y < 2400) y += 543
+  // Format matches the filenames already in the user's export folder
+  // ("VCB Meeting Minutes 18.8.69"): dot-separated, NO zero padding, and a
+  // 2-digit Buddhist year. Dots are legal in a filename on every OS; slashes
+  // would not be.
+  return d + '.' + mo + '.' + (y % 100)
+}
+
 export interface SrcdocOpts {
   isDark?: boolean
   aiDisclaimer?: boolean
   pdfTitle?: string
+  /** "d.m.yy" (Buddhist era) appended to the PDF filename — see pdfDateSuffix. */
+  pdfDate?: string
   execUrl?: string
   meetingId?: string
   /** Omit Paged.js and the preview chrome — used for print/PDF output only. */
@@ -319,7 +372,10 @@ export function buildMeetingSrcdoc(html: string, css: string, thaiDate: string, 
   // filename (\ / : * ? " < > |) so the browser doesn't silently mangle or
   // reject the suggested name. Mirrors the GAS source's pdfTitle computation
   // exactly, even though only this SPA can actually make use of it.
-  const pdfTitle = (opts.pdfTitle || 'Meeting').replace(/[\\/:*?"<>|]/g, '').trim() || 'Meeting'
+  // The date is appended so exported PDFs are distinguishable in a folder —
+  // every one was otherwise named just "VCB Meeting Minutes". See pdfDateSuffix.
+  const pdfBase = (opts.pdfTitle || 'Meeting').replace(/[\\/:*?"<>|]/g, '').trim() || 'Meeting'
+  const pdfTitle = opts.pdfDate ? pdfBase + ' ' + opts.pdfDate : pdfBase
   const qrPageCss = (opts.execUrl && opts.meetingId) ? buildQrPageCss(verifyQrDataUri(opts.execUrl, opts.meetingId)) : ''
   const head = '<!DOCTYPE html><html><head><meta charset="utf-8"><base target="_blank">' +
     '<title>' + esc(pdfTitle) + '</title>' +

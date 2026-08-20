@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditEntry, Project, MeetingFull, Theme } from '../types'
 import { fmtDate, fmtTime, fmtThaiDate } from '../lib/i18n'
-import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint } from '../lib/docRender'
+import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint, pdfDateSuffix } from '../lib/docRender'
 import { fetchMeeting, getCached, setCached } from '../api/contentCache'
 import { api, getToken } from '../api/client'
 import { applyMobileScale, isMobile, fileIconKind, fmtFileSize, fileToBase64 } from '../lib/ui'
@@ -24,6 +24,10 @@ interface Props {
   onBusy: (msg: string | null) => void
   onEdit: (m: MeetingFull) => void
   onMutated: () => void
+  /** Invoked when a visitor who is NOT yet an editor clicks ✎ Edit — the
+   *  button is shown to everyone (see the detail bar), so this is where an
+   *  anonymous reader is asked to identify themselves. */
+  onSignIn: () => void
   execUrl: string
   /** Current theme — threaded down purely so this component re-renders (and
    *  recomputes srcdoc) on every theme toggle, not just on first meeting
@@ -36,7 +40,7 @@ interface Props {
 }
 
 // Mirrors openMeeting() + renderDetail().
-export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, userEmail, onToast, onBusy, onEdit, onMutated, execUrl, theme }: Props) {
+export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, userEmail, onToast, onBusy, onEdit, onMutated, onSignIn, execUrl, theme }: Props) {
   const [m, setM] = useState<MeetingFull | null>(getCached(id) ?? null)
   const [loading, setLoading] = useState(!getCached(id))
   const [err, setErr] = useState('')
@@ -84,7 +88,14 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
         const fitFrame = (): void => {
           try {
             const d = frame.contentWindow!.document
-            frame.style.height = (d.body.scrollHeight + 48) + 'px'
+            // Size the frame to its content EXACTLY. An extra +48px pad used to
+            // be added here as clipping insurance, but the document already
+            // ends with .pagedjs_pages' own 22px bottom padding, so the pad
+            // rendered as a bare white strip between the last sheet and the
+            // attachments card. Verified in a real browser across 1–4 page
+            // documents with webfonts loading late: no clipping, no inner
+            // scrollbar. Mirrors JavaScript.html.
+            frame.style.height = d.body.scrollHeight + 'px'
             if (!revealed) {
               revealed = true
               frame.style.visibility = 'visible'
@@ -251,11 +262,11 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
 
   const p = byId[m.projectId] || ({} as Project)
   const canEdit = isAdmin || isEditor
-  const editable = canEdit && m.source !== 'doc-import'
   const srcdocOpts = {
     isDark: theme === 'dark',
     aiDisclaimer: m.source === 'fathom' || m.source === 'transkriptor',
     pdfTitle: m.title,
+    pdfDate: pdfDateSuffix(m),
     execUrl,
     meetingId: m.id
   }
@@ -272,7 +283,15 @@ export default function MeetingDetail({ id, byId, projects, isAdmin, isEditor, u
           <button className="dbtn primary" id="d_file" title="Also show this in a project" onClick={() => setTagPickerOpen(true)}>📂 File into project…</button>
         )}
         {m.fathomUrl && <a className="dbtn" id="d_recording" href={m.fathomUrl} target="_blank" rel="noreferrer">▶ Recording</a>}
-        {editable && <button className="dbtn primary" id="d_editapp" onClick={openEditFresh}>✎ Edit here</button>}
+        {/* Shown to EVERYONE, including anonymous readers — mirrors the GAS
+            change of 2026-08-20. Under ANYONE_ANONYMOUS the server cannot know
+            a visitor is an editor until they identify themselves, so hiding the
+            button left allow-listed employees with no way in and no way to
+            discover one. Guests get the button and are prompted to sign in on
+            click. (doc-import meetings stay uneditable for everyone.) */}
+        {m.source !== 'doc-import' && (
+          <button className="dbtn primary" id="d_editapp" onClick={canEdit ? openEditFresh : onSignIn}>✎ Edit here</button>
+        )}
         {isAdmin && <button className="dbtn" id="d_history" title="See who edited this and when" onClick={() => setHistoryOpen(true)}>🕘 <span className="blbl">History</span></button>}
         <button className={'dbtn' + (commentsOpen ? ' active' : '')} id="d_comments" title="Comments" onClick={() => setCommentsOpen(v => !v)}>💬 <span className="blbl">Comments</span></button>
         <button className="dbtn" id="d_share" title="Share link" onClick={share}>🔗 <span className="blbl">Share link</span></button>

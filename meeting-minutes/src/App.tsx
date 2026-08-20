@@ -16,6 +16,7 @@ import MeetingDetail from './components/MeetingDetail'
 import Timeline from './components/Timeline'
 import SettingsModal from './components/SettingsModal'
 import AccessModal from './components/AccessModal'
+import EditorSignInModal from './components/EditorSignInModal'
 import MeetingModal from './components/MeetingModal'
 import EditorModal from './components/EditorModal'
 import NewProjectModal from './components/NewProjectModal'
@@ -54,6 +55,10 @@ export default function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [accessOpen, setAccessOpen] = useState(false)
+  // Editor sign-in. The ✎ Edit button is shown to everyone (the server cannot
+  // know a visitor is an editor until they identify themselves), so this is
+  // opened when a not-yet-editor clicks it.
+  const [signInOpen, setSignInOpen] = useState(false)
   const [meetingModalOpen, setMeetingModalOpen] = useState(false)
   const [meetingModalTarget, setMeetingModalTarget] = useState<MeetingFull | null>(null)
   const [editorTarget, setEditorTarget] = useState<MeetingFull | null>(null)
@@ -229,7 +234,9 @@ export default function App() {
           isEditor={session.isEditor}
           userEmail={session.user}
           onToast={toast} onBusy={onBusy} onEdit={openEdit}
-          onMutated={() => { refreshAll() }} execUrl={session.execUrl} theme={theme}
+          onMutated={() => { refreshAll() }}
+          onSignIn={() => setSignInOpen(true)}
+          execUrl={session.execUrl} theme={theme}
         />
       )
     }
@@ -275,6 +282,12 @@ export default function App() {
         open={settingsOpen} onClose={() => setSettingsOpen(false)} session={session}
         theme={theme} lang={lang} setTheme={setTheme} setLang={setLang}
         onAccess={() => { setSettingsOpen(false); setAccessOpen(true) }} tr={tr}
+      />
+      <EditorSignInModal
+        open={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        onSignedIn={() => { refreshAll() }}
+        onToast={toast} onBusy={onBusy}
       />
       <AccessModal open={accessOpen} onClose={() => { setAccessOpen(false); setSettingsOpen(true) }} onBusy={onBusy} onToast={toast} />
       <MeetingModal

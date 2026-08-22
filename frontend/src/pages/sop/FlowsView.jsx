@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { sopApi, toneOf } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
 import Swimlane from './Swimlane.jsx';
+import ShareButton from './ShareButton.jsx';
 
 /** Process flows: pick a document on the left, read its swimlane on the right. */
-export default function FlowsView({ module }) {
+export default function FlowsView({ module, sharedId }) {
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
-  const [openId, setOpenId] = useState(null);
+  // a ?flow=ID link lands on that diagram; an id that no longer exists just
+  // falls through to the first flow rather than showing an empty pane
+  const [openId, setOpenId] = useState(sharedId || null);
 
   const load = () => {
     setErr(null); setList(null);
@@ -58,10 +61,13 @@ export default function FlowsView({ module }) {
       </div>
 
       <div className="min-w-0 space-y-3">
-        <header>
-          <span className={`chip ${toneOf(flow.module)}`}>{flow.id}</span>
-          <h3 className="mt-2 text-lg font-bold text-slate-800">{flow.title_th}</h3>
-          {flow.title_en && <p className="text-sm text-slate-500">{flow.title_en}</p>}
+        <header className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <span className={`chip ${toneOf(flow.module)}`}>{flow.id}</span>
+            <h3 className="mt-2 text-lg font-bold text-slate-800">{flow.title_th}</h3>
+            {flow.title_en && <p className="text-sm text-slate-500">{flow.title_en}</p>}
+          </div>
+          <ShareButton param="flow" value={flow.id} className="shrink-0" />
         </header>
         <Swimlane key={flow.id} flow={flow} />
       </div>

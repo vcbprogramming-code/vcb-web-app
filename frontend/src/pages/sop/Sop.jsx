@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { sopApi } from '../../lib/sop.js';
 import { PageHeader } from '../../components/ui/index.js';
 import Spinner from '../../components/Spinner.jsx';
@@ -19,10 +20,24 @@ const TABS = [
 ];
 
 export default function Sop() {
+  // A link can point straight at one item: ?case=12 or ?flow=AP-3. People quote
+  // the manual at each other, and "ดูเคส AP-3" used to mean describing where to
+  // click. The parameter also decides which tab opens.
+  const [sp, setSp] = useSearchParams();
+  const sharedCase = sp.get('case');
+  const sharedFlow = sp.get('flow');
+
   const [boot, setBoot] = useState(null);
   const [error, setError] = useState(null);
-  const [tab, setTab] = useState('cases');
+  const [tab, setTab] = useState(sharedFlow ? 'flows' : 'cases');
   const [module, setModule] = useState(''); // '' = ทุกหมวด
+
+  // Switching tabs by hand drops the deep link — it belongs to the item that was
+  // shared, and carrying it into another view would reopen it unasked.
+  const pickTab = (key) => {
+    setTab(key);
+    if (sharedCase || sharedFlow) setSp({}, { replace: true });
+  };
 
   const load = () => {
     setError(null);
@@ -74,7 +89,7 @@ export default function Sop() {
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => {
-            setTab(t.key);
+            pickTab(t.key);
             // don't carry a filter into a tab where that module has nothing
             const next = t.key === 'flows' ? counts.flows : counts.scenarios;
             if (module && !next[module]) setModule('');
@@ -117,8 +132,8 @@ export default function Sop() {
         </div>
       )}
 
-      {tab === 'cases' && <ScenariosView modules={modules} module={module} canEdit={canEdit} onChanged={load} />}
-      {tab === 'flows' && <FlowsView module={module} />}
+      {tab === 'cases' && <ScenariosView modules={modules} module={module} canEdit={canEdit} onChanged={load} sharedNo={sharedCase} />}
+      {tab === 'flows' && <FlowsView module={module} sharedId={sharedFlow} />}
       {tab === 'reports' && <ReportsView canEdit={canEdit} onChanged={load} />}
     </div>
   );

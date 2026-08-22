@@ -231,6 +231,12 @@ const PATHS = {
       <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z" />
     </>
   ),
+  link: (
+    <>
+      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.41 1.41" />
+      <path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.41-1.41" />
+    </>
+  ),
 };
 
 export default function Icon({ name, className = 'w-5 h-5', strokeWidth = 1.8, ...rest }) {

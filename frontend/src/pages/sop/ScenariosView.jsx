@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sopApi, toneOf } from '../../lib/sop.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import ShareButton from './ShareButton.jsx';
 import ScenarioModal from './ScenarioModal.jsx';
 
 /** Case studies: searchable list on the left, full case on the right. */
-export default function ScenariosView({ modules, module, canEdit, onChanged }) {
+export default function ScenariosView({ modules, module, canEdit, onChanged, sharedNo }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
   const [q, setQ] = useState('');
-  const [openNo, setOpenNo] = useState(null);
+  // a ?case=N link opens that case straight away, before anyone clicks
+  const [openNo, setOpenNo] = useState(sharedNo ? Number(sharedNo) : null);
   const [detail, setDetail] = useState(null);
   const [rev, setRev] = useState(0); // bumped after a save so the open case refetches
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
@@ -26,7 +28,30 @@ export default function ScenariosView({ modules, module, canEdit, onChanged }) {
   }, [module, q]);
 
   useEffect(() => { setList(null); const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
-  useEffect(() => { setOpenNo(null); setDetail(null); }, [module]);
+  // Changing the module filter clears the open case. Compare against the previous
+  // value rather than counting renders: React runs effects twice on mount in
+  // development, and a "skip the first run" flag gets used up by the first pass —
+  // the second then wiped a ?case=N link before anyone saw it.
+  // The module header is itself sticky at the top of the viewport. A bar pinned
+  // to top:0 parks underneath it and is never seen, so sit just below — measured,
+  // not hardcoded, because the header grows when its content wraps on a phone.
+  const [barTop, setBarTop] = useState(0);
+  useEffect(() => {
+    const measure = () => {
+      const h = document.querySelector('header.sticky');
+      setBarTop(h ? Math.round(h.getBoundingClientRect().height) : 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  const lastModule = useRef(module);
+  useEffect(() => {
+    if (lastModule.current === module) return;
+    lastModule.current = module;
+    setOpenNo(null); setDetail(null);
+  }, [module]);
 
   useEffect(() => {
     if (openNo == null) { setDetail(null); return; }
@@ -108,10 +133,25 @@ export default function ScenariosView({ modules, module, canEdit, onChanged }) {
 
           {/* detail */}
           <div className={`rounded-2xl border border-slate-200 bg-white p-5 ${openNo == null ? 'hidden lg:block' : ''}`}>
+            {/* On a phone the detail fills the screen and its title row scrolls
+                away, taking แชร์/แก้ไข with it. Keep them on the back bar, which
+                stays put — the same place the reader already looks to get out. */}
             {openNo != null && (
-              <button onClick={() => setOpenNo(null)} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-brand lg:hidden">
-                <Icon name="arrowLeft" className="h-4 w-4" /> กลับไปที่รายการ
-              </button>
+              <div style={{ top: barTop }} className="sticky z-10 -mx-5 mb-3 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-5 py-2 lg:hidden">
+                <button onClick={() => setOpenNo(null)} className="inline-flex items-center gap-1 text-sm font-medium text-brand">
+                  <Icon name="arrowLeft" className="h-4 w-4" /> กลับไปที่รายการ
+                </button>
+                {detail && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <ShareButton param="case" value={detail.no} />
+                    {canEdit && (
+                      <button onClick={() => setEdit(detail)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-brand">
+                        แก้ไข
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {openNo == null ? (
               <p className="py-16 text-center text-sm text-slate-500">เลือกกรณีศึกษาทางซ้ายเพื่อดูรายละเอียด</p>
@@ -128,8 +168,10 @@ export default function ScenariosView({ modules, module, canEdit, onChanged }) {
                     <h3 className="mt-2 text-lg font-bold text-slate-800">{detail.title_th}</h3>
                     {detail.title_en && <p className="text-sm text-slate-500">{detail.title_en}</p>}
                   </div>
+                  <div className="hidden shrink-0 flex-wrap items-center gap-1 lg:flex">
+                    <ShareButton param="case" value={detail.no} />
                   {canEdit && (
-                    <div className="flex shrink-0 items-center gap-1">
+                    <>
                       <button onClick={() => move(detail, 'up')} title="เลื่อนขึ้น" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
                         <Icon name="arrowLeft" className="h-4 w-4 rotate-90" />
                       </button>
@@ -138,8 +180,9 @@ export default function ScenariosView({ modules, module, canEdit, onChanged }) {
                       </button>
                       <button onClick={() => setEdit(detail)} className="text-sm font-medium text-brand hover:underline">แก้ไข</button>
                       <button onClick={() => remove(detail)} className="ml-2 text-sm text-rose-500 hover:underline">ลบ</button>
-                    </div>
+                    </>
                   )}
+                  </div>
                 </header>
 
                 {detail.problem && (

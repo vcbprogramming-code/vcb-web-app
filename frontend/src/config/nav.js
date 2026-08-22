@@ -63,15 +63,13 @@ export const apps = [
     enabled: true,
   },
   {
-    // shown on the Portal as a disabled "coming soon" card (not yet a route).
-    // `comingSoon` cards render greyed-out and non-clickable.
-    to: '/system-map',
+    to: '/sysmap',
     title: 'แผนผังระบบ (System Map)',
-    desc: 'แผนผังกระบวนการทำงานและการเชื่อมโยงระบบของกลุ่ม VCB',
+    desc: 'กระบวนการทำงานของกลุ่ม ทะเบียนฟังก์ชันรายแผนก และจุดที่ใช้ AI ช่วยได้',
     icon: 'sysmap',
     color: 'bg-pink-50 text-pink-600',
-    enabled: false,
-    comingSoon: true,
+    perm: ['sysmap', 'view'],
+    enabled: true,
   },
 ];
 

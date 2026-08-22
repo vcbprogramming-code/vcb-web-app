@@ -12,6 +12,7 @@ import onboardingRoutes from './onboarding.routes.js';
 import announcementRoutes from './announcements.routes.js';
 import supportRoutes from './support.routes.js';
 import sopRoutes from './sop.routes.js';
+import sysmapRoutes from './sysmap.routes.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 
@@ -54,5 +55,7 @@ router.use('/credit', moduleGate('credit'), creditRoutes);
 router.use('/onboarding', moduleGate('onboarding'), onboardingRoutes);
 // Module 5: SOP (คู่มือปฏิบัติงาน) — reference content, gated like the rest
 router.use('/sop', moduleGate('sop'), sopRoutes);
+// แผนผังระบบ: how the group works, as data. Read by everyone, edited by admins.
+router.use('/sysmap', moduleGate('sysmap'), sysmapRoutes);
 
 export default router;

@@ -109,6 +109,13 @@ const inspect = () => page.evaluate(() => {
 const notes = [];
 const note = (sev, where, what) => notes.push({ sev, where, what });
 
+// Load the app once and throw the result away. Against a dev server the first
+// visit can 404 on a chunk that is still being built, and the very first page of
+// the sweep would report a script error that has nothing to do with the code —
+// twice now that has sent someone looking for a bug that was never there.
+await page.goto(APP, { waitUntil: 'networkidle2' }).catch(() => {});
+await settle(4000);
+
 for (const { u, role, key } of WHO) {
   suite(`หน้าจอในมุมของ${role}`);
   for (const p of PAGES) {

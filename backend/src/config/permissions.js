@@ -56,6 +56,14 @@ export const PERMISSION_CATALOG = [
       { key: 'edit', label: 'แก้ไขเนื้อหา' },
     ],
   },
+  {
+    module: 'sysmap',
+    label: 'แผนผังระบบ (System Map)',
+    actions: [
+      { key: 'view', label: 'ดูแผนผัง' },
+      { key: 'edit', label: 'แก้ไขข้อมูลแผนผัง' },
+    ],
+  },
 ];
 
 /**
@@ -70,6 +78,9 @@ const ROLE_DEFAULTS = {
     credit: { view: true, edit: true },
     onboarding: { view: true, edit: false },
     sop: { view: true, edit: false },
+    // The operating map is reference material the whole company reads; editing
+    // it rewrites how the business says it works, so that stays with an admin.
+    sysmap: { view: true, edit: false },
   },
   hr: {
     ememo: { view: true, create: true, submit: true, settings: false },
@@ -77,6 +88,7 @@ const ROLE_DEFAULTS = {
     credit: { view: false, edit: false },
     onboarding: { view: true, edit: true },
     sop: { view: true, edit: false },
+    sysmap: { view: true, edit: false },
   },
 };
 

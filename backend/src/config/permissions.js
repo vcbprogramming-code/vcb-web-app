@@ -57,6 +57,15 @@ export const PERMISSION_CATALOG = [
     ],
   },
   {
+    module: 'meetings',
+    label: 'รายงานการประชุม',
+    actions: [
+      { key: 'view', label: 'ดูรายงาน' },
+      { key: 'edit', label: 'สร้าง/แก้ไขรายงาน' },
+      { key: 'manage', label: 'จัดการกลุ่มการประชุม' },
+    ],
+  },
+  {
     module: 'sysmap',
     label: 'แผนผังระบบ (System Map)',
     actions: [
@@ -81,6 +90,7 @@ const ROLE_DEFAULTS = {
     // The operating map is reference material the whole company reads; editing
     // it rewrites how the business says it works, so that stays with an admin.
     sysmap: { view: true, edit: false },
+    meetings: { view: true, edit: false, manage: false },
   },
   hr: {
     ememo: { view: true, create: true, submit: true, settings: false },
@@ -89,6 +99,7 @@ const ROLE_DEFAULTS = {
     onboarding: { view: true, edit: true },
     sop: { view: true, edit: false },
     sysmap: { view: true, edit: false },
+    meetings: { view: true, edit: true, manage: false },
   },
 };
 

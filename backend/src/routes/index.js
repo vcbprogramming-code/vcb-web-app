@@ -13,6 +13,7 @@ import announcementRoutes from './announcements.routes.js';
 import supportRoutes from './support.routes.js';
 import sopRoutes from './sop.routes.js';
 import sysmapRoutes from './sysmap.routes.js';
+import meetingRoutes from './meetings.routes.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 
@@ -57,5 +58,7 @@ router.use('/onboarding', moduleGate('onboarding'), onboardingRoutes);
 router.use('/sop', moduleGate('sop'), sopRoutes);
 // แผนผังระบบ: how the group works, as data. Read by everyone, edited by admins.
 router.use('/sysmap', moduleGate('sysmap'), sysmapRoutes);
+// รายงานการประชุม: minutes per project, versioned
+router.use('/meetings', moduleGate('meetings'), meetingRoutes);
 
 export default router;

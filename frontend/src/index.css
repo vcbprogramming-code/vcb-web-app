@@ -241,3 +241,38 @@
 /* light neutral tiles/rules that stayed bright on a dark page */
 .dark [class~="bg-slate-200"] { background-color: #334155 !important; }
 .dark [class~="bg-slate-300"] { background-color: #475569 !important; }
+
+/* รายงานการประชุม — the minutes body, in the editor and when read back.
+   The editor writes plain HTML with no classes, so the shape has to come from
+   here or a table arrives with no borders and a list with no bullets. */
+.mtg-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+.mtg-body th,
+.mtg-body td {
+  border: 1px solid #dbe1ea;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.mtg-body th { background: #f3f6fb; font-weight: 700; }
+.mtg-body ul { list-style: disc; padding-inline-start: 1.4em; margin: 0.5rem 0; }
+.mtg-body ol { list-style: decimal; padding-inline-start: 1.6em; margin: 0.5rem 0; }
+.mtg-body li { margin: 0.15rem 0; }
+.mtg-body p { margin: 0.45rem 0; }
+.mtg-body h1, .mtg-body h2, .mtg-body h3 { font-weight: 700; margin: 0.9rem 0 0.4rem; }
+.mtg-body h1 { font-size: 1.3rem; }
+.mtg-body h2 { font-size: 1.15rem; }
+.mtg-body h3 { font-size: 1.02rem; }
+.mtg-body a { color: #2563eb; text-decoration: underline; }
+.mtg-body img { max-width: 100%; height: auto; border-radius: 8px; margin: 0.5rem 0; }
+.mtg-body blockquote {
+  border-inline-start: 3px solid #dbe1ea;
+  padding-inline-start: 0.9rem;
+  color: #475569;
+  margin: 0.6rem 0;
+}
+/* wide tables must scroll inside the body, never push the page sideways */
+.mtg-body { overflow-x: auto; }

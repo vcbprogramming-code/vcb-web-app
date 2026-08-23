@@ -15,6 +15,7 @@ import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
 import Sop from './pages/sop/Sop.jsx';
 import SystemMap from './pages/sysmap/SystemMap.jsx';
+import Meetings from './pages/meetings/Meetings.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { disabledPaths } from './config/nav.js';
 
@@ -88,6 +89,8 @@ export default function App() {
           <Route path="sop" element={<Feature path="/sop"><Sop /></Feature>} />
 
           <Route path="sysmap" element={<Feature path="/sysmap"><SystemMap /></Feature>} />
+
+          <Route path="meetings" element={<Feature path="/meetings"><Meetings /></Feature>} />
 
           <Route path="admin" element={<Navigate to="/settings?s=users" replace />} />
         </Route>

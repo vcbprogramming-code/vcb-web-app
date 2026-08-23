@@ -34,6 +34,7 @@ export const perfApi = {
   requestLeave: (body) => api('/performance/leave', { method: 'POST', body }),
   decideLeave: (id, approve, note) => api(`/performance/leave/${id}/decide`, { method: 'POST', body: { approve, note } }),
   cancelLeave: (id) => api(`/performance/leave/${id}/cancel`, { method: 'POST' }),
+  leaveSlipUrl: (id) => apiBlobUrl(`/performance/leave/${id}/slip`),
   leaveApprovers: () => api('/performance/leave/approvers'),
   setLeaveApprover: (approverId, employeeIds) =>
     api(`/performance/leave/approvers/${approverId}`, { method: 'PUT', body: { employeeIds } }),

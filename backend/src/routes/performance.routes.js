@@ -5,6 +5,7 @@ import { query, queryOne } from '../config/db.js';
 import { requireAuth, requireRole, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { buildLeaveSlip } from '../services/leaveSlip.js';
 
 // =============================================================================
 // Module 2 — daily work-ACTIVITY log (hr-worklog). API mirrors the reference
@@ -484,11 +485,14 @@ const leaveSelect = `
   select r.id, r.employee_id, r.unit_id, r.leave_type, r.from_date, r.to_date,
          r.reason, r.status, r.requested_at, r.decided_at, r.decide_note,
          e.full_name as employee_name, e.employee_code,
+         pos.name as position, dept.name as department,
          u.code as site_key, u.name as site_name,
          rp.full_name as requested_by_name, dp.full_name as decided_by_name,
          (r.to_date - r.from_date + 1) as days
     from leave_requests r
     join employees e on e.id = r.employee_id
+    left join positions pos on pos.id = e.position_id
+    left join departments dept on dept.id = e.department_id
     left join units u on u.id = r.unit_id
     left join profiles rp on rp.id = r.requested_by
     left join profiles dp on dp.id = r.decided_by`;
@@ -644,6 +648,30 @@ router.post('/leave/:id/cancel', asyncHandler(async (req, res) => {
   if (row.status !== 'pending') throw new ApiError(409, 'คำขอที่ถูกตัดสินแล้วยกเลิกไม่ได้');
   await query(`update leave_requests set status = 'cancelled', updated_at = now() where id = $1`, [row.id]);
   res.json({ ok: true });
+}));
+
+/** GET /api/performance/leave/:id/slip — the request as a printable ใบลา.
+ *  Anyone who may see the request may print it: the requester, the assigned
+ *  supervisor, or an admin. */
+router.get('/leave/:id/slip', asyncHandler(async (req, res) => {
+  const row = await queryOne(`${leaveSelect} where r.id = $1`, [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบคำขอลานี้');
+
+  const ids = await approvableEmployeeIds(req.profile);
+  const mayApprove = ids === null || ids.includes(row.employee_id);
+  if (!mayApprove && row.requested_by !== req.profile.id) {
+    throw new ApiError(403, 'ไม่มีสิทธิ์เปิดใบลาฉบับนี้');
+  }
+
+  const company = (await queryOne(
+    'select company from units where id = $1', [row.unit_id]))?.company || undefined;
+  const doc = buildLeaveSlip(row, company ? { company } : {});
+  res.setHeader('Content-Type', 'application/pdf');
+  // inline: people open it to read and print, and a forced download makes that
+  // two steps instead of one
+  res.setHeader('Content-Disposition',
+    `inline; filename="leave-${String(row.id).slice(0, 8)}.pdf"`);
+  doc.pipe(res);
 }));
 
 /** GET /api/performance/leave/approvers — the supervisor → team map. Admin only. */

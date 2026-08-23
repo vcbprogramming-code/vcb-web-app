@@ -28,7 +28,10 @@ const files = [];
   if (/\.jsx$/.test(p)) files.push(p);
 })(target);
 
-const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+// Only the quote needs escaping. Escaping the backslash as well would turn an
+// existing \\n into the two characters "\\" and "n", and a confirm dialog would
+// print them instead of breaking the line.
+const esc = (s) => s.replace(/'/g, "\\'");
 let totalWrapped = 0; const notes = [];
 
 for (const file of files) {
@@ -58,7 +61,8 @@ for (const file of files) {
     if (/\bt\(/.test(text)) return m0;
     // a run holding operators is a comparison that happened to contain '>',
     // not screen text — leave it for a person
-    if (/&&|\|\||=>|\$\{|`|\?\s|===|!==|;|\breturn\b|=/.test(text)) return m0;
+    // a quote inside the run means it is the tail of a ternary — '…' : 'ข้อความ'
+    if (/&&|\|\||=>|\$\{|`|\?\s|===|!==|;|\breturn\b|=|'|"/.test(text)) return m0;
     let out = '';
     let i = 0;
     let any = false;
@@ -109,7 +113,9 @@ for (const file of files) {
   for (const c of needsHook.reverse()) {
     const body = src.slice(c.at, findEnd(src, c.at));
     if (!/\bt\(/.test(body)) continue;
-    if (/const\s+t\s*=|\bt\s*\}\s*=\s*use/.test(body.slice(0, 400))) continue;
+    // only a real useT() counts — a timer handle called `t` once made this skip
+    // the hook and the page died with "t is not defined"
+    if (/const\s+t\s*=\s*useT\(\)|\bt\b[^}]*\}\s*=\s*useLang\(/.test(body)) continue;
     const indent = (src.slice(c.at).match(/^\n(\s*)/) || [, '  '])[1];
     src = `${src.slice(0, c.at)}\n${indent}const t = useT();${src.slice(c.at)}`;
   }

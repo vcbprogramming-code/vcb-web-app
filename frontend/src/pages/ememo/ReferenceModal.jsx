@@ -3,6 +3,7 @@ import { ememoApi, STATUS_META, formatThaiDate } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Preview the referenced ("อ้างถึง") document in a modal instead of navigating
@@ -10,6 +11,7 @@ import Spinner from '../../components/Spinner.jsx';
  * to open the full document if the user wants more.
  */
 export default function ReferenceModal({ refId, onClose, onOpenFull }) {
+  const t = useT();
   const [doc, setDoc] = useState(null);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -39,14 +41,14 @@ export default function ReferenceModal({ refId, onClose, onOpenFull }) {
 
   return (
     <Modal
-      title="เอกสารที่อ้างถึง"
+      title={t('เอกสารที่อ้างถึง')}
       onClose={onClose}
       size="xl"
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ปิด</button>
+          <button onClick={onClose} className="btn-outline">{t('ปิด')}</button>
           <button onClick={() => onOpenFull(refId)} className="btn-primary">
-            <Icon name="arrowRight" className="h-4 w-4" /> เปิดเอกสารเต็ม
+            <Icon name="arrowRight" className="h-4 w-4" /> {t('เปิดเอกสารเต็ม')}
           </button>
         </>
       }
@@ -54,7 +56,7 @@ export default function ReferenceModal({ refId, onClose, onOpenFull }) {
       {error ? (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : !doc ? (
-        <div className="flex justify-center py-16"><Spinner label="กำลังโหลดเอกสารที่อ้างถึง…" /></div>
+        <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดเอกสารที่อ้างถึง…')} /></div>
       ) : (
         <div className="space-y-4">
           {/* meta */}
@@ -66,23 +68,23 @@ export default function ReferenceModal({ refId, onClose, onOpenFull }) {
             <h3 className="text-lg font-bold text-slate-800">{doc.doc_number}</h3>
             <p className="text-slate-600">{doc.subject}</p>
             <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
-              <span>วันที่รับ: {formatThaiDate(doc.date_received)}</span>
-              {doc.department && <span>แผนก: {doc.department}</span>}
-              {doc.recipient && <span>เรียน: {doc.recipient}</span>}
+              <span>{t('วันที่รับ:')} {formatThaiDate(doc.date_received)}</span>
+              {doc.department && <span>{t('แผนก:')} {doc.department}</span>}
+              {doc.recipient && <span>{t('เรียน:')} {doc.recipient}</span>}
             </div>
           </div>
 
           {/* letter preview */}
           {previewUrl ? (
             <iframe
-              title="เอกสารที่อ้างถึง"
+              title={t('เอกสารที่อ้างถึง')}
               src={`${previewUrl}#view=FitH`}
               className="h-[60vh] min-h-[420px] w-full rounded-xl border border-slate-200 bg-slate-50"
             />
           ) : (
             <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 text-center text-sm text-slate-400">
               <Icon name="file" className="h-8 w-8 text-slate-300" />
-              ไม่มีไฟล์หนังสือให้แสดง — กด “เปิดเอกสารเต็ม” เพื่อดูรายละเอียด
+              {t('ไม่มีไฟล์หนังสือให้แสดง — กด “เปิดเอกสารเต็ม” เพื่อดูรายละเอียด')}
             </div>
           )}
         </div>

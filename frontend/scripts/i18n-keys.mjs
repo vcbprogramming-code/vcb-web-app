@@ -16,7 +16,8 @@ for (const f of files) {
   if (/lib\/(en|i18n)\./.test(f)) continue;
   const src = fs.readFileSync(f, 'utf8');
   for (const m of src.matchAll(/\bt\(\s*'((?:[^'\\]|\\.)*)'/g)) {
-    const k = m[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+    // read the literal the way JS will: \n is a newline, not two characters
+    const k = m[1].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\'/g, "'").replace(/\\\\/g, '\\');
     if (!keys.has(k)) keys.set(k, f);
   }
 }

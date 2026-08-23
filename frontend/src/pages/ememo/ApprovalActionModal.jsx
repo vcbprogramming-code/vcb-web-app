@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Confirmation modal for an approval decision.
@@ -39,6 +40,7 @@ const META = {
 };
 
 export default function ApprovalActionModal({ action, onClose, onConfirm, warnNoSignature = false, nextApproverName = null, isFinalStep = false }) {
+  const t = useT();
   const base = META[action] || META.approved;
   // state-aware description for approve: forward to next, or finalize
   const m = action === 'approved'
@@ -71,7 +73,7 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
       size="md"
       footer={
         <>
-          <button onClick={onClose} disabled={busy} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} disabled={busy} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${m.btn}`}>
             <Icon name={m.icon} className="h-4 w-4" /> {busy ? 'กำลังบันทึก…' : m.confirm}
           </button>
@@ -88,7 +90,7 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
       {warnNoSignature && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>คุณยังไม่ได้ตั้งค่าลายเซ็น หากอนุมัติตอนนี้ เอกสารจะไม่มีรูปลายเซ็นของคุณ — แนะนำให้ตั้งค่าลายเซ็นที่หน้า “โปรไฟล์ของฉัน” ก่อน</span>
+          <span>{t('คุณยังไม่ได้ตั้งค่าลายเซ็น หากอนุมัติตอนนี้ เอกสารจะไม่มีรูปลายเซ็นของคุณ — แนะนำให้ตั้งค่าลายเซ็นที่หน้า “โปรไฟล์ของฉัน” ก่อน')}</span>
         </div>
       )}
 

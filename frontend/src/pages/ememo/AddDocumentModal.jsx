@@ -7,6 +7,7 @@ import Icon from '../../components/Icon.jsx';
 import LetterheadPreview from './LetterheadPreview.jsx';
 import ReferencePicker from './ReferencePicker.jsx';
 import CcPicker from './CcPicker.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 // stable per-row id so removable input rows keep a key tied to the row, not its
 // index — deleting a middle row then doesn't re-point the surviving DOM inputs
@@ -14,6 +15,7 @@ import CcPicker from './CcPicker.jsx';
 const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
 
 export default function AddDocumentModal({ projects, docTypes, onClose, onCreated, initial = null }) {
+  const t = useT();
   const { profile, user } = useAuth();
   const authorName = profile?.full_name || user?.email || '';
   // when duplicating ("สร้างจากใบเดิม"), `initial` prefills the form fields
@@ -277,7 +279,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       subject.trim() || body.trim() || recipient.trim() || files.length || enclList.length || approvers.some((a) => a.email.trim())
     );
     if (dirty) {
-      const ok = await confirm({ title: 'ออกโดยไม่บันทึก?', message: 'ข้อมูลที่กรอกไว้จะหายไป ต้องการออกจากหน้านี้หรือไม่?', confirmLabel: 'ออกโดยไม่บันทึก' });
+      const ok = await confirm({ title: t('ออกโดยไม่บันทึก?'), message: t('ข้อมูลที่กรอกไว้จะหายไป ต้องการออกจากหน้านี้หรือไม่?'), confirmLabel: t('ออกโดยไม่บันทึก') });
       if (!ok) return;
     }
     onClose();
@@ -451,7 +453,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-bold text-slate-800">{initial ? 'สร้างเอกสารจากใบเดิม' : 'เพิ่มเอกสารใหม่'}</h3>
             {/* compact step label on mobile (the full stepper is desktop-only) */}
-            <span className="text-sm font-medium text-slate-500 sm:hidden">ขั้นที่ {step}/3 · {STEPS[step - 1]}</span>
+            <span className="text-sm font-medium text-slate-500 sm:hidden">{t('ขั้นที่')} {step}/3 · {STEPS[step - 1]}</span>
             {/* stepper */}
             <div className="hidden items-center gap-1.5 sm:flex">
               {STEPS.map((label, i) => {
@@ -481,7 +483,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {step === 1 && (<>
           {companies.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">บริษัท / ตราหัวจดหมาย</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('บริษัท / ตราหัวจดหมาย')}</label>
               {/* The project's bound company is only a DEFAULT now (#6) — the clerk
                   can still switch the header if a document needs a different brand.
                   (Previously this was hard-locked; the client asked to drop Auto-lock.) */}
@@ -490,29 +492,29 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                     so the select shows the real saved value instead of silently
                     snapping to the first company */}
                 {companyId && !companies.some((c) => c.id === companyId) && (
-                  <option value={companyId}>หัวกระดาษที่บันทึกไว้ (บริษัทถูกปิดใช้งาน)</option>
+                  <option value={companyId}>{t('หัวกระดาษที่บันทึกไว้ (บริษัทถูกปิดใช้งาน)')}</option>
                 )}
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
                 ))}
               </select>
               {letter?.company_id && (
-                <p className="mt-1 text-[11px] text-slate-400">ค่าเริ่มต้นของโครงการนี้ถูกเลือกให้แล้ว — เปลี่ยนได้หากต้องการ</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('ค่าเริ่มต้นของโครงการนี้ถูกเลือกให้แล้ว — เปลี่ยนได้หากต้องการ')}</p>
               )}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">โครงการ <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('โครงการ')} <span className="text-red-500">*</span></label>
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={field}>
-                <option value="">— เลือกโครงการ —</option>
+                <option value="">{t('— เลือกโครงการ —')}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name && p.name !== p.code ? `${p.code} — ${p.name}` : p.code}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสเอกสาร <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('รหัสเอกสาร')} <span className="text-red-500">*</span></label>
               <select
                 value={docCode}
                 onChange={(e) => {
@@ -535,7 +537,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 }}
                 className={field}
               >
-                <option value="">— เลือกรหัส —</option>
+                <option value="">{t('— เลือกรหัส —')}</option>
                 {docCodes.map((c) => (
                   <option key={c.code} value={c.code}>{c.code} — {c.recipient_title || c.department}</option>
                 ))}
@@ -545,41 +547,41 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
 
           {/* live doc-number preview */}
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
-            <span className="text-slate-500">เลขที่เอกสาร (อัตโนมัติ): </span>
+            <span className="text-slate-500">{t('เลขที่เอกสาร (อัตโนมัติ):')} </span>
             {previewLoading ? (
-              <span className="text-slate-400">กำลังคำนวณ…</span>
+              <span className="text-slate-400">{t('กำลังคำนวณ…')}</span>
             ) : preview ? (
               <span className="font-semibold text-slate-800">{preview.docNumber}</span>
             ) : (
-              <span className="text-slate-400">เลือกโครงการและรหัสเอกสารเพื่อดูเลขที่</span>
+              <span className="text-slate-400">{t('เลือกโครงการและรหัสเอกสารเพื่อดูเลขที่')}</span>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">ประเภทเอกสาร</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('ประเภทเอกสาร')}</label>
               <select value={docTypeId} onChange={(e) => setDocTypeId(e.target.value)} className={field}>
-                <option value="">— ไม่ระบุ —</option>
+                <option value="">{t('— ไม่ระบุ —')}</option>
                 {docTypes.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">วันที่เอกสาร</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('วันที่เอกสาร')}</label>
               <input type="date" value={dateReceived} onChange={(e) => setDateReceived(e.target.value)} className={field} />
             </div>
           </div>
 
           {/* fields ordered to match the real memo: เรื่อง → เรียน → อ้างถึง → สำเนาเรียน → สิ่งที่ส่งมาด้วย */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">เรื่อง <span className="text-red-500">*</span></label>
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="เช่น ขออนุมัติ…" className={field} />
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('เรื่อง')} <span className="text-red-500">*</span></label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t('เช่น ขออนุมัติ…')} className={field} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">เรียน (ผู้รับ)</label>
-            <input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('เรียน (ผู้รับ)')}</label>
+            <input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('เช่น ผู้จัดการฝ่ายวิศวกรรม')} className={field} />
           </div>
 
           {/* อ้างถึง and สำเนาเรียน each take the full width and their own line.
@@ -587,56 +589,56 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               column: the reference search had no room for a document title, and
               the สำเนาเรียน names collapsed into chips too small to read. */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">อ้างถึง (ไม่บังคับ)</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('อ้างถึง (ไม่บังคับ)')}</label>
             {/* #3: reference must be a real in-system document (search & pick) */}
             <ReferencePicker
               value={{ docId: referenceDocId, text: reference }}
               onChange={({ docId, text }) => { setReferenceDocId(docId); setReference(text); }}
               excludeId={initial?.sourceId}
             />
-            <p className="mt-1 text-xs text-slate-400">เลือกจากเอกสารที่มีอยู่ในระบบ (กดแล้วลิงก์ไปเอกสารตัวจริงได้) · เอกสารอื่นที่ไม่มีในระบบให้แนบเป็นไฟล์แทน</p>
+            <p className="mt-1 text-xs text-slate-400">{t('เลือกจากเอกสารที่มีอยู่ในระบบ (กดแล้วลิงก์ไปเอกสารตัวจริงได้) · เอกสารอื่นที่ไม่มีในระบบให้แนบเป็นไฟล์แทน')}</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">สำเนาเรียน / CC (ไม่บังคับ)</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('สำเนาเรียน / CC (ไม่บังคับ)')}</label>
             <CcPicker value={ccIds} onChange={setCcIds} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">สิ่งที่ส่งมาด้วย (ไม่บังคับ)</label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('สิ่งที่ส่งมาด้วย (ไม่บังคับ)')}</label>
             <div className="space-y-2">
               {enclosures.map((e, i) => (
                 <div key={e._id} className="flex items-center gap-2">
                   <span className="w-5 shrink-0 text-center text-sm text-slate-400">{i + 1}.</span>
-                  <input value={e.name} onChange={(ev) => setEncl(i, 'name', ev.target.value)} placeholder="เช่น สรุปปริมาณ" className={`${field} flex-1`} />
-                  <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder="จำนวน" type="number" min="0" className={`${field} w-20`} />
-                  <input value={e.unit} onChange={(ev) => setEncl(i, 'unit', ev.target.value)} placeholder="หน่วย" className={`${field} w-20`} title="หน่วย เช่น ชุด/แผ่น/เล่ม/ฉบับ" />
+                  <input value={e.name} onChange={(ev) => setEncl(i, 'name', ev.target.value)} placeholder={t('เช่น สรุปปริมาณ')} className={`${field} flex-1`} />
+                  <input value={e.qty} onChange={(ev) => setEncl(i, 'qty', ev.target.value)} placeholder={t('จำนวน')} type="number" min="0" className={`${field} w-20`} />
+                  <input value={e.unit} onChange={(ev) => setEncl(i, 'unit', ev.target.value)} placeholder={t('หน่วย')} className={`${field} w-20`} title={t('หน่วย เช่น ชุด/แผ่น/เล่ม/ฉบับ')} />
                   {enclosures.length > 1 && (
                     <button type="button" onClick={() => removeEncl(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
                   )}
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addEncl} className="mt-2 text-sm font-medium text-blue-600 hover:underline">+ เพิ่มรายการ</button>
+            <button type="button" onClick={addEncl} className="mt-2 text-sm font-medium text-blue-600 hover:underline">{t('+ เพิ่มรายการ')}</button>
           </div>
           </>)}
 
           {step === 2 && (<>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">เนื้อความ</label>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} placeholder="รายละเอียดเนื้อความ (จะแสดงในหนังสือฝั่งขวา)" className={field} />
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('เนื้อความ')}</label>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} placeholder={t('รายละเอียดเนื้อความ (จะแสดงในหนังสือฝั่งขวา)')} className={field} />
           </div>
 
           {/* supplementary file upload — multiple files allowed */}
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">
-              แนบไฟล์เพิ่มเติม (ไม่บังคับ)
+              {t('แนบไฟล์เพิ่มเติม (ไม่บังคับ)')}
             </label>
-            <p className="text-xs text-slate-400 mb-2">เอกสารประกอบ — แนบได้หลายไฟล์ เพิ่มเติมจากตัวหนังสือ ไม่ได้แทนที่กัน</p>
+            <p className="text-xs text-slate-400 mb-2">{t('เอกสารประกอบ — แนบได้หลายไฟล์ เพิ่มเติมจากตัวหนังสือ ไม่ได้แทนที่กัน')}</p>
 
             {copyingFiles && (
               <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand-border bg-brand-tint px-4 py-2.5 text-sm text-brand">
-                <Icon name="paperclip" className="h-4 w-4" /> กำลังคัดลอกไฟล์แนบจากใบเดิม…
+                <Icon name="paperclip" className="h-4 w-4" /> {t('กำลังคัดลอกไฟล์แนบจากใบเดิม…')}
               </div>
             )}
 
@@ -651,10 +653,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                       <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
                       <span className="truncate text-slate-700">{f.name}</span>
                       <span className="shrink-0 text-xs text-slate-400">({(f.size / 1024).toFixed(0)} KB)</span>
-                      {uploading && <span className="shrink-0 text-xs font-medium text-brand">กำลังอัปโหลด…</span>}
-                      {done && <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> เสร็จ</span>}
+                      {uploading && <span className="shrink-0 text-xs font-medium text-brand">{t('กำลังอัปโหลด…')}</span>}
+                      {done && <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> {t('เสร็จ')}</span>}
                     </span>
-                    {!submitting && <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-sm text-red-500 hover:underline">ลบ</button>}
+                    {!submitting && <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-sm text-red-500 hover:underline">{t('ลบ')}</button>}
                   </li>
                   );
                 })}
@@ -672,13 +674,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               {compressing ? (
                 <span className="inline-flex items-center gap-2 text-sm font-medium text-brand">
                   <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-90" d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>
-                  กำลังบีบรูปเพื่อลดขนาด…
+                  {t('กำลังบีบรูปเพื่อลดขนาด…')}
                 </span>
               ) : (
                 <>
                   <Icon name="download" className="h-6 w-6 text-slate-400" />
                   <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
-                  <span className="text-xs text-slate-400">รูปภาพจะถูกบีบอัตโนมัติ · PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์</span>
+                  <span className="text-xs text-slate-400">{t('รูปภาพจะถูกบีบอัตโนมัติ · PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์')}</span>
                 </>
               )}
               <input type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" className="hidden" onChange={(e) => { pickFiles(e.target.files); e.target.value = ''; }} />
@@ -693,9 +695,9 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {/* ผู้จัดการโครงการ / ผู้ลงนาม = ผู้อนุมัติลำดับแรก. From the project if bound,
               else the creator must pick one. Signs under "ขอแสดงความนับถือ". */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-4">
-            <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก)')} <span className="text-red-500">*</span></label>
             <p className="mb-2 text-xs text-slate-400">
-              เซ็นใต้ "ขอแสดงความนับถือ" และ<b className="text-slate-600">อนุมัติเป็นลำดับแรก</b>ก่อนส่งต่อผู้อนุมัติที่สูงกว่า · ผู้จัดทำ <b className="text-slate-600">({authorName})</b> เป็นผู้ร่าง
+              เซ็นใต้ "ขอแสดงความนับถือ" และ<b className="text-slate-600">{t('อนุมัติเป็นลำดับแรก')}</b>{t('ก่อนส่งต่อผู้อนุมัติที่สูงกว่า · ผู้จัดทำ')} <b className="text-slate-600">({authorName})</b> {t('เป็นผู้ร่าง')}
             </p>
             {pmConfigured ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
@@ -707,7 +709,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   </div>
                   {pmEmail && signerName && <div className="truncate text-xs text-slate-500">{pmEmail}</div>}
                 </div>
-                <span className="ml-auto shrink-0 text-[11px] text-slate-400">กำหนดจากโครงการ</span>
+                <span className="ml-auto shrink-0 text-[11px] text-slate-400">{t('กำหนดจากโครงการ')}</span>
               </div>
             ) : projectId ? (
               <>
@@ -721,17 +723,17 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   }}
                   className={field}
                 >
-                  <option value="">— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —</option>
+                  <option value="">{t('— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —')}</option>
                   {approverUsers.map((u) => (
                     <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
                   ))}
                 </select>
-                <p className="mt-1 text-[11px] text-slate-400">โครงการนี้ยังไม่ได้ตั้งผู้จัดการโครงการถาวร — เลือกผู้ลงนามสำหรับเอกสารนี้ (ตั้งถาวรได้ที่ ตั้งค่า E-Memo → โครงการ)</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('โครงการนี้ยังไม่ได้ตั้งผู้จัดการโครงการถาวร — เลือกผู้ลงนามสำหรับเอกสารนี้ (ตั้งถาวรได้ที่ ตั้งค่า E-Memo → โครงการ)')}</p>
               </>
             ) : (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
                 <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>เลือกโครงการก่อน</span>
+                <span>{t('เลือกโครงการก่อน')}</span>
               </div>
             )}
           </div>
@@ -748,7 +750,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <label className="block text-sm font-medium text-slate-600">ผู้อนุมัติที่สูงกว่า (ลำดับถัดจากผู้จัดการโครงการ) {approversLocked ? '' : '(ไม่บังคับ)'}</label>
               {approversLocked && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-medium text-brand">
-                  <Icon name="check" className="h-3 w-3" /> กำหนดจากรหัสเอกสาร
+                  <Icon name="check" className="h-3 w-3" /> {t('กำหนดจากรหัสเอกสาร')}
                 </span>
               )}
             </div>
@@ -758,18 +760,18 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 : 'เลือกผู้อนุมัติตามลำดับขั้น (ต้องมีบัญชีในระบบ) — เมื่อบันทึก ระบบจะสร้างหนังสือและส่งอีเมลขออนุมัติให้ทีละคนตามลำดับ · ต้องการเก็บไว้ก่อนโดยยังไม่ส่ง ให้กด “บันทึกเป็นฉบับร่าง”'}
             </p>
             <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-              ผู้อนุมัติลำดับที่ 1 คือ <b className="text-slate-800">{signerName || pmEmail || '— ยังไม่ได้เลือก —'}</b> (ผู้จัดการโครงการ / ผู้ลงนาม)
+              {t('ผู้อนุมัติลำดับที่ 1 คือ')} <b className="text-slate-800">{signerName || pmEmail || '— ยังไม่ได้เลือก —'}</b> (ผู้จัดการโครงการ / ผู้ลงนาม)
               {authorIsSigner && ' — ซึ่งคือตัวท่านเอง จึงถือว่าลงนามแล้วทันที'}
             </div>
             {authorIsSigner && !approvers.some((a) => a.email.trim()) && (
               <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>ท่านเป็นผู้ลงนามของเอกสารนี้เอง ถ้าไม่เลือกผู้อนุมัติที่สูงกว่า จะไม่มีผู้ใดตรวจสอบเอกสารเลย — เลือกอย่างน้อย 1 คน หรือกด “บันทึกเป็นฉบับร่าง”</span>
+                <span>{t('ท่านเป็นผู้ลงนามของเอกสารนี้เอง ถ้าไม่เลือกผู้อนุมัติที่สูงกว่า จะไม่มีผู้ใดตรวจสอบเอกสารเลย — เลือกอย่างน้อย 1 คน หรือกด “บันทึกเป็นฉบับร่าง”')}</span>
               </div>
             )}
             {!approversLocked && approverUsers.length === 0 && (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                ยังไม่มีบัญชีผู้อนุมัติในระบบ — ติดต่อผู้ดูแลระบบให้เพิ่มผู้ใช้ก่อน หรือเว้นว่างไว้เพื่อบันทึกเป็น <b>ฉบับร่าง</b> แล้วส่งอนุมัติภายหลังได้
+                {t('ยังไม่มีบัญชีผู้อนุมัติในระบบ — ติดต่อผู้ดูแลระบบให้เพิ่มผู้ใช้ก่อน หรือเว้นว่างไว้เพื่อบันทึกเป็น')} <b>{t('ฉบับร่าง')}</b> {t('แล้วส่งอนุมัติภายหลังได้')}
               </div>
             )}
             <div className="space-y-2">
@@ -780,7 +782,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                     <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />
                   ) : (
                     <select value={a.email} onChange={(e) => pickApprover(i, e.target.value)} className={`${field} flex-1`}>
-                      <option value="">— เลือกผู้อนุมัติ —</option>
+                      <option value="">{t('— เลือกผู้อนุมัติ —')}</option>
                       {/* keep a pre-filled address (e.g. the project manager) selectable
                           even if it isn't in the account list, so it never silently blanks */}
                       {a.email && !approverUsers.some((u) => u.email === a.email) && (
@@ -796,8 +798,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   )}
                   {!approversLocked && approvers.length > 1 && (
                     <>
-                      <button type="button" onClick={() => moveApprover(i, -1)} disabled={i === 0} title="เลื่อนขึ้น" className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowLeft" className="h-4 w-4 rotate-90" /></button>
-                      <button type="button" onClick={() => moveApprover(i, 1)} disabled={i === approvers.length - 1} title="เลื่อนลง" className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowRight" className="h-4 w-4 rotate-90" /></button>
+                      <button type="button" onClick={() => moveApprover(i, -1)} disabled={i === 0} title={t('เลื่อนขึ้น')} className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowLeft" className="h-4 w-4 rotate-90" /></button>
+                      <button type="button" onClick={() => moveApprover(i, 1)} disabled={i === approvers.length - 1} title={t('เลื่อนลง')} className="px-1 text-slate-400 hover:text-brand disabled:opacity-30"><Icon name="arrowRight" className="h-4 w-4 rotate-90" /></button>
                       <button type="button" onClick={() => removeApprover(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
                     </>
                   )}
@@ -805,7 +807,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               ))}
             </div>
             {!approversLocked && (
-              <button type="button" onClick={addApprover} className="mt-2 text-sm font-medium text-blue-600 hover:underline">+ เพิ่มผู้อนุมัติ</button>
+              <button type="button" onClick={addApprover} className="mt-2 text-sm font-medium text-blue-600 hover:underline">{t('+ เพิ่มผู้อนุมัติ')}</button>
             )}
           </div>
           </>)}
@@ -815,7 +817,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               {error}
               {savedDraftId && (
                 <button type="button" onClick={() => onCreated(savedDraftId)} className="mt-2 block font-semibold text-red-800 underline">
-                  เปิดเอกสารที่บันทึกไว้เพื่อดำเนินการต่อ →
+                  {t('เปิดเอกสารที่บันทึกไว้เพื่อดำเนินการต่อ →')}
                 </button>
               )}
             </div>
@@ -827,12 +829,12 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               {step === 1 ? 'ยกเลิก' : '← ก่อนหน้า'}
             </button>
             {step < 3 ? (
-              <button key="next" type="button" onClick={goNext} className="btn-primary">ถัดไป →</button>
+              <button key="next" type="button" onClick={goNext} className="btn-primary">{t('ถัดไป →')}</button>
             ) : (
               <div className="flex items-center gap-2">
                 {pmEmail.trim() && (
                   <button type="button" disabled={submitting} onClick={(e) => submit(e, { asDraft: true })} className="btn-outline">
-                    บันทึกเป็นฉบับร่าง
+                    {t('บันทึกเป็นฉบับร่าง')}
                   </button>
                 )}
                 <button key="submit" type="submit" disabled={submitting} className="btn-primary">
@@ -850,7 +852,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
         {/* RIGHT: live A4 letterhead preview */}
         <div className="hidden min-h-0 overflow-auto border-l border-slate-200 bg-slate-100 p-6 lg:block">
           <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            <Icon name="file" className="h-4 w-4" /> ตัวอย่างหนังสือ
+            <Icon name="file" className="h-4 w-4" /> {t('ตัวอย่างหนังสือ')}
           </div>
           <LetterheadPreview letter={previewLetter} doc={previewDoc} company={company} />
         </div>

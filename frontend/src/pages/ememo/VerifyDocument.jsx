@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const AUDIT_ACTION_TH = {
   created: 'สร้างเอกสาร', edited: 'แก้ไขเอกสาร', submitted: 'ส่งเข้าสายอนุมัติ',
@@ -17,6 +18,7 @@ const STEP_ACTION_TH = { approved: 'อนุมัติ', rejected: 'ไม่
  * came from this system: its status, approval trail and audit log.
  */
 export default function VerifyDocument() {
+  const t = useT();
   const { token } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -35,7 +37,7 @@ export default function VerifyDocument() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
             <Icon name="document" className="h-5 w-5" />
           </span>
-          <span className="text-lg font-bold">VCB E-Memo · ตรวจสอบเอกสาร</span>
+          <span className="text-lg font-bold">{t('VCB E-Memo · ตรวจสอบเอกสาร')}</span>
         </div>
 
         {error ? (
@@ -43,18 +45,18 @@ export default function VerifyDocument() {
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
               <Icon name="x" className="h-6 w-6" />
             </span>
-            <h2 className="text-lg font-bold text-slate-800">ตรวจสอบไม่สำเร็จ</h2>
+            <h2 className="text-lg font-bold text-slate-800">{t('ตรวจสอบไม่สำเร็จ')}</h2>
             <p className="mt-1 text-sm text-slate-500">{error}</p>
-            <p className="mt-2 text-xs text-slate-400">QR หรือลิงก์อาจไม่ถูกต้อง หรือเอกสารถูกลบออกจากระบบแล้ว</p>
+            <p className="mt-2 text-xs text-slate-400">{t('QR หรือลิงก์อาจไม่ถูกต้อง หรือเอกสารถูกลบออกจากระบบแล้ว')}</p>
           </div>
         ) : !data ? (
-          <div className="flex justify-center py-16"><Spinner label="กำลังตรวจสอบ…" /></div>
+          <div className="flex justify-center py-16"><Spinner label={t('กำลังตรวจสอบ…')} /></div>
         ) : (
           <Verified data={data} />
         )}
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          หน้านี้แสดงข้อมูลจากระบบ VCB E-Memo โดยตรง เพื่อยืนยันว่าเอกสารเป็นของจริง
+          {t('หน้านี้แสดงข้อมูลจากระบบ VCB E-Memo โดยตรง เพื่อยืนยันว่าเอกสารเป็นของจริง')}
         </p>
       </div>
     </div>
@@ -62,6 +64,7 @@ export default function VerifyDocument() {
 }
 
 function Verified({ data }) {
+  const t = useT();
   const { document: doc, approval_steps: steps = [], audit = [] } = data;
   const status = STATUS_META[doc.status] || STATUS_META.pending;
   // The green "genuine & approved" endorsement is only truthful for an approved
@@ -107,17 +110,17 @@ function Verified({ data }) {
         <h1 className="text-xl font-bold text-slate-800">{doc.doc_number}</h1>
         <p className="text-slate-600">{doc.subject}</p>
         <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-sm">
-          <div><span className="text-slate-500">วันที่รับ:</span> <span className="font-medium text-slate-800">{formatThaiDate(doc.date_received)}</span></div>
-          <div><span className="text-slate-500">แผนก:</span> <span className="font-medium text-slate-800">{doc.department}</span></div>
-          {doc.doc_type_name && <div><span className="text-slate-500">ประเภท:</span> <span className="font-medium text-slate-800">{doc.doc_type_name}</span></div>}
-          {doc.project_name && <div><span className="text-slate-500">โครงการ:</span> <span className="font-medium text-slate-800">{doc.project_name}</span></div>}
+          <div><span className="text-slate-500">{t('วันที่รับ:')}</span> <span className="font-medium text-slate-800">{formatThaiDate(doc.date_received)}</span></div>
+          <div><span className="text-slate-500">{t('แผนก:')}</span> <span className="font-medium text-slate-800">{doc.department}</span></div>
+          {doc.doc_type_name && <div><span className="text-slate-500">{t('ประเภท:')}</span> <span className="font-medium text-slate-800">{doc.doc_type_name}</span></div>}
+          {doc.project_name && <div><span className="text-slate-500">{t('โครงการ:')}</span> <span className="font-medium text-slate-800">{doc.project_name}</span></div>}
         </div>
       </div>
 
       {/* approval trail */}
       {steps.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h3 className="mb-3 font-bold text-slate-800">การพิจารณา</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('การพิจารณา')}</h3>
           <ol className="space-y-2.5">
             {steps.map((s) => {
               const color = s.action === 'approved' ? 'text-emerald-600' : s.action === 'rejected' ? 'text-rose-600' : s.action === 'returned' ? 'text-orange-600' : 'text-slate-400';
@@ -142,7 +145,7 @@ function Verified({ data }) {
       {audit.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <h3 className="mb-3 flex items-center gap-1.5 font-bold text-slate-800">
-            <Icon name="clock" className="h-4 w-4 text-slate-400" /> ประวัติการดำเนินการ (Audit Trail)
+            <Icon name="clock" className="h-4 w-4 text-slate-400" /> {t('ประวัติการดำเนินการ (Audit Trail)')}
           </h3>
           <ol className="space-y-2">
             {audit.map((a, i) => (
@@ -150,7 +153,7 @@ function Verified({ data }) {
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="font-medium text-slate-700">{AUDIT_ACTION_TH[a.action] || a.action}</span>
-                  {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
+                  {a.actor_label && <span className="text-slate-500">{t('โดย')} {a.actor_label}</span>}
                   <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
                 </div>
               </li>

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ememoApi, STATUS_META, formatThaiDate, formatThaiDateTime } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const STEP_ACTION_TH = { approved: 'อนุมัติ', rejected: 'ไม่อนุมัติ', returned: 'ส่งกลับแก้ไข', pending: 'รอพิจารณา' };
 
@@ -16,6 +17,7 @@ const STEP_ACTION_TH = { approved: 'อนุมัติ', rejected: 'ไม่
  * the URL is the authorisation, and it unlocks this document only.
  */
 export default function SharedDocument() {
+  const t = useT();
   const { token } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -33,7 +35,7 @@ export default function SharedDocument() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
             <Icon name="document" className="h-5 w-5" />
           </span>
-          <span className="text-lg font-bold">VCB E-Memo · สำเนาเรียน</span>
+          <span className="text-lg font-bold">{t('VCB E-Memo · สำเนาเรียน')}</span>
         </div>
 
         {error ? (
@@ -41,17 +43,17 @@ export default function SharedDocument() {
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
               <Icon name="x" className="h-6 w-6" />
             </span>
-            <h2 className="text-lg font-bold text-slate-800">เปิดเอกสารไม่สำเร็จ</h2>
+            <h2 className="text-lg font-bold text-slate-800">{t('เปิดเอกสารไม่สำเร็จ')}</h2>
             <p className="mt-1 text-sm text-slate-500">{error}</p>
           </div>
         ) : !data ? (
-          <div className="flex justify-center py-16"><Spinner label="กำลังเปิดเอกสาร…" /></div>
+          <div className="flex justify-center py-16"><Spinner label={t('กำลังเปิดเอกสาร…')} /></div>
         ) : (
           <Shared data={data} token={token} />
         )}
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          หน้านี้เปิดจากลิงก์ในอีเมลสำเนาเรียน — แสดงเฉพาะเอกสารฉบับนี้เท่านั้น และเป็นการดูอย่างเดียว
+          {t('หน้านี้เปิดจากลิงก์ในอีเมลสำเนาเรียน — แสดงเฉพาะเอกสารฉบับนี้เท่านั้น และเป็นการดูอย่างเดียว')}
         </p>
       </div>
     </div>
@@ -59,6 +61,7 @@ export default function SharedDocument() {
 }
 
 function Shared({ data, token }) {
+  const t = useT();
   const { document: doc, approval_steps: steps = [], has_file: hasFile, file_name: fileName, shared_with: sharedWith } = data;
   const status = STATUS_META[doc.status] || STATUS_META.pending;
   const approved = doc.status === 'approved';
@@ -105,12 +108,12 @@ function Shared({ data, token }) {
         <h1 className="text-xl font-bold text-slate-800">{doc.doc_number}</h1>
         <p className="text-slate-600">{doc.subject}</p>
         <div className="mt-3 grid gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
-          <div><span className="text-slate-500">วันที่:</span> <span className="font-medium text-slate-800">{formatThaiDate(doc.date_received)}</span></div>
-          {doc.recipient && <div><span className="text-slate-500">เรียน:</span> <span className="font-medium text-slate-800">{doc.recipient}</span></div>}
-          {doc.department && <div><span className="text-slate-500">แผนก:</span> <span className="font-medium text-slate-800">{doc.department}</span></div>}
-          {doc.project_name && <div><span className="text-slate-500">โครงการ:</span> <span className="font-medium text-slate-800">{doc.project_name}</span></div>}
-          {doc.preparer_name && <div><span className="text-slate-500">ผู้จัดทำ:</span> <span className="font-medium text-slate-800">{doc.preparer_name}</span></div>}
-          {doc.company_name && <div><span className="text-slate-500">บริษัท:</span> <span className="font-medium text-slate-800">{doc.company_name}</span></div>}
+          <div><span className="text-slate-500">{t('วันที่:')}</span> <span className="font-medium text-slate-800">{formatThaiDate(doc.date_received)}</span></div>
+          {doc.recipient && <div><span className="text-slate-500">{t('เรียน:')}</span> <span className="font-medium text-slate-800">{doc.recipient}</span></div>}
+          {doc.department && <div><span className="text-slate-500">{t('แผนก:')}</span> <span className="font-medium text-slate-800">{doc.department}</span></div>}
+          {doc.project_name && <div><span className="text-slate-500">{t('โครงการ:')}</span> <span className="font-medium text-slate-800">{doc.project_name}</span></div>}
+          {doc.preparer_name && <div><span className="text-slate-500">{t('ผู้จัดทำ:')}</span> <span className="font-medium text-slate-800">{doc.preparer_name}</span></div>}
+          {doc.company_name && <div><span className="text-slate-500">{t('บริษัท:')}</span> <span className="font-medium text-slate-800">{doc.company_name}</span></div>}
         </div>
       </div>
 
@@ -119,7 +122,7 @@ function Shared({ data, token }) {
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
             <h3 className="flex items-center gap-1.5 font-bold text-slate-800">
-              <Icon name="document" className="h-4 w-4 text-slate-400" /> หนังสือ
+              <Icon name="document" className="h-4 w-4 text-slate-400" /> {t('หนังสือ')}
             </h3>
             <a
               href={fileUrl || undefined}
@@ -129,27 +132,27 @@ function Shared({ data, token }) {
                 fileUrl ? 'bg-brand hover:bg-brand-light' : 'pointer-events-none bg-slate-300'
               }`}
             >
-              <Icon name="download" className="h-3.5 w-3.5" /> เปิด / บันทึกไฟล์
+              <Icon name="download" className="h-3.5 w-3.5" /> {t('เปิด / บันทึกไฟล์')}
             </a>
           </div>
           {fileError ? (
-            <div className="px-5 py-8 text-center text-sm text-red-600">เปิดไฟล์หนังสือไม่สำเร็จ — {fileError}</div>
+            <div className="px-5 py-8 text-center text-sm text-red-600">{t('เปิดไฟล์หนังสือไม่สำเร็จ —')} {fileError}</div>
           ) : fileUrl ? (
             <iframe src={fileUrl} title={doc.doc_number} className="h-[75vh] w-full bg-slate-100" />
           ) : (
-            <div className="flex h-[40vh] items-center justify-center bg-slate-50"><Spinner label="กำลังโหลดหนังสือ…" /></div>
+            <div className="flex h-[40vh] items-center justify-center bg-slate-50"><Spinner label={t('กำลังโหลดหนังสือ…')} /></div>
           )}
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-200 bg-white px-5 py-8 text-center text-sm text-slate-500">
-          ยังไม่มีไฟล์หนังสือสำหรับเอกสารฉบับนี้
+          {t('ยังไม่มีไฟล์หนังสือสำหรับเอกสารฉบับนี้')}
         </div>
       )}
 
       {/* approval trail — status only; reasons and opinions stay internal */}
       {steps.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h3 className="mb-3 font-bold text-slate-800">สายอนุมัติ</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('สายอนุมัติ')}</h3>
           <ol className="space-y-2.5">
             {steps.map((s) => {
               const color = s.action === 'approved' ? 'text-emerald-600'
@@ -160,7 +163,7 @@ function Shared({ data, token }) {
                   <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">{s.step_no}</span>
                   <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
                     <span className="font-medium text-slate-700">{s.approver_name}</span>
-                    {s.is_signer && <span className="text-[11px] text-slate-400">ผู้จัดการโครงการ / ผู้ลงนาม</span>}
+                    {s.is_signer && <span className="text-[11px] text-slate-400">{t('ผู้จัดการโครงการ / ผู้ลงนาม')}</span>}
                     <span className={`text-xs font-semibold ${color}`}>{STEP_ACTION_TH[s.action] || s.action}</span>
                     {s.acted_at && <span className="text-xs text-slate-400">{formatThaiDateTime(s.acted_at)}</span>}
                   </div>

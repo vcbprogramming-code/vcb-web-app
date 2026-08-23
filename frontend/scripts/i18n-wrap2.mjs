@@ -27,7 +27,10 @@ const files = [];
   if (/\.jsx$/.test(p)) files.push(p);
 })(target);
 
-const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+// Only the quote needs escaping. Escaping the backslash as well would turn an
+// existing \\n into the two characters "\\" and "n", and a confirm dialog would
+// print them instead of breaking the line.
+const esc = (s) => s.replace(/'/g, "\\'");
 let total = 0; const notes = [];
 
 for (const file of files) {
@@ -63,12 +66,42 @@ for (const file of files) {
   }
 
   if (!n) continue;
+
+  // same as the first pass: a component that now calls t() needs the hook, and
+  // the file needs the import — without them the page dies at run time
+  const comps = [];
+  const compRe = /(?:export\s+default\s+)?function\s+([A-Z]\w*)\s*\([^)]*\)\s*\{|const\s+([A-Z]\w*)\s*=\s*(?:\([^)]*\)|\w+)\s*=>\s*\{/g;
+  let cm;
+  while ((cm = compRe.exec(src))) comps.push(cm.index + cm[0].length);
+  for (const at of comps.reverse()) {
+    const body = src.slice(at, blockEnd(src, at));
+    if (!/\bt\(/.test(body)) continue;
+    if (/const\s+t\s*=\s*useT\(\)/.test(body)) continue;
+    const indent = (src.slice(at).match(/^\n(\s*)/) || [, '  '])[1];
+    src = `${src.slice(0, at)}\n${indent}const t = useT();${src.slice(at)}`;
+  }
+  if (!/from '.*lib\/i18n\.jsx'/.test(src)) {
+    const rel = path.relative(path.dirname(file), path.join('src', 'lib')).replace(/\\/g, '/');
+    const imp = `import { useT } from '${rel.startsWith('.') ? rel : `./${rel}`}/i18n.jsx';\n`;
+    const last = src.lastIndexOf('\nimport ');
+    const eol = src.indexOf('\n', last + 1);
+    src = src.slice(0, eol + 1) + imp + src.slice(eol + 1);
+  }
+
   src = src.replace(/\/\*__C(\d+)__\*\//g, (m, i) => hidden[Number(i)]);
   try { esbuild.transformSync(src, { loader: 'jsx', jsx: 'automatic' }); }
   catch (e) { notes.push(`${file}: ไวยากรณ์เสีย ไม่เขียนทับ`); continue; }
   total += n;
   console.log(`${String(n).padStart(4)}  ${file}`);
   if (write) fs.writeFileSync(file, src);
+}
+
+function blockEnd(s, open) {
+  let d = 1;
+  for (let i = open; i < s.length; i++) {
+    if (s[i] === '{') d++; else if (s[i] === '}') { d--; if (!d) return i; }
+  }
+  return s.length;
 }
 
 /** [start, end) of every function body in the file. */

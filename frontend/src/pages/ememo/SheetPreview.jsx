@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import Spinner from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Inline preview of an .xlsx attachment as a scrollable table. The workbook is
@@ -9,6 +10,7 @@ import Spinner from '../../components/Spinner.jsx';
  * viewer. Falls back to a "please download" message if it can't be shown.
  */
 export default function SheetPreview({ docId, attId, heightClass = 'h-[calc(100vh-220px)] min-h-[560px]' }) {
+  const t = useT();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sheets, setSheets] = useState([]);
@@ -30,13 +32,13 @@ export default function SheetPreview({ docId, attId, heightClass = 'h-[calc(100v
   }, [docId, attId]);
 
   if (loading) {
-    return <div className={`flex ${heightClass} items-center justify-center rounded-xl border border-slate-200 bg-slate-50`}><Spinner label="กำลังเปิดตาราง…" /></div>;
+    return <div className={`flex ${heightClass} items-center justify-center rounded-xl border border-slate-200 bg-slate-50`}><Spinner label={t('กำลังเปิดตาราง…')} /></div>;
   }
   if (error || sheets.length === 0) {
     return (
       <div className={`flex ${heightClass} flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-6 text-center text-sm text-slate-500`}>
         <span>{error || 'ไม่มีข้อมูลในไฟล์นี้'}</span>
-        <span className="text-xs text-slate-400">กรุณาดาวน์โหลดไฟล์เพื่อเปิดด้วยโปรแกรม</span>
+        <span className="text-xs text-slate-400">{t('กรุณาดาวน์โหลดไฟล์เพื่อเปิดด้วยโปรแกรม')}</span>
       </div>
     );
   }
@@ -74,7 +76,7 @@ export default function SheetPreview({ docId, attId, heightClass = 'h-[calc(100v
       </table>
       {truncated && (
         <div className="border-t border-slate-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700">
-          แสดงเพียงบางส่วน (ไฟล์ขนาดใหญ่) — ดาวน์โหลดเพื่อดูข้อมูลทั้งหมด
+          {t('แสดงเพียงบางส่วน (ไฟล์ขนาดใหญ่) — ดาวน์โหลดเพื่อดูข้อมูลทั้งหมด')}
         </div>
       )}
     </div>

@@ -45,15 +45,16 @@ function findNextHoliday(from) {
 }
 
 export default function HolidayCalendar() {
+  const t = useT();
   const [view, setView] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   // re-evaluate "today" every minute so the today-highlight and the countdown
   // don't go stale on a dashboard left open past midnight
   const [today, setToday] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => {
+    const tick = setInterval(() => {
       setToday((prev) => { const n = new Date(); return n.toDateString() === prev.toDateString() ? prev : n; });
     }, 60000);
-    return () => clearInterval(t);
+    return () => clearInterval(tick);
   }, []);
 
   const year = view.getFullYear();

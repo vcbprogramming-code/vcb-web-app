@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * สำเนาเรียน (CC) — pick people, not free text.
@@ -18,6 +19,7 @@ import Icon from '../../components/Icon.jsx';
  * `value` is an array of profile ids; `onChange` gets the new array.
  */
 export default function CcPicker({ value = [], onChange, exclude = [] }) {
+  const t = useT();
   const [people, setPeople] = useState([]);
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');
@@ -59,7 +61,7 @@ export default function CcPicker({ value = [], onChange, exclude = [] }) {
                 <span className="truncate text-sm text-slate-800">{p.full_name || p.email}</span>
                 {p.full_name && <span className="truncate text-xs text-slate-400">· {p.email}</span>}
               </div>
-              <button type="button" onClick={() => remove(p.id)} title="เอาออก"
+              <button type="button" onClick={() => remove(p.id)} title={t('เอาออก')}
                 className="px-1 text-slate-400 hover:text-red-600">
                 <Icon name="x" className="h-4 w-4" />
               </button>
@@ -78,11 +80,11 @@ export default function CcPicker({ value = [], onChange, exclude = [] }) {
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="พิมพ์ชื่อหรืออีเมลเพื่อค้นหา"
+                placeholder={t('พิมพ์ชื่อหรืออีเมลเพื่อค้นหา')}
                 className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none placeholder:text-slate-400"
               />
             </div>
-            <button type="button" onClick={() => { setAdding(false); setQ(''); }} title="ปิด"
+            <button type="button" onClick={() => { setAdding(false); setQ(''); }} title={t('ปิด')}
               className="px-1 text-slate-400 hover:text-slate-700">
               <Icon name="x" className="h-4 w-4" />
             </button>
@@ -116,12 +118,12 @@ export default function CcPicker({ value = [], onChange, exclude = [] }) {
       ) : (
         <button type="button" onClick={() => setAdding(true)}
           className="mt-2 text-sm font-medium text-blue-600 hover:underline">
-          + เพิ่มผู้รับสำเนา
+          {t('+ เพิ่มผู้รับสำเนา')}
         </button>
       )}
 
       <p className="mt-1 text-xs text-slate-400">
-        ผู้รับสำเนาต้องมีบัญชีในระบบ · จะได้รับอีเมลแจ้ง เปิดดูเอกสารและร่วมแสดงความเห็นได้ในหน้าเดียวกับผู้อนุมัติ (ไม่ต้องอนุมัติ)
+        {t('ผู้รับสำเนาต้องมีบัญชีในระบบ · จะได้รับอีเมลแจ้ง เปิดดูเอกสารและร่วมแสดงความเห็นได้ในหน้าเดียวกับผู้อนุมัติ (ไม่ต้องอนุมัติ)')}
       </p>
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * "ขอความเห็น" — the current approver asks another in-system user for an opinion
@@ -9,6 +10,7 @@ import Icon from '../../components/Icon.jsx';
  * and sends. onConfirm({ email, name, question }) does the API call.
  */
 export default function ConsultModal({ onClose, onConfirm }) {
+  const t = useT();
   const [users, setUsers] = useState([]);
   const [email, setEmail] = useState('');
   const [question, setQuestion] = useState('');
@@ -33,12 +35,12 @@ export default function ConsultModal({ onClose, onConfirm }) {
 
   return (
     <Modal
-      title="ขอความเห็น"
+      title={t('ขอความเห็น')}
       onClose={busy ? undefined : onClose}
       size="md"
       footer={
         <>
-          <button onClick={onClose} disabled={busy} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} disabled={busy} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">
             <Icon name="chat" className="h-4 w-4" /> {busy ? 'กำลังส่ง…' : 'ส่งขอความเห็น'}
           </button>
@@ -50,15 +52,15 @@ export default function ConsultModal({ onClose, onConfirm }) {
           <Icon name="chat" className="h-5 w-5" />
         </span>
         <p className="text-sm text-slate-600">
-          ขอความเห็นประกอบการพิจารณาจากผู้ใช้ในระบบ — ระบบจะส่งอีเมลให้เข้ามาดูเอกสารและตอบในหน้านี้
-          <b className="text-slate-700"> โดยไม่ต้องอนุมัติ</b> (ท่านยังเป็นผู้ตัดสิน)
+          {t('ขอความเห็นประกอบการพิจารณาจากผู้ใช้ในระบบ — ระบบจะส่งอีเมลให้เข้ามาดูเอกสารและตอบในหน้านี้')}
+          <b className="text-slate-700"> {t('โดยไม่ต้องอนุมัติ')}</b> {t('(ท่านยังเป็นผู้ตัดสิน)')}
         </p>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-600">ขอความเห็นจาก <span className="text-red-500">*</span></label>
+        <label className="mb-1 block text-sm font-medium text-slate-600">{t('ขอความเห็นจาก')} <span className="text-red-500">*</span></label>
         <select value={email} onChange={(e) => setEmail(e.target.value)} className="field">
-          <option value="">— เลือกผู้ใช้ —</option>
+          <option value="">{t('— เลือกผู้ใช้ —')}</option>
           {users.map((u) => (
             <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
           ))}
@@ -66,12 +68,12 @@ export default function ConsultModal({ onClose, onConfirm }) {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-600">คำถาม / สิ่งที่ขอปรึกษา (ไม่บังคับ)</label>
+        <label className="mb-1 block text-sm font-medium text-slate-600">{t('คำถาม / สิ่งที่ขอปรึกษา (ไม่บังคับ)')}</label>
         <textarea
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           rows={3}
-          placeholder="เช่น รบกวนช่วยดูเรื่องราคาต่อหน่วยให้หน่อยครับ…"
+          placeholder={t('เช่น รบกวนช่วยดูเรื่องราคาต่อหน่วยให้หน่อยครับ…')}
           className="field"
         />
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ememoApi, formatThaiDate } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * "อ้างถึง" picker (#3) — search existing in-system documents and pick one, so the
@@ -13,6 +14,7 @@ import Icon from '../../components/Icon.jsx';
  *   excludeId  a document id to hide from results (don't reference yourself)
  */
 export default function ReferencePicker({ value, onChange, excludeId }) {
+  const t = useT();
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -64,7 +66,7 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
           <Icon name={selected.isLinked ? 'file' : 'edit'} className={`h-4 w-4 shrink-0 ${selected.isLinked ? 'text-brand' : 'text-slate-400'}`} />
           <span className="truncate text-sm font-medium text-slate-800">{selected.doc_number}</span>
-          {!selected.isLinked && <span className="shrink-0 text-[11px] text-slate-400">(ข้อความเดิม — ไม่ได้ลิงก์)</span>}
+          {!selected.isLinked && <span className="shrink-0 text-[11px] text-slate-400">{t('(ข้อความเดิม — ไม่ได้ลิงก์)')}</span>}
           <button type="button" onClick={clear} className="ml-auto text-slate-400 hover:text-red-600">
             <Icon name="x" className="h-4 w-4" />
           </button>
@@ -76,7 +78,7 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
             value={q}
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder="ค้นหาเลขที่หรือเรื่องของเอกสารในระบบ…"
+            placeholder={t('ค้นหาเลขที่หรือเรื่องของเอกสารในระบบ…')}
             className="field !py-2.5 pl-9"
           />
         </div>
@@ -85,7 +87,7 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
       {open && !selected && (
         <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
           {loading ? (
-            <div className="px-3 py-3 text-sm text-slate-400">กำลังค้นหา…</div>
+            <div className="px-3 py-3 text-sm text-slate-400">{t('กำลังค้นหา…')}</div>
           ) : results.length === 0 ? (
             <div className="px-3 py-3 text-sm text-slate-400">
               {q.trim() ? 'ไม่พบเอกสารที่ตรงกัน' : 'พิมพ์เพื่อค้นหาเอกสาร'}

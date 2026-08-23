@@ -113,12 +113,12 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-medium text-slate-500">{t('จัดเก็บเข้ากลุ่ม:')}</span>
             {(m.tags || []).length === 0 && <span className="text-xs text-slate-400">{t('ยังไม่ได้จัดเก็บ')}</span>}
-            {(m.tags || []).map((t) => (
-              <span key={t.id} className="chip inline-flex items-center gap-1"
-                style={{ backgroundColor: `${t.color}1a`, color: t.color }}>
-                {t.name}
+            {(m.tags || []).map((tag) => (
+              <span key={tag.id} className="chip inline-flex items-center gap-1"
+                style={{ backgroundColor: `${tag.color}1a`, color: tag.color }}>
+                {tag.name}
                 {canEdit && (
-                  <button onClick={() => act(() => meetingsApi.untag(m.id, t.id), 'เอาออกจากกลุ่มแล้ว')}
+                  <button onClick={() => act(() => meetingsApi.untag(m.id, tag.id), 'เอาออกจากกลุ่มแล้ว')}
                     title={t('เอาออกจากกลุ่มนี้')} className="opacity-60 hover:opacity-100">
                     <Icon name="x" className="h-3 w-3" />
                   </button>

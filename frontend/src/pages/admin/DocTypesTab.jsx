@@ -66,26 +66,26 @@ export default function DocTypesTab() {
           <p className="text-sm text-slate-400 p-5">{t('กำลังโหลด…')}</p>
         ) : types.length === 0 ? (
           <p className="text-sm text-slate-400 p-5">{t('ยังไม่มีประเภทเอกสาร — เพิ่มด้านบนได้เลย')}</p>
-        ) : types.map((t) => (
-          <div key={t.id} className="flex items-center justify-between px-5 py-3">
-            {editId === t.id ? (
+        ) : types.map((dt) => (
+          <div key={dt.id} className="flex items-center justify-between px-5 py-3">
+            {editId === dt.id ? (
               <input value={editName} onChange={(e) => setEditName(e.target.value)} className={`${field} flex-1 mr-3`} autoFocus />
             ) : (
-              <span className="text-slate-800">{t.name}</span>
+              <span className="text-slate-800">{dt.name}</span>
             )}
             <div className="whitespace-nowrap">
-              {editId === t.id ? (
+              {editId === dt.id ? (
                 <>
-                  <button onClick={() => saveEdit(t.id)} disabled={rowBusy(t.id)} className="text-emerald-600 hover:underline text-sm mr-3 disabled:opacity-50">
-                    <BusyLabel busy={rowKey === `save:${t.id}`} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel>
+                  <button onClick={() => saveEdit(dt.id)} disabled={rowBusy(dt.id)} className="text-emerald-600 hover:underline text-sm mr-3 disabled:opacity-50">
+                    <BusyLabel busy={rowKey === `save:${dt.id}`} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel>
                   </button>
-                  <button onClick={() => setEditId(null)} disabled={rowBusy(t.id)} className="text-slate-400 hover:underline text-sm disabled:opacity-50">{t('ยกเลิก')}</button>
+                  <button onClick={() => setEditId(null)} disabled={rowBusy(dt.id)} className="text-slate-400 hover:underline text-sm disabled:opacity-50">{t('ยกเลิก')}</button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => { setEditId(t.id); setEditName(t.name); }} disabled={rowBusy(t.id)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">{t('แก้ไข')}</button>
-                  <button onClick={() => remove(t.id, t.name)} disabled={rowBusy(t.id)} className="text-red-500 hover:underline text-sm disabled:opacity-50">
-                    <BusyLabel busy={rowKey === `del:${t.id}`} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
+                  <button onClick={() => { setEditId(dt.id); setEditName(dt.name); }} disabled={rowBusy(dt.id)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">{t('แก้ไข')}</button>
+                  <button onClick={() => remove(dt.id, dt.name)} disabled={rowBusy(dt.id)} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+                    <BusyLabel busy={rowKey === `del:${dt.id}`} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
                   </button>
                 </>
               )}

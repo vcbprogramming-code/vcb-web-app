@@ -210,10 +210,19 @@ await query('delete from credit_ledger where ref like $1 or note like $1', [`%${
 await query('delete from credit_ledger where facility_id = any($1)', [made.fac]);
 await query('delete from credit_requests where facility_id = any($1)', [made.fac]);
 await query('delete from facilities where company like $1 or notes like $1', [`%${MARK}%`]);
+// the permission checks post a facility they expect to be refused; when one of
+// them is wrong the row lands anyway, so it is swept by its marker too
+await query("delete from credit_ledger where facility_id in (select id from facilities where facility_no = 'x')");
+await query("delete from facilities where facility_no = 'x'");
+await query('delete from cash_plans where note like $1', [`%${MARK}%`]);
+await query('delete from cash_plans where id = any($1)', [made.plan]);
+// count the cash plans too — they were the one table the sweep used to miss
 const left = await query(
-  `select (select count(*) from facilities where notes like $1)::int f,
-          (select count(*) from credit_ledger where ref like $1)::int l`, [`%${MARK}%`]);
+  `select (select count(*) from facilities where notes like $1 or facility_no = 'x')::int f,
+          (select count(*) from credit_ledger where ref like $1)::int l,
+          (select count(*) from cash_plans where note like $1)::int c`, [`%${MARK}%`]);
 suite('9. ไม่ทิ้งข้อมูลทดสอบไว้');
-happy('ลบข้อมูลทดสอบหมดแล้ว', left.rows[0].f === 0 && left.rows[0].l === 0, JSON.stringify(left.rows[0]));
+happy('ลบข้อมูลทดสอบหมดแล้ว',
+  left.rows[0].f === 0 && left.rows[0].l === 0 && left.rows[0].c === 0, JSON.stringify(left.rows[0]));
 
 process.exit(report(`${ROOT}/credit.json`) ? 1 : 0);

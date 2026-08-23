@@ -257,7 +257,15 @@ export default function FacilitiesTab({ projects, onChanged }) {
                 <td className="tbl-td text-slate-400">{i + 1}</td>
                 <td className="tbl-td">
                   <div className="font-medium text-slate-800">{projName[f.project_id] || '—'}</div>
-                  {f.bank && <div className="text-xs text-slate-400">{f.bank}</div>}
+                  {/* the bank's own facility number is how finance and the bank
+                      refer to the same line — it has to be readable here, not
+                      only inside the edit form. */}
+                  {(f.bank || f.facility_no) && (
+                    <div className="text-xs text-slate-400">
+                      {[f.bank, f.facility_no].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                  {f.company && <div className="text-xs text-slate-400">{f.company}</div>}
                 </td>
                 <td className="tbl-td"><span className={`chip ${TYPE_CHIP[f.type] || 'bg-slate-100 text-slate-600'}`}>{f.type}</span></td>
                 <td className="tbl-td text-right tabular-nums">{formatMoney(f.limit)}</td>

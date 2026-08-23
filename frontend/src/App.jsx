@@ -77,7 +77,7 @@ export default function App() {
             path="credit"
             element={
               <Feature path="/credit">
-                <ProtectedRoute roles={['admin', 'executive']}>
+                <ProtectedRoute perm={['credit', 'view']}>
                   <CreditFacility />
                 </ProtectedRoute>
               </Feature>

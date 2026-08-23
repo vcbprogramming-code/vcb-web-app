@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { pool, query, queryOne } from '../config/db.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff } from '../services/credit.js';
@@ -11,7 +11,13 @@ const FACILITY_TYPES = ['L/G (BG)', 'LGM (L/G)', 'T/L', 'B/E (AVAL)', 'P/N'];
 
 // Financial data — admin + executive only.
 const router = Router();
-router.use(requireAuth, requireRole('admin', 'executive'));
+// Gate on the configurable permission rather than on the role, so that granting
+// a finance officer "วงเงินสินเชื่อ → ดูข้อมูล" in ตั้งค่า → ผู้ใช้ actually works.
+// Role defaults still restrict this to admin/executive out of the box.
+// Reading is view; anything that changes a figure is edit.
+const canView = requirePermission('credit', 'view');
+const canEdit = requirePermission('credit', 'edit');
+router.use(requireAuth, (req, res, next) => (req.method === 'GET' ? canView : canEdit)(req, res, next));
 
 const num = (v) => (v != null ? Number(v) : null);
 // Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts.
@@ -56,6 +62,11 @@ router.get('/facilities', asyncHandler(async (req, res) => {
   res.json({ data: views });
 }));
 
+// Postgres raises on a malformed uuid, so a stray path segment must be turned
+// away here rather than surfacing as a 500.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.param('id', (req, res, next, v) => (UUID.test(v) ? next() : next(new ApiError(404, 'Not found'))));
+
 const facilitySchema = z.object({
   projectId: z.string().uuid(), company: z.string().optional().nullable(), bank: z.string().optional().nullable(),
   facilityNo: z.string().optional().nullable(), type: z.enum(FACILITY_TYPES), limit: z.number().nonnegative(),
@@ -66,6 +77,7 @@ router.post('/facilities', asyncHandler(async (req, res) => {
   const parsed = facilitySchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
+  if (!(await queryOne('select id from projects where id = $1', [d.projectId]))) throw new ApiError(404, 'Project not found');
   const row = await queryOne(
     `insert into facilities (project_id, company, bank, facility_no, type, "limit", used_baseline, interest_rate, fee_rate, approved_date, due_date, notes)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
@@ -118,7 +130,7 @@ router.get('/ledger', asyncHandler(async (req, res) => {
   res.json({ data: rows.map(ledgerOut) });
 }));
 const ledgerSchema = z.object({
-  facilityId: z.string().uuid(), amount: z.number(), status: z.string().optional(),
+  facilityId: z.string().uuid(), amount: z.number().positive(), status: z.string().optional(),
   startDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(),
   ref: z.string().optional().nullable(), source: z.string().optional().nullable(),
   docFrom: z.string().optional().nullable(), docTo: z.string().optional().nullable(),
@@ -158,6 +170,7 @@ router.patch('/ledger/:id', asyncHandler(async (req, res) => {
 router.post('/ledger/:id/settle', asyncHandler(async (req, res) => {
   const before = await queryOne('select status from credit_ledger where id = $1', [req.params.id]);
   if (!before) throw new ApiError(404, 'Ledger item not found');
+  if (before.status === 'ชำระแล้ว') throw new ApiError(409, 'รายการนี้บันทึกชำระแล้ว');
   const after = await queryOne(`update credit_ledger set status='ชำระแล้ว', settled_date=current_date where id=$1 returning *`, [req.params.id]);
   await writeAudit({ actor: req.profile, action: 'settle', target: 'ledger', targetId: req.params.id, changes: { status: { before: before.status, after: 'ชำระแล้ว' } } });
   res.json({ data: ledgerOut(after) });
@@ -278,7 +291,8 @@ router.get('/cash-plan', asyncHandler(async (req, res) => {
 }));
 const cashPlanSchema = z.object({
   projectId: z.string().uuid(), month: z.string().regex(/^\d{4}-\d{2}$/), period: z.string().optional(),
-  income: z.number().optional(), newPN: z.number().optional(), deductions: z.number().optional(),
+  income: z.number().nonnegative().optional(), newPN: z.number().nonnegative().optional(),
+  deductions: z.number().nonnegative().optional(),
   incomeBreakdown: z.string().optional().nullable(), available: z.number().optional(), note: z.string().optional().nullable(),
 });
 router.post('/cash-plan', asyncHandler(async (req, res) => {

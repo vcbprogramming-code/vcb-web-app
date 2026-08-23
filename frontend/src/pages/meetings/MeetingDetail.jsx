@@ -9,7 +9,7 @@ import Icon from '../../components/Icon.jsx';
 
 /** One meeting: the body, what was attached, what the team said, and what it
  *  used to say before somebody changed it. */
-export default function MeetingDetail({ id, canEdit, onClose, onEdit, onDelete, onChanged }) {
+export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdit, onDelete, onChanged }) {
   const toast = useToast();
   const confirm = useConfirm();
   const { profile } = useAuth();
@@ -19,6 +19,7 @@ export default function MeetingDetail({ id, canEdit, onClose, onEdit, onDelete, 
   const [text, setText] = useState('');
   const [history, setHistory] = useState(false);
   const [preview, setPreview] = useState(null); // an older version being read
+  const [filing, setFiling] = useState(false);
 
   const load = useCallback(() => { setM(null); setError(null);
     return meetingsApi.get(id).then((r) => setM(r.data)).catch((e) => setError(e.message)); }, [id]);
@@ -95,6 +96,59 @@ export default function MeetingDetail({ id, canEdit, onClose, onEdit, onDelete, 
           </button>
         </div>
       </header>
+
+      {m.recording_url && (
+        <a href={m.recording_url} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-brand hover:bg-slate-50">
+          <Icon name="link" className="h-4 w-4" /> เปิดไฟล์บันทึกเสียง
+        </a>
+      )}
+
+      {/* Where this recording has been filed. It stays in its inbox either way —
+          filing adds a place to find it, it does not move it out of the archive. */}
+      {(m.is_inbox || (m.tags || []).length > 0) && (
+        <section className="rounded-xl bg-slate-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-slate-500">จัดเก็บเข้ากลุ่ม:</span>
+            {(m.tags || []).length === 0 && <span className="text-xs text-slate-400">ยังไม่ได้จัดเก็บ</span>}
+            {(m.tags || []).map((t) => (
+              <span key={t.id} className="chip inline-flex items-center gap-1"
+                style={{ backgroundColor: `${t.color}1a`, color: t.color }}>
+                {t.name}
+                {canEdit && (
+                  <button onClick={() => act(() => meetingsApi.untag(m.id, t.id), 'เอาออกจากกลุ่มแล้ว')}
+                    title="เอาออกจากกลุ่มนี้" className="opacity-60 hover:opacity-100">
+                    <Icon name="x" className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+            {canEdit && (
+              filing ? (
+                <select autoFocus defaultValue="" disabled={busy}
+                  onChange={(e) => { const v = e.target.value; setFiling(false);
+                    if (v) act(() => meetingsApi.tag(m.id, v), 'จัดเก็บเข้ากลุ่มแล้ว'); }}
+                  onBlur={() => setFiling(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm">
+                  <option value="">— เลือกกลุ่มปลายทาง —</option>
+                  {groups.filter((g) => !g.is_inbox && g.id !== m.group_id
+                    && !(m.tags || []).some((t) => t.id === g.id))
+                    .map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              ) : (
+                <button onClick={() => setFiling(true)} className="text-xs font-medium text-brand hover:underline">
+                  + จัดเก็บเข้ากลุ่ม
+                </button>
+              )
+            )}
+          </div>
+          {m.is_inbox && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              บันทึกนี้อยู่ในกล่องรอจัดเก็บถาวร การจัดเก็บเป็นการเพิ่มที่ให้หาเจอ ไม่ได้ย้ายออกจากกล่อง
+            </p>
+          )}
+        </section>
+      )}
 
       {m.content
         ? <div className="mtg-body border-t border-slate-100 pt-4 text-[15px] leading-relaxed text-slate-800"

@@ -83,6 +83,7 @@ function UserSignature({ user }) {
 }
 
 function UserModal({ user, onClose, onSaved }) {
+  const t = useT();
   const editing = Boolean(user);
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [email, setEmail] = useState(user?.email || '');

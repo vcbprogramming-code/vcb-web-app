@@ -1,21 +1,27 @@
 /**
  * Every t('…') on screen must resolve to the translate function.
  *
- * Two ways it silently does not, both of which blank a page at run time while
+ * Three ways it silently does not, all of which blank a page at run time while
  * the build stays green:
  *
- *   1. no `const t = useT()` in the component at all
- *   2. something nearer is called `t` — a loop variable, a timer handle — and
- *      wins the lookup
+ *   1. the component never calls useT()
+ *   2. something nearer is called `t` — a loop variable, a timer handle
+ *   3. it is a class component, which cannot hold a hook at all
  *
- * Both happened while this layer was being built, which is why this is a file
- * and not a habit. Class components are called out too: a class cannot hold a
- * hook, so its translated text has to move into a function component.
+ * All three happened while this layer was being built, which is why this is a
+ * file and not a habit.
+ *
+ * Components here are declared at the left margin, one per region, so the file
+ * is split on those declarations rather than by counting braces — brace counting
+ * kept tripping over an apostrophe in JSX text. Shadowing is left to esbuild,
+ * which renames the inner binding: a t2("…") in its output is precisely the
+ * "t is not a function" the browser reports.
  *
  *   node scripts/i18n-check.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import esbuild from 'esbuild';
 
 const files = [];
 (function walk(d) {
@@ -25,61 +31,40 @@ const files = [];
   }
 })('src');
 
+const CALL = /\bt\(\s*['`]/;
 const problems = [];
-const lineAt = (s, i) => s.slice(0, i).split('\n').length;
 
 for (const file of files) {
   if (/lib\/i18n\.jsx$/.test(file)) continue;
   const raw = fs.readFileSync(file, 'utf8');
-  // comments are prose; blank them so their text never counts as code
-  const src = raw.replace(/\/\*[\s\S]*?\*\/|(^|[^:"'\\])\/\/[^\n]*/g, (m, lead = '') => lead + ' '.repeat(m.length - lead.length));
-  const calls = [...src.matchAll(/\bt\(\s*['`]/g)];
-  if (!calls.length) continue;
+  if (!CALL.test(raw)) continue;
 
-  if (!/from '[^']*i18n\.jsx'/.test(src)) {
-    problems.push(`${file}: เรียก t() แต่ไม่ได้ import useT`);
-    continue;
-  }
-  if (!/const\s+t\s*=\s*useT\(\)/.test(src)) {
-    problems.push(`${file}: เรียก t() แต่ไม่มี const t = useT() เลยทั้งไฟล์`);
-  }
+  if (!/from '[^']*i18n\.jsx'/.test(raw)) { problems.push(`${file}: เรียก t() แต่ไม่ได้ import useT`); continue; }
 
-  // scopes where some other `t` wins the name
-  const shadows = [];
-  const bind = [
-    /\(\s*(t)\s*(?:,[^)]*)?\)\s*=>\s*[({]/g,   // (t) => (   /   (t, i) => {
-    /(?:^|[^\w.$])(t)\s*=>\s*[({]/g,           // t => {
-    /const\s+(t)\s*=\s*(?!useT\(\))/g,         // const t = anything else
-    /function\s+\w*\s*\([^)]*\b(t)\b[^)]*\)/g, // function f(t)
-  ];
-  for (const re of bind) {
-    let m;
-    while ((m = re.exec(src))) shadows.push([m.index, scopeEnd(src, m.index + m[0].length - 1)]);
-  }
-  for (const c of calls) {
-    const hit = shadows.find(([a, b]) => c.index > a && c.index < b);
-    if (hit) problems.push(`${file}:${lineAt(src, c.index)} มีตัวแปรชื่อ t บังฟังก์ชันแปลอยู่`);
-  }
+  // 1. a component that calls t() must hold the hook itself
+  const lines = raw.split('\n');
+  const starts = [];
+  lines.forEach((l, i) => {
+    const m = l.match(/^(?:export\s+default\s+)?(?:function\s+(\w+)|(?:const|let)\s+(\w+)\s*=)/);
+    if (m) starts.push({ line: i, name: m[1] || m[2] });
+  });
+  starts.forEach((s, i) => {
+    const region = lines.slice(s.line, starts[i + 1]?.line ?? lines.length).join('\n');
+    if (!CALL.test(region)) return;
+    if (/const\s+t\s*=\s*useT\(\)/.test(region)) return;
+    problems.push(`${file}:${s.line + 1} ${s.name}() เรียก t() แต่ไม่มี const t = useT()`);
+  });
 
-  // a class cannot call a hook
-  for (const m of src.matchAll(/class\s+(\w+)\s+extends\s+React\.Component\s*\{/g)) {
-    const body = src.slice(m.index, scopeEnd(src, src.indexOf('{', m.index)));
-    if (/\bt\(\s*['`]/.test(body)) problems.push(`${file}: class ${m[1]} เรียก t() แต่ class ใช้ hook ไม่ได้`);
-  }
-}
+  // 2. anything nearer called `t` — esbuild renames it, so the call is t2("…")
+  let js;
+  try { js = esbuild.transformSync(raw, { loader: 'jsx', jsx: 'automatic' }).code; }
+  catch { problems.push(`${file}: ไวยากรณ์เสีย`); continue; }
+  if (/\bt\d+\(\s*["'`]/.test(js)) problems.push(`${file}: มีตัวแปรชื่อ t บังฟังก์ชันแปลอยู่`);
 
-/** End of the block or parenthesised body that starts at or after `from`. */
-function scopeEnd(s, from) {
-  const open = s.indexOf('{', from) === from ? from : s.slice(from, from + 4).search(/[({]/) + from;
-  const ch = s[open];
-  if (ch !== '{' && ch !== '(') return from;
-  const close = ch === '{' ? '}' : ')';
-  let d = 0;
-  for (let i = open; i < s.length; i++) {
-    if (s[i] === ch) d++;
-    else if (s[i] === close) { d--; if (!d) return i; }
+  // 3. a class cannot hold a hook
+  for (const m of raw.matchAll(/class\s+(\w+)\s+extends\s+React\.Component/g)) {
+    if (CALL.test(raw.slice(m.index))) problems.push(`${file}: class ${m[1]} เรียก t() แต่ class ใช้ hook ไม่ได้`);
   }
-  return s.length;
 }
 
 if (problems.length) {

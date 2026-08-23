@@ -129,6 +129,17 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
     finally { setBusy(false); }
   };
 
+  // A site office still keeps a paper file, and the person approving often wants
+  // something to hold. Open it in a tab rather than downloading: people read it
+  // and print from there, and a forced download makes that two steps.
+  const openSlip = async (r) => {
+    try {
+      const url = await perfApi.leaveSlipUrl(r.id);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+
   if (!mine || !pending || !decided) return <div className="flex justify-center py-12"><Spinner label="กำลังโหลดคำขอลา…" /></div>;
 
   const TABS = [
@@ -206,6 +217,10 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
                   className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50">ไม่อนุมัติ</button>
               </>
             )}
+            <button onClick={() => openSlip(r)} title="เปิดใบลาเพื่อพิมพ์"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+              <Icon name="file" className="h-4 w-4" /> ใบลา
+            </button>
             {tab === 'mine' && r.status === 'pending' && (
               <button onClick={() => cancel(r)} disabled={busy}
                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">ยกเลิกคำขอ</button>

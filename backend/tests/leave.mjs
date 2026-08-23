@@ -7,7 +7,7 @@
  * so reversing or cancelling has to take exactly those days back.
  */
 import { fileURLToPath } from 'node:url';
-import { call, suite, happy, bad, report, U, warm, query } from './harness.mjs';
+import { call, suite, happy, bad, report, U, warm, query, tok, API } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 await warm();
@@ -167,6 +167,28 @@ suite('4. ยกเลิกคำขอที่ยังไม่ถูกต�
 }
 async function queryStatus(id) {
   return (await query('select status from leave_requests where id = $1', [id])).rows[0]?.status;
+}
+
+// ── 4b. ใบลา ───────────────────────────────────────────────────────────────
+suite('4b. ใบลาสำหรับพิมพ์');
+{
+  const emp = await makeEmployee('ใบลา');
+  const r = await ask(A, emp, '2027-05-04', '2027-05-08', { leaveType: 'vacation', reason: 'พาครอบครัวไปต่างจังหวัด' });
+  mine.reqs.push(r.row.id);
+  await call(`/performance/leave/${r.row.id}/decide`, { method: 'POST', user: A, body: { approve: true, note: 'อนุมัติตามที่ขอ' } });
+
+  const res = await fetch(`${API}/performance/leave/${r.row.id}/slip`, { headers: { Authorization: `Bearer ${tok(A)}` } });
+  const buf = Buffer.from(await res.arrayBuffer());
+  happy('เปิดใบลาได้', res.status === 200, `${res.status}`);
+  happy('เป็นไฟล์ PDF จริง', buf.subarray(0, 5).toString() === '%PDF-', buf.subarray(0, 8).toString());
+  happy('เปิดอ่านในแท็บได้เลย ไม่บังคับดาวน์โหลด',
+    (res.headers.get('content-disposition') || '').startsWith('inline'), res.headers.get('content-disposition'));
+  happy('มีเนื้อหาจริง ไม่ใช่ไฟล์เปล่า', buf.length > 20000, `${Math.round(buf.length / 1024)} KB`);
+
+  bad('คนที่ไม่เกี่ยวข้องเปิดใบลาไม่ได้',
+    (await fetch(`${API}/performance/leave/${r.row.id}/slip`, { headers: { Authorization: `Bearer ${tok(C)}` } })).status === 403, '');
+  bad('คำขอที่ไม่มีอยู่จริง → 404',
+    (await fetch(`${API}/performance/leave/00000000-0000-0000-0000-000000000000/slip`, { headers: { Authorization: `Bearer ${tok(A)}` } })).status === 404, '');
 }
 
 // ── 5. หน้าตั้งค่าผู้อนุมัติ ───────────────────────────────────────────────

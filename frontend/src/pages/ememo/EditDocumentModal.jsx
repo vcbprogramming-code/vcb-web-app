@@ -98,7 +98,7 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทเอกสาร')}</label>
             <select value={form.docTypeId} onChange={(e) => set('docTypeId', e.target.value)} className="field">
               <option value="">{t('— ไม่ระบุ —')}</option>
-              {docTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {docTypes.map((dt) => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
             </select>
           </div>
           <div>

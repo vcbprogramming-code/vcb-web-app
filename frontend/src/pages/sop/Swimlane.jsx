@@ -52,37 +52,37 @@ function layout(flow) {
   const ABOVE = 'translate(-50%,-100%)'; // label sits on top of the connector
   const edges = (flow.edges || []).map((e, i) => {
     const s = placed.get(e.from);
-    const t = placed.get(e.to);
-    if (!s || !t) return null; // tolerate a dangling reference rather than crash
-    const forward = t.cx > s.cx;
-    const down = t.li > s.li;
+    const target = placed.get(e.to);
+    if (!s || !target) return null; // tolerate a dangling reference rather than crash
+    const forward = target.cx > s.cx;
+    const down = target.li > s.li;
     let d;
     let lx;
     let ly;
     let tf = ABOVE;
-    if (s.li === t.li) {
-      if (forward) { d = `M${s.r},${s.cy} L${t.l},${t.cy}`; lx = (s.r + t.l) / 2; ly = s.t - 4; }
+    if (s.li === target.li) {
+      if (forward) { d = `M${s.r},${s.cy} L${target.l},${target.cy}`; lx = (s.r + target.l) / 2; ly = s.target - 4; }
       else {
         const y = s.laneBottom - 10;
-        d = `M${s.cx},${s.b} V${y} H${t.cx} V${t.b}`; lx = (s.cx + t.cx) / 2; ly = y - 3;
+        d = `M${s.cx},${s.b} V${y} H${target.cx} V${target.b}`; lx = (s.cx + target.cx) / 2; ly = y - 3;
       }
-    } else if (Math.abs(t.cx - s.cx) < 2) {
+    } else if (Math.abs(target.cx - s.cx) < 2) {
       // A pair of nodes often has both a down and an up connector (submit /
       // reject). Offset each by direction so the two lines — and their labels —
-      // don't land on top of each other.
+      // don'target land on top of each other.
       const off = down ? 9 : -9;
-      d = down ? `M${s.cx + off},${s.b} L${t.cx + off},${t.t}` : `M${s.cx + off},${s.t} L${t.cx + off},${t.b}`;
+      d = down ? `M${s.cx + off},${s.b} L${target.cx + off},${target.target}` : `M${s.cx + off},${s.target} L${target.cx + off},${target.b}`;
       lx = s.cx + off + (down ? 7 : -7);
-      ly = (down ? s.b + t.t : t.b + s.t) / 2;
+      ly = (down ? s.b + target.target : target.b + s.target) / 2;
       tf = down ? 'translate(0,-50%)' : 'translate(-100%,-50%)';
     } else if (forward) {
-      d = `M${s.r},${s.cy} H${t.cx} V${down ? t.t : t.b}`;
+      d = `M${s.r},${s.cy} H${target.cx} V${down ? target.target : target.b}`;
       // label the vertical drop, not the horizontal run: a decision that fans
       // out to two lanes at the same rank shares the run but not the drop.
-      lx = t.cx + 7; ly = (s.cy + (down ? t.t : t.b)) / 2; tf = 'translate(0,-50%)';
+      lx = target.cx + 7; ly = (s.cy + (down ? target.target : target.b)) / 2; tf = 'translate(0,-50%)';
     } else {
-      d = `M${s.cx},${down ? s.b : s.t} V${t.cy} H${t.r}`;
-      lx = (s.cx + t.r) / 2; ly = t.t - 4;
+      d = `M${s.cx},${down ? s.b : s.target} V${target.cy} H${target.r}`;
+      lx = (s.cx + target.r) / 2; ly = target.target - 4;
     }
     const st = styleOf(e.kind);
     return { key: `${e.from}->${e.to}-${i}`, d, lx, ly, tf, color: st.color, label: e.label || st.label };

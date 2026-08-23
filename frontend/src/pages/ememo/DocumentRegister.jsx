@@ -24,7 +24,9 @@ function ProjectChip({ code, color, active, onClick, subtle }) {
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+      // py-1 left these 30px tall — under the 32px a fingertip reliably hits, and
+      // there are a dozen of them side by side on a phone
+      className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
         active
           ? activeClass
           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
@@ -79,11 +81,12 @@ function FilterDropdown({ label, value, active, icon = 'chevronDown', align = 'l
 }
 
 function StatusBadge({ status }) {
+  const t = useT();
   const meta = STATUS_META[status] || STATUS_META.pending;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${meta.chip}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-      {meta.label}
+      {t(meta.label, null, 'status')}
     </span>
   );
 }
@@ -129,8 +132,8 @@ export default function DocumentRegister() {
   const [wakeHint, setWakeHint] = useState(false);
   useEffect(() => {
     if (!loading) { setWakeHint(false); return; }
-    const t = setTimeout(() => setWakeHint(true), 5000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setWakeHint(true), 5000);
+    return () => clearTimeout(timer);
   }, [loading]);
 
   // load reference data once
@@ -159,8 +162,8 @@ export default function DocumentRegister() {
 
   // debounce search; reload on filter change
   useEffect(() => {
-    const t = setTimeout(loadDocs, search ? 300 : 0);
-    return () => clearTimeout(t);
+    const timer = setTimeout(loadDocs, search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [loadDocs, search]);
 
   // reset to page 1 whenever a non-page filter changes
@@ -205,7 +208,7 @@ export default function DocumentRegister() {
     setTo(iso(last));
   };
 
-  const activeDocType = docTypes.find((t) => t.id === docTypeId);
+  const activeDocType = docTypes.find((dt) => dt.id === docTypeId);
   const activeStatus = STATUS_OPTIONS.find((s) => s.value === status);
 
   // Inject the register's stats + actions into the shared top bar (no 2nd banner).
@@ -299,13 +302,13 @@ export default function DocumentRegister() {
                 >
                   {t('ทุกประเภทเอกสาร')}
                 </button>
-                {docTypes.map((t) => (
+                {docTypes.map((dt) => (
                   <button
-                    key={t.id}
-                    onClick={() => { setDocTypeId(t.id); close(); }}
-                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${docTypeId === t.id ? 'font-semibold text-brand' : 'text-slate-600'}`}
+                    key={dt.id}
+                    onClick={() => { setDocTypeId(dt.id); close(); }}
+                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${docTypeId === dt.id ? 'font-semibold text-brand' : 'text-slate-600'}`}
                   >
-                    {t.name}
+                    {dt.name}
                   </button>
                 ))}
               </div>
@@ -313,7 +316,7 @@ export default function DocumentRegister() {
           </FilterDropdown>
 
           {/* สถานะ */}
-          <FilterDropdown label={t('ทุกสถานะ')} value={activeStatus?.label} active={!!status} width="w-48">
+          <FilterDropdown label={t('ทุกสถานะ')} value={activeStatus && t(activeStatus.label, null, 'status')} active={!!status} width="w-48">
             {(close) => (
               <div>
                 <button

@@ -25,9 +25,39 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
+/**
+ * The API answers in English for programmer-facing conditions ("Document not
+ * found"), and those strings were reaching the screen exactly as written — an
+ * English sentence in a Thai interface. Everything the user reads is Thai first
+ * and translated from there, so the message is turned round here, once, rather
+ * than at each of the places that display it. Anything unrecognised is passed
+ * through unchanged: a raw message the user can quote to us still beats none.
+ */
+const SERVER_TH = {
+  'Document not found': 'ไม่พบเอกสารนี้',
+  'Project not found': 'ไม่พบโครงการนี้',
+  'User not found': 'ไม่พบผู้ใช้รายนี้',
+  'Facility not found': 'ไม่พบวงเงินนี้',
+  'Ledger item not found': 'ไม่พบรายการสินเชื่อนี้',
+  'Request not found': 'ไม่พบคำขอนี้',
+  'Attachment not found': 'ไม่พบไฟล์แนบนี้',
+  'Message not found': 'ไม่พบข้อความนี้',
+  'Company not found': 'ไม่พบบริษัทนี้',
+  'Doc code not found': 'ไม่พบรหัสเอกสารนี้',
+  'Type not found': 'ไม่พบประเภทนี้',
+  'Cash plan row not found': 'ไม่พบงวดแผนเงินสดนี้',
+  'File not found in storage': 'ไม่พบไฟล์ในที่จัดเก็บ',
+  'Not found': 'ไม่พบข้อมูลที่ต้องการ',
+  'Invalid input': 'ข้อมูลที่กรอกไม่ถูกต้อง',
+  'No fields to update': 'ไม่มีข้อมูลที่เปลี่ยนแปลง',
+  'No file uploaded (field "file")': 'ยังไม่ได้เลือกไฟล์',
+  'Not authenticated': 'กรุณาเข้าสู่ระบบใหม่',
+  'Insufficient permissions': 'ไม่มีสิทธิ์ดำเนินการนี้',
+};
+
 /** Build an Error carrying the HTTP status + friendly Thai message. */
 function apiError(message, { status, network = false, timeout = false } = {}) {
-  const err = new Error(message);
+  const err = new Error(SERVER_TH[message] || message);
   if (status != null) err.status = status;
   if (network) err.network = true;
   if (timeout) err.timeout = true;

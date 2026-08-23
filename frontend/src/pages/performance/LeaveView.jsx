@@ -44,13 +44,13 @@ function Row({ r, children }) {
           : <div className="text-sm text-slate-400">{t('— ไม่ได้ระบุเหตุผล')}</div>}
         {r.decided_by_name && (
           <div className="mt-0.5 text-xs text-slate-500">
-            {st.label}โดย {r.decided_by_name} · {thDate(r.decided_at)}
+            {t(st.label, null, 'status')}{t('โดย')} {r.decided_by_name} · {thDate(r.decided_at)}
             {r.decide_note ? ` — ${r.decide_note}` : ''}
           </div>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className={`chip ${st.chip}`}>{st.label}</span>
+        <span className={`chip ${st.chip}`}>{t(st.label, null, 'status')}</span>
         {children}
       </div>
     </div>
@@ -91,9 +91,9 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!form.employeeId) { setError('กรุณาเลือกชื่อพนักงาน'); return; }
-    if (!form.from || !form.to) { setError('กรุณาระบุช่วงวันที่ลา'); return; }
-    if (form.to < form.from) { setError('วันสิ้นสุดต้องไม่ก่อนวันเริ่มลา'); return; }
+    if (!form.employeeId) { setError(t('กรุณาเลือกชื่อพนักงาน')); return; }
+    if (!form.from || !form.to) { setError(t('กรุณาระบุช่วงวันที่ลา')); return; }
+    if (form.to < form.from) { setError(t('วันสิ้นสุดต้องไม่ก่อนวันเริ่มลา')); return; }
     setBusy(true);
     try {
       await perfApi.requestLeave(form);
@@ -107,16 +107,16 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
 
   const decide = async (r, approve) => {
     const ok = await confirm({
-      title: approve ? 'อนุมัติการลา' : 'ไม่อนุมัติการลา',
-      message: `${r.employee_name} · ${thDate(r.from_date)} – ${thDate(r.to_date)} (${r.days} วัน)`
-        + (approve ? '\nวันเหล่านี้จะถูกบันทึกเป็นวันลาในตารางงานให้อัตโนมัติ' : ''),
-      confirmLabel: approve ? 'อนุมัติ' : 'ไม่อนุมัติ', danger: !approve,
+      title: approve ? t('อนุมัติการลา') : t('ไม่อนุมัติการลา'),
+      message: `${r.employee_name} · ${thDate(r.from_date)} – ${thDate(r.to_date)} (${r.days} ${t('วัน')})`
+        + (approve ? '\n' + t('วันเหล่านี้จะถูกบันทึกเป็นวันลาในตารางงานให้อัตโนมัติ') : ''),
+      confirmLabel: approve ? t('อนุมัติ') : t('ไม่อนุมัติ'), danger: !approve,
     });
     if (!ok) return;
     setBusy(true);
     try {
       await perfApi.decideLeave(r.id, approve);
-      toast.success(approve ? 'อนุมัติแล้ว' : 'บันทึกว่าไม่อนุมัติแล้ว');
+      toast.success(approve ? t('อนุมัติแล้ว') : t('บันทึกว่าไม่อนุมัติแล้ว'));
       await load();
       onChanged?.();
     } catch (err) { toast.error(err.message); }
@@ -168,7 +168,7 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทการลา')}</label>
               <select value={form.leaveType} onChange={(e) => setForm((f) => ({ ...f, leaveType: e.target.value }))} className="field">
-                {types.map((t) => <option key={t.code} value={t.code}>{t.th}</option>)}
+                {types.map((lt) => <option key={lt.code} value={lt.code}>{lt.th}</option>)}
               </select>
             </div>
             <div>
@@ -187,19 +187,19 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
           </div>
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           <div className="flex items-center gap-3">
-            <button type="submit" disabled={busy} className="btn-primary">{busy ? 'กำลังส่ง…' : 'ส่งคำขอลา'}</button>
+            <button type="submit" disabled={busy} className="btn-primary">{busy ? t('กำลังส่ง…') : t('ส่งคำขอลา')}</button>
             {days > 0 && <span className="text-sm text-slate-500">{t('รวม')} {days} {t('วัน')}</span>}
           </div>
         </form>
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+        {TABS.map((tab) => (
+          <button key={tab.key} onClick={() => setTab(tab.key)}
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === t.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-            {t.label}
-            <span className={`ml-1.5 rounded-full px-1.5 text-xs ${t.hot ? 'bg-amber-400 font-bold text-[#0f172a]' : 'text-slate-400'}`}>{t.n}</span>
+              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            {tab.label}
+            <span className={`ml-1.5 rounded-full px-1.5 text-xs ${tab.hot ? 'bg-amber-400 font-bold text-[#0f172a]' : 'text-slate-400'}`}>{tab.n}</span>
           </button>
         ))}
       </div>
@@ -207,8 +207,8 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
       <div className="rounded-2xl border border-slate-200 bg-white">
         {list.length === 0 ? (
           <p className="py-12 text-center text-sm text-slate-500">
-            {tab === 'mine' ? 'ยังไม่มีคำขอลาของท่าน'
-              : tab === 'pending' ? 'ไม่มีคำขอรออนุมัติ' : 'ยังไม่มีประวัติการพิจารณา'}
+            {tab === 'mine' ? t('ยังไม่มีคำขอลาของท่าน')
+              : tab === 'pending' ? t('ไม่มีคำขอรออนุมัติ') : t('ยังไม่มีประวัติการพิจารณา')}
           </p>
         ) : list.map((r) => (
           <Row key={r.id} r={r}>

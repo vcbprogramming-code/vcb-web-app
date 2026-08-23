@@ -34,13 +34,13 @@ export default function ReferencePicker({ value, onChange, excludeId }) {
     if (term.length < 1) { setResults([]); return; }
     let cancelled = false;
     setLoading(true);
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       ememoApi.searchDocuments(term)
         .then((r) => { if (!cancelled) setResults((r.data || []).filter((d) => d.id !== excludeId)); })
         .catch(() => !cancelled && setResults([]))
         .finally(() => !cancelled && setLoading(false));
     }, 250);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [q, open, excludeId]);
 
   // close on outside click

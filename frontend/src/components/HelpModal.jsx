@@ -56,7 +56,7 @@ export default function HelpModal({ onClose }) {
           <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{t('ส่วนที่เกี่ยวข้อง')}</label>
           <select value={area} onChange={(e) => setArea(e.target.value)} className={field}>
             <option value="">{t('— เลือกส่วนที่เกี่ยวข้อง —')}</option>
-            {areaOptions.map((a) => <option key={a.to} value={a.title}>{a.title}</option>)}
+            {areaOptions.map((a) => <option key={a.to} value={a.title}>{t(a.title)}</option>)}
             <option value="อื่น ๆ">{t('อื่น ๆ')}</option>
           </select>
         </div>

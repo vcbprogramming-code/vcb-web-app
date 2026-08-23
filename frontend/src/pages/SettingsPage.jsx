@@ -75,6 +75,11 @@ export default function SettingsPage() {
   const wanted = ALIASES[sp.get('s')] || sp.get('s');
   const [fallback, setFallback] = useState(null);
   const activeKey = all.some((i) => i.key === wanted) ? wanted : (fallback || all[0]?.key);
+  // Someone forwarded a link to a section this person cannot open. Silently
+  // showing them a different page reads as a broken link; say what happened.
+  const denied = wanted && !all.some((i) => i.key === wanted) && !fallback
+    ? (GROUPS.flatMap((g) => g.items).find((i) => i.key === wanted) || null)
+    : null;
   const active = all.find((i) => i.key === activeKey) || all[0];
   const Active = active?.Comp;
 
@@ -85,9 +90,15 @@ export default function SettingsPage() {
       <PageHeader
         title={t('ตั้งค่า')}
         subtitle={isAdmin
-          ? 'ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว'
-          : 'ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน'}
+          ? t('ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว')
+          : t('ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน')}
       />
+
+      {denied && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t('ลิงก์นี้ชี้ไปที่ “{section}” ซึ่งเปิดได้เฉพาะผู้ดูแลระบบ — จึงพาท่านมาที่หน้าที่ท่านเปิดได้แทน', { section: t(denied.label) })}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_1fr] lg:items-start">
         {/* left menu — grouped by scope */}
@@ -95,7 +106,7 @@ export default function SettingsPage() {
           {groups.map((g) => (
             <div key={g.key} className="mb-1 last:mb-0">
               <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                {g.label}
+                {t(g.label)}
               </div>
               {g.items.map((i) => (
                 <button
@@ -108,7 +119,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <Icon name={i.icon} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">{i.label}</span>
+                  <span className="min-w-0 truncate">{t(i.label)}</span>
                 </button>
               ))}
             </div>

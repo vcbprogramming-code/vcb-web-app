@@ -14,22 +14,22 @@ const TABS = [
 export default function Onboarding() {
   const t = useT();
   const [tab, setTab] = useState('newhires');
-  const Active = TABS.find((t) => t.key === tab).Comp;
+  const Active = TABS.find((x) => x.key === tab).Comp;
 
   return (
     <div className="space-y-5">
       <PageHeader title={t('แนะแนวและติดตามพนักงานใหม่ 90 วัน')} subtitle="คลังข้อมูล · แผนแนะแนว 30-60-90 วัน · แบบประเมินทดลองงาน" />
 
       <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tab.key}
+            onClick={() => setTab(tab.key)}
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === t.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>

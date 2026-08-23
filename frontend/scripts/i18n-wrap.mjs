@@ -17,6 +17,10 @@ import esbuild from 'esbuild';
 const TH = /[฀-๿]/;
 const DISPLAY_ATTRS = ['placeholder', 'title', 'alt', 'aria-label', 'label', 'confirmLabel', 'cancelLabel', 'emptyText'];
 
+// The A4 letter canvas is a picture of a PDF that is always Thai, so wrapping it
+// would make the preview disagree with the file the user downloads.
+const NEVER = [/ememo\/LetterheadPreview\.jsx$/];
+
 const target = process.argv[2];
 const write = process.argv.includes('--write');
 if (!target) { console.error('ต้องระบุไฟล์หรือโฟลเดอร์'); process.exit(1); }
@@ -25,7 +29,7 @@ const files = [];
 (function walk(p) {
   const st = fs.statSync(p);
   if (st.isDirectory()) { for (const e of fs.readdirSync(p)) walk(path.join(p, e)); return; }
-  if (/\.jsx$/.test(p)) files.push(p);
+  if (/\.jsx$/.test(p) && !NEVER.some((r) => r.test(p))) files.push(p);
 })(target);
 
 // Only the quote needs escaping. Escaping the backslash as well would turn an

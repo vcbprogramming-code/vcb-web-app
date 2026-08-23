@@ -89,20 +89,20 @@ export default function Sop() {
 
       {/* view switch */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => {
-            pickTab(t.key);
-            // don't carry a filter into a tab where that module has nothing
-            const next = t.key === 'flows' ? counts.flows : counts.scenarios;
+        {TABS.map((tab) => (
+          <button key={tab.key} onClick={() => {
+            pickTab(tab.key);
+            // don'tab carry a filter into a tab where that module has nothing
+            const next = tab.key === 'flows' ? counts.flows : counts.scenarios;
             if (module && !next[module]) setModule('');
           }}
             className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === t.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
-            <Icon name={t.icon} className="h-4 w-4" /> {t.label}
+            <Icon name={tab.icon} className="h-4 w-4" /> {tab.label}
             <span className="ml-1 text-xs text-slate-400">
-              {t.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
-                : t.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
+              {tab.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
+                : tab.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
                 : counts.reports}
             </span>
           </button>

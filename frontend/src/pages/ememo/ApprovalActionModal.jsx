@@ -45,8 +45,8 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
   // state-aware description for approve: forward to next, or finalize
   const m = action === 'approved'
     ? { ...base, desc: isFinalStep
-        ? 'เมื่ออนุมัติ เอกสารจะได้รับการอนุมัติสมบูรณ์'
-        : (nextApproverName ? `เมื่ออนุมัติ เอกสารจะถูกส่งต่อให้ “${nextApproverName}” พิจารณาต่อ` : base.desc) }
+        ? t('เมื่ออนุมัติ เอกสารจะได้รับการอนุมัติสมบูรณ์')
+        : (nextApproverName ? t('เมื่ออนุมัติ เอกสารจะถูกส่งต่อให้ “{who}” พิจารณาต่อ', { who: nextApproverName }) : t(base.desc)) }
     : base;
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,7 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
 
   const submit = async () => {
     if (m.required && !comment.trim()) {
-      setError('กรุณาระบุเหตุผล/ความเห็น');
+      setError(t('กรุณาระบุเหตุผล/ความเห็น'));
       return;
     }
     setBusy(true); setError(null);
@@ -68,14 +68,14 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
 
   return (
     <Modal
-      title={m.title}
+      title={t(m.title)}
       onClose={busy ? undefined : onClose}
       size="md"
       footer={
         <>
           <button onClick={onClose} disabled={busy} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${m.btn}`}>
-            <Icon name={m.icon} className="h-4 w-4" /> {busy ? 'กำลังบันทึก…' : m.confirm}
+            <Icon name={m.icon} className="h-4 w-4" /> {busy ? t('กำลังบันทึก…') : t(m.confirm)}
           </button>
         </>
       }
@@ -84,7 +84,7 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
         <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.iconBg}`}>
           <Icon name={m.icon} className="h-5 w-5" />
         </span>
-        <p className="text-sm text-slate-600">{m.desc}</p>
+        <p className="text-sm text-slate-600">{t(m.desc)}</p>
       </div>
 
       {warnNoSignature && (
@@ -96,14 +96,14 @@ export default function ApprovalActionModal({ action, onClose, onConfirm, warnNo
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-600">
-          {m.label}{m.required && <span className="text-red-500"> *</span>}
+          {t(m.label)}{m.required && <span className="text-red-500"> *</span>}
         </label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
           autoFocus
-          placeholder={m.required ? 'ระบุเหตุผล…' : 'พิมพ์ความเห็น (ถ้ามี)…'}
+          placeholder={m.required ? t('ระบุเหตุผล…') : t('พิมพ์ความเห็น (ถ้ามี)…')}
           className="field"
         />
       </div>

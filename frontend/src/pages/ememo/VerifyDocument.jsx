@@ -97,7 +97,7 @@ function Verified({ data }) {
         </span>
         <div>
           <div className={`font-bold ${banner.title}`}>{banner.titleText}</div>
-          <div className={`text-xs ${banner.sub}`}>ออกจากระบบ VCB E-Memo · {doc.company_name || 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง'}</div>
+          <div className={`text-xs ${banner.sub}`}>{t('ออกโดยระบบ VCB E-Memo')} · {doc.company_name || 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง'}</div>
         </div>
       </div>
 

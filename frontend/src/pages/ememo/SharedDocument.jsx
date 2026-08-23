@@ -103,7 +103,7 @@ function Shared({ data, token }) {
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-white">{doc.project_code}</span>
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{status.label}</span>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{t(status.label, null, 'status')}</span>
         </div>
         <h1 className="text-xl font-bold text-slate-800">{doc.doc_number}</h1>
         <p className="text-slate-600">{doc.subject}</p>

@@ -138,7 +138,7 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
           {[['coverage', 'ความครบถ้วน'], ['week', 'รายสัปดาห์']].map(([k, label]) => (
             <button key={k} onClick={() => setMode(k)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>

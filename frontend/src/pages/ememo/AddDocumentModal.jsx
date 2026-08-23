@@ -203,7 +203,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }
     let cancelled = false;
     setPreviewLoading(true);
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       ememoApi
         .nextNumber(projectId, docCode)
         .then((res) => !cancelled && setPreview(res.data))
@@ -212,7 +212,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }, 250);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [projectId, docCode]);
 
@@ -232,13 +232,13 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       const shrunk = results.filter((r) => r.compressed);
       if (shrunk.length) {
         const saved = shrunk.reduce((s, r) => s + (r.from - r.to), 0);
-        setCompressNote(`บีบรูปแล้ว ${shrunk.length} ไฟล์ · ประหยัด ${fmtBytes(saved)}`);
+        setCompressNote(t('บีบรูปแล้ว {n} ไฟล์ · ประหยัด {size}', { n: shrunk.length, size: fmtBytes(saved) }));
       }
     } catch { /* fall back to the originals on any failure */ }
     setCompressing(false);
     const tooBig = processed.filter((f) => f.size > MAX_BYTES);
     const ok = processed.filter((f) => f.size <= MAX_BYTES);
-    if (tooBig.length) setError(`ไฟล์ใหญ่เกิน 200 MB: ${tooBig.map((f) => f.name).join(', ')}`);
+    if (tooBig.length) setError(t('ไฟล์ใหญ่เกิน 200 MB: {names}', { names: tooBig.map((f) => f.name).join(', ') }));
     setFiles((prev) => {
       const seen = new Set(prev.map((f) => `${f.name}:${f.size}`));
       return [...prev, ...ok.filter((f) => !seen.has(`${f.name}:${f.size}`))];
@@ -263,10 +263,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     setError(null);
     if (step === 1) {
       const miss = [];
-      if (!projectId) miss.push('โครงการ');
+      if (!projectId) miss.push('โครงการ');  // translated where it is shown
       if (!docCode) miss.push('รหัสเอกสาร');
       if (!subject.trim()) miss.push('เรื่อง');
-      if (miss.length) { setError(`กรุณากรอก: ${miss.join(' · ')}`); return; }
+      if (miss.length) { setError(t('กรุณากรอก: {fields}', { fields: miss.map(t).join(' · ') })); return; }
     }
     setStep((s) => Math.min(3, s + 1));
   };
@@ -295,14 +295,14 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
     }
     setError(null);
     if (!projectId || !docCode || !subject.trim()) {
-      setError('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง');
+      setError(t('กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง'));
       setStep(1);
       return;
     }
     // to SEND for approval a ผู้จัดการโครงการ/ผู้ลงนาม is required (they approve first).
     // If higher approvers were chosen but no PM, block; if nothing chosen → draft.
     if (!pmEmail.trim() && approvers.some((a) => a.email.trim())) {
-      setError('กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) ในขั้นที่ 2 ก่อน — เอกสารต้องผ่าน ผจก. ก่อนส่งผู้อนุมัติที่สูงกว่า');
+      setError(t('กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) ในขั้นที่ 2 ก่อน — เอกสารต้องผ่าน ผจก. ก่อนส่งผู้อนุมัติที่สูงกว่า'));
       setStep(2);
       return;
     }
@@ -401,7 +401,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       // instead of recreating, and offer a direct link to open it.
       if (doc?.id) {
         setSavedDraftId(doc.id);
-        setError(`บันทึกเอกสารเป็นฉบับร่างแล้ว แต่ขั้นตอนถัดไปทำไม่สำเร็จ: ${err.message}`);
+        setError(t('บันทึกเอกสารเป็นฉบับร่างแล้ว แต่ขั้นตอนถัดไปทำไม่สำเร็จ: {reason}', { reason: err.message }));
       } else {
         setError(err.message);
       }
@@ -451,7 +451,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-4">
-            <h3 className="text-lg font-bold text-slate-800">{initial ? 'สร้างเอกสารจากใบเดิม' : 'เพิ่มเอกสารใหม่'}</h3>
+            <h3 className="text-lg font-bold text-slate-800">{initial ? t('สร้างเอกสารจากใบเดิม') : t('เพิ่มเอกสารใหม่')}</h3>
             {/* compact step label on mobile (the full stepper is desktop-only) */}
             <span className="text-sm font-medium text-slate-500 sm:hidden">{t('ขั้นที่')} {step}/3 · {STEPS[step - 1]}</span>
             {/* stepper */}
@@ -495,7 +495,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                   <option value={companyId}>{t('หัวกระดาษที่บันทึกไว้ (บริษัทถูกปิดใช้งาน)')}</option>
                 )}
                 {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
+                  <option key={c.id} value={c.id}>{c.name}{c.is_default ? ` (${t('ค่าเริ่มต้น')})` : ''}</option>
                 ))}
               </select>
               {letter?.company_id && (
@@ -562,8 +562,8 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               <label className="block text-sm font-medium text-slate-600 mb-1">{t('ประเภทเอกสาร')}</label>
               <select value={docTypeId} onChange={(e) => setDocTypeId(e.target.value)} className={field}>
                 <option value="">{t('— ไม่ระบุ —')}</option>
-                {docTypes.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
+                {docTypes.map((dt) => (
+                  <option key={dt.id} value={dt.id}>{dt.name}</option>
                 ))}
               </select>
             </div>
@@ -679,7 +679,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
               ) : (
                 <>
                   <Icon name="download" className="h-6 w-6 text-slate-400" />
-                  <span className="text-sm text-slate-600">{files.length ? 'เพิ่มไฟล์อีก' : 'คลิกหรือลากไฟล์มาวางที่นี่'}</span>
+                  <span className="text-sm text-slate-600">{files.length ? t('เพิ่มไฟล์อีก') : t('คลิกหรือลากไฟล์มาวางที่นี่')}</span>
                   <span className="text-xs text-slate-400">{t('รูปภาพจะถูกบีบอัตโนมัติ · PDF และรูปภาพจะรวมเข้ากับหนังสือ · Word/Excel แนบเป็นไฟล์ประกอบ · สูงสุด 200 MB/ไฟล์')}</span>
                 </>
               )}
@@ -826,7 +826,7 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
           {/* wizard nav */}
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <button type="button" onClick={step === 1 ? requestClose : goBack} className="btn-outline">
-              {step === 1 ? 'ยกเลิก' : '← ก่อนหน้า'}
+              {step === 1 ? t('ยกเลิก') : t('← ก่อนหน้า')}
             </button>
             {step < 3 ? (
               <button key="next" type="button" onClick={goNext} className="btn-primary">{t('ถัดไป →')}</button>
@@ -839,10 +839,10 @@ export default function AddDocumentModal({ projects, docTypes, onClose, onCreate
                 )}
                 <button key="submit" type="submit" disabled={submitting} className="btn-primary">
                   {submitting
-                    ? (uploadingIdx >= 0 ? `กำลังอัปโหลดไฟล์ (${uploadingIdx + 1}/${files.length})…` : 'กำลังบันทึก…')
+                    ? (uploadingIdx >= 0 ? t('กำลังอัปโหลดไฟล์ ({i}/{n})…', { i: uploadingIdx + 1, n: files.length }) : t('กำลังบันทึก…'))
                     : pmEmail.trim()
-                      ? 'บันทึกและส่งอนุมัติ'
-                      : 'บันทึกเอกสาร'}
+                      ? t('บันทึกและส่งอนุมัติ')
+                      : t('บันทึกเอกสาร')}
                 </button>
               </div>
             )}

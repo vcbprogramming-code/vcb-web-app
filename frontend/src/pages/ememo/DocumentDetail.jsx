@@ -160,17 +160,17 @@ export default function DocumentDetail() {
     if (!combinePending) { combinePollRef.current = 0; return undefined; }
     if (combinePollRef.current >= 6) return undefined; // give up after ~21s
     combinePollRef.current += 1;
-    const t = setTimeout(load, 3500);
-    return () => clearTimeout(t);
+    const timer = setTimeout(load, 3500);
+    return () => clearTimeout(timer);
   }, [doc, combinePending, load]);
 
   // confirmed from ApprovalActionModal (comment already validated there)
   const confirmApproval = async (comment) => {
-    const done = { approved: 'อนุมัติเอกสารเรียบร้อย', returned: 'ส่งกลับให้แก้ไขแล้ว', rejected: 'ไม่อนุมัติเอกสารแล้ว' };
+    const done = { approved: t('อนุมัติเอกสารเรียบร้อย'), returned: t('ส่งกลับให้แก้ไขแล้ว'), rejected: t('ไม่อนุมัติเอกสารแล้ว') };
     const acted = approvalAction;
     const res = await ememoApi.approveDocument(id, acted, comment);
     setApprovalAction(null);
-    toast.success(done[acted] || 'ดำเนินการเรียบร้อย');
+    toast.success(done[acted] || t('ดำเนินการเรียบร้อย'));
     // closure + next step: pull the caller's remaining awaiting-me queue
     try {
       const r = await ememoApi.awaitingMe();
@@ -184,7 +184,7 @@ export default function DocumentDetail() {
   const confirmConsult = async ({ email, name, question }) => {
     await ememoApi.consultDocument(id, email, name, question);
     setShowConsult(false);
-    toast.success(`ส่งขอความเห็นถึง ${name || email} แล้ว`);
+    toast.success(t('ส่งขอความเห็นถึง {who} แล้ว', { who: name || email }));
     load();
   };
 
@@ -205,7 +205,7 @@ export default function DocumentDetail() {
     // real name instead of the blob's random id
     if (letter) list.push({ id: letter.id, label: t('เอกสาร'), isLetter: true, contentType: letter.content_type, fileName: letter.file_name });
     // number the supplementary files so it's clear which is attachment #1, #2… (#2)
-    inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type, fileName: a.file_name }));
+    inlineKinds.forEach((a, i) => list.push({ id: a.id, label: t('ไฟล์แนบ #{n}: {name}', { n: i + 1, name: a.file_name }), isLetter: false, contentType: a.content_type, fileName: a.file_name }));
     return list;
   })() : [];
 
@@ -306,7 +306,7 @@ export default function DocumentDetail() {
     if (!msgText.trim() && !msgFile) return;
     setPosting(true); setError(null);
     try {
-      const body = msgText.trim() || `แนบไฟล์: ${msgFile.name}`;
+      const body = msgText.trim() || t('แนบไฟล์: {name}', { name: msgFile.name });
       const { data } = await ememoApi.postMessage(id, body, mentions.map((m) => m.id));
       setMentions([]);
       if (msgFile) await ememoApi.attachMessageFile(id, data.id, msgFile);
@@ -319,7 +319,7 @@ export default function DocumentDetail() {
     <div className="space-y-3">
       <button onClick={() => navigate('/memos')} className="text-sm text-brand hover:underline">{t('← กลับทะเบียนเอกสาร')}</button>
       <div className="rounded-xl bg-red-50 px-4 py-3 text-red-700">
-        {loadError}
+        {t(loadError)}{' '}
         <button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     </div>
@@ -336,7 +336,7 @@ export default function DocumentDetail() {
   const notSubmitted = ['draft', 'returned', 'rejected'].includes(doc.status);
   const isResubmit = ['returned', 'rejected'].includes(doc.status); // resubmission needs a reason
   const isPending = doc.status === 'pending';
-  const me = profile?.full_name || user?.email || 'ฉัน';
+  const me = profile?.full_name || user?.email || t('ฉัน');
 
   // consulted-user cue: is there an open "ขอความเห็น" addressed to me?
   // (myEmail is resolved once near the top, alongside the wrong-account check)
@@ -365,9 +365,9 @@ export default function DocumentDetail() {
           <div className="min-w-0 flex-1">
             <div className="text-sm font-bold text-slate-900">
               {postAction.action === 'approved'
-                ? (postAction.finalized ? 'อนุมัติเอกสารเรียบร้อยแล้ว' : 'บันทึกการอนุมัติของคุณแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป')
-                : postAction.action === 'rejected' ? 'บันทึกการไม่อนุมัติเรียบร้อยแล้ว'
-                : 'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว'}
+                ? (postAction.finalized ? t('อนุมัติเอกสารเรียบร้อยแล้ว') : t('บันทึกการอนุมัติของคุณแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป'))
+                : postAction.action === 'rejected' ? t('บันทึกการไม่อนุมัติเรียบร้อยแล้ว')
+                : t('ส่งกลับให้ผู้จัดทำแก้ไขแล้ว')}
             </div>
             <p className="text-xs text-slate-600">{t('ระบบบันทึกผลการพิจารณาของคุณเรียบร้อยแล้ว')}</p>
           </div>
@@ -405,7 +405,7 @@ export default function DocumentDetail() {
               <div className="text-sm font-bold text-amber-900">{t('ท่านกำลังใช้งานด้วยคนละบัญชีกับที่อีเมลส่งถึง')}</div>
               <p className="mt-1 text-xs text-amber-800">
                 {t('อีเมลฉบับนี้ส่งถึง')} <b>{maskEmail(addressedTo)}</b> {t('แต่เครื่องนี้เข้าสู่ระบบด้วย')} <b>{maskEmail(myEmail)}</b>
-                {' '}จึงยังดำเนินการกับเอกสารนี้ไม่ได้
+                {' '}{t('จึงยังดำเนินการกับเอกสารนี้ไม่ได้')}
               </p>
               <button onClick={switchAccount} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-amber-700">
                 <Icon name="user" className="h-4 w-4" /> {t('สลับไปบัญชี')} {maskEmail(addressedTo)}
@@ -445,7 +445,7 @@ export default function DocumentDetail() {
           <div className="min-w-[240px]">
             <div className="mb-1 flex items-center gap-2">
               <span className="rounded-md px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: doc.project_color || '#64748b' }}>{doc.project_code}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{status.label}</span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{t(status.label, null, 'status')}</span>
             </div>
             <h2 className="text-lg font-bold text-slate-800">{doc.doc_number}</h2>
             <p className="text-slate-600">{doc.subject}</p>
@@ -540,7 +540,7 @@ export default function DocumentDetail() {
                   <button
                     onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)}
                     disabled={attBusy === activePreviewId}
-                    title={activePreview?.fileName ? `ดาวน์โหลด ${activePreview.fileName}` : 'ดาวน์โหลดไฟล์ที่กำลังเปิด'}
+                    title={activePreview?.fileName ? t('ดาวน์โหลด {name}', { name: activePreview.fileName }) : t('ดาวน์โหลดไฟล์ที่กำลังเปิด')}
                     className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline disabled:opacity-50"
                   >
                     {attBusy === activePreviewId
@@ -603,7 +603,7 @@ export default function DocumentDetail() {
                     onClick={() => downloadAttachment(a.id, a.file_name)}
                     disabled={attBusy === a.id}
                     className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-brand hover:bg-brand-tint disabled:opacity-60"
-                    title={`ดาวน์โหลด ${a.file_name}`}
+                    title={t('ดาวน์โหลด {name}', { name: a.file_name })}
                   >
                     <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
                     <span className="min-w-0 flex-1 truncate">{a.file_name}</span>
@@ -649,7 +649,7 @@ export default function DocumentDetail() {
                 <Icon name="file" className="h-10 w-10 text-slate-300" />
                 <p className="text-sm text-slate-400">{t('ยังไม่มีไฟล์หนังสือสำหรับเอกสารนี้')}</p>
                 <button onClick={generatePdf} disabled={busy} className="btn-primary">
-                  <Icon name="file" className="h-4 w-4" /> {busy ? 'กำลังสร้าง…' : 'สร้างไฟล์หนังสือ'}
+                  <Icon name="file" className="h-4 w-4" /> {busy ? t('กำลังสร้าง…') : t('สร้างไฟล์หนังสือ')}
                 </button>
               </div>
             )}
@@ -681,7 +681,7 @@ export default function DocumentDetail() {
                   }}
                   onKeyDown={(e) => { if (e.key === 'Escape') setMentionOpen(false); }}
                   rows={2}
-                  placeholder={consultForMe ? 'พิมพ์ความเห็นของคุณ…' : 'เขียนข้อความ / บันทึก / สอบถาม…  (พิมพ์ @ เพื่อกล่าวถึงเพื่อนร่วมงาน)'}
+                  placeholder={consultForMe ? t('พิมพ์ความเห็นของคุณ…') : t('เขียนข้อความ / บันทึก / สอบถาม…  (พิมพ์ @ เพื่อกล่าวถึงเพื่อนร่วมงาน)')}
                   className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
                 {mentionOpen && (() => {
@@ -699,7 +699,7 @@ export default function DocumentDetail() {
                           onClick={() => {
                             setMentions((prev) => [...prev, p]);
                             // replace the half-typed "@xxx" with the person's name
-                            setMsgText((t) => t.replace(/(^|\s)@[^\s@]*$/, `$1@${p.full_name || p.email} `));
+                            setMsgText((prev) => prev.replace(/(^|\s)@[^\s@]*$/, `$1@${p.full_name || p.email} `));
                             setMentionOpen(false);
                           }}
                           className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50"
@@ -735,7 +735,7 @@ export default function DocumentDetail() {
               <div className="mt-2 flex items-center justify-between gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-slate-500 hover:text-brand">
                   <Icon name="paperclip" className="h-4 w-4" />
-                  {msgFile ? <span className="max-w-[160px] truncate">{msgFile.name}</span> : 'แนบไฟล์'}
+                  {msgFile ? <span className="max-w-[160px] truncate">{msgFile.name}</span> : t('แนบไฟล์')}
                   <input type="file" className="hidden" onChange={async (e) => {
                     const f = e.target.files?.[0];
                     e.target.value = '';
@@ -747,7 +747,7 @@ export default function DocumentDetail() {
                 <div className="flex items-center gap-2">
                   {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">{t('ลบไฟล์')}</button>}
                   <button onClick={postMessage} disabled={posting || (!msgText.trim() && !msgFile)} className="btn-primary px-3 py-1.5 text-xs">
-                    {posting ? 'กำลังส่ง…' : consultForMe ? 'ส่งความเห็น' : 'ส่งข้อความ'}
+                    {posting ? t('กำลังส่ง…') : consultForMe ? t('ส่งความเห็น') : t('ส่งข้อความ')}
                   </button>
                 </div>
               </div>
@@ -881,7 +881,7 @@ function Timeline({ doc, openAttachment }) {
               </span>
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-                  <span className={`font-medium ${warn ? 'text-amber-600' : 'text-slate-600'}`}>{AUDIT_ACTION_TH[a.action] || a.action}</span>
+                  <span className={`font-medium ${warn ? 'text-amber-600' : 'text-slate-600'}`}>{t(AUDIT_ACTION_TH[a.action] || a.action, null, 'audit')}</span>
                   {a.actor_label && <span className="text-slate-500">{t('โดย')} {a.actor_label}</span>}
                   <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
                 </div>
@@ -891,7 +891,7 @@ function Timeline({ doc, openAttachment }) {
                       <li key={j} className="text-slate-500">
                         <span className="font-medium text-slate-600">{c.label}:</span>{' '}
                         {c.from
-                          ? <><span className="text-rose-500 line-through">{truncate(c.from)}</span> <span className="text-slate-400">→</span> <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span></>
+                          ? <><span className="text-rose-500 line-through">{truncate(c.from)}</span> <span className="text-slate-400">→</span> <span className="text-emerald-600">{truncate(c.to) || t('(ว่าง)')}</span></>
                           : <span className="text-emerald-600">{truncate(c.to) || '(ว่าง)'}</span>}
                       </li>
                     ))}
@@ -923,7 +923,7 @@ function Timeline({ doc, openAttachment }) {
                   <span className="truncate">{s.approver_name || s.approver_email}</span>
                   {/* #10: mark the signer clearly as the project manager */}
                   {s.is_signer && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">{t('ผู้จัดการโครงการ')}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : ev.isCurrent ? 'กำลังพิจารณา' : m.label}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${m.chip}`}>{isWaiting ? t('รอลำดับ') : ev.isCurrent ? t('กำลังพิจารณา') : t(m.label, null, 'status')}</span>
                   {s.acted_at && <span className="text-[11px] text-slate-500">{formatThaiDateTime(s.acted_at)}</span>}
                 </div>
                 <div className="truncate text-xs text-slate-500">{s.approver_email}</div>
@@ -950,7 +950,7 @@ function Timeline({ doc, openAttachment }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-slate-800">{m.author_name || m.author_label || 'ผู้ใช้'}</span>
+                <span className="font-medium text-slate-800">{m.author_name || m.author_label || t('ผู้ใช้')}</span>
                 {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">{t('ขอความเห็น')}</span>}
                 <span className="text-[11px] text-slate-500">{formatThaiDateTime(m.created_at)}</span>
               </div>

@@ -63,7 +63,7 @@ export default function ReferenceModal({ refId, onClose, onOpenFull }) {
           <div>
             <div className="mb-1 flex items-center gap-2">
               <span className="rounded-md px-2.5 py-1 text-xs font-semibold text-white" style={{ backgroundColor: doc.project_color || '#64748b' }}>{doc.project_code}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{status.label}</span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.chip}`}>{t(status.label, null, 'status')}</span>
             </div>
             <h3 className="text-lg font-bold text-slate-800">{doc.doc_number}</h3>
             <p className="text-slate-600">{doc.subject}</p>

@@ -61,7 +61,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
 
   return (
     <Modal
-      title={editing ? 'แก้ไขวงเงินสินเชื่อ' : 'เพิ่มวงเงินสินเชื่อ'}
+      title={editing ? t('แก้ไขวงเงินสินเชื่อ') : t('เพิ่มวงเงินสินเชื่อ')}
       onClose={onClose}
       size="2xl"
       footer={
@@ -82,7 +82,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทวงเงิน')} <span className="text-red-500">*</span></label>
             <select value={form.type} onChange={(e) => set('type', e.target.value)} className="field">
-              {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {TYPES.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
             </select>
           </div>
         </div>
@@ -197,13 +197,14 @@ function DrawdownModal({ facility, onClose, onSaved }) {
   );
 }
 
-export default function FacilitiesTab({ projects, onChanged }) {
+export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
   const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
+  useEffect(() => { if (openNew) setEdit(null); }, [openNew]);
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
   const [drawdown, setDrawdown] = useState(null);
 
@@ -211,8 +212,8 @@ export default function FacilitiesTab({ projects, onChanged }) {
     creditApi.facilities({ projectId, type, search }).then((r) => setFacilities(r.data)).catch((e) => setError(e.message));
   }, [projectId, type, search]);
   useEffect(() => {
-    const t = setTimeout(load, search ? 300 : 0);
-    return () => clearTimeout(t);
+    const timer = setTimeout(load, search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [load, search]);
 
   const projName = Object.fromEntries(projects.map((p) => [p.id, p.name || p.code]));
@@ -228,7 +229,7 @@ export default function FacilitiesTab({ projects, onChanged }) {
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="field !w-auto">
           <option value="">{t('ทุกประเภท')}</option>
-          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          {TYPES.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
         </select>
         <div className="relative min-w-[200px] flex-1">
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

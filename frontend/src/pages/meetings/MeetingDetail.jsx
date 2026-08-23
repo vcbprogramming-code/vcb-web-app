@@ -134,7 +134,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                   className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm">
                   <option value="">{t('— เลือกกลุ่มปลายทาง —')}</option>
                   {groups.filter((g) => !g.is_inbox && g.id !== m.group_id
-                    && !(m.tags || []).some((t) => t.id === g.id))
+                    && !(m.tags || []).some((tag) => tag.id === g.id))
                     .map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               ) : (

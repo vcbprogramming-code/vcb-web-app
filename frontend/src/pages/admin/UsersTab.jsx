@@ -209,7 +209,7 @@ function UserModal({ user, onClose, onSaved }) {
               </button>
             </div>
             <p className="mt-1 text-xs text-slate-400">
-              {isGoogle ? 'บัญชีนี้จะเข้าได้เฉพาะปุ่ม “Sign in with Google” เท่านั้น' : 'บัญชีนี้จะเข้าด้วยการกรอกอีเมล (ไม่ใช้ Google)'}
+              {isGoogle ? t('บัญชีนี้จะเข้าได้เฉพาะปุ่ม “Sign in with Google” เท่านั้น') : t('บัญชีนี้จะเข้าด้วยการกรอกอีเมล (ไม่ใช้ Google)')}
             </p>
           </div>
 
@@ -217,10 +217,10 @@ function UserModal({ user, onClose, onSaved }) {
           {!isGoogle && (
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">
-                {editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : <>รหัสผ่าน <span className="text-red-500">*</span></>}
+                {editing ? t('รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)') : <>{t('รหัสผ่าน')} <span className="text-red-500">*</span></>}
               </label>
               <input type="text" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder={editing ? 'ไม่เปลี่ยน' : 'อย่างน้อย 6 ตัวอักษร'} className={field} />
+                placeholder={editing ? t('ไม่เปลี่ยน') : t('อย่างน้อย 6 ตัวอักษร')} className={field} />
             </div>
           )}
           <div>
@@ -273,7 +273,7 @@ export default function UsersTab() {
     setBusyKey(`toggle:${u.id}`);
     try {
       await adminApi.updateUser(u.id, { isActive: !u.is_active });
-      toast.success(u.is_active ? 'ปิดใช้งานผู้ใช้แล้ว' : 'เปิดใช้งานผู้ใช้แล้ว');
+      toast.success(u.is_active ? t('ปิดใช้งานผู้ใช้แล้ว') : t('เปิดใช้งานผู้ใช้แล้ว'));
       await load();
     } catch (e) { toast.error(e.message); }
     finally { setBusyKey(null); }
@@ -322,7 +322,7 @@ export default function UsersTab() {
                 <td className="tbl-td text-slate-600">{u.email}</td>
                 <td className="tbl-td">
                   <span className={`chip ${u.login_method === 'google' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-                    {u.login_method === 'google' ? 'Google' : 'อีเมล'}
+                    {u.login_method === 'google' ? 'Google' : t('อีเมล')}
                   </span>
                 </td>
                 <td className="tbl-td">
@@ -330,7 +330,7 @@ export default function UsersTab() {
                 </td>
                 <td className="tbl-td">
                   <span className={`chip ${u.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                    {u.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}
+                    {u.is_active ? t('ใช้งาน') : t('ปิดใช้งาน', null, 'status')}
                   </span>
                 </td>
                 {/* which projects this person is scoped to. Empty = no restriction,
@@ -356,14 +356,14 @@ export default function UsersTab() {
                 <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setEditUser(u)} disabled={rowBusy(u)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">{t('แก้ไข')}</button>
                   <button onClick={() => toggleActive(u)} disabled={rowBusy(u)} className="text-slate-500 hover:underline text-sm mr-3 disabled:opacity-50">
-                    <BusyLabel busy={busyKey === `toggle:${u.id}`} busyText="กำลังบันทึก…">
-                      {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                    <BusyLabel busy={busyKey === `toggle:${u.id}`} busyText={t('กำลังบันทึก…')}>
+                      {u.is_active ? t('ปิดใช้งาน') : t('เปิดใช้งาน')}
                     </BusyLabel>
                   </button>
                   {/* can't delete your own account */}
                   {u.id !== profile?.id && (
                     <button onClick={() => removeUser(u)} disabled={rowBusy(u)} className="text-sm text-red-500 hover:underline disabled:opacity-50">
-                      <BusyLabel busy={busyKey === `del:${u.id}`} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
+                      <BusyLabel busy={busyKey === `del:${u.id}`} busyText={t('กำลังลบ…')}>{t('ลบ')}</BusyLabel>
                     </button>
                   )}
                 </td>

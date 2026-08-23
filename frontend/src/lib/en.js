@@ -15,7 +15,6 @@ export const EN = {
   'บันทึก': 'Save',
   'บันทึกแล้ว': 'Saved',
   'กำลังบันทึก…': 'Saving…',
-  'ยกเลิก': 'Cancel',
   'ปิด': 'Close',
   'แก้ไข': 'Edit',
   'ลบ': 'Delete',
@@ -28,9 +27,7 @@ export const EN = {
   'กำลังส่ง…': 'Sending…',
   'กำลังอัปโหลด…': 'Uploading…',
   'กำลังส่งออก…': 'Exporting…',
-  'ส่ง': 'Send',
   'ค้นหา…': 'Search…',
-  'ทั้งหมด': 'All',
   'ไม่พบข้อมูล': 'Nothing found',
   'ยังไม่มีข้อมูล': 'No data yet',
   'ดูรายละเอียด': 'View details',
@@ -49,18 +46,14 @@ export const EN = {
   'ล้างทั้งหมด': 'Clear all',
 
   // ── คำนามที่ใช้ร่วมกัน ─────────────────────────────────────────────────
-  'โครงการ': 'Project',
   'ทุกโครงการ': 'All projects',
   'ทุกกลุ่ม': 'All groups',
   'ทุกหมวด': 'All categories',
-  'ทุกแผนก': 'All departments',
   'ทุกสถานะ': 'All statuses',
   'แผนก': 'Department',
   'สถานะ': 'Status',
-  'ประเภท': 'Type',
   'รหัส': 'Code',
   'ชื่อ-นามสกุล': 'Full name',
-  'อีเมล': 'Email',
   'บทบาท': 'Role',
   'ตำแหน่ง': 'Position',
   'หมายเหตุ': 'Note',
@@ -69,39 +62,21 @@ export const EN = {
   'เวลา': 'Time',
   'ครบกำหนด': 'Due',
   'ชุด': 'set',
-  'วัน': 'day(s)',
   'ลายเซ็น': 'Signature',
   'ไฟล์แนบ': 'Attachments',
   'ความเห็น': 'Comments',
   'ประวัติ': 'History',
-  'ผู้ใช้': 'User',
-  'ผู้ดูแลระบบ': 'Administrator',
-  'ผู้บริหาร': 'Executive',
-  'เจ้าหน้าที่ HR': 'HR officer',
 
   // ── สถานะที่ใช้ร่วมกัน ─────────────────────────────────────────────────
-  'ฉบับร่าง': 'Draft',
-  'รออนุมัติ': 'Awaiting approval',
-  'อนุมัติแล้ว': 'Approved',
-  'ไม่อนุมัติ': 'Not approved',
-  'อนุมัติ': 'Approve',
-  'ยกเลิกแล้ว': 'Cancelled',
-  'ส่งกลับแก้ไข': 'Returned for revision',
-  'ใช้งาน': 'Active',
-  'ปิดใช้งาน': 'Disable',
   'ยังไม่เผยแพร่': 'Not published',
   'ปักหมุด': 'Pin',
   'เอาหมุดออก': 'Unpin',
 
   // ── หน้าแรก (Portal) ───────────────────────────────────────────────────
   'ระบบงานภายใน': 'Internal systems',
-  'แอปพลิเคชัน': 'Applications',
-  'รายการ': 'items',
   'ช่วยเหลือ': 'Help',
   'ช่วยเหลือ / แจ้งปัญหา': 'Help / report a problem',
   'เร็วๆ นี้': 'Coming soon',
-  'เปิดใช้งาน': 'Open',
-  'ระบบออนไลน์': 'System online',
   'สลับบัญชี': 'Switch account',
   'ออกจากระบบ': 'Sign out',
   'ปฏิทินวันหยุด': 'Holiday calendar',
@@ -111,44 +86,18 @@ export const EN = {
   'วันหยุดถัดไป': 'Next holiday',
   'อีก': 'in',
   'ค้นหาแอปพลิเคชัน…': 'Search applications…',
-  'สวัสดีตอนเช้า': 'Good morning',
-  'สวัสดีตอนบ่าย': 'Good afternoon',
-  'สวัสดีตอนเย็น': 'Good evening',
   'กลับสู่หน้า Portal': 'Back to the portal',
   'สำหรับใช้งานภายในเท่านั้น': 'Internal use only',
 
   // ── ชื่อโมดูลบนหน้าแรก ─────────────────────────────────────────────────
-  'บันทึก & อนุมัติ (E-Memo)': 'Memos & Approvals (E-Memo)',
-  'บันทึก & อนุมัติ': 'Memos & Approvals',
-  'จัดทำหนังสือ ออกเลขอัตโนมัติ และอนุมัติออนไลน์พร้อมลายเซ็น':
-    'Draft letters, number them automatically, and approve online with a signature',
-  'บันทึกงานฝ่ายบุคคล': 'HR Work Log',
-  'บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน':
-    'What each person worked on each day, by site',
-  'วงเงินสินเชื่อโครงการ': 'Project Credit Facilities',
-  'ติดตามวงเงิน การเบิกใช้ คำขออนุมัติ และแผนกระแสเงินสด':
-    'Track limits, drawdowns, approval requests and the cash plan',
   'รับพนักงานใหม่': 'Onboarding',
-  'คลังข้อมูล แผน 30-60-90 วัน และแบบประเมินทดลองงาน':
-    'Reference material, the 30-60-90 day plan, and the probation review',
   'ตั้งค่า': 'Settings',
-  'ผู้ใช้และสิทธิ์ · โครงการ/หัวจดหมาย · ประเภทเอกสาร · โปรไฟล์และลายเซ็นของฉัน':
-    'Users and permissions · Projects/letterhead · Document types · My profile and signature',
-  'คู่มือปฏิบัติงาน (SOP)': 'Operating Manual (SOP)',
-  'ระเบียบปฏิบัติมาตรฐาน ERP — กรณีศึกษา ผังกระบวนการ และเมนูรายงาน':
-    'ERP standard operating procedures — case studies, process flows, and the report menu',
   'รายงานการประชุม': 'Meeting Minutes',
-  'บันทึกการประชุมแยกตามโครงการ เก็บทุกเวอร์ชัน ไฟล์แนบ และความเห็นของทีม':
-    'Minutes by project, every version kept, with attachments and team comments',
-  'แผนผังระบบ (System Map)': 'System Map',
   'แผนผังระบบ': 'System Map',
-  'กระบวนการทำงานของกลุ่ม ทะเบียนฟังก์ชันรายแผนก และจุดที่ใช้ AI ช่วยได้':
-    'How the group works, the function register by department, and where AI can help',
 
   // ── เข้าสู่ระบบ ────────────────────────────────────────────────────────
   'ลงชื่อเข้าใช้ด้วย Google': 'Sign in with Google',
   'เข้าสู่ระบบด้วยอีเมล': 'Sign in with email',
-  'รหัสผ่าน': 'Password',
   'หรือ': 'or',
   'บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)': 'An account your administrator created (email + password)',
   'ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบเพื่อขอรหัสผ่านใหม่':
@@ -341,7 +290,6 @@ export const EN = {
   'รหัสหมวดต้นทุนอัตโนมัติ': 'Automatic cost-category code',
   'เช่น 5': 'e.g. 5',
   'ชื่อ (ไทย) *': 'Name (Thai) *',
-  'ชื่อ (อังกฤษ)': 'Name (English)',
   'กิจกรรม': 'Activities',
   'หมวดหมู่': 'Category',
   'การจับคู่': 'Mapping',
@@ -448,7 +396,6 @@ export const EN = {
   'วัตถุประสงค์ · ขอบเขต · หมายเหตุ': 'Purpose · scope · notes',
   'ขอบเขต:': 'Scope:',
   'เลื่อนดูแนวนอนได้ · ย่อ/ขยายได้': 'Scrolls sideways · zooms in and out',
-  'ย่อ': 'Zoom out',
   'ขยาย': 'Zoom in',
   'ขั้นที่': 'Step',
   'เริ่ม / จบ': 'Start / end',
@@ -469,7 +416,6 @@ export const EN = {
   'แสดง': 'Showing',
   'จาก': 'of',
   'งานที่ทำ': 'What it does',
-  'อยู่ใน ERP': 'In the ERP',
   'โมดูล': 'Module',
   'ไม่พบรายการที่ตรงกับที่กรอง': 'Nothing matches this filter',
   'ทำที่หน้างาน': 'Done on site',
@@ -737,7 +683,6 @@ export const EN = {
   'แผนงาน 30-60-90 วันจะถูกสร้างจากเทมเพลตที่ใช้งานอยู่ให้อัตโนมัติ':
     'The 30-60-90 day plan is created automatically from the active template',
   'ยังไม่มีพนักงานใหม่ในระบบติดตาม': 'No new starters being tracked yet',
-  'ความคืบหน้า': 'Progress',
   'เริ่มงาน': 'Started',
   'แนะแนวและติดตามพนักงานใหม่ 90 วัน': 'Onboarding and 90-day follow-up',
   'เทมเพลตงานในแต่ละช่วง — เมื่อเพิ่มพนักงานใหม่ ระบบจะคัดลอกรายการเหล่านี้เป็นแผนติดตามให้อัตโนมัติ':
@@ -877,7 +822,6 @@ export const EN = {
   '— เลือกผู้ใช้ —': '— Choose someone —',
   'คำถาม / สิ่งที่ขอปรึกษา (ไม่บังคับ)': 'Question / what you are asking about (optional)',
   'เช่น รบกวนช่วยดูเรื่องราคาต่อหน่วยให้หน่อยครับ…': 'e.g. could you take a look at the unit price…',
-  'ยกเลิกเอกสาร': 'Cancel document',
   'ยกเลิกเอกสารนี้?\nเอกสารจะไม่เดินในสายอนุมัติต่อ และกลับคืนไม่ได้':
     'Cancel this document?\nIt will stop moving through the approval chain, and this cannot be undone.',
   'ยกเลิกเอกสารแล้ว': 'Document cancelled',
@@ -937,7 +881,6 @@ export const EN = {
   'บันทึกการแก้ไขแล้ว': 'Changes saved',
   'ยังไม่มีการพิจารณาหรือข้อความ — เริ่มการสนทนาด้านล่างได้เลย':
     'No decisions or messages yet — start the conversation below',
-  'โดย': 'by',
   'ผู้จัดการโครงการ': 'Project manager',
   'ลงลายเซ็นบนเอกสารแล้ว': 'Signed the document',
   'เปิดดูเอกสาร:': 'Open the document:',
@@ -1029,4 +972,325 @@ export const EN = {
   'ประเภท:': 'Type:',
   'การพิจารณา': 'Decisions',
   'ประวัติการดำเนินการ (Audit Trail)': 'Audit trail',
+
+  // ── ชื่อโมดูลและคำอธิบายบนหน้าแรก ───────────────────────────────────────
+  'บันทึก & อนุมัติ (E-Memo)': 'Memos & Approvals (E-Memo)',
+  'บันทึก & อนุมัติ': 'Memos & Approvals',
+  'จัดทำหนังสือ ออกเลขอัตโนมัติ และอนุมัติออนไลน์พร้อมลายเซ็น':
+    'Write letters, number them automatically, and approve online with a signature',
+  'บันทึกงานฝ่ายบุคคล': 'HR work log',
+  'บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน':
+    'What each person did each day, site by site',
+  'วงเงินสินเชื่อโครงการ': 'Project credit facilities',
+  'ติดตามวงเงิน การเบิกใช้ คำขออนุมัติ และแผนกระแสเงินสด':
+    'Facilities, drawdowns, approval requests, and the cash plan',
+  'แนะแนวพนักงานใหม่ 90 วัน': 'New starters — the first 90 days',
+  'แนะแนวพนักงานใหม่': 'New starters',
+  'คลังข้อมูล แผน 30-60-90 วัน และแบบประเมินทดลองงาน':
+    'The resource library, the 30-60-90 day plan, and the probation review',
+  'ผู้ใช้และสิทธิ์ · โครงการ/หัวจดหมาย · ประเภทเอกสาร · โปรไฟล์และลายเซ็นของฉัน':
+    'Users and permissions · projects and letterheads · document types · my profile and signature',
+  'คู่มือปฏิบัติงาน (SOP)': 'Standard operating procedures (SOP)',
+  'ระเบียบปฏิบัติมาตรฐาน ERP — กรณีศึกษา ผังกระบวนการ และเมนูรายงาน':
+    'ERP standard practice — worked cases, process flows, and where to find each report',
+  'บันทึกการประชุมแยกตามโครงการ เก็บทุกเวอร์ชัน ไฟล์แนบ และความเห็นของทีม':
+    'Minutes by project, every version kept, with attachments and the team\'s comments',
+  'แผนผังระบบ (System Map)': 'System map',
+  'กระบวนการทำงานของกลุ่ม ทะเบียนฟังก์ชันรายแผนก และจุดที่ใช้ AI ช่วยได้':
+    'How the group works, the function register by department, and where AI could help',
+  'ภาพรวม E-Memo': 'E-Memo overview',
+
+  // ── บทบาทผู้ใช้ ─────────────────────────────────────────────────────────
+  'ผู้ดูแลระบบ': 'Administrator',
+  'ผู้บริหาร': 'Executive',
+  'เจ้าหน้าที่ HR': 'HR officer',
+
+  // ── สถานะเอกสารและผลการพิจารณา ──────────────────────────────────────────
+  'ฉบับร่าง': 'Draft',
+  'รออนุมัติ': 'Awaiting approval',
+  'อนุมัติแล้ว': 'Approved',
+  'ตีกลับ': 'Sent back',
+  'ยกเลิก': 'Cancel',
+  'รอดำเนินการ': 'Waiting',
+  'อนุมัติ': 'Approve',
+  'ไม่อนุมัติ': 'Refuse',
+  'ส่งกลับแก้ไข': 'Send back for amendment',
+  'รอลำดับ': 'Later in the chain',
+  'กำลังพิจารณา': 'Deciding now',
+
+  // ── วันหยุดราชการ ───────────────────────────────────────────────────────
+  'วันขึ้นปีใหม่': "New Year's Day",
+  'วันจักรี': 'Chakri Day',
+  'วันสงกรานต์': 'Songkran',
+  'วันแรงงานแห่งชาติ': 'National Labour Day',
+  'วันฉัตรมงคล': 'Coronation Day',
+  'วันเฉลิมพระชนมพรรษา ร.10': "H.M. the King's Birthday",
+  'วันแม่แห่งชาติ': "Mother's Day",
+  'วันคล้ายวันสวรรคต ร.9': 'Passing of H.M. King Rama IX',
+  'วันปิยมหาราช': 'Chulalongkorn Day',
+  'วันพ่อแห่งชาติ': "Father's Day",
+  'วันรัฐธรรมนูญ': 'Constitution Day',
+  'วันสิ้นปี': "New Year's Eve",
+
+  // ── แผนผังระบบ: ช่องกรอกในหน้าต่างแก้ไข ─────────────────────────────────
+  'กรุณากรอก "{f}"': 'Please fill in "{f}"',
+  'รหัสเลน': 'Lane code',
+  'ตัวอักษรอังกฤษ ตัวเลข . _ - เช่น lane-a': 'Latin letters, digits, . _ - — e.g. lane-a',
+  'ชื่อ (อังกฤษ)': 'Name (English)',
+  'รหัสกล่องงาน': 'Step code',
+  'เช่น n-bd-pipeline': 'e.g. n-bd-pipeline',
+  'อยู่ในเลน': 'In lane',
+  'ประเภท': 'Type',
+  'ทำมือ': 'Manual',
+  'อยู่ใน ERP': 'In the ERP',
+  'แผนกหลัก': 'Main department',
+  'แผนกร่วม': 'Second department',
+  'ชื่องาน (อังกฤษ)': 'Step name (English)',
+  'ชื่องาน (ไทย)': 'Step name (Thai)',
+  'คำขยาย (อังกฤษ)': 'Qualifier (English)',
+  'คำขยาย (ไทย)': 'Qualifier (Thai)',
+  'โมดูล ERP': 'ERP module',
+  'คำอธิบาย (อังกฤษ)': 'Description (English)',
+  'คำอธิบาย (ไทย)': 'Description (Thai)',
+  'แรงที่ต้องลง': 'Effort',
+  'สูง': 'High',
+  'ปานกลาง': 'Medium',
+  'ต่ำ': 'Low',
+
+  // ── E-Memo: ประวัติการดำเนินการและกล่องข้อความ ─────────────────────────
+  'สร้างเอกสาร': 'Document created',
+  'แก้ไขเอกสาร': 'Document edited',
+  'ส่งเข้าสายอนุมัติ': 'Sent into the approval chain',
+  'ยกเลิกเอกสาร': 'Cancel document',
+  'ส่งต่อ': 'Forwarded',
+  'ส่งอนุมัติซ้ำ': 'Resubmitted',
+  'ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ': 'Could not email the approver',
+  'มีไฟล์แนบที่รวมเข้าไฟล์เดียวไม่ได้': 'Some attachments could not be merged',
+  'อนุมัติเอกสารเรียบร้อย': 'Document approved',
+  'ส่งกลับให้แก้ไขแล้ว': 'Sent back for amendment',
+  'ไม่อนุมัติเอกสารแล้ว': 'Document refused',
+  'ดำเนินการเรียบร้อย': 'Done',
+  'ส่งขอความเห็นถึง {who} แล้ว': 'Asked {who} for their view',
+  'แนบไฟล์: {name}': 'Attached: {name}',
+  'ฉัน': 'me',
+  'อนุมัติเอกสารเรียบร้อยแล้ว': 'The document is approved',
+  'บันทึกการอนุมัติของคุณแล้ว — ส่งต่อผู้อนุมัติลำดับถัดไป':
+    'Your approval is recorded — it has gone to the next approver',
+  'บันทึกการไม่อนุมัติเรียบร้อยแล้ว': 'Your refusal is recorded',
+  'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว': 'Sent back to the writer to amend',
+  'จึงยังดำเนินการกับเอกสารนี้ไม่ได้': 'so you cannot act on this document yet',
+  'ดาวน์โหลด {name}': 'Download {name}',
+  'กำลังสร้าง…': 'Creating…',
+  'สร้างไฟล์หนังสือ': 'Create the letter file',
+  'พิมพ์ความเห็นของคุณ…': 'Type your view…',
+  'เขียนข้อความ / บันทึก / สอบถาม…  (พิมพ์ @ เพื่อกล่าวถึงเพื่อนร่วมงาน)':
+    'Write a message, a note, or a question…  (type @ to mention a colleague)',
+  'แนบไฟล์': 'Attach a file',
+  'ส่งความเห็น': 'Send view',
+  'ส่งข้อความ': 'Send message',
+  '(ว่าง)': '(empty)',
+  'ผู้ใช้': 'User',
+  'ไฟล์แนบ #{n}: {name}': 'Attachment #{n}: {name}',
+
+  // ── หน้าแรกและตัวช่วยนำทาง ──────────────────────────────────────────────
+  'สวัสดีตอนเช้า': 'Good morning',
+  'สวัสดีตอนบ่าย': 'Good afternoon',
+  'สวัสดีตอนเย็น': 'Good evening',
+  'ความเคลื่อนไหวของ VCB Connect ในวันนี้': "What is moving in VCB Connect today",
+  'ระบบออนไลน์': 'System online',
+  'เปิดใช้งาน': 'Open',
+  'ผู้ใช้งาน': 'user',
+  'เมนูหลัก': 'Main menu',
+  'แอปพลิเคชัน': 'Applications',
+  'ออกจากระบบแล้วเข้าด้วยบัญชีอื่น': 'Sign out and back in as someone else',
+  'VCB Group · สำหรับใช้งานภายในเท่านั้น': 'VCB Group · internal use only',
+  'เมนู': 'Menu',
+  'ค้นหาแอปพลิเคชัน': 'Search applications',
+  'สลับธีมสว่าง/มืด': 'Switch between light and dark',
+  'โหลดประกาศไม่สำเร็จ': 'Could not load announcements',
+  'รายการ': 'items',
+  'ไม่พบแอปที่ตรงกับ “{q}”': 'Nothing matches "{q}"',
+  'VCB Connect · ระบบงานภายใน กลุ่มวิจิตรภัณฑ์ก่อสร้าง':
+    'VCB Connect · internal systems, Vichitbhan Construction Group',
+
+  // ── E-Memo: ตัวช่วยสร้างเอกสาร ─────────────────────────────────────────
+  'บีบรูปแล้ว {n} ไฟล์ · ประหยัด {size}': 'Compressed {n} images · saved {size}',
+  'ไฟล์ใหญ่เกิน 200 MB: {names}': 'Larger than 200 MB: {names}',
+  'กรุณากรอก: {fields}': 'Please fill in: {fields}',
+  'โครงการ': 'Project',
+  'กรุณาเลือกโครงการ รหัสเอกสาร และระบุเรื่อง': 'Please choose a project and a code, and enter a subject',
+  'กรุณาเลือกผู้จัดการโครงการ (ผู้ลงนาม) ในขั้นที่ 2 ก่อน — เอกสารต้องผ่าน ผจก. ก่อนส่งผู้อนุมัติที่สูงกว่า':
+    'Choose the project manager (signatory) in step 2 first — the document goes through them before any more senior approver',
+  'สร้างเอกสารจากใบเดิม': 'New document from this one',
+  'เพิ่มเอกสารใหม่': 'New document',
+  'เพิ่มไฟล์อีก': 'Add more files',
+  'คลิกหรือลากไฟล์มาวางที่นี่': 'Click, or drag files here',
+  '← ก่อนหน้า': '← Back',
+  'กำลังอัปโหลดไฟล์ ({i}/{n})…': 'Uploading file {i} of {n}…',
+  'บันทึกและส่งอนุมัติ': 'Save and send for approval',
+  'บันทึกเอกสาร': 'Save document',
+  'บันทึกเอกสารเป็นฉบับร่างแล้ว แต่ขั้นตอนถัดไปทำไม่สำเร็จ: {reason}':
+    'Saved as a draft, but the next step failed: {reason}',
+
+  // ── กล่องตัดสินใจอนุมัติ ────────────────────────────────────────────────
+  'อนุมัติเอกสาร': 'Approve document',
+  'ยืนยันการอนุมัติเอกสารนี้ — เมื่ออนุมัติแล้วจะดำเนินการขั้นต่อไปทันที':
+    'Confirm your approval — the document moves on straight away',
+  'ยืนยันการอนุมัติ': 'Confirm approval',
+  'ส่งเอกสารกลับให้ผู้จัดทำแก้ไข โปรดระบุสิ่งที่ต้องแก้':
+    'Send it back to the writer to amend — say what needs changing',
+  'เหตุผล / สิ่งที่ต้องแก้ไข': 'Reason / what needs changing',
+  'ยืนยันส่งกลับแก้ไข': 'Confirm sending back',
+  'ไม่อนุมัติเอกสาร': 'Refuse document',
+  'ปฏิเสธเอกสารนี้ (สิ้นสุดการพิจารณา) โปรดระบุเหตุผล':
+    'Refuse this document — that ends the review. Please give a reason.',
+  'เหตุผลที่ไม่อนุมัติ': 'Reason for refusing',
+  'ยืนยันไม่อนุมัติ': 'Confirm refusal',
+  'เมื่ออนุมัติ เอกสารจะได้รับการอนุมัติสมบูรณ์': 'Approving this completes the document',
+  'เมื่ออนุมัติ เอกสารจะถูกส่งต่อให้ “{who}” พิจารณาต่อ': 'Approving sends it on to "{who}"',
+  'กรุณาระบุเหตุผล/ความเห็น': 'Please give a reason or a comment',
+  'ระบุเหตุผล…': 'Give a reason…',
+  'พิมพ์ความเห็น (ถ้ามี)…': 'Add a comment if you wish…',
+
+  // ── การลา ───────────────────────────────────────────────────────────────
+  'ยกเลิกแล้ว': 'Cancelled',
+  'กรุณาเลือกชื่อพนักงาน': 'Please choose an employee',
+  'กรุณาระบุช่วงวันที่ลา': 'Please give the dates',
+  'วันสิ้นสุดต้องไม่ก่อนวันเริ่มลา': 'The last day cannot fall before the first',
+  'อนุมัติการลา': 'Approve leave',
+  'ไม่อนุมัติการลา': 'Refuse leave',
+  'วันเหล่านี้จะถูกบันทึกเป็นวันลาในตารางงานให้อัตโนมัติ':
+    'These days are written into the work schedule as leave automatically',
+  'บันทึกว่าไม่อนุมัติแล้ว': 'Recorded as refused',
+  'ส่งคำขอลา': 'Send request',
+  'ยังไม่มีคำขอลาของท่าน': 'You have no leave requests yet',
+  'ไม่มีคำขอรออนุมัติ': 'Nothing waiting for approval',
+  'ยังไม่มีประวัติการพิจารณา': 'No decisions yet',
+  'วัน': 'days',
+  'โดย': 'by',
+
+  // ── ภาพรวม E-Memo: ตัวกรองและหน่วยนับ ──────────────────────────────────
+  'ทั้งหมด': 'All',
+  'เดือนนี้': 'This month',
+  '3 เดือนล่าสุด': 'Last 3 months',
+  'ปีนี้': 'This year',
+  'ไม่เกิน 3 วัน': 'Within 3 days',
+  '4–7 วัน': '4–7 days',
+  '8–14 วัน': '8–14 days',
+  'เกิน 14 วัน': 'Over 14 days',
+  'ไม่มีเอกสารให้ส่งออก': 'Nothing to export',
+  'ดาวน์โหลดทะเบียน {n} ฉบับตามตัวกรองนี้เป็นไฟล์ Excel':
+    'Download these {n} documents as an Excel file',
+  '({n} ครั้ง)': '({n} decisions)',
+  'ย่อ': 'Zoom out',
+  'ดูทั้งหมด ({n})': 'Show all ({n})',
+  'ความคืบหน้า': 'Progress',
+  'กิจกรรมหลัก': 'Main activities',
+  'หมวดงานหลัก': 'Main cost categories',
+
+  // ── หน้าอนุมัติจากลิงก์อีเมล ────────────────────────────────────────────
+  'ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว': 'passed to the next approver',
+  'กรุณาระบุอีเมลผู้ที่ต้องการส่งต่อ': 'Please give the email address to forward to',
+  'กรุณาเซ็นหรืออัปโหลดลายเซ็นก่อนอนุมัติ': 'Please sign, or upload a signature, before approving',
+  'กรุณาระบุเหตุผลที่ส่งกลับแก้ไข': 'Please say why it is going back',
+  'กรุณาระบุเหตุผลที่ไม่อนุมัติ': 'Please say why you are refusing',
+  'ลิงก์หมดอายุแล้ว': 'This link has expired',
+  'รายการนี้ถูกดำเนินการไปแล้ว': 'This has already been dealt with',
+  'หนังสือฉบับเต็ม': 'the full letter',
+  'ส่ง': 'Send',
+
+  // ── ตั้งค่า: เมนูด้านซ้าย ──────────────────────────────────────────────
+  'ของฉัน': 'Mine',
+  'ระบบ': 'System',
+  'ผู้ใช้และสังกัดโครงการ': 'Users and projects',
+  'ประกาศ': 'Announcements',
+  'โครงการ / หัวจดหมาย': 'Projects / letterheads',
+  'บริษัท / ตรา': 'Companies / marks',
+  'ผู้อนุมัติตามรหัสเอกสาร': 'Approvers by document code',
+  'ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว':
+    'Every system and E-Memo setting lives here',
+  'ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน':
+    'Your profile and the signature that appears on your documents',
+
+  // ── วงเงินสินเชื่อ: แท็บและตัวเลข ──────────────────────────────────────
+  'วงเงินสินเชื่อ (Facilities)': 'Facilities',
+  'รายการสินเชื่อ (Credit Ledger)': 'Credit ledger',
+  'วางแผนสินเชื่อ (Cash Plan)': 'Cash plan',
+  'ติดตามวงเงินสินเชื่อทุกโครงการ · Credit Facility Manager':
+    'Every project\'s credit facilities in one place',
+  'เกินกำหนด': 'Overdue',
+  'ดอกเบี้ยเกินกำหนด': 'overdue interest',
+
+  // ── ตั้งค่า: ผู้ใช้ ────────────────────────────────────────────────────
+  'บัญชีนี้จะเข้าได้เฉพาะปุ่ม “Sign in with Google” เท่านั้น':
+    'This account can only sign in with the "Sign in with Google" button',
+  'บัญชีนี้จะเข้าด้วยการกรอกอีเมล (ไม่ใช้ Google)': 'This account signs in with an email and password, not Google',
+  'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)': 'New password (leave empty to keep the current one)',
+  'รหัสผ่าน': 'Password',
+  'ไม่เปลี่ยน': 'unchanged',
+  'อย่างน้อย 6 ตัวอักษร': 'at least 6 characters',
+  'ปิดใช้งานผู้ใช้แล้ว': 'User deactivated',
+  'เปิดใช้งานผู้ใช้แล้ว': 'User reactivated',
+  'อีเมล': 'Email',
+  'ใช้งาน': 'Active',
+  'ปิดใช้งาน': 'Deactivate',
+  'เปิดใช้งานผู้ใช้': 'Reactivate user',
+
+  // ── คำพ้องรูป: ไทยคำเดียวกัน อังกฤษคนละคำ ───────────────────────────────
+  // ป้ายสถานะอ่านเป็นผลลัพธ์ ส่วนปุ่มอ่านเป็นคำสั่ง — t(…, null, 'status')
+  'status::ยกเลิก': 'Cancelled',
+  'status::อนุมัติ': 'Approved',
+  'status::ไม่อนุมัติ': 'Not approved',
+  'status::ส่งกลับแก้ไข': 'Returned for amendment',
+  'status::ปิดใช้งาน': 'Disabled',
+  'audit::ยกเลิกเอกสาร': 'Document cancelled',
+  'audit::อนุมัติ': 'Approved',
+  'audit::ไม่อนุมัติ': 'Refused',
+  'audit::ส่งกลับแก้ไข': 'Sent back for amendment',
+  'list::ย่อ': 'Show less',
+
+  // ── ข้อความผิดพลาดที่มาจากเซิร์ฟเวอร์ (แปลงเป็นไทยที่ lib/api.js ก่อน) ──
+  'ไม่พบเอกสารนี้': 'Document not found',
+  'ไม่พบโครงการนี้': 'Project not found',
+  'ไม่พบผู้ใช้รายนี้': 'User not found',
+  'ไม่พบวงเงินนี้': 'Facility not found',
+  'ไม่พบรายการสินเชื่อนี้': 'Credit entry not found',
+  'ไม่พบคำขอนี้': 'Request not found',
+  'ไม่พบไฟล์แนบนี้': 'Attachment not found',
+  'ไม่พบข้อความนี้': 'Message not found',
+  'ไม่พบบริษัทนี้': 'Company not found',
+  'ไม่พบรหัสเอกสารนี้': 'Document code not found',
+  'ไม่พบประเภทนี้': 'Type not found',
+  'ไม่พบงวดแผนเงินสดนี้': 'Cash plan period not found',
+  'ไม่พบไฟล์ในที่จัดเก็บ': 'The file is not in storage',
+  'ไม่พบข้อมูลที่ต้องการ': 'Not found',
+  'ข้อมูลที่กรอกไม่ถูกต้อง': 'Some of what you entered is not valid',
+  'ไม่มีข้อมูลที่เปลี่ยนแปลง': 'Nothing was changed',
+  'ยังไม่ได้เลือกไฟล์': 'No file chosen',
+  'กรุณาเข้าสู่ระบบใหม่': 'Please sign in again',
+  'ไม่มีสิทธิ์ดำเนินการนี้': 'You do not have permission to do that',
+  'เซิร์ฟเวอร์ตอบสนองช้ากว่าปกติ (ระบบอาจกำลังเริ่มทำงาน) กรุณาลองใหม่อีกครั้ง':
+    'The server is slower than usual (it may be starting up) — please try again',
+  'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่':
+    'Could not reach the server — check your connection and try again',
+  'ลิงก์นี้ชี้ไปที่ “{section}” ซึ่งเปิดได้เฉพาะผู้ดูแลระบบ — จึงพาท่านมาที่หน้าที่ท่านเปิดได้แทน':
+    'That link points at "{section}", which only an administrator can open — you have been brought to a section you can use instead',
+  'ยังไม่มีวงเงินให้ส่งออก': 'No facilities to export yet',
+  'ดาวน์โหลดวงเงินทั้งหมดเป็นไฟล์ Excel': 'Download every facility as an Excel file',
+  'ยังไม่มีวงเงินสินเชื่อในระบบ': 'No credit facilities yet',
+  'เริ่มจากเพิ่มวงเงินที่ธนาคารอนุมัติให้แต่ละโครงการ แล้วจึงบันทึกการเบิกใช้ — ยอดคงเหลือและรายการครบกำหนดจะคำนวณให้เอง':
+    'Start by adding the facility the bank approved for a project, then record each drawdown — the remaining limit and what falls due are worked out for you',
+  'เพิ่มวงเงินแรก': 'Add the first facility',
+  'แก้ไขวงเงินสินเชื่อ': 'Edit facility',
+  'เพิ่มวงเงินสินเชื่อ': 'Add facility',
+  'โมดูลนี้แสดงข้อมูลตามไซต์งานที่ท่านดูแล — ขอให้ผู้ดูแลระบบผูกไซต์งานให้ท่านที่ ตั้งค่า → ผู้ใช้และสังกัดโครงการ แล้วกลับมาที่หน้านี้อีกครั้ง':
+    'This module shows the sites you look after — ask an administrator to assign you one under Settings → Users and projects, then come back',
+  'ไม่พบรายงานที่ตรงกับคำค้น': 'Nothing matches that search',
+  'ยังไม่มีรายงานในกลุ่มนี้': 'No minutes in this group yet',
+  'ยังไม่มีรายงานให้อ่าน — กด “เพิ่มรายงาน” เพื่อเริ่มฉบับแรก':
+    'Nothing to read yet — press "Add minutes" to write the first',
+  'ออกโดยระบบ VCB E-Memo': 'Issued by the VCB E-Memo system',
+  'ความครบถ้วน': 'Coverage',
+  'รายสัปดาห์': 'Weekly',
+  'บันทึกการประชุมแยกตามโครงการและฝ่าย · {n} ฉบับ': 'Minutes by project and department · {n} in all',
 };

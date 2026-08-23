@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { perfApi } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import { PageHeader } from '../../components/ui/index.js';
@@ -16,13 +17,30 @@ const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', '�
 const monthLabel = ({ y, m }) => `${THAI_MONTHS[m - 1]} ${y + 543}`;
 const shift = ({ y, m }, delta) => { const d = new Date(y, m - 1 + delta, 1); return { y: d.getFullYear(), m: d.getMonth() + 1 }; };
 
+/** A dead end with no way out reads as a broken page; say who can open it. */
+function NoSites() {
+  const t = useT();
+  return (
+    <div className="card flex flex-col items-center gap-2 py-10 text-center">
+      <h3 className="font-bold text-slate-700">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</h3>
+      <p className="max-w-md text-sm text-slate-500">
+        {t('โมดูลนี้แสดงข้อมูลตามไซต์งานที่ท่านดูแล — ขอให้ผู้ดูแลระบบผูกไซต์งานให้ท่านที่ ตั้งค่า → ผู้ใช้และสังกัดโครงการ แล้วกลับมาที่หน้านี้อีกครั้ง')}
+      </p>
+    </div>
+  );
+}
+
 export default function Performance() {
   const t = useT();
   const now = new Date();
   const toast = useToast();
   const [boot, setBoot] = useState(null);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('entry'); // entry | dashboard | index | settings
+  // The tab lives in the URL so a link can point at one — "ดูหน้าการลา" was
+  // impossible to send to anyone, unlike the deep links SOP already supports.
+  const [sp, setSp] = useSearchParams();
+  const view = sp.get('tab') || 'entry'; // entry | dashboard | leave | index | settings
+  const setView = (v) => setSp((prev) => { const n = new URLSearchParams(prev); n.set('tab', v); return n; }, { replace: true });
   const [cur, setCur] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const [siteKey, setSiteKey] = useState('');
   const [roster, setRoster] = useState([]);
@@ -50,7 +68,7 @@ export default function Performance() {
 
   useEffect(() => {
     perfApi.bootstrap()
-      .then((r) => { setBoot(r); if (r.sites?.length) setSiteKey(r.sites[0].key); if (!r.canEntry) setView('dashboard'); })
+      .then((r) => { setBoot(r); if (r.sites?.length) setSiteKey(r.sites[0].key); if (!r.canEntry && !sp.get('tab')) setView('dashboard'); })
       .catch((e) => setError(e.message));
   }, []);
 
@@ -63,7 +81,7 @@ export default function Performance() {
     { key: 'leave', label: t('การลา'), show: true },
     { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
-  ].filter((t) => t.show);
+  ].filter((x) => x.show);
 
   return (
     <div className="space-y-4">
@@ -72,7 +90,7 @@ export default function Performance() {
           ตารางเวลาทำงาน") promised both. */}
       <PageHeader
         title={t('บันทึกงานฝ่ายบุคคล')}
-        subtitle="บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน"
+        subtitle={t('บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน')}
         right={
           <div className="flex items-center gap-2">
             {/* icon-only: the month they move to has to be readable, not guessable */}
@@ -85,10 +103,10 @@ export default function Performance() {
 
       {/* view tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setView(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === t.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            {t.label}
+        {tabs.map((tab) => (
+          <button key={tab.key} onClick={() => setView(tab.key)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === tab.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            {tab.label}
           </button>
         ))}
         {/* Which site you are looking at matters to both views: the grid shows its
@@ -118,7 +136,7 @@ export default function Performance() {
 
       {view === 'entry' && (
         boot.sites.length === 0
-          ? <div className="card text-center text-sm text-slate-400">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</div>
+          ? <NoSites />
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
 

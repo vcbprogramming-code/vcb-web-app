@@ -37,7 +37,7 @@ const iso = (d) => {
 function approverLabel(name, all) {
   if (!name.includes('@')) return name;
   const short = name.split('@')[0];
-  const clashes = all.filter((t) => t.name !== name && t.name.split('@')[0] === short).length > 0;
+  const clashes = all.filter((o) => o.name !== name && o.name.split('@')[0] === short).length > 0;
   return clashes ? name : short;
 }
 
@@ -85,8 +85,8 @@ export default function Dashboard() {
   useEffect(() => { ememoApi.listProjects().then((r) => setProjects(r.data)).catch(() => {}); }, []);
   // keep a screen left open in a meeting room honest
   useEffect(() => {
-    const t = setInterval(() => load(), 5 * 60 * 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => load(), 5 * 60 * 1000);
+    return () => clearInterval(timer);
   }, [load]);
 
   /** Open the register already filtered to whatever was clicked. */
@@ -106,7 +106,7 @@ export default function Dashboard() {
       const now = new Date();
       const p = (n) => String(n).padStart(2, '0');
       const stamp = `${now.getFullYear() + 543}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
-      const parts = ['ทะเบียนเอกสาร'];
+      const parts = [t('ทะเบียนเอกสาร')];
       const proj = projects.find((x) => x.id === projectId);
       if (proj) parts.push(proj.code);
       const a = document.createElement('a');
@@ -133,7 +133,7 @@ export default function Dashboard() {
                 rangeKey === r.key ? 'bg-brand text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
-              {r.label}
+              {t(r.label)}
             </button>
           ))}
 
@@ -160,7 +160,7 @@ export default function Dashboard() {
           <button
             onClick={downloadExcel}
             disabled={exporting || !s?.total}
-            title={!s?.total ? 'ไม่มีเอกสารให้ส่งออก' : `ดาวน์โหลดทะเบียน ${s.total} ฉบับตามตัวกรองนี้เป็นไฟล์ Excel`}
+            title={!s?.total ? t('ไม่มีเอกสารให้ส่งออก') : t('ดาวน์โหลดทะเบียน {n} ฉบับตามตัวกรองนี้เป็นไฟล์ Excel', { n: s.total })}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
           >
             {exporting
@@ -236,9 +236,9 @@ export default function Dashboard() {
                 <span className="text-xs text-slate-400">{t('นับจากวันที่รับเอกสาร')}</span>
               </div>
               <BarList
-                unit=" ฉบับ"
+                unit={` ${t("ฉบับ")}`}
                 emphasisKey="15+"
-                rows={s.aging.map((a) => ({ key: a.bucket, label: AGING[a.bucket], value: a.count }))}
+                rows={s.aging.map((a) => ({ key: a.bucket, label: t(AGING[a.bucket]), value: a.count }))}
                 onPick={() => drill({ status: 'pending' })}
               />
               {overdue > 0 && (
@@ -259,13 +259,13 @@ export default function Dashboard() {
                 <div className="py-8 text-center text-sm text-slate-400">{t('ยังไม่มีการอนุมัติในช่วงที่เลือก')}</div>
               ) : (
                 <BarList
-                  unit=" วัน"
+                  unit={` ${t("วัน")}`}
                   emphasisKey={s.turnaround[0]?.name}
-                  rows={s.turnaround.map((t) => ({
-                    key: t.name,
-                    label: approverLabel(t.name, s.turnaround),
-                    value: t.avg_days,
-                    hint: `(${t.steps} ครั้ง)`,
+                  rows={s.turnaround.map((row) => ({
+                    key: row.name,
+                    label: approverLabel(row.name, s.turnaround),
+                    value: row.avg_days,
+                    hint: t('({n} ครั้ง)', { n: row.steps }),
                   }))}
                 />
               )}
@@ -275,10 +275,10 @@ export default function Dashboard() {
             <div className="card">
               <h3 className="mb-3 font-bold text-slate-800">{t('สถานะเอกสาร')}</h3>
               <BarList
-                unit=" ฉบับ"
+                unit={` ${t("ฉบับ")}`}
                 rows={STATUS_ORDER.filter((st) => s.byStatus[st]).map((st) => ({
                   key: st,
-                  label: STATUS_META[st]?.label || st,
+                  label: t(STATUS_META[st]?.label || st, null, 'status'),
                   value: s.byStatus[st] || 0,
                   hint: s.total ? `(${Math.round(((s.byStatus[st] || 0) / s.total) * 100)}%)` : '',
                   color: st === 'approved' ? '#15803d' : st === 'pending' ? '#b45309'
@@ -292,7 +292,7 @@ export default function Dashboard() {
             <div className="card">
               <h3 className="mb-3 font-bold text-slate-800">{t('เอกสารแยกตามโครงการ')}</h3>
               <BarList
-                unit=" ฉบับ"
+                unit={` ${t("ฉบับ")}`}
                 rows={s.byProject.filter((p) => p.count > 0).map((p) => ({
                   key: p.code, label: p.code, chip: p.code, value: p.count, color: p.color || '#64748b',
                 }))}
@@ -325,7 +325,7 @@ export default function Dashboard() {
                         <div className="truncate text-xs text-slate-500">{d.subject}</div>
                       </div>
                       <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${(STATUS_META[d.status] || STATUS_META.pending).chip}`}>
-                        {(STATUS_META[d.status] || STATUS_META.pending).label}
+                        {t((STATUS_META[d.status] || STATUS_META.pending).label, null, 'status')}
                       </span>
                     </li>
                   ))}

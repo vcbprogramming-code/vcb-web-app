@@ -99,7 +99,16 @@ suite('3. ปุ่มแชร์');
     else await settle(200);
   }
   happy('ปุ่มบอกผู้ใช้ว่าคัดลอกแล้ว', verdict.includes('คัดลอกแล้ว'), verdict || '(ปุ่มไม่เปลี่ยนสถานะเลย)');
-  const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+  // Reading the clipboard needs the window to hold focus, and a browser started
+  // by another suite can take it away — retry rather than report a defect that
+  // is really the test environment. The button's own verdict above is the check
+  // that matters; this confirms what actually landed on the clipboard.
+  let copied = '';
+  for (let i = 0; i < 10 && !copied; i += 1) {
+    await page.bringToFront().catch(() => {});
+    copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+    if (!copied) await settle(300);
+  }
   happy('คัดลอกลิงก์ที่ชี้มาที่เคสนี้', copied.includes(`case=${scenario.no}`), copied || '(อ่านคลิปบอร์ดไม่ได้)');
   await shot('03-กดแชร์');
 

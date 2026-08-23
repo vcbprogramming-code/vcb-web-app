@@ -24,11 +24,11 @@ export function ToastProvider({ children }) {
   const t = useT();
   const [toasts, setToasts] = useState([]);
 
-  const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const dismiss = useCallback((id) => setToasts((prev) => prev.filter((x) => x.id !== id)), []);
 
   const push = useCallback((message, variant = 'info', ttl = 3500) => {
     const id = `toast-${++toastSeq}`;
-    setToasts((t) => [...t, { id, message, variant }]);
+    setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => dismiss(id), ttl);
   }, [dismiss]);
 

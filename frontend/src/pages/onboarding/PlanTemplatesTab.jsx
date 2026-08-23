@@ -36,15 +36,15 @@ export default function PlanTemplatesTab() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {PHASES.map((phase) => {
-          const items = templates.filter((t) => t.phase === phase);
+          const items = templates.filter((tpl) => tpl.phase === phase);
           return (
             <div key={phase} className="card">
               <h3 className="mb-3 font-bold text-slate-800">{phase} {t('วัน')} <span className="text-xs font-normal text-slate-400">({items.length})</span></h3>
               <div className="space-y-2">
-                {items.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm">
-                    <span className="text-slate-700">{t.title}</span>
-                    <button onClick={() => remove(t.id)} className="text-slate-300 hover:text-red-600"><Icon name="trash" className="h-4 w-4" /></button>
+                {items.map((tpl) => (
+                  <div key={tpl.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                    <span className="text-slate-700">{tpl.title}</span>
+                    <button onClick={() => remove(tpl.id)} className="text-slate-300 hover:text-red-600"><Icon name="trash" className="h-4 w-4" /></button>
                   </div>
                 ))}
                 {items.length === 0 && <p className="text-xs text-slate-400">{t('ยังไม่มีรายการ')}</p>}

@@ -47,11 +47,12 @@ function FacilityStat({ label, item }) {
 }
 
 function BucketStat({ label, bucket, accent }) {
+  const t = useT();
   return (
     <div className="card-sm">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className={`mt-1 text-xl font-bold ${accent || 'text-slate-900'}`}>{formatMoney(bucket?.amount || 0)}</div>
-      <div className="mt-1 text-[11px] text-slate-400">{bucket?.count || 0} รายการ</div>
+      <div className="mt-1 text-[11px] text-slate-400">{bucket?.count || 0} {t('รายการ')}</div>
     </div>
   );
 }
@@ -63,6 +64,8 @@ export default function CreditFacility() {
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState(null);
   const [showRequests, setShowRequests] = useState(false);
+  // set by the empty state so its button opens the add form, not just the tab
+  const [openNew, setOpenNew] = useState(0);
 
   const loadOverview = useCallback(() => {
     creditApi.overview().then((r) => setOverview(r.data)).catch((e) => setError(e.message));
@@ -73,7 +76,10 @@ export default function CreditFacility() {
     ememoApi.listProjects().then((r) => setProjects(r.data)).catch(() => {});
   }, [loadOverview]);
 
-  const byType = Object.fromEntries((overview?.byType || []).map((t) => [t.type, t]));
+  const byType = Object.fromEntries((overview?.byType || []).map((row) => [row.type, row]));
+  // Nothing has been entered yet. Four dashes and a row of ฿0 tell a first-time
+  // user nothing about where to start, and Export would hand them an empty file.
+  const empty = overview != null && (overview.byType || []).length === 0;
 
   const handleExport = async () => {
     try {
@@ -90,23 +96,41 @@ export default function CreditFacility() {
     <div className="space-y-5">
       <PageHeader
         title={t('บริหารวงเงินสินเชื่อโครงการ')}
-        subtitle="ติดตามวงเงินสินเชื่อทุกโครงการ · Credit Facility Manager"
+        subtitle={t('ติดตามวงเงินสินเชื่อทุกโครงการ · Credit Facility Manager')}
         right={
           <div className="flex items-center gap-2">
             <button onClick={() => setShowRequests(true)} className="btn-outline">
-              <Icon name="inbox" className="h-4 w-4" /> คำขอใช้วงเงิน
+              <Icon name="inbox" className="h-4 w-4" /> {t('คำขอใช้วงเงิน')}
               {overview?.pendingCount ? (
                 <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-700">{overview.pendingCount}</span>
               ) : null}
             </button>
-            <button onClick={handleExport} className="btn-outline">
-              <Icon name="download" className="h-4 w-4" /> Export Excel
+            <button onClick={handleExport} disabled={empty} className="btn-outline disabled:opacity-40"
+              title={empty ? t('ยังไม่มีวงเงินให้ส่งออก') : t('ดาวน์โหลดวงเงินทั้งหมดเป็นไฟล์ Excel')}>
+              <Icon name="download" className="h-4 w-4" /> {t('ส่งออก Excel')}
             </button>
           </div>
         }
       />
 
-      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{t(error)}</div>}
+
+      {empty && (
+        <div className="card flex flex-col items-center gap-3 py-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-tint text-brand">
+            <Icon name="card" className="h-6 w-6" />
+          </span>
+          <div>
+            <h3 className="font-bold text-slate-800">{t('ยังไม่มีวงเงินสินเชื่อในระบบ')}</h3>
+            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+              {t('เริ่มจากเพิ่มวงเงินที่ธนาคารอนุมัติให้แต่ละโครงการ แล้วจึงบันทึกการเบิกใช้ — ยอดคงเหลือและรายการครบกำหนดจะคำนวณให้เอง')}
+            </p>
+          </div>
+          <button onClick={() => { setTab('facilities'); setOpenNew((n) => n + 1); }} className="btn-primary">
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มวงเงินแรก')}
+          </button>
+        </div>
+      )}
 
       {/* headline cards */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -132,8 +156,8 @@ export default function CreditFacility() {
           </div>
           {overview?.buckets?.overdue?.count ? (
             <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              เกินกำหนด {overview.buckets.overdue.count} รายการ · {formatMoney(overview.buckets.overdue.amount)}
-              {overview.overdueInterest ? ` · ดอกเบี้ยเกินกำหนด ${formatMoney(overview.overdueInterest)}` : ''}
+              {t('เกินกำหนด')} {overview.buckets.overdue.count} {t('รายการ')} · {formatMoney(overview.buckets.overdue.amount)}
+              {overview.overdueInterest ? ` · ${t('ดอกเบี้ยเกินกำหนด')} ${formatMoney(overview.overdueInterest)}` : ''}
             </div>
           ) : null}
         </div>
@@ -142,12 +166,12 @@ export default function CreditFacility() {
           <div className="grid grid-cols-2 gap-3">
             <div className="card-sm">
               <div className="text-xs font-semibold text-slate-500">{t('อยู่ระหว่างเสนออนุมัติ')}</div>
-              <div className="mt-1 text-xl font-bold text-slate-900">{overview?.pendingCount || 0} รายการ</div>
+              <div className="mt-1 text-xl font-bold text-slate-900">{overview?.pendingCount || 0} {t('รายการ')}</div>
               <div className="mt-1 text-[11px] text-slate-400">{formatMoney(overview?.pendingAmount || 0)}</div>
             </div>
             <div className="card-sm">
               <div className="text-xs font-semibold text-slate-500">{t('อนุมัติแล้ว (คำขอ)')}</div>
-              <div className="mt-1 text-xl font-bold text-emerald-600">{overview?.approvedCount || 0} รายการ</div>
+              <div className="mt-1 text-xl font-bold text-emerald-600">{overview?.approvedCount || 0} {t('รายการ')}</div>
             </div>
           </div>
         </div>
@@ -155,20 +179,20 @@ export default function CreditFacility() {
 
       {/* tabs */}
       <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tab.key}
+            onClick={() => setTab(tab.key)}
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === t.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {t.label}
+            {t(tab.label)}
           </button>
         ))}
       </div>
 
-      <TabComp projects={projects} onChanged={loadOverview} />
+      <TabComp projects={projects} onChanged={loadOverview} openNew={openNew} />
 
       {showRequests && (
         <RequestsPanel

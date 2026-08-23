@@ -31,7 +31,9 @@ const files = [];
   }
 })('src');
 
-const CALL = /\bt\(\s*['`]/;
+// t('…') and t(meta.label) both count — the second is how a data-driven label
+// gets translated, and missing it is what let a blank StatusBadge through.
+const CALL = /\bt\(\s*['`\w]/;
 const problems = [];
 
 for (const file of files) {
@@ -55,11 +57,22 @@ for (const file of files) {
     problems.push(`${file}:${s.line + 1} ${s.name}() เรียก t() แต่ไม่มี const t = useT()`);
   });
 
-  // 2. anything nearer called `t` — esbuild renames it, so the call is t2("…")
-  let js;
-  try { js = esbuild.transformSync(raw, { loader: 'jsx', jsx: 'automatic' }).code; }
-  catch { problems.push(`${file}: ไวยากรณ์เสีย`); continue; }
-  if (/\bt\d+\(\s*["'`]/.test(js)) problems.push(`${file}: มีตัวแปรชื่อ t บังฟังก์ชันแปลอยู่`);
+  // 2. in a file that translates, nothing else may be called `t`. Deciding case
+  //    by case whether a particular shadow is reachable was guesswork that both
+  //    missed real breakage and cried wolf; the flat rule removes the whole
+  //    class, and renaming a loop variable costs nothing.
+  const shadows = [
+    /\(\s*t\s*(?:,[^)]*)?\)\s*=>/g,          // (t) => …   /   (t, i) => …
+    /(?:^|[^\w.$'"])t\s*=>/gm,                   // t => …
+    /const\s+t\s*=(?!\s*useT\s*\()/g,           // const t = something else
+    /function\s+\w*\s*\([^)]*\bt\b[^)]*\)/g, // function f(t)
+  ];
+  for (const re of shadows) {
+    const m = re.exec(raw);
+    if (m) problems.push(`${file}:${raw.slice(0, m.index).split('\n').length} มีตัวแปรชื่อ t อยู่ในไฟล์ที่ใช้ฟังก์ชันแปล — ตั้งชื่ออื่น`);
+  }
+  try { esbuild.transformSync(raw, { loader: 'jsx', jsx: 'automatic' }); }
+  catch { problems.push(`${file}: ไวยากรณ์เสีย`); }
 
   // 3. a class cannot hold a hook
   for (const m of raw.matchAll(/class\s+(\w+)\s+extends\s+React\.Component/g)) {

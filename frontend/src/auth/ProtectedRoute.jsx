@@ -1,8 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext.jsx';
 
-/** Gates routes behind authentication and (optionally) a set of roles. */
-export default function ProtectedRoute({ children, roles }) {
+/**
+ * Gates routes behind authentication and (optionally) a role list or a single
+ * module permission. Prefer `perm` — it follows the effective permissions an
+ * admin can actually configure per person, where a role list cannot be changed
+ * without changing the person's role.
+ */
+export default function ProtectedRoute({ children, roles, perm }) {
   const { user, profile, loading, authError, retry } = useAuth();
   const location = useLocation();
 
@@ -34,6 +39,10 @@ export default function ProtectedRoute({ children, roles }) {
   }
 
   if (roles && profile && !roles.includes(profile.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (perm && profile && profile.effective_permissions?.[perm[0]]?.[perm[1]] !== true) {
     return <Navigate to="/" replace />;
   }
 

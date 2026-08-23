@@ -31,8 +31,8 @@ export const apps = [
     desc: 'ติดตามวงเงิน การเบิกใช้ คำขออนุมัติ และแผนกระแสเงินสด',
     icon: 'card',
     color: 'bg-amber-50 text-amber-600',
-    roles: ['admin', 'executive'], // financial data — restricted
-    enabled: false,
+    perm: ['credit', 'view'], // financial data — off for everyone but admin/executive by default,
+    enabled: true,            // and grantable per person from ตั้งค่า → ผู้ใช้
   },
   {
     to: '/onboarding',

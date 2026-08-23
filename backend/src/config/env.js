@@ -41,7 +41,7 @@ export const env = {
   // Modules turned off for the current soft launch — their APIs return 404 until
   // enabled (defence in depth; the frontend also hides them in config/nav.js).
   // Comma-separated; set DISABLED_MODULES='' to enable everything.
-  disabledModules: (process.env.DISABLED_MODULES ?? 'credit,onboarding')
+  disabledModules: (process.env.DISABLED_MODULES ?? 'onboarding')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),

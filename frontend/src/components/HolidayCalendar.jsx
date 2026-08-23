@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { holidaysForYear } from '../lib/portal.js';
 import Icon from './Icon.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 // Thai public-holiday month calendar (ported from the client's portal): month
 // grid with prev/next nav, weekend/holiday/today highlighting, a legend, and a
@@ -44,15 +45,16 @@ function findNextHoliday(from) {
 }
 
 export default function HolidayCalendar() {
+  const t = useT();
   const [view, setView] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   // re-evaluate "today" every minute so the today-highlight and the countdown
   // don't go stale on a dashboard left open past midnight
   const [today, setToday] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => {
+    const tick = setInterval(() => {
       setToday((prev) => { const n = new Date(); return n.toDateString() === prev.toDateString() ? prev : n; });
     }, 60000);
-    return () => clearInterval(t);
+    return () => clearInterval(tick);
   }, []);
 
   const year = view.getFullYear();
@@ -67,15 +69,15 @@ export default function HolidayCalendar() {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-          <Icon name="calendar" className="h-4 w-4 text-brand" /> ปฏิทินวันหยุด
+          <Icon name="calendar" className="h-4 w-4 text-brand" /> {t('ปฏิทินวันหยุด')}
         </h3>
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="เดือนก่อนหน้า" onClick={() => setView(new Date(year, month - 1, 1))}
+          <button type="button" aria-label={t('เดือนก่อนหน้า')} onClick={() => setView(new Date(year, month - 1, 1))}
             className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
             <Icon name="arrowLeft" className="h-4 w-4" />
           </button>
           <span className="min-w-[92px] text-center text-xs font-medium text-slate-500">{monthLabel}</span>
-          <button type="button" aria-label="เดือนถัดไป" onClick={() => setView(new Date(year, month + 1, 1))}
+          <button type="button" aria-label={t('เดือนถัดไป')} onClick={() => setView(new Date(year, month + 1, 1))}
             className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
             <Icon name="arrowRight" className="h-4 w-4" />
           </button>
@@ -112,14 +114,14 @@ export default function HolidayCalendar() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> วันหยุด</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-300" /> เสาร์-อาทิตย์</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-brand" /> วันนี้</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> {t('วันหยุด')}</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-300" /> {t('เสาร์-อาทิตย์')}</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-brand" /> {t('วันนี้')}</span>
       </div>
 
       {nextHoliday && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
-          <span className="min-w-0 text-slate-600">วันหยุดถัดไป: <b>{nextHoliday.name}</b> ({nextHoliday.date})</span>
+          <span className="min-w-0 text-slate-600">{t('วันหยุดถัดไป:')} <b>{nextHoliday.name}</b> ({nextHoliday.date})</span>
           <span className="shrink-0 font-semibold text-brand">{nextHoliday.daysAway === 0 ? 'วันนี้' : `อีก ${nextHoliday.daysAway} วัน`}</span>
         </div>
       )}

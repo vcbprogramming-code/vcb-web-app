@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatThaiLongDate, ememoApi } from '../../lib/ememo.js';
+import { useT } from '../../lib/i18n.jsx';
 
 /** Resolve the header logo: the selected company's logo (auth-gated blob) if it
  *  has one, else the bundled default asset. */
@@ -43,6 +44,7 @@ const FOOTER = 0.10;   // blank footer band reserved at the bottom of EVERY page
  * sigBlockNeeded guard.
  */
 export default function LetterheadPreview({ letter = {}, doc = {}, company = null }) {
+  const t = useT();
   const logoSrc = useCompanyLogo(company);
   const enclosures = Array.isArray(doc.enclosures) ? doc.enclosures : [];
   const recipient = doc.recipient || letter.default_recipient;
@@ -165,29 +167,29 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
           </div>
         </div>
         <div className="shrink-0 text-right text-[9px] text-slate-500">
-          {letter.phone && <div>โทร. {letter.phone}</div>}
-          {letter.fax && <div>โทรสาร {letter.fax}</div>}
-          {letter.telex && <div>เทเล็กซ์ {letter.telex}</div>}
+          {letter.phone && <div>{t('โทร.')} {letter.phone}</div>}
+          {letter.fax && <div>{t('โทรสาร')} {letter.fax}</div>}
+          {letter.telex && <div>{t('เทเล็กซ์')} {letter.telex}</div>}
         </div>
       </div>
       <div className="mt-2 border-t-2 border-[#1f2a44]" />
       <div className="mt-[2px] border-t border-[#1f2a44]" />
 
-      <div className="mt-3 text-center text-[20px] font-bold tracking-wide">บันทึกข้อความ</div>
+      <div className="mt-3 text-center text-[20px] font-bold tracking-wide">{t('บันทึกข้อความ')}</div>
 
       <div className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-1 text-[13px]">
-        <div><span className="font-bold">เลขที่</span> {doc.doc_number || '— เลือกโครงการและรหัสเอกสาร —'}</div>
-        <div><span className="font-bold">วันที่</span> {formatThaiLongDate(doc.date_received || new Date())}</div>
+        <div><span className="font-bold">{t('เลขที่')}</span> {doc.doc_number || '— เลือกโครงการและรหัสเอกสาร —'}</div>
+        <div><span className="font-bold">{t('วันที่')}</span> {formatThaiLongDate(doc.date_received || new Date())}</div>
       </div>
       <div className="mt-2 border-t border-slate-200" />
 
       <div className="mt-3 space-y-1">
-        <FieldRow label="เรื่อง" value={doc.subject} placeholder="(ระบุเรื่อง)" />
-        {recipient && <FieldRow label="เรียน" value={recipient} />}
-        {doc.reference && <FieldRow label="อ้างถึง" value={doc.reference} />}
+        <FieldRow label={t('เรื่อง')} value={doc.subject} placeholder={t('(ระบุเรื่อง)')} />
+        {recipient && <FieldRow label={t('เรียน')} value={recipient} />}
+        {doc.reference && <FieldRow label={t('อ้างถึง')} value={doc.reference} />}
         {enclosures.length > 0 && (
           <div className="flex gap-2">
-            <div className="w-24 shrink-0 font-bold">สิ่งที่ส่งมาด้วย</div>
+            <div className="w-24 shrink-0 font-bold">{t('สิ่งที่ส่งมาด้วย')}</div>
             <div className="min-w-0">
               {enclosures.map((e, i) => (
                 <div key={i}>{i + 1}. {e.name}{e.qty != null ? `  จำนวน ${e.qty} ${e.unit || 'ชุด'}` : ''}</div>
@@ -199,7 +201,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
 
       {/* body — break-words so long unbroken strings still wrap (no overflow) */}
       <div ref={withSigRef ? bodyRef : undefined} className="mt-3 whitespace-pre-wrap break-words text-justify indent-10">
-        {doc.body || <span className="text-slate-300">(เนื้อความของหนังสือจะแสดงที่นี่)</span>}
+        {doc.body || <span className="text-slate-300">{t('(เนื้อความของหนังสือจะแสดงที่นี่)')}</span>}
       </div>
 
       {/* closing + signature — kept whole (pushed to next page by `spacer`) */}
@@ -207,7 +209,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
         <div className="w-1/2 text-center leading-relaxed">
           <div>{letter.closing_line || 'ขอแสดงความนับถือ'}</div>
           {doc.signature_image_url ? (
-            <img src={doc.signature_image_url} alt="ลายเซ็น" className="mx-auto mt-2 h-12 w-auto object-contain" />
+            <img src={doc.signature_image_url} alt={t('ลายเซ็น')} className="mx-auto mt-2 h-12 w-auto object-contain" />
           ) : (
             <div className="mt-12" />
           )}
@@ -217,11 +219,11 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
       </div>
 
       {showPreparer && (
-        <div className="mt-6 text-[11px] text-slate-500">ผู้จัดทำ: {preparerName}</div>
+        <div className="mt-6 text-[11px] text-slate-500">{t('ผู้จัดทำ:')} {preparerName}</div>
       )}
       {doc.cc_recipients && (
         <div className="mt-4 border-t border-slate-200 pt-2 text-[11px] text-slate-500">
-          สำเนาเรียน : {doc.cc_recipients}
+          {t('สำเนาเรียน :')} {doc.cc_recipients}
         </div>
       )}
     </div>
@@ -258,7 +260,7 @@ export default function LetterheadPreview({ letter = {}, doc = {}, company = nul
           </div>
           {/* blank footer band with a subtle page number */}
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-center pb-2 text-[10px] text-slate-300" style={{ height: footerH }}>
-            {pageCount > 1 && <span>หน้า {p + 1} / {pageCount}</span>}
+            {pageCount > 1 && <span>{t('หน้า')} {p + 1} / {pageCount}</span>}
           </div>
         </div>
       ))}

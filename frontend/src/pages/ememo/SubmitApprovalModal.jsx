@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 // stable per-row id so removable rows key by identity, not index (see AddDocumentModal)
 const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
 
 export default function SubmitApprovalModal({ documentId, docCode, projectManager, prefill = null, resubmit = false, onClose, onSubmitted }) {
+  const t = useT();
   // Start from whatever was already chosen — the draft's parked list, or the
   // chain a rejected doc went round with. Blank only when there is nothing.
   const [approvers, setApprovers] = useState(() =>
@@ -94,27 +96,27 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           <p className="text-sm text-slate-500">
-            ผู้จัดการโครงการ (ผู้ลงนาม) อนุมัติเป็นลำดับแรก แล้วส่งต่อผู้อนุมัติที่สูงกว่าทีละคน — ระบบส่งอีเมลให้เข้ามาอนุมัติในเว็บ (ทุกคนต้องมีบัญชีในระบบ)
+            {t('ผู้จัดการโครงการ (ผู้ลงนาม) อนุมัติเป็นลำดับแรก แล้วส่งต่อผู้อนุมัติที่สูงกว่าทีละคน — ระบบส่งอีเมลให้เข้ามาอนุมัติในเว็บ (ทุกคนต้องมีบัญชีในระบบ)')}
           </p>
 
           {/* #11: re-submitting a rejected/returned doc requires a reason */}
           {resubmit && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/70 dark:bg-amber-500/10 p-3">
-              <label className="mb-1 block text-sm font-medium text-amber-800">เหตุผลที่ส่งพิจารณาอีกครั้ง <span className="text-red-500">*</span></label>
+              <label className="mb-1 block text-sm font-medium text-amber-800">{t('เหตุผลที่ส่งพิจารณาอีกครั้ง')} <span className="text-red-500">*</span></label>
               <textarea
                 value={resubmitNote}
                 onChange={(e) => setResubmitNote(e.target.value)}
                 rows={2}
-                placeholder="เช่น แก้ไขตัวเลขงบประมาณตามที่ท่านให้ความเห็นแล้ว"
+                placeholder={t('เช่น แก้ไขตัวเลขงบประมาณตามที่ท่านให้ความเห็นแล้ว')}
                 className={field}
               />
-              <p className="mt-1 text-[11px] text-amber-700">ข้อความนี้จะบันทึกในประวัติและแจ้งให้ผู้อนุมัติทราบว่าได้แก้ไขอะไรไปแล้ว</p>
+              <p className="mt-1 text-[11px] text-amber-700">{t('ข้อความนี้จะบันทึกในประวัติและแจ้งให้ผู้อนุมัติทราบว่าได้แก้ไขอะไรไปแล้ว')}</p>
             </div>
           )}
 
           {/* PM = signer / first approver */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-3">
-            <label className="mb-1 block text-sm font-medium text-slate-600">ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก) <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้จัดการโครงการ / ผู้ลงนาม (อนุมัติลำดับแรก)')} <span className="text-red-500">*</span></label>
             {pmConfigured ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
                 <Icon name="user" className="h-4 w-4 shrink-0 text-slate-400" />
@@ -122,11 +124,11 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
                   <div className="font-medium text-slate-800">{pmName || pmEmail}</div>
                   {pmEmail && pmName && <div className="truncate text-[11px] text-slate-500">{pmEmail}</div>}
                 </div>
-                <span className="ml-auto shrink-0 text-[11px] text-slate-400">กำหนดจากโครงการ</span>
+                <span className="ml-auto shrink-0 text-[11px] text-slate-400">{t('กำหนดจากโครงการ')}</span>
               </div>
             ) : (
               <select value={pmEmail} onChange={(e) => { const u = users.find((x) => x.email === e.target.value); setPmEmail(e.target.value); setPmName(u?.full_name || ''); }} className={field}>
-                <option value="">— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —</option>
+                <option value="">{t('— เลือกผู้จัดการโครงการ (ผู้ลงนาม) —')}</option>
                 {users.map((u) => (<option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>))}
               </select>
             )}
@@ -141,7 +143,7 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
                   <input value={a.name ? `${a.name} (${a.email})` : a.email} className={`${field} flex-1 bg-slate-100`} readOnly />
                 ) : (
                   <select value={a.email} onChange={(e) => pick(i, e.target.value)} className={`${field} flex-1`}>
-                    <option value="">— เลือกผู้อนุมัติ —</option>
+                    <option value="">{t('— เลือกผู้อนุมัติ —')}</option>
                     {users.map((u) => (
                       <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
                     ))}
@@ -153,12 +155,12 @@ export default function SubmitApprovalModal({ documentId, docCode, projectManage
               </div>
             ))}
           </div>
-          {!locked && <button type="button" onClick={add} className="text-sm text-blue-600 hover:underline">+ เพิ่มผู้อนุมัติ</button>}
+          {!locked && <button type="button" onClick={add} className="text-sm text-blue-600 hover:underline">{t('+ เพิ่มผู้อนุมัติ')}</button>}
 
           {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+            <button type="button" onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
             <button type="submit" disabled={submitting} className="btn-primary">
               {submitting ? 'กำลังส่ง…' : resubmit ? 'ส่งพิจารณาอีกครั้ง' : 'ส่งอนุมัติ'}
             </button>

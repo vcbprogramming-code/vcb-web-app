@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { adminApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * What one user is allowed to do, and which documents they can see.
@@ -16,6 +17,7 @@ import Spinner from '../../components/Spinner.jsx';
  * Nothing is written when the admin never opened this tab and changed nothing.
  */
 const UserPermissions = forwardRef(function UserPermissions({ userId, role }, ref) {
+  const t = useT();
   const [catalog, setCatalog] = useState([]);
   const [roleDefaults, setRoleDefaults] = useState({});
   const [effective, setEffective] = useState({});
@@ -98,7 +100,7 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
     setVisCodes((prev) => (prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]));
   };
 
-  if (loading) return <div className="flex justify-center py-12"><Spinner className="h-6 w-6" label="กำลังโหลดสิทธิ์…" /></div>;
+  if (loading) return <div className="flex justify-center py-12"><Spinner className="h-6 w-6" label={t('กำลังโหลดสิทธิ์…')} /></div>;
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
 
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
@@ -108,13 +110,13 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
     <div className="space-y-4">
       {isAdmin ? (
         <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          ผู้ดูแลระบบมีสิทธิ์ทุกอย่างโดยอัตโนมัติ — ไม่ต้องตั้งค่าสิทธิ์
+          {t('ผู้ดูแลระบบมีสิทธิ์ทุกอย่างโดยอัตโนมัติ — ไม่ต้องตั้งค่าสิทธิ์')}
         </div>
       ) : (
         <>
           <p className="text-xs text-slate-400">
-            เปิดสวิตช์เพื่อให้สิทธิ์ · ปิดเพื่อห้าม · ค่าเริ่มต้นมาจาก<b>บทบาท</b>ของผู้ใช้ — รายการที่ปรับต่างจากบทบาทจะมีป้าย{' '}
-            <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-700">แก้เฉพาะคนนี้</span>
+            {t('เปิดสวิตช์เพื่อให้สิทธิ์ · ปิดเพื่อห้าม · ค่าเริ่มต้นมาจาก')}<b>{t('บทบาท')}</b>{t('ของผู้ใช้ — รายการที่ปรับต่างจากบทบาทจะมีป้าย')}{' '}
+            <span className="rounded bg-amber-100 px-1 text-[10px] font-medium text-amber-700">{t('แก้เฉพาะคนนี้')}</span>
           </p>
           <div className="space-y-4">
             {catalog.map((mod) => (
@@ -131,7 +133,7 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
                           {a.label}
                           {overridden && (
                             <>
-                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">แก้เฉพาะคนนี้</span>
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{t('แก้เฉพาะคนนี้')}</span>
                               <button type="button" onClick={() => resetOne(mod.module, a.key)} className="text-[11px] text-slate-400 hover:text-brand hover:underline">
                                 คืนค่าเริ่มต้น ({def ? 'อนุญาต' : 'ห้าม'})
                               </button>
@@ -158,16 +160,15 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
       {!isAdmin && (
         <div className="overflow-hidden rounded-2xl border border-slate-200">
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700">
-            การมองเห็นเอกสาร (E-Memo)
+            {t('การมองเห็นเอกสาร (E-Memo)')}
           </div>
           <div className="space-y-4 p-4">
             <p className="text-xs text-slate-400">
-              เลือกโครงการ/ประเภทที่ผู้ใช้คนนี้มองเห็นได้ — <b>ถ้าไม่เลือกเลย = เห็นทุกเอกสาร</b> ·
-              ถ้าเลือกบางอัน จะเห็นเฉพาะเอกสารที่ตรงกับที่เลือกเท่านั้น
+              {t('เลือกโครงการ/ประเภทที่ผู้ใช้คนนี้มองเห็นได้ —')} <b>ถ้าไม่เลือกเลย = เห็นทุกเอกสาร</b> {t('· ถ้าเลือกบางอัน จะเห็นเฉพาะเอกสารที่ตรงกับที่เลือกเท่านั้น')}
             </p>
             <div>
               <div className="mb-1.5 text-xs font-medium text-slate-500">
-                โครงการที่เห็นได้ {visProjects.length === 0 && <span className="text-emerald-600">(ทุกโครงการ)</span>}
+                โครงการที่เห็นได้ {visProjects.length === 0 && <span className="text-emerald-600">{t('(ทุกโครงการ)')}</span>}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {projects.map((p) => (
@@ -179,7 +180,7 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
             </div>
             <div>
               <div className="mb-1.5 text-xs font-medium text-slate-500">
-                ประเภท/รหัสที่เห็นได้ {visCodes.length === 0 && <span className="text-emerald-600">(ทุกประเภท)</span>}
+                ประเภท/รหัสที่เห็นได้ {visCodes.length === 0 && <span className="text-emerald-600">{t('(ทุกประเภท)')}</span>}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {docCodes.map((c) => (
@@ -192,7 +193,7 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
             {(visProjects.length > 0 || visCodes.length > 0) && (
               <button type="button" onClick={() => { setDirty(true); setVisProjects([]); setVisCodes([]); }}
                 className="text-sm text-slate-500 hover:text-slate-800">
-                ล้าง (เห็นทุกเอกสาร)
+                {t('ล้าง (เห็นทุกเอกสาร)')}
               </button>
             )}
           </div>
@@ -201,7 +202,7 @@ const UserPermissions = forwardRef(function UserPermissions({ userId, role }, re
 
       {dirty && (
         <p className="inline-flex items-center gap-1 text-xs text-amber-600">
-          <Icon name="clock" className="h-3.5 w-3.5" /> การเปลี่ยนแปลงจะถูกบันทึกเมื่อกดปุ่มบันทึกด้านล่าง
+          <Icon name="clock" className="h-3.5 w-3.5" /> {t('การเปลี่ยนแปลงจะถูกบันทึกเมื่อกดปุ่มบันทึกด้านล่าง')}
         </p>
       )}
     </div>

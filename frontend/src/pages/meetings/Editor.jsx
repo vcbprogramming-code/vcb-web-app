@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { meetingsApi } from '../../lib/meetings.js';
 import { useToast } from '../../components/Toast.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * The minutes editor.
@@ -15,6 +16,7 @@ import Icon from '../../components/Icon.jsx';
  * sanitises it on save. Nothing in this file is a security boundary.
  */
 export default function Editor({ meetingId, value, onChange }) {
+  const t = useT();
   const toast = useToast();
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export default function Editor({ meetingId, value, onChange }) {
   const link = () => {
     const url = window.prompt('ใส่ลิงก์ (ขึ้นต้นด้วย https://)');
     if (!url) return;
-    if (!/^https?:\/\//i.test(url)) { toast.error('ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://'); return; }
+    if (!/^https?:\/\//i.test(url)) { toast.error(t('ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://')); return; }
     run('createLink', url);
   };
 
@@ -60,9 +62,9 @@ export default function Editor({ meetingId, value, onChange }) {
 
   const pickImage = async (file) => {
     if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('ต้องเป็นไฟล์ภาพ'); return; }
-    if (/svg/i.test(file.type)) { toast.error('ไม่รองรับไฟล์ SVG'); return; }
-    if (!meetingId) { toast.error('บันทึกรายงานก่อน แล้วจึงแทรกรูปได้'); return; }
+    if (!file.type.startsWith('image/')) { toast.error(t('ต้องเป็นไฟล์ภาพ')); return; }
+    if (/svg/i.test(file.type)) { toast.error(t('ไม่รองรับไฟล์ SVG')); return; }
+    if (!meetingId) { toast.error(t('บันทึกรายงานก่อน แล้วจึงแทรกรูปได้')); return; }
     setBusy(true);
     try {
       // Upload first, then reference it. Embedding the bytes in the body would
@@ -84,15 +86,15 @@ export default function Editor({ meetingId, value, onChange }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 px-2 py-1.5">
-        <Btn on={() => run('bold')} title="ตัวหนา"><b>B</b></Btn>
-        <Btn on={() => run('italic')} title="ตัวเอียง"><i>I</i></Btn>
-        <Btn on={() => run('underline')} title="ขีดเส้นใต้"><u>U</u></Btn>
+        <Btn on={() => run('bold')} title={t('ตัวหนา')}><b>B</b></Btn>
+        <Btn on={() => run('italic')} title={t('ตัวเอียง')}><i>I</i></Btn>
+        <Btn on={() => run('underline')} title={t('ขีดเส้นใต้')}><u>U</u></Btn>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <Btn on={() => run('insertUnorderedList')} title="หัวข้อย่อย">• รายการ</Btn>
-        <Btn on={() => run('insertOrderedList')} title="รายการมีเลข">1. ลำดับ</Btn>
-        <Btn on={checklist} title="รายการติ๊กถูก">☐ ติ๊ก</Btn>
+        <Btn on={() => run('insertUnorderedList')} title={t('หัวข้อย่อย')}>{t('• รายการ')}</Btn>
+        <Btn on={() => run('insertOrderedList')} title={t('รายการมีเลข')}>{t('1. ลำดับ')}</Btn>
+        <Btn on={checklist} title={t('รายการติ๊กถูก')}>{t('☐ ติ๊ก')}</Btn>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <Btn on={table} title="แทรกตาราง"><Icon name="layers" className="inline h-4 w-4" /> ตาราง</Btn>
+        <Btn on={table} title={t('แทรกตาราง')}><Icon name="layers" className="inline h-4 w-4" /> {t('ตาราง')}</Btn>
         <label className="cursor-pointer rounded-md px-2 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100"
           title={meetingId ? 'แทรกรูป' : 'บันทึกรายงานก่อนจึงแทรกรูปได้'}>
           <Icon name="file" className="inline h-4 w-4" /> {busy ? 'กำลังอัปโหลด…' : 'รูป'}
@@ -100,8 +102,8 @@ export default function Editor({ meetingId, value, onChange }) {
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickImage(f); }} />
         </label>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <Btn on={link} title="ใส่ลิงก์"><Icon name="link" className="inline h-4 w-4" /> ลิงก์</Btn>
-        <Btn on={() => run('unlink')} title="ถอดลิงก์">ถอดลิงก์</Btn>
+        <Btn on={link} title={t('ใส่ลิงก์')}><Icon name="link" className="inline h-4 w-4" /> {t('ลิงก์')}</Btn>
+        <Btn on={() => run('unlink')} title={t('ถอดลิงก์')}>{t('ถอดลิงก์')}</Btn>
       </div>
 
       <div
@@ -112,7 +114,7 @@ export default function Editor({ meetingId, value, onChange }) {
         onBlur={emit}
         role="textbox"
         aria-multiline="true"
-        aria-label="เนื้อหารายงานการประชุม"
+        aria-label={t('เนื้อหารายงานการประชุม')}
         className="mtg-body min-h-[340px] px-5 py-4 text-[15px] leading-relaxed text-slate-800 outline-none"
       />
     </div>

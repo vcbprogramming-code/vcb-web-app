@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 // stable per-row id so removable rows key by identity, not index (see AddDocumentModal)
 const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
@@ -14,6 +15,7 @@ const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.r
  * approvers set, the create-document form auto-fills and locks them.
  */
 export default function DocCodeApproversTab() {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [codes, setCodes] = useState([]);
@@ -54,7 +56,7 @@ export default function DocCodeApproversTab() {
         .filter((r) => r.email);
       await adminApi.saveDocCodeApprovers(editCode, cleaned);
       setEditCode(null);
-      toast.success('บันทึกสายอนุมัติแล้ว');
+      toast.success(t('บันทึกสายอนุมัติแล้ว'));
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -76,7 +78,7 @@ export default function DocCodeApproversTab() {
       });
       setShowAdd(false);
       setAddForm({ code: '', department: '', recipientTitle: '' });
-      toast.success('เพิ่มรหัสเอกสารแล้ว');
+      toast.success(t('เพิ่มรหัสเอกสารแล้ว'));
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -99,7 +101,7 @@ export default function DocCodeApproversTab() {
         recipientTitle: metaForm.recipientTitle.trim() || undefined,
       });
       setEditMeta(null);
-      toast.success('บันทึกรหัสเอกสารแล้ว');
+      toast.success(t('บันทึกรหัสเอกสารแล้ว'));
       load();
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -107,13 +109,13 @@ export default function DocCodeApproversTab() {
 
   // ---- delete a code ----
   const removeCode = async (code) => {
-    const ok = await confirm({ title: 'ลบรหัสเอกสาร', message: `ลบรหัสเอกสาร "${code}"?\n(ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`, confirmLabel: 'ลบรหัส' });
+    const ok = await confirm({ title: t('ลบรหัสเอกสาร'), message: `ลบรหัสเอกสาร "${code}"?\n(ลบไม่ได้ถ้ามีเอกสารใช้รหัสนี้อยู่)`, confirmLabel: t('ลบรหัส') });
     if (!ok) return;
     setDelCode(code);
     setError(null);
     try {
       await adminApi.deleteDocCode(code);
-      toast.success('ลบรหัสเอกสารแล้ว');
+      toast.success(t('ลบรหัสเอกสารแล้ว'));
       await load();
     } catch (e) { toast.error(e.message); }
     finally { setDelCode(null); }
@@ -125,11 +127,11 @@ export default function DocCodeApproversTab() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm text-slate-500">
-          จัดการรหัสเอกสาร — เพิ่ม / แก้ไข / ลบ และกำหนดสายอนุมัติประจำแต่ละรหัส เมื่อผู้ใช้เลือกรหัสตอนสร้างเอกสาร ระบบจะเติมผู้อนุมัติให้อัตโนมัติและล็อกไว้
+          {t('จัดการรหัสเอกสาร — เพิ่ม / แก้ไข / ลบ และกำหนดสายอนุมัติประจำแต่ละรหัส เมื่อผู้ใช้เลือกรหัสตอนสร้างเอกสาร ระบบจะเติมผู้อนุมัติให้อัตโนมัติและล็อกไว้')}
         </p>
         {!showAdd && (
           <button onClick={() => { setShowAdd(true); setError(null); }} className="btn-primary shrink-0 !py-2 !text-sm">
-            <Icon name="plus" className="h-4 w-4" /> เพิ่มรหัสเอกสาร
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรหัสเอกสาร')}
           </button>
         )}
       </div>
@@ -140,20 +142,20 @@ export default function DocCodeApproversTab() {
         <div className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 dark:bg-blue-500/10 p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">รหัส <span className="text-red-500">*</span></label>
-              <input value={addForm.code} onChange={(e) => setAddForm((f) => ({ ...f, code: e.target.value }))} placeholder="เช่น 08" className={field} />
+              <label className="mb-1 block text-xs font-medium text-slate-500">{t('รหัส')} <span className="text-red-500">*</span></label>
+              <input value={addForm.code} onChange={(e) => setAddForm((f) => ({ ...f, code: e.target.value }))} placeholder={t('เช่น 08')} className={field} />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-slate-500">แผนก / ชื่อย่อ <span className="text-red-500">*</span></label>
-              <input value={addForm.department} onChange={(e) => setAddForm((f) => ({ ...f, department: e.target.value }))} placeholder="เช่น ฝ่ายการเงิน" className={field} />
+              <label className="mb-1 block text-xs font-medium text-slate-500">{t('แผนก / ชื่อย่อ')} <span className="text-red-500">*</span></label>
+              <input value={addForm.department} onChange={(e) => setAddForm((f) => ({ ...f, department: e.target.value }))} placeholder={t('เช่น ฝ่ายการเงิน')} className={field} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">ตำแหน่งผู้รับ (เรียน) — ไม่บังคับ</label>
-            <input value={addForm.recipientTitle} onChange={(e) => setAddForm((f) => ({ ...f, recipientTitle: e.target.value }))} placeholder="เช่น ผู้จัดการฝ่ายการเงิน" className={field} />
+            <label className="mb-1 block text-xs font-medium text-slate-500">{t('ตำแหน่งผู้รับ (เรียน) — ไม่บังคับ')}</label>
+            <input value={addForm.recipientTitle} onChange={(e) => setAddForm((f) => ({ ...f, recipientTitle: e.target.value }))} placeholder={t('เช่น ผู้จัดการฝ่ายการเงิน')} className={field} />
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setShowAdd(false); setError(null); }} className="btn-outline !py-1.5 !text-sm">ยกเลิก</button>
+            <button onClick={() => { setShowAdd(false); setError(null); }} className="btn-outline !py-1.5 !text-sm">{t('ยกเลิก')}</button>
             <button onClick={createCode} disabled={busy} className="btn-primary !py-1.5 !text-sm">{busy ? 'กำลังเพิ่ม…' : 'เพิ่มรหัส'}</button>
           </div>
         </div>
@@ -161,9 +163,9 @@ export default function DocCodeApproversTab() {
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
         {loading ? (
-          <p className="p-5 text-sm text-slate-400">กำลังโหลด…</p>
+          <p className="p-5 text-sm text-slate-400">{t('กำลังโหลด…')}</p>
         ) : codes.length === 0 ? (
-          <p className="p-5 text-sm text-slate-400">ยังไม่มีรหัสเอกสาร — กด “เพิ่มรหัสเอกสาร” เพื่อเริ่ม</p>
+          <p className="p-5 text-sm text-slate-400">{t('ยังไม่มีรหัสเอกสาร — กด “เพิ่มรหัสเอกสาร” เพื่อเริ่ม')}</p>
         ) : codes.map((c) => {
           const count = Array.isArray(c.default_approvers) ? c.default_approvers.length : 0;
           return (
@@ -184,9 +186,9 @@ export default function DocCodeApproversTab() {
                     <button onClick={() => startEdit(c)} disabled={delCode === c.code} className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50">
                       {count > 0 ? 'ผู้อนุมัติ' : 'กำหนดผู้อนุมัติ'}
                     </button>
-                    <button onClick={() => startEditMeta(c)} disabled={delCode === c.code} className="text-sm font-medium text-slate-500 hover:underline disabled:opacity-50">แก้รหัส</button>
+                    <button onClick={() => startEditMeta(c)} disabled={delCode === c.code} className="text-sm font-medium text-slate-500 hover:underline disabled:opacity-50">{t('แก้รหัส')}</button>
                     <button onClick={() => removeCode(c.code)} disabled={delCode === c.code} className="text-sm font-medium text-red-500 hover:underline disabled:opacity-50">
-                      <BusyLabel busy={delCode === c.code} busyText="กำลังลบ…">ลบ</BusyLabel>
+                      <BusyLabel busy={delCode === c.code} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
                     </button>
                   </div>
                 )}
@@ -196,15 +198,15 @@ export default function DocCodeApproversTab() {
               {editMeta === c.code && (
                 <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">แผนก / ชื่อย่อ <span className="text-red-500">*</span></label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">{t('แผนก / ชื่อย่อ')} <span className="text-red-500">*</span></label>
                     <input value={metaForm.department} onChange={(e) => setMetaForm((f) => ({ ...f, department: e.target.value }))} className={field} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">ตำแหน่งผู้รับ (เรียน)</label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">{t('ตำแหน่งผู้รับ (เรียน)')}</label>
                     <input value={metaForm.recipientTitle} onChange={(e) => setMetaForm((f) => ({ ...f, recipientTitle: e.target.value }))} className={field} />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setEditMeta(null)} className="btn-outline !py-1.5 !text-sm">ยกเลิก</button>
+                    <button onClick={() => setEditMeta(null)} className="btn-outline !py-1.5 !text-sm">{t('ยกเลิก')}</button>
                     <button onClick={saveMeta} disabled={busy} className="btn-primary !py-1.5 !text-sm">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
                   </div>
                 </div>
@@ -216,17 +218,17 @@ export default function DocCodeApproversTab() {
                   {rows.map((r, i) => (
                     <div key={r._id} className="flex items-center gap-2">
                       <span className="w-5 shrink-0 text-center text-sm font-semibold text-slate-400">{i + 1}</span>
-                      <input value={r.name} onChange={(e) => updateRow(i, 'name', e.target.value)} placeholder="ชื่อ (ไม่บังคับ)" className={`${field} w-36`} />
-                      <input value={r.email} onChange={(e) => updateRow(i, 'email', e.target.value)} placeholder="อีเมล" type="email" className={`${field} flex-1`} />
+                      <input value={r.name} onChange={(e) => updateRow(i, 'name', e.target.value)} placeholder={t('ชื่อ (ไม่บังคับ)')} className={`${field} w-36`} />
+                      <input value={r.email} onChange={(e) => updateRow(i, 'email', e.target.value)} placeholder={t('อีเมล')} type="email" className={`${field} flex-1`} />
                       {rows.length > 1 && (
                         <button onClick={() => removeRow(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
                       )}
                     </div>
                   ))}
                   <div className="flex items-center justify-between pt-1">
-                    <button onClick={addRow} className="text-sm font-medium text-blue-600 hover:underline">+ เพิ่มผู้อนุมัติ</button>
+                    <button onClick={addRow} className="text-sm font-medium text-blue-600 hover:underline">{t('+ เพิ่มผู้อนุมัติ')}</button>
                     <div className="flex gap-2">
-                      <button onClick={() => setEditCode(null)} className="btn-outline !py-1.5 !text-sm">ยกเลิก</button>
+                      <button onClick={() => setEditCode(null)} className="btn-outline !py-1.5 !text-sm">{t('ยกเลิก')}</button>
                       <button onClick={save} disabled={busy} className="btn-primary !py-1.5 !text-sm">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
                     </div>
                   </div>

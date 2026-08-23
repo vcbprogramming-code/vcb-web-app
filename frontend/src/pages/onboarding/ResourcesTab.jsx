@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { onboardingApi } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const CATEGORIES = ['นโยบาย', 'สวัสดิการ', 'คู่มือ', 'เอกสารลงนาม', 'สื่อแนะนำ'];
 const CAT_CHIP = {
@@ -13,6 +14,7 @@ const CAT_CHIP = {
 };
 
 function AddResourceModal({ onClose, onSaved }) {
+  const t = useT();
   const [form, setForm] = useState({ title: '', category: CATEGORIES[0], description: '', link: '', requiresSignature: false });
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -41,43 +43,43 @@ function AddResourceModal({ onClose, onSaved }) {
 
   return (
     <Modal
-      title="เพิ่มข้อมูลพนักงานใหม่"
+      title={t('เพิ่มข้อมูลพนักงานใหม่')}
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อเรื่อง <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อเรื่อง')} <span className="text-red-500">*</span></label>
           <input value={form.title} onChange={(e) => set('title', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">หมวด</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมวด')}</label>
             <select value={form.category} onChange={(e) => set('category', e.target.value)} className="field">
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="flex items-end">
             <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={form.requiresSignature} onChange={(e) => set('requiresSignature', e.target.checked)} /> ต้องลงนาม
+              <input type="checkbox" checked={form.requiresSignature} onChange={(e) => set('requiresSignature', e.target.checked)} /> {t('ต้องลงนาม')}
             </label>
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">รายละเอียด</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('รายละเอียด')}</label>
           <textarea rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} className="field" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ลิงก์ภายนอก (ถ้ามี)</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ลิงก์ภายนอก (ถ้ามี)')}</label>
           <input value={form.link} onChange={(e) => set('link', e.target.value)} className="field" placeholder="https://…" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">แนบไฟล์ (ถ้ามี)</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('แนบไฟล์ (ถ้ามี)')}</label>
           <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className="block w-full text-sm" />
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
@@ -87,6 +89,7 @@ function AddResourceModal({ onClose, onSaved }) {
 }
 
 export default function ResourcesTab() {
+  const t = useT();
   const [resources, setResources] = useState([]);
   const [error, setError] = useState(null);
   const [category, setCategory] = useState('');
@@ -110,15 +113,15 @@ export default function ResourcesTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <select value={category} onChange={(e) => setCategory(e.target.value)} className="field !w-auto">
-          <option value="">ทุกหมวด</option>
+          <option value="">{t('ทุกหมวด')}</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <button onClick={() => setAdding(true)} className="btn-primary ml-auto"><Icon name="plus" className="h-4 w-4" /> เพิ่มข้อมูล</button>
+        <button onClick={() => setAdding(true)} className="btn-primary ml-auto"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มข้อมูล')}</button>
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       {resources.length === 0 ? (
-        <div className="card text-center text-slate-400">ยังไม่มีข้อมูลในคลัง</div>
+        <div className="card text-center text-slate-400">{t('ยังไม่มีข้อมูลในคลัง')}</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {resources.map((r) => (
@@ -126,13 +129,13 @@ export default function ResourcesTab() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className={`chip ${CAT_CHIP[r.category] || 'bg-slate-100 text-slate-600'}`}>{r.category}</span>
-                  {r.requires_signature && <span className="chip bg-amber-50 text-amber-700">ต้องลงนาม</span>}
+                  {r.requires_signature && <span className="chip bg-amber-50 text-amber-700">{t('ต้องลงนาม')}</span>}
                 </div>
                 <div className="mt-1.5 font-semibold text-slate-800">{r.title}</div>
                 {r.description && <div className="text-xs text-slate-500">{r.description}</div>}
                 <div className="mt-2 flex gap-3 text-sm">
-                  {r.has_file && <button onClick={() => open(r.id)} className="text-brand hover:underline">เปิดไฟล์</button>}
-                  {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-brand hover:underline">ลิงก์</a>}
+                  {r.has_file && <button onClick={() => open(r.id)} className="text-brand hover:underline">{t('เปิดไฟล์')}</button>}
+                  {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-brand hover:underline">{t('ลิงก์')}</a>}
                 </div>
               </div>
               <button onClick={() => remove(r.id)} className="shrink-0 text-slate-300 hover:text-red-600"><Icon name="trash" className="h-4 w-4" /></button>

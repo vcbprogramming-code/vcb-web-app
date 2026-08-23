@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { pick, connMeta } from '../../lib/sysmap.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /** What one box is, and what it connects to in both directions. */
 export default function NodeDetail({ node, nodes, conns, depts, modules, lang, onSelect, onClose, onEdit }) {
+  const t = useT();
   const nameOf = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const dept = depts.find((d) => d.key === node.dept);
   const mod = modules.find((m) => m.code === node.module);
@@ -41,8 +43,8 @@ export default function NodeDetail({ node, nodes, conns, depts, modules, lang, o
             <span className={`chip ${node.node_type === 'erp' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
               {node.node_type === 'erp' ? 'อยู่ใน ERP' : 'ทำมือ'}
             </span>
-            {node.at_site && <span className="chip bg-sky-50 text-sky-700">ทำที่หน้างาน</span>}
-            {node.unverified && <span className="chip bg-amber-50 text-amber-700">ยังไม่ยืนยัน</span>}
+            {node.at_site && <span className="chip bg-sky-50 text-sky-700">{t('ทำที่หน้างาน')}</span>}
+            {node.unverified && <span className="chip bg-amber-50 text-amber-700">{t('ยังไม่ยืนยัน')}</span>}
           </div>
           <h3 className="mt-2 whitespace-pre-line text-lg font-bold leading-snug text-slate-800">
             {pick(lang, node.label_th, node.label_en)}
@@ -53,9 +55,9 @@ export default function NodeDetail({ node, nodes, conns, depts, modules, lang, o
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {onEdit && (
-            <button onClick={() => onEdit(node)} className="text-sm font-medium text-brand hover:underline">แก้ไข</button>
+            <button onClick={() => onEdit(node)} className="text-sm font-medium text-brand hover:underline">{t('แก้ไข')}</button>
           )}
-          <button onClick={onClose} title="ปิด" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <button onClick={onClose} title={t('ปิด')} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
             <Icon name="x" className="h-4 w-4" />
           </button>
         </div>
@@ -63,7 +65,7 @@ export default function NodeDetail({ node, nodes, conns, depts, modules, lang, o
 
       {mod && (
         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <b className="text-slate-700">โมดูล {mod.code}</b> · {mod.name}{mod.purpose ? ` — ${mod.purpose}` : ''}
+          <b className="text-slate-700">{t('โมดูล')} {mod.code}</b> · {mod.name}{mod.purpose ? ` — ${mod.purpose}` : ''}
         </p>
       )}
 
@@ -75,7 +77,7 @@ export default function NodeDetail({ node, nodes, conns, depts, modules, lang, o
 
       {items.length > 0 && (
         <section>
-          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">สิ่งที่ทำในขั้นนี้</h4>
+          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('สิ่งที่ทำในขั้นนี้')}</h4>
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
             {items.map((it, i) => <li key={i}>{it}</li>)}
           </ul>
@@ -85,18 +87,18 @@ export default function NodeDetail({ node, nodes, conns, depts, modules, lang, o
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            รับงานมาจาก ({inn.length})
+            {t('รับงานมาจาก (')}{inn.length})
           </h4>
           {inn.length === 0
-            ? <p className="px-2 text-sm text-slate-400">— เป็นจุดเริ่มต้น</p>
+            ? <p className="px-2 text-sm text-slate-400">{t('— เป็นจุดเริ่มต้น')}</p>
             : inn.map((c) => <Link key={c.id} id={c.from_node} c={c} dir="in" />)}
         </div>
         <div>
           <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            ส่งงานต่อไปที่ ({out.length})
+            {t('ส่งงานต่อไปที่ (')}{out.length})
           </h4>
           {out.length === 0
-            ? <p className="px-2 text-sm text-slate-400">— เป็นปลายทาง</p>
+            ? <p className="px-2 text-sm text-slate-400">{t('— เป็นปลายทาง')}</p>
             : out.map((c) => <Link key={c.id} id={c.to_node} c={c} dir="out" />)}
         </div>
       </section>

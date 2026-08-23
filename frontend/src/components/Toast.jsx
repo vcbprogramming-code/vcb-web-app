@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import Icon from './Icon.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const ToastContext = createContext(null);
 
@@ -20,6 +21,7 @@ const VARIANTS = {
  * the top-right and auto-dismiss. No dependencies.
  */
 export function ToastProvider({ children }) {
+  const t = useT();
   const [toasts, setToasts] = useState([]);
 
   const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
@@ -41,20 +43,20 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={api}>
       {children}
       <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-full max-w-sm flex-col gap-2">
-        {toasts.map((t) => {
-          const v = VARIANTS[t.variant] || VARIANTS.info;
+        {toasts.map((n) => {
+          const v = VARIANTS[n.variant] || VARIANTS.info;
           return (
             <div
-              key={t.id}
+              key={n.id}
               className={`pointer-events-auto flex items-start gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-0 shadow-lg ring-1 ${v.ring}`}
-              role={t.variant === 'error' ? 'alert' : 'status'}
+              role={n.variant === 'error' ? 'alert' : 'status'}
             >
               <span className={`h-full w-1 self-stretch ${v.bar}`} />
               <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${v.iconBg}`}>
                 <Icon name={v.icon} className="h-4 w-4" strokeWidth={2.4} />
               </span>
-              <p className="flex-1 py-0.5 pr-1 text-sm text-slate-700">{t.message}</p>
-              <button onClick={() => dismiss(t.id)} className="mt-0.5 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="ปิด">
+              <p className="flex-1 py-0.5 pr-1 text-sm text-slate-700">{n.message}</p>
+              <button onClick={() => dismiss(n.id)} className="mt-0.5 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label={t('ปิด')}>
                 <Icon name="x" className="h-4 w-4" />
               </button>
             </div>

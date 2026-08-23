@@ -7,6 +7,7 @@ import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useHeaderSlot } from '../../components/HeaderSlot.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 // Status options driven from the SAME source as the table chips (STATUS_META),
 // so the filter vocabulary and the rows always match (Thai, single source).
@@ -88,6 +89,7 @@ function StatusBadge({ status }) {
 }
 
 export default function DocumentRegister() {
+  const t = useT();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const toast = useToast();
@@ -232,18 +234,18 @@ export default function DocumentRegister() {
             }`}
           >
             <Icon name="clock" className="h-4 w-4" />
-            <span className="hidden sm:inline">รออนุมัติ</span> {awaiting.count}
+            <span className="hidden sm:inline">{t('รออนุมัติ')}</span> {awaiting.count}
             {awaitingOnly && <Icon name="x" className="h-3.5 w-3.5" />}
           </button>
         )}
         <div className="hidden rounded-lg bg-white/10 px-3.5 py-1.5 text-sm text-cyan-100/80 ring-1 ring-inset ring-white/15 md:block">
-          <span className="font-bold text-white">{total}</span> เอกสาร
+          <span className="font-bold text-white">{total}</span> {t('เอกสาร')}
         </div>
         {isAdmin && (
           <button
             onClick={() => navigate('/settings?s=projects')}
-            title="ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)"
-            aria-label="ตั้งค่า E-Memo"
+            title={t('ตั้งค่า E-Memo (โครงการ / รหัส / สายอนุมัติ)')}
+            aria-label={t('ตั้งค่า E-Memo')}
             className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-100 ring-1 ring-inset ring-white/15 transition hover:bg-white/15"
           >
             <Icon name="settings" className="h-4 w-4" />
@@ -253,11 +255,11 @@ export default function DocumentRegister() {
             and set apart from the secondary buttons so it isn't hit by accident. */}
         <button
           onClick={() => setShowAdd(true)}
-          aria-label="เพิ่มเอกสาร"
+          aria-label={t('เพิ่มเอกสาร')}
           className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-cyan-400 px-2.5 py-2 text-sm font-bold text-[#0f172a] shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-300 transition hover:bg-cyan-300 sm:px-4"
         >
           <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} />
-          <span className="hidden sm:inline">เพิ่มเอกสาร</span>
+          <span className="hidden sm:inline">{t('เพิ่มเอกสาร')}</span>
         </button>
       </>
     ),
@@ -282,20 +284,20 @@ export default function DocumentRegister() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาเลขที่ / เรื่อง / รหัสเอกสาร"
+              placeholder={t('ค้นหาเลขที่ / เรื่อง / รหัสเอกสาร')}
               className="field !py-1.5 pl-9"
             />
           </div>
 
           {/* ประเภทเอกสาร */}
-          <FilterDropdown label="ทุกประเภทเอกสาร" value={activeDocType?.name} active={!!docTypeId} width="w-56">
+          <FilterDropdown label={t('ทุกประเภทเอกสาร')} value={activeDocType?.name} active={!!docTypeId} width="w-56">
             {(close) => (
               <div className="max-h-72 overflow-auto">
                 <button
                   onClick={() => { setDocTypeId(''); close(); }}
                   className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!docTypeId ? 'font-semibold text-brand' : 'text-slate-600'}`}
                 >
-                  ทุกประเภทเอกสาร
+                  {t('ทุกประเภทเอกสาร')}
                 </button>
                 {docTypes.map((t) => (
                   <button
@@ -311,14 +313,14 @@ export default function DocumentRegister() {
           </FilterDropdown>
 
           {/* สถานะ */}
-          <FilterDropdown label="ทุกสถานะ" value={activeStatus?.label} active={!!status} width="w-48">
+          <FilterDropdown label={t('ทุกสถานะ')} value={activeStatus?.label} active={!!status} width="w-48">
             {(close) => (
               <div>
                 <button
                   onClick={() => { setStatus(''); close(); }}
                   className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${!status ? 'font-semibold text-brand' : 'text-slate-600'}`}
                 >
-                  ทุกสถานะ
+                  {t('ทุกสถานะ')}
                 </button>
                 {STATUS_OPTIONS.map((s) => (
                   <button
@@ -337,8 +339,8 @@ export default function DocumentRegister() {
               you created, and the ones you have actually acted on, without paging
               through everyone else's work */}
           {[
-            { key: 'created', label: 'เอกสารของฉัน', title: 'เฉพาะเอกสารที่ฉันเป็นผู้สร้าง' },
-            { key: 'acted', label: 'ที่ฉันเคยดำเนินการ', title: 'เอกสารที่ฉันเคยอนุมัติ ไม่อนุมัติ หรือให้ความเห็น — เรียงจากที่ทำล่าสุด' },
+            { key: 'created', label: t('เอกสารของฉัน'), title: t('เฉพาะเอกสารที่ฉันเป็นผู้สร้าง') },
+            { key: 'acted', label: t('ที่ฉันเคยดำเนินการ'), title: t('เอกสารที่ฉันเคยอนุมัติ ไม่อนุมัติ หรือให้ความเห็น — เรียงจากที่ทำล่าสุด') },
           ].map((m) => (
             <button
               key={m.key}
@@ -380,26 +382,26 @@ export default function DocumentRegister() {
               onClick={clearAllFilters}
               className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 transition hover:bg-rose-50"
             >
-              <Icon name="x" className="h-3.5 w-3.5" /> ล้างตัวกรองทั้งหมด
+              <Icon name="x" className="h-3.5 w-3.5" /> {t('ล้างตัวกรองทั้งหมด')}
             </button>
           )}
         </div>
 
         {/* date row */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-500">วันที่รับ (ค.ศ.):</span>
-          <input type="date" aria-label="วันที่รับ ตั้งแต่" value={from} onChange={(e) => setFrom(e.target.value)}
+          <span className="text-slate-500">{t('วันที่รับ (ค.ศ.):')}</span>
+          <input type="date" aria-label={t('วันที่รับ ตั้งแต่')} value={from} onChange={(e) => setFrom(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
           <Icon name="arrowRight" className="h-3.5 w-3.5 text-slate-400" />
-          <input type="date" aria-label="วันที่รับ ถึง" value={to} onChange={(e) => setTo(e.target.value)}
+          <input type="date" aria-label={t('วันที่รับ ถึง')} value={to} onChange={(e) => setTo(e.target.value)}
             className="rounded-lg border border-slate-200 px-2.5 py-1.5" />
-          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">7 วันล่าสุด</button>
-          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">30 วันล่าสุด</button>
-          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">เดือนก่อน</button>
+          <button onClick={() => quickRange(7)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">{t('7 วันล่าสุด')}</button>
+          <button onClick={() => quickRange(30)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">{t('30 วันล่าสุด')}</button>
+          <button onClick={lastMonth} className="rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">{t('เดือนก่อน')}</button>
           {(from || to) && (
             <>
               <span className="text-slate-400">(พ.ศ. {from ? formatThaiDate(from) : '…'} – {to ? formatThaiDate(to) : '…'})</span>
-              <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> ล้างวันที่</button>
+              <button onClick={clearDates} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-rose-600 hover:bg-rose-50"><Icon name="x" className="h-3.5 w-3.5" /> {t('ล้างวันที่')}</button>
             </>
           )}
 
@@ -427,11 +429,11 @@ export default function DocumentRegister() {
           <thead>
             <tr className="bg-slate-900 text-left text-[11px] uppercase tracking-wider text-slate-300">
               <th className="tbl-th font-semibold">#</th>
-              <th className="tbl-th font-semibold">วันที่</th>
-              <th className="tbl-th font-semibold">รหัส</th>
-              <th className="tbl-th font-semibold">เอกสาร</th>
-              <th className="tbl-th font-semibold">สถานะ</th>
-              <th className="tbl-th text-right font-semibold">จัดการ</th>
+              <th className="tbl-th font-semibold">{t('วันที่')}</th>
+              <th className="tbl-th font-semibold">{t('รหัส')}</th>
+              <th className="tbl-th font-semibold">{t('เอกสาร')}</th>
+              <th className="tbl-th font-semibold">{t('สถานะ')}</th>
+              <th className="tbl-th text-right font-semibold">{t('จัดการ')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -454,15 +456,15 @@ export default function DocumentRegister() {
                     <Icon name="search" className="h-9 w-9 text-slate-300" />
                     <p className="text-sm text-slate-500">ไม่พบเอกสารที่ตรงกับตัวกรอง{search.trim() ? ` “${search.trim()}”` : ''}</p>
                     <button onClick={clearAllFilters} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-                      <Icon name="x" className="h-4 w-4" /> ล้างตัวกรองทั้งหมด
+                      <Icon name="x" className="h-4 w-4" /> {t('ล้างตัวกรองทั้งหมด')}
                     </button>
                   </div>
                 ) : (
                   <div className="mx-auto flex max-w-sm flex-col items-center gap-3">
                     <Icon name="document" className="h-10 w-10 text-slate-300" />
-                    <p className="text-sm text-slate-500">ยังไม่มีเอกสารในระบบ — เริ่มสร้างเอกสารฉบับแรกได้เลย</p>
+                    <p className="text-sm text-slate-500">{t('ยังไม่มีเอกสารในระบบ — เริ่มสร้างเอกสารฉบับแรกได้เลย')}</p>
                     <button onClick={() => setShowAdd(true)} className="btn-primary">
-                      <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> เพิ่มเอกสาร
+                      <Icon name="plus" className="h-4 w-4" strokeWidth={2.5} /> {t('เพิ่มเอกสาร')}
                     </button>
                   </div>
                 )}
@@ -495,7 +497,7 @@ export default function DocumentRegister() {
                         {/* #2: "รออนุมัติจากคุณ" marker right beside the doc number */}
                         {d.is_awaiting_me && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-[#0f172a]">
-                            <Icon name="clock" className="h-3 w-3" /> รออนุมัติจากคุณ
+                            <Icon name="clock" className="h-3 w-3" /> {t('รออนุมัติจากคุณ')}
                           </span>
                         )}
                       </div>
@@ -524,21 +526,21 @@ export default function DocumentRegister() {
 
         {wakeHint && loading && (
           <p className="border-t border-slate-100 px-5 py-2 text-center text-xs text-slate-400">
-            เซิร์ฟเวอร์กำลังเริ่มทำงาน (โหมดประหยัดพลังงาน) — การโหลดครั้งแรกหลังพักอาจใช้เวลาสักครู่ ครั้งต่อไปจะเร็วขึ้น
+            {t('เซิร์ฟเวอร์กำลังเริ่มทำงาน (โหมดประหยัดพลังงาน) — การโหลดครั้งแรกหลังพักอาจใช้เวลาสักครู่ ครั้งต่อไปจะเร็วขึ้น')}
           </p>
         )}
 
         {/* pagination */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-t border-slate-100 text-sm">
           <span className="text-slate-500">
-            {total > 0 ? <>แสดง <span className="font-medium text-slate-700">{rangeStart}–{rangeEnd}</span> จาก {total} ฉบับ</> : 'ไม่มีเอกสาร'}
+            {total > 0 ? <>แสดง <span className="font-medium text-slate-700">{rangeStart}–{rangeEnd}</span> {t('จาก')} {total} {t('ฉบับ')}</> : 'ไม่มีเอกสาร'}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">หน้า {page} / {totalPages}</span>
+            <span className="text-slate-400">{t('หน้า')} {page} / {totalPages}</span>
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">ก่อนหน้า</button>
+              className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">{t('ก่อนหน้า')}</button>
             <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">ถัดไป</button>
+              className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">{t('ถัดไป')}</button>
           </div>
         </div>
       </div>
@@ -551,8 +553,8 @@ export default function DocumentRegister() {
           onCreated={(newId, meta) => {
             setShowAdd(false);
             loadDocs();
-            if (meta?.emailFailed) toast.error('บันทึกเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง');
-            else toast.success('บันทึกเอกสารเรียบร้อยแล้ว');
+            if (meta?.emailFailed) toast.error(t('บันทึกเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'));
+            else toast.success(t('บันทึกเอกสารเรียบร้อยแล้ว'));
             if (newId) navigate(`/memos/${newId}`);
           }}
         />

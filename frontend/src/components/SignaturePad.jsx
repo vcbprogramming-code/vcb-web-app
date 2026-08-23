@@ -1,10 +1,12 @@
 import { useRef, useEffect } from 'react';
+import { useT } from '../lib/i18n.jsx';
 
 /**
  * A small canvas the approver draws their signature on (mouse or touch).
  * Exposes the drawing as a PNG data URL via onChange. Returns null when blank.
  */
 export default function SignaturePad({ onChange, height = 140 }) {
+  const t = useT();
   const canvasRef = useRef(null);
   const drawing = useRef(false);
   const hasInk = useRef(false); // ref, not state — avoids stale closure in end()
@@ -90,8 +92,8 @@ export default function SignaturePad({ onChange, height = 140 }) {
         onTouchEnd={end}
       />
       <div className="flex justify-between mt-1">
-        <span className="text-xs text-slate-400">เซ็นลายเซ็นในกรอบ (ใช้เมาส์หรือนิ้ว)</span>
-        <button type="button" onClick={clear} className="text-xs text-slate-500 hover:text-red-600">ล้าง</button>
+        <span className="text-xs text-slate-400">{t('เซ็นลายเซ็นในกรอบ (ใช้เมาส์หรือนิ้ว)')}</span>
+        <button type="button" onClick={clear} className="text-xs text-slate-500 hover:text-red-600">{t('ล้าง')}</button>
       </div>
     </div>
   );

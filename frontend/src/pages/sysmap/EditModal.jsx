@@ -3,6 +3,7 @@ import { Modal } from '../../components/ui/index.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import { sysmapApi } from '../../lib/sysmap.js';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * One form for every kind of row on the map.
@@ -70,6 +71,7 @@ const API = {
 };
 
 export default function EditModal({ kind, row, lanes = [], depts = [], modules = [], onClose, onSaved }) {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const editing = Boolean(row);
@@ -118,7 +120,7 @@ export default function EditModal({ kind, row, lanes = [], depts = [], modules =
       message: kind === 'node'
         ? 'เส้นเชื่อมที่ต่อกับกล่องนี้จะถูกลบไปด้วย เพราะเส้นที่ปลายทางหายไปจะกลายเป็นเส้นชี้ไปที่ว่าง'
         : `ลบ "${row[KEY_OF[kind]]}" ออกจากแผนผัง?`,
-      confirmLabel: 'ลบ', danger: true,
+      confirmLabel: t('ลบ'), danger: true,
     });
     if (!ok) return;
     setBusy(true);
@@ -171,8 +173,8 @@ export default function EditModal({ kind, row, lanes = [], depts = [], modules =
       size="md"
       footer={
         <>
-          {editing && <button type="button" onClick={remove} disabled={busy} className="mr-auto text-sm font-medium text-rose-600 hover:underline disabled:opacity-50">ลบ</button>}
-          <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+          {editing && <button type="button" onClick={remove} disabled={busy} className="mr-auto text-sm font-medium text-rose-600 hover:underline disabled:opacity-50">{t('ลบ')}</button>}
+          <button type="button" onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button type="submit" form="sysmap-form" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }

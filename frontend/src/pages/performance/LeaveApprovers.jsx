@@ -3,6 +3,7 @@ import { perfApi } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * ใครอนุมัติการลาของใคร.
@@ -15,6 +16,7 @@ import Icon from '../../components/Icon.jsx';
  * work, they just land on the admins, which is a fallback and not a plan.
  */
 export default function LeaveApprovers() {
+  const t = useT();
   const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -40,7 +42,7 @@ export default function LeaveApprovers() {
   const unassigned = useMemo(() => new Set(data?.unassigned || []), [data]);
 
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!data) return <div className="flex justify-center py-12"><Spinner label="กำลังโหลด…" /></div>;
+  if (!data) return <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const term = q.trim().toLowerCase();
   const list = data.employees.filter((e) => !term
@@ -58,7 +60,7 @@ export default function LeaveApprovers() {
     setBusy(true);
     try {
       await perfApi.setLeaveApprover(who, [...picked]);
-      toast.success('บันทึกผู้อนุมัติแล้ว');
+      toast.success(t('บันทึกผู้อนุมัติแล้ว'));
       await load();
     } catch (e) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -67,30 +69,28 @@ export default function LeaveApprovers() {
   return (
     <div className="max-w-3xl space-y-4">
       <div>
-        <h3 className="text-sm font-bold text-slate-800">ผู้อนุมัติการลา</h3>
+        <h3 className="text-sm font-bold text-slate-800">{t('ผู้อนุมัติการลา')}</h3>
         <p className="mt-0.5 text-xs text-slate-500">
-          เลือกหัวหน้าหนึ่งคน แล้วติ๊กว่าใครเป็นลูกน้อง — หัวหน้าจะเห็นเฉพาะคำขอลาของคนที่ติ๊กไว้
-          · พนักงานหนึ่งคนมีหัวหน้าได้มากกว่าหนึ่ง เผื่อหัวหน้าลาแล้วงานไม่ค้าง
+          {t('เลือกหัวหน้าหนึ่งคน แล้วติ๊กว่าใครเป็นลูกน้อง — หัวหน้าจะเห็นเฉพาะคำขอลาของคนที่ติ๊กไว้ · พนักงานหนึ่งคนมีหัวหน้าได้มากกว่าหนึ่ง เผื่อหัวหน้าลาแล้วงานไม่ค้าง')}
         </p>
       </div>
 
       {data.employees.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">
-          ยังไม่มีพนักงานในระบบ — เพิ่มพนักงานในไซต์งานก่อน แล้วจึงกลับมาผูกหัวหน้า
+          {t('ยังไม่มีพนักงานในระบบ — เพิ่มพนักงานในไซต์งานก่อน แล้วจึงกลับมาผูกหัวหน้า')}
         </p>
       ) : (
         <>
           {unassigned.size > 0 && (
             <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <b>ยังไม่มีหัวหน้า {unassigned.size} คน</b> — คำขอลาของคนเหล่านี้จะไปที่ผู้ดูแลระบบแทน
-              ซึ่งใช้งานได้ แต่ไม่ใช่สิ่งที่ตั้งใจไว้
+              <b>{t('ยังไม่มีหัวหน้า')} {unassigned.size} {t('คน')}</b> {t('— คำขอลาของคนเหล่านี้จะไปที่ผู้ดูแลระบบแทน ซึ่งใช้งานได้ แต่ไม่ใช่สิ่งที่ตั้งใจไว้')}
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">หัวหน้า</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('หัวหน้า')}</label>
             <select value={who} onChange={(e) => setWho(e.target.value)} className="field">
-              <option value="">— เลือกผู้อนุมัติ —</option>
+              <option value="">{t('— เลือกผู้อนุมัติ —')}</option>
               {data.people.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.full_name} ({p.email}){teamSize.get(p.id) ? ` · ลูกน้อง ${teamSize.get(p.id)} คน` : ''}
@@ -103,12 +103,12 @@ export default function LeaveApprovers() {
             <>
               <div className="relative">
                 <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหาพนักงาน"
-                  placeholder="ค้นหาชื่อพนักงานหรือไซต์งาน…" className="field !pl-9" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('ค้นหาพนักงาน')}
+                  placeholder={t('ค้นหาชื่อพนักงานหรือไซต์งาน…')} className="field !pl-9" />
               </div>
 
               <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-slate-200 bg-white">
-                {list.length === 0 && <p className="py-8 text-center text-sm text-slate-500">ไม่พบพนักงานที่ค้นหา</p>}
+                {list.length === 0 && <p className="py-8 text-center text-sm text-slate-500">{t('ไม่พบพนักงานที่ค้นหา')}</p>}
                 {list.map((e) => (
                   <label key={e.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50">
                     <input type="checkbox" checked={picked.has(e.id)} onChange={() => toggle(e.id)}
@@ -120,7 +120,7 @@ export default function LeaveApprovers() {
                       </span>
                     </span>
                     {unassigned.has(e.id) && !picked.has(e.id) && (
-                      <span className="chip bg-amber-50 text-amber-700">ยังไม่มีหัวหน้า</span>
+                      <span className="chip bg-amber-50 text-amber-700">{t('ยังไม่มีหัวหน้า')}</span>
                     )}
                   </label>
                 ))}
@@ -131,7 +131,7 @@ export default function LeaveApprovers() {
                   {busy ? 'กำลังบันทึก…' : `บันทึก (${picked.size} คน)`}
                 </button>
                 {picked.size > 0 && (
-                  <button onClick={() => setPicked(new Set())} className="text-sm text-slate-500 hover:text-slate-800">ล้างทั้งหมด</button>
+                  <button onClick={() => setPicked(new Set())} className="text-sm text-slate-500 hover:text-slate-800">{t('ล้างทั้งหมด')}</button>
                 )}
               </div>
             </>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { profileApi, ROLE_LABELS } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * "โปรไฟล์และลายเซ็น" — each user sets their display name, job title and a
@@ -14,6 +15,8 @@ import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
  * signature cannot sign anything.
  */
 export default function MySignatureTab() {
+
+  const t = useT();
 
   const [profile, setProfile] = useState(null);
   const [fullName, setFullName] = useState('');
@@ -90,13 +93,13 @@ export default function MySignatureTab() {
       return (
         <div className="max-w-2xl space-y-3">
           <div className="card space-y-3 text-center">
-            <p className="text-sm text-red-600">โหลดข้อมูลโปรไฟล์ไม่สำเร็จ: {loadError}</p>
-            <div><button onClick={load} className="btn-primary">ลองใหม่อีกครั้ง</button></div>
+            <p className="text-sm text-red-600">{t('โหลดข้อมูลโปรไฟล์ไม่สำเร็จ:')} {loadError}</p>
+            <div><button onClick={load} className="btn-primary">{t('ลองใหม่อีกครั้ง')}</button></div>
           </div>
         </div>
       );
     }
-    return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
+    return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
   }
   const field = 'field';
 
@@ -105,56 +108,56 @@ export default function MySignatureTab() {
 
       <div className="card space-y-4">
         <div>
-          <label htmlFor="me-name" className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล</label>
+          <label htmlFor="me-name" className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อ-นามสกุล')}</label>
           <input id="me-name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="me-email" className="mb-1 block text-sm font-medium text-slate-600">อีเมล</label>
+            <label htmlFor="me-email" className="mb-1 block text-sm font-medium text-slate-600">{t('อีเมล')}</label>
             <input id="me-email" value={profile.email || ''} disabled className={`${field} bg-slate-100 text-slate-500`} />
           </div>
           <div>
-            <label htmlFor="me-role" className="mb-1 block text-sm font-medium text-slate-600">บทบาท</label>
+            <label htmlFor="me-role" className="mb-1 block text-sm font-medium text-slate-600">{t('บทบาท')}</label>
             <input id="me-role" value={ROLE_LABELS[profile.role] || profile.role} disabled className={`${field} bg-slate-100 text-slate-500`} />
           </div>
         </div>
         <div>
-          <label htmlFor="me-title" className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่ง (แสดงใต้ชื่อในเอกสาร)</label>
-          <input id="me-title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="เช่น ผู้จัดการฝ่ายวิศวกรรม" className={field} />
+          <label htmlFor="me-title" className="mb-1 block text-sm font-medium text-slate-600">{t('ตำแหน่ง (แสดงใต้ชื่อในเอกสาร)')}</label>
+          <input id="me-title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder={t('เช่น ผู้จัดการฝ่ายวิศวกรรม')} className={field} />
         </div>
 
         {/* signature */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ลายเซ็น (ไม่บังคับ)</label>
-          <p className="mb-2 text-xs text-slate-400">อัปโหลดรูปลายเซ็น — จะแสดงเหนือชื่อในหนังสือโดยอัตโนมัติ (PNG พื้นโปร่งใสจะดูดีที่สุด)</p>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ลายเซ็น (ไม่บังคับ)')}</label>
+          <p className="mb-2 text-xs text-slate-400">{t('อัปโหลดรูปลายเซ็น — จะแสดงเหนือชื่อในหนังสือโดยอัตโนมัติ (PNG พื้นโปร่งใสจะดูดีที่สุด)')}</p>
           {sigUrl ? (
             <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-4">
-              <img src={sigUrl} alt="ลายเซ็น" className="h-16 w-auto object-contain" />
+              <img src={sigUrl} alt={t('ลายเซ็น')} className="h-16 w-auto object-contain" />
               <div className="flex gap-3">
                 <label className="cursor-pointer text-sm font-medium text-blue-600 hover:underline">
-                  เปลี่ยนรูป
+                  {t('เปลี่ยนรูป')}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => pickSig(e.target.files?.[0])} />
                 </label>
                 <button onClick={removeSig} disabled={busy || removingSig} className="text-sm text-red-500 hover:underline disabled:opacity-50">
-                  <BusyLabel busy={removingSig} busyText="กำลังลบ…">ลบลายเซ็น</BusyLabel>
+                  <BusyLabel busy={removingSig} busyText="กำลังลบ…">{t('ลบลายเซ็น')}</BusyLabel>
                 </button>
               </div>
             </div>
           ) : (
             <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 py-6 hover:border-slate-300">
               <Icon name="signature" className="h-6 w-6 text-slate-400" />
-              <span className="text-sm text-slate-600">คลิกเพื่ออัปโหลดรูปลายเซ็น</span>
-              <span className="text-xs text-slate-400">PNG/JPG · สูงสุด 2 MB</span>
+              <span className="text-sm text-slate-600">{t('คลิกเพื่ออัปโหลดรูปลายเซ็น')}</span>
+              <span className="text-xs text-slate-400">{t('PNG/JPG · สูงสุด 2 MB')}</span>
               <input type="file" accept="image/*" className="hidden" onChange={(e) => pickSig(e.target.files?.[0])} />
             </label>
           )}
         </div>
 
         {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        {saved && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">บันทึกโปรไฟล์เรียบร้อยแล้ว</div>}
+        {saved && <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{t('บันทึกโปรไฟล์เรียบร้อยแล้ว')}</div>}
 
         <div className="flex justify-end">
-          <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">บันทึก</BusyLabel></button>
+          <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button>
         </div>
       </div>
     </div>

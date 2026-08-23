@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Icon from '../../components/Icon.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const EMPTY = { name: '', nameEn: '', address: '', phone: '', fax: '', telex: '', logoUrl: '', isDefault: false };
 
@@ -32,6 +33,7 @@ function LogoThumb({ companyId, logoUrl, size = 44 }) {
 }
 
 export default function CompaniesTab() {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [companies, setCompanies] = useState([]);
@@ -87,7 +89,7 @@ export default function CompaniesTab() {
     try {
       if (editId === 'new') await adminApi.createCompany(body);
       else await adminApi.updateCompany(editId, body);
-      toast.success('บันทึกบริษัทแล้ว');
+      toast.success(t('บันทึกบริษัทแล้ว'));
       cancel();
       load();
     } catch (err) { setError(err.message); }
@@ -96,16 +98,16 @@ export default function CompaniesTab() {
 
   const makeDefault = async (id) => {
     setRowKey(`default:${id}`);
-    try { await adminApi.updateCompany(id, { isDefault: true }); toast.success('ตั้งเป็นบริษัทหลักแล้ว'); await load(); }
+    try { await adminApi.updateCompany(id, { isDefault: true }); toast.success(t('ตั้งเป็นบริษัทหลักแล้ว')); await load(); }
     catch (err) { toast.error(err.message); }
     finally { setRowKey(null); }
   };
 
   const remove = async (c) => {
-    const ok = await confirm({ title: 'ลบบริษัท', message: `ลบบริษัท "${c.name}"?`, confirmLabel: 'ลบบริษัท' });
+    const ok = await confirm({ title: t('ลบบริษัท'), message: `ลบบริษัท "${c.name}"?`, confirmLabel: t('ลบบริษัท') });
     if (!ok) return;
     setRowKey(`del:${c.id}`);
-    try { await adminApi.deleteCompany(c.id); toast.success('ลบบริษัทแล้ว'); await load(); }
+    try { await adminApi.deleteCompany(c.id); toast.success(t('ลบบริษัทแล้ว')); await load(); }
     catch (err) { toast.error(err.message); setRowKey(null); }
   };
 
@@ -116,11 +118,11 @@ export default function CompaniesTab() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">
-          บริษัท/ตราสำหรับหัวจดหมาย — ผู้สร้างเอกสารจะเลือกได้ตอนสร้างบันทึกข้อความ โลโก้และหัวจดหมายจะเปลี่ยนตามบริษัทที่เลือก
+          {t('บริษัท/ตราสำหรับหัวจดหมาย — ผู้สร้างเอกสารจะเลือกได้ตอนสร้างบันทึกข้อความ โลโก้และหัวจดหมายจะเปลี่ยนตามบริษัทที่เลือก')}
         </p>
         {!editing && (
           <button onClick={startNew} className="btn-primary shrink-0">
-            <Icon name="plus" className="mr-1 inline h-4 w-4 align-[-2px]" /> เพิ่มบริษัท
+            <Icon name="plus" className="mr-1 inline h-4 w-4 align-[-2px]" /> {t('เพิ่มบริษัท')}
           </button>
         )}
       </div>
@@ -145,23 +147,23 @@ export default function CompaniesTab() {
             </div>
             <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="text-sm sm:col-span-2">
-                <span className="mb-1 block font-medium text-slate-600">ชื่อบริษัท (ไทย) *</span>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${field} w-full`} placeholder="บริษัท ... จำกัด" />
+                <span className="mb-1 block font-medium text-slate-600">{t('ชื่อบริษัท (ไทย) *')}</span>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${field} w-full`} placeholder={t('บริษัท ... จำกัด')} />
               </label>
               <label className="text-sm sm:col-span-2">
-                <span className="mb-1 block font-medium text-slate-600">ชื่อบริษัท (อังกฤษ)</span>
+                <span className="mb-1 block font-medium text-slate-600">{t('ชื่อบริษัท (อังกฤษ)')}</span>
                 <input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} className={`${field} w-full`} placeholder="... Co., Ltd." />
               </label>
               <label className="text-sm sm:col-span-2">
-                <span className="mb-1 block font-medium text-slate-600">ที่อยู่</span>
+                <span className="mb-1 block font-medium text-slate-600">{t('ที่อยู่')}</span>
                 <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={`${field} w-full`} />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-medium text-slate-600">โทรศัพท์</span>
+                <span className="mb-1 block font-medium text-slate-600">{t('โทรศัพท์')}</span>
                 <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`${field} w-full`} />
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-medium text-slate-600">โทรสาร</span>
+                <span className="mb-1 block font-medium text-slate-600">{t('โทรสาร')}</span>
                 <input value={form.fax} onChange={(e) => setForm({ ...form, fax: e.target.value })} className={`${field} w-full`} />
               </label>
             </div>
@@ -169,11 +171,11 @@ export default function CompaniesTab() {
 
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
-            ตั้งเป็นบริษัทหลัก (ค่าเริ่มต้นเมื่อสร้างเอกสาร)
+            {t('ตั้งเป็นบริษัทหลัก (ค่าเริ่มต้นเมื่อสร้างเอกสาร)')}
           </label>
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" onClick={cancel} className="btn-outline">ยกเลิก</button>
+            <button type="button" onClick={cancel} className="btn-outline">{t('ยกเลิก')}</button>
             <button type="submit" disabled={busy || uploading} className="btn-primary">
               {busy ? 'กำลังบันทึก…' : 'บันทึก'}
             </button>
@@ -183,9 +185,9 @@ export default function CompaniesTab() {
 
       <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
         {loading ? (
-          <p className="p-5 text-sm text-slate-400">กำลังโหลด…</p>
+          <p className="p-5 text-sm text-slate-400">{t('กำลังโหลด…')}</p>
         ) : companies.length === 0 ? (
-          <p className="p-5 text-sm text-slate-400">ยังไม่มีบริษัท — กด “เพิ่มบริษัท” เพื่อเริ่ม</p>
+          <p className="p-5 text-sm text-slate-400">{t('ยังไม่มีบริษัท — กด “เพิ่มบริษัท” เพื่อเริ่ม')}</p>
         ) : companies.map((c) => (
           <div key={c.id} className="flex items-center gap-4 px-5 py-3.5">
             <LogoThumb companyId={c.id} logoUrl={c.logo_url} />
@@ -193,7 +195,7 @@ export default function CompaniesTab() {
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium text-slate-800">{c.name}</span>
                 {c.is_default && (
-                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand">ค่าเริ่มต้น</span>
+                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-medium text-brand">{t('ค่าเริ่มต้น')}</span>
                 )}
               </div>
               {c.name_en && <div className="truncate text-xs text-slate-400">{c.name_en}</div>}
@@ -201,13 +203,13 @@ export default function CompaniesTab() {
             <div className="flex shrink-0 items-center gap-3 text-sm">
               {!c.is_default && (
                 <button onClick={() => makeDefault(c.id)} disabled={rowBusy(c)} className="text-slate-500 hover:text-brand hover:underline disabled:opacity-50">
-                  <BusyLabel busy={rowKey === `default:${c.id}`} busyText="กำลังตั้งค่า…">ตั้งเป็นค่าเริ่มต้น</BusyLabel>
+                  <BusyLabel busy={rowKey === `default:${c.id}`} busyText="กำลังตั้งค่า…">{t('ตั้งเป็นค่าเริ่มต้น')}</BusyLabel>
                 </button>
               )}
-              <button onClick={() => startEdit(c)} disabled={rowBusy(c)} className="text-blue-600 hover:underline disabled:opacity-50">แก้ไข</button>
+              <button onClick={() => startEdit(c)} disabled={rowBusy(c)} className="text-blue-600 hover:underline disabled:opacity-50">{t('แก้ไข')}</button>
               {!c.is_default && (
                 <button onClick={() => remove(c)} disabled={rowBusy(c)} className="text-red-500 hover:underline disabled:opacity-50">
-                  <BusyLabel busy={rowKey === `del:${c.id}`} busyText="กำลังลบ…">ลบ</BusyLabel>
+                  <BusyLabel busy={rowKey === `del:${c.id}`} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
                 </button>
               )}
             </div>

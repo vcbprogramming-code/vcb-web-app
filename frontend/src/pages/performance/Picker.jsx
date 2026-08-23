@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Two-step searchable picker (port of the reference oppOpen/oppRender flow).
@@ -7,6 +8,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
  * Floats next to `anchor`; onApply('') clears the cell.
  */
 export default function Picker({ anchor, activities, categories, onApply, onClose }) {
+  const t = useT();
   const [step, setStep] = useState(1);
   const [q, setQ] = useState('');
   const [pending, setPending] = useState(null);
@@ -66,18 +68,18 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
       <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${step === 2 ? 'cursor-pointer text-brand' : 'text-slate-700'} bg-slate-50 border-b border-slate-200`}
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
         {step === 1
-          ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> เลือกกิจกรรม</>
-          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> เลือกหมวดต้นทุน · งาน: <b>{pending?.code}</b></>}
+          ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> {t('เลือกกิจกรรม')}</>
+          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b></>}
       </div>
       <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1.5">
-        <input ref={searchRef} type="text" placeholder="ค้นหา…" autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}
+        <input ref={searchRef} type="text" placeholder={t('ค้นหา…')} autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}
           className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         <span className="shrink-0 text-[11px] text-slate-400">{filtered.length}/{items.length}</span>
-        <button onMouseDown={(e) => { e.preventDefault(); onApply(''); }} className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">ล้าง</button>
+        <button onMouseDown={(e) => { e.preventDefault(); onApply(''); }} className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">{t('ล้าง')}</button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {order.length === 0
-          ? <div className="px-3 py-6 text-center text-sm text-slate-400">ไม่พบรายการ "{q}"</div>
+          ? <div className="px-3 py-6 text-center text-sm text-slate-400">{t('ไม่พบรายการ "')}{q}"</div>
           : order.map((c) => (
             <div key={c}>
               <div className="sticky top-0 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{c}</div>

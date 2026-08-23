@@ -7,6 +7,7 @@ import Icon from '../../components/Icon.jsx';
 import ScenariosView from './ScenariosView.jsx';
 import FlowsView from './FlowsView.jsx';
 import ReportsView from './ReportsView.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Module 5 — SOP (คู่มือปฏิบัติงาน). Three views over the same manual:
@@ -20,6 +21,7 @@ const TABS = [
 ];
 
 export default function Sop() {
+  const t = useT();
   // A link can point straight at one item: ?case=12 or ?flow=AP-3. People quote
   // the manual at each other, and "ดูเคส AP-3" used to mean describing where to
   // click. The parameter also decides which tab opens.
@@ -49,11 +51,11 @@ export default function Sop() {
     return (
       <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
         {error}
-        <button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+        <button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     );
   }
-  if (!boot) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลดคู่มือ…" /></div>;
+  if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดคู่มือ…')} /></div>;
 
   const { modules, meta, counts, canEdit } = boot;
   // the chips filter whatever tab is open, so they count that tab's content
@@ -70,12 +72,12 @@ export default function Sop() {
       {meta?.purpose && (
         <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
           <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-            วัตถุประสงค์ · ขอบเขต · หมายเหตุ
+            {t('วัตถุประสงค์ · ขอบเขต · หมายเหตุ')}
           </summary>
           <div className="mt-3 space-y-3 text-sm text-slate-600">
             <p className="whitespace-pre-line">{meta.purpose}</p>
-            {meta.scope && <p><b>ขอบเขต:</b> {meta.scope}</p>}
-            {meta.manual && <p><b>อ้างอิง:</b> {meta.manual}</p>}
+            {meta.scope && <p><b>{t('ขอบเขต:')}</b> {meta.scope}</p>}
+            {meta.manual && <p><b>{t('อ้างอิง:')}</b> {meta.manual}</p>}
             {Array.isArray(meta.notes) && meta.notes.length > 0 && (
               <ul className="list-disc space-y-1 pl-5">
                 {meta.notes.map((n, i) => <li key={i}>{n}</li>)}
@@ -114,7 +116,7 @@ export default function Sop() {
             className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               module === '' ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
             }`}>
-            ทุกหมวด
+            {t('ทุกหมวด')}
           </button>
           {modules.map((m) => {
             const n = countFor(m.code);

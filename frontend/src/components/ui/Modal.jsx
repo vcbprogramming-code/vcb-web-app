@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Icon from '../Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 /* eslint-disable react-hooks/exhaustive-deps */
 
 const SIZES = {
@@ -16,6 +17,7 @@ const SIZES = {
  * focus trap so keyboard users can't tab into the page behind it.
  */
 export default function Modal({ title, onClose, size = 'lg', footer, children }) {
+  const t = useT();
   const panelRef = useRef(null);
   // Keep the latest onClose without re-running the mount effect. Callers often
   // pass a fresh inline arrow every render (e.g. onClose={() => setX(false)}); if
@@ -68,7 +70,7 @@ export default function Modal({ title, onClose, size = 'lg', footer, children })
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
           <h3 className="font-bold text-slate-800">{title}</h3>
           {onClose && (
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="ปิด">
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label={t('ปิด')}>
               <Icon name="x" className="h-5 w-5" />
             </button>
           )}

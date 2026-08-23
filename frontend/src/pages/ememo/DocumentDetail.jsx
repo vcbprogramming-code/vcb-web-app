@@ -13,6 +13,7 @@ import AddDocumentModal from './AddDocumentModal.jsx';
 import ReferenceModal from './ReferenceModal.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /** .xlsx attachment → previewable as a table (parsed server-side). */
 const isSheet = (a) =>
@@ -69,6 +70,7 @@ function chainPrefill(steps) {
 }
 
 export default function DocumentDetail() {
+  const t = useT();
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -201,7 +203,7 @@ export default function DocumentDetail() {
     const list = [];
     // fileName travels with every tab so the download button can save under the
     // real name instead of the blob's random id
-    if (letter) list.push({ id: letter.id, label: 'เอกสาร', isLetter: true, contentType: letter.content_type, fileName: letter.file_name });
+    if (letter) list.push({ id: letter.id, label: t('เอกสาร'), isLetter: true, contentType: letter.content_type, fileName: letter.file_name });
     // number the supplementary files so it's clear which is attachment #1, #2… (#2)
     inlineKinds.forEach((a, i) => list.push({ id: a.id, label: `ไฟล์แนบ #${i + 1}: ${a.file_name}`, isLetter: false, contentType: a.content_type, fileName: a.file_name }));
     return list;
@@ -231,10 +233,10 @@ export default function DocumentDetail() {
   }, [activePreviewId, id]);
 
   const cancelDoc = async () => {
-    const ok = await confirm({ title: 'ยกเลิกเอกสาร', message: 'ยกเลิกเอกสารนี้?\nเอกสารจะไม่เดินในสายอนุมัติต่อ และกลับคืนไม่ได้', confirmLabel: 'ยกเลิกเอกสาร' });
+    const ok = await confirm({ title: t('ยกเลิกเอกสาร'), message: t('ยกเลิกเอกสารนี้?\nเอกสารจะไม่เดินในสายอนุมัติต่อ และกลับคืนไม่ได้'), confirmLabel: t('ยกเลิกเอกสาร') });
     if (!ok) return;
     setCanceling(true);
-    try { await ememoApi.cancelDocument(id); toast.success('ยกเลิกเอกสารแล้ว'); load(); }
+    try { await ememoApi.cancelDocument(id); toast.success(t('ยกเลิกเอกสารแล้ว')); load(); }
     catch (e) { setError(e.message); toast.error(e.message); } finally { setCanceling(false); }
   };
 
@@ -315,14 +317,14 @@ export default function DocumentDetail() {
 
   if (loadError) return (
     <div className="space-y-3">
-      <button onClick={() => navigate('/memos')} className="text-sm text-brand hover:underline">← กลับทะเบียนเอกสาร</button>
+      <button onClick={() => navigate('/memos')} className="text-sm text-brand hover:underline">{t('← กลับทะเบียนเอกสาร')}</button>
       <div className="rounded-xl bg-red-50 px-4 py-3 text-red-700">
         {loadError}
-        <button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+        <button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     </div>
   );
-  if (!doc) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
+  if (!doc) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const status = STATUS_META[doc.status] || STATUS_META.pending;
   // journey-aware permissions: only the owner (or admin) manages the document,
@@ -351,7 +353,7 @@ export default function DocumentDetail() {
   return (
     <div className="space-y-5">
       <button onClick={() => navigate('/memos')} className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-slate-800">
-        <Icon name="arrowLeft" className="h-4 w-4" /> กลับทะเบียนเอกสาร
+        <Icon name="arrowLeft" className="h-4 w-4" /> {t('กลับทะเบียนเอกสาร')}
       </button>
 
       {/* After acting: a concise closure card confirming the outcome (#12). */}
@@ -367,9 +369,9 @@ export default function DocumentDetail() {
                 : postAction.action === 'rejected' ? 'บันทึกการไม่อนุมัติเรียบร้อยแล้ว'
                 : 'ส่งกลับให้ผู้จัดทำแก้ไขแล้ว'}
             </div>
-            <p className="text-xs text-slate-600">ระบบบันทึกผลการพิจารณาของคุณเรียบร้อยแล้ว</p>
+            <p className="text-xs text-slate-600">{t('ระบบบันทึกผลการพิจารณาของคุณเรียบร้อยแล้ว')}</p>
           </div>
-          <button onClick={() => navigate('/memos')} className="btn-outline shrink-0">กลับทะเบียนเอกสาร</button>
+          <button onClick={() => navigate('/memos')} className="btn-outline shrink-0">{t('กลับทะเบียนเอกสาร')}</button>
         </div>
       )}
 
@@ -383,10 +385,10 @@ export default function DocumentDetail() {
             <Icon name="chat" className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-bold text-slate-900">คุณถูกขอความเห็นในเอกสารนี้</div>
-            <p className="text-xs text-slate-600">ท่านไม่จำเป็นต้องอนุมัติ — เพียงอ่านเอกสารแล้วให้ความเห็นในช่องด้านล่าง</p>
+            <div className="text-sm font-bold text-slate-900">{t('คุณถูกขอความเห็นในเอกสารนี้')}</div>
+            <p className="text-xs text-slate-600">{t('ท่านไม่จำเป็นต้องอนุมัติ — เพียงอ่านเอกสารแล้วให้ความเห็นในช่องด้านล่าง')}</p>
           </div>
-          <button onClick={scrollToComposer} className="btn-primary shrink-0"><Icon name="chat" className="h-4 w-4" /> ให้ความเห็น</button>
+          <button onClick={scrollToComposer} className="btn-primary shrink-0"><Icon name="chat" className="h-4 w-4" /> {t('ให้ความเห็น')}</button>
         </div>
       )}
 
@@ -400,15 +402,15 @@ export default function DocumentDetail() {
               <Icon name="warning" className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold text-amber-900">ท่านกำลังใช้งานด้วยคนละบัญชีกับที่อีเมลส่งถึง</div>
+              <div className="text-sm font-bold text-amber-900">{t('ท่านกำลังใช้งานด้วยคนละบัญชีกับที่อีเมลส่งถึง')}</div>
               <p className="mt-1 text-xs text-amber-800">
-                อีเมลฉบับนี้ส่งถึง <b>{maskEmail(addressedTo)}</b> แต่เครื่องนี้เข้าสู่ระบบด้วย <b>{maskEmail(myEmail)}</b>
+                {t('อีเมลฉบับนี้ส่งถึง')} <b>{maskEmail(addressedTo)}</b> {t('แต่เครื่องนี้เข้าสู่ระบบด้วย')} <b>{maskEmail(myEmail)}</b>
                 {' '}จึงยังดำเนินการกับเอกสารนี้ไม่ได้
               </p>
               <button onClick={switchAccount} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-amber-700">
-                <Icon name="user" className="h-4 w-4" /> สลับไปบัญชี {maskEmail(addressedTo)}
+                <Icon name="user" className="h-4 w-4" /> {t('สลับไปบัญชี')} {maskEmail(addressedTo)}
               </button>
-              <p className="mt-2 text-[11px] text-amber-700">เข้าสู่ระบบเสร็จแล้วระบบจะพากลับมาที่เอกสารฉบับนี้ให้เอง</p>
+              <p className="mt-2 text-[11px] text-amber-700">{t('เข้าสู่ระบบเสร็จแล้วระบบจะพากลับมาที่เอกสารฉบับนี้ให้เอง')}</p>
             </div>
           </div>
         </div>
@@ -422,14 +424,14 @@ export default function DocumentDetail() {
             <Icon name="check" className="h-5 w-5" />
           </span>
           <div>
-            <div className="text-sm font-bold text-slate-900">เอกสารนี้รอการอนุมัติจากคุณ</div>
-            <p className="text-xs text-slate-600">ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มด้านบน</p>
+            <div className="text-sm font-bold text-slate-900">{t('เอกสารนี้รอการอนุมัติจากคุณ')}</div>
+            <p className="text-xs text-slate-600">{t('ตรวจเอกสารด้านล่าง แล้วเลือกดำเนินการที่ปุ่มด้านบน')}</p>
             {myApproval.hasSignature === false && (
               <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
                 <Icon name="warning" className="h-3.5 w-3.5" />
-                คุณยังไม่ได้ตั้งค่าลายเซ็น —
-                <button onClick={() => navigate('/profile')} className="underline hover:text-amber-800">ตั้งค่าลายเซ็นที่โปรไฟล์</button>
-                เพื่อให้ลายเซ็นปรากฏบนเอกสารที่อนุมัติ
+                {t('คุณยังไม่ได้ตั้งค่าลายเซ็น —')}
+                <button onClick={() => navigate('/profile')} className="underline hover:text-amber-800">{t('ตั้งค่าลายเซ็นที่โปรไฟล์')}</button>
+                {t('เพื่อให้ลายเซ็นปรากฏบนเอกสารที่อนุมัติ')}
               </p>
             )}
           </div>
@@ -451,17 +453,17 @@ export default function DocumentDetail() {
 
           {/* MIDDLE: document meta — always level with the title (independent of actions) */}
           <div className="grid min-w-[240px] flex-1 grid-cols-1 gap-x-6 gap-y-1.5 pt-0.5 text-sm sm:grid-cols-2">
-            <MetaItem icon="calendar" label="วันที่รับ">{formatThaiDate(doc.date_received)}</MetaItem>
-            <MetaItem icon="building" label="แผนก">{doc.department}</MetaItem>
-            {doc.recipient && <MetaItem icon="inbox" label="เรียน">{doc.recipient}</MetaItem>}
-            {doc.doc_type_name && <MetaItem icon="layers" label="ประเภท">{doc.doc_type_name}</MetaItem>}
+            <MetaItem icon="calendar" label={t('วันที่รับ')}>{formatThaiDate(doc.date_received)}</MetaItem>
+            <MetaItem icon="building" label={t('แผนก')}>{doc.department}</MetaItem>
+            {doc.recipient && <MetaItem icon="inbox" label={t('เรียน')}>{doc.recipient}</MetaItem>}
+            {doc.doc_type_name && <MetaItem icon="layers" label={t('ประเภท')}>{doc.doc_type_name}</MetaItem>}
             {doc.reference && (
-              <MetaItem icon="file" label="อ้างถึง">
+              <MetaItem icon="file" label={t('อ้างถึง')}>
                 {doc.reference_doc ? (
                   <button
                     onClick={() => setRefPreviewId(doc.reference_doc.id)}
                     className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
-                    title="ดูตัวอย่างเอกสารที่อ้างถึง"
+                    title={t('ดูตัวอย่างเอกสารที่อ้างถึง')}
                   >
                     {doc.reference}
                     <Icon name="eye" className="h-3.5 w-3.5" />
@@ -470,18 +472,18 @@ export default function DocumentDetail() {
               </MetaItem>
             )}
             {(doc.cc_people?.length > 0 || doc.cc_recipients) && (
-              <MetaItem icon="people" label="สำเนาเรียน">
+              <MetaItem icon="people" label={t('สำเนาเรียน')}>
                 {doc.cc_people?.length > 0
                   ? doc.cc_people.map((p) => p.full_name || p.email).join(' · ')
                   : doc.cc_recipients}
               </MetaItem>
             )}
             {Array.isArray(doc.enclosures) && doc.enclosures.length > 0 && (
-              <MetaItem icon="paperclip" label="สิ่งที่ส่งมาด้วย" className="sm:col-span-2">
+              <MetaItem icon="paperclip" label={t('สิ่งที่ส่งมาด้วย')} className="sm:col-span-2">
                 {doc.enclosures.map((e, i) => `${i + 1}. ${e.name}${e.qty != null ? ` (${e.qty} ${e.unit || 'ชุด'})` : ''}`).join('  ·  ')}
               </MetaItem>
             )}
-            {doc.remarks && <MetaItem icon="edit" label="หมายเหตุ" className="sm:col-span-2">{doc.remarks}</MetaItem>}
+            {doc.remarks && <MetaItem icon="edit" label={t('หมายเหตุ')} className="sm:col-span-2">{doc.remarks}</MetaItem>}
           </div>
 
           {/* RIGHT: actions (only when there are any, so the row doesn't get skewed) */}
@@ -490,34 +492,34 @@ export default function DocumentDetail() {
                 "send back for edit"). Tooltips clarify each action's meaning. */}
             {myApproval.canApprove && (
               <>
-                <button onClick={() => setShowConsult(true)} title="สอบถาม/ขอความเห็นจากผู้อื่นก่อนตัดสินใจ — ยังไม่ใช่การอนุมัติ" className="inline-flex items-center gap-2 rounded-xl border border-brand/40 px-4 py-2.5 text-sm font-medium text-brand transition hover:bg-brand-tint">
-                  <Icon name="chat" className="h-4 w-4" /> ขอความเห็น
+                <button onClick={() => setShowConsult(true)} title={t('สอบถาม/ขอความเห็นจากผู้อื่นก่อนตัดสินใจ — ยังไม่ใช่การอนุมัติ')} className="inline-flex items-center gap-2 rounded-xl border border-brand/40 px-4 py-2.5 text-sm font-medium text-brand transition hover:bg-brand-tint">
+                  <Icon name="chat" className="h-4 w-4" /> {t('ขอความเห็น')}
                 </button>
-                <button onClick={() => setApprovalAction('rejected')} title="ไม่อนุมัติเอกสาร และส่งกลับให้ผู้จัดทำแก้ไขเพื่อยื่นใหม่ (ต้องระบุเหตุผล)" className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
-                  <Icon name="x" className="h-4 w-4" /> ไม่อนุมัติ
+                <button onClick={() => setApprovalAction('rejected')} title={t('ไม่อนุมัติเอกสาร และส่งกลับให้ผู้จัดทำแก้ไขเพื่อยื่นใหม่ (ต้องระบุเหตุผล)')} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700">
+                  <Icon name="x" className="h-4 w-4" /> {t('ไม่อนุมัติ')}
                 </button>
-                <button onClick={() => setApprovalAction('approved')} title="อนุมัติเอกสาร และส่งต่อผู้อนุมัติลำดับถัดไป (ถ้ามี)" className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
-                  <Icon name="check" className="h-5 w-5" /> อนุมัติ
+                <button onClick={() => setApprovalAction('approved')} title={t('อนุมัติเอกสาร และส่งต่อผู้อนุมัติลำดับถัดไป (ถ้ามี)')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">
+                  <Icon name="check" className="h-5 w-5" /> {t('อนุมัติ')}
                 </button>
               </>
             )}
 
             {/* OWNER/ADMIN actions — scoped to status (#13 — ยกเลิก + สร้างจากใบนี้ removed) */}
             {canManage && notSubmitted && (
-              <button onClick={() => setShowEdit(true)} disabled={busy} title="แก้ไขเนื้อหาเอกสารก่อนส่งอนุมัติ" className="btn-outline">
-                <Icon name="edit" className="h-4 w-4" /> แก้ไข
+              <button onClick={() => setShowEdit(true)} disabled={busy} title={t('แก้ไขเนื้อหาเอกสารก่อนส่งอนุมัติ')} className="btn-outline">
+                <Icon name="edit" className="h-4 w-4" /> {t('แก้ไข')}
               </button>
             )}
             {canManage && notSubmitted && (
-              <button onClick={() => setShowSubmit(true)} title="ส่งเอกสารเข้าสายอนุมัติ (ผู้จัดการโครงการอนุมัติเป็นลำดับแรก)" className="btn-primary">
-                <Icon name="check" className="h-4 w-4" /> ส่งอนุมัติ
+              <button onClick={() => setShowSubmit(true)} title={t('ส่งเอกสารเข้าสายอนุมัติ (ผู้จัดการโครงการอนุมัติเป็นลำดับแรก)')} className="btn-primary">
+                <Icon name="check" className="h-4 w-4" /> {t('ส่งอนุมัติ')}
               </button>
             )}
 
             {/* public verification page (same as scanning the PDF's QR) */}
             {doc.verify_token && (
               <a href={`/verify/${doc.verify_token}`} target="_blank" rel="noreferrer" className="btn-outline">
-                <Icon name="eye" className="h-4 w-4" /> ตรวจสอบ (QR)
+                <Icon name="eye" className="h-4 w-4" /> {t('ตรวจสอบ (QR)')}
               </a>
             )}
           </div>
@@ -529,7 +531,7 @@ export default function DocumentDetail() {
         <div className="lg:col-span-3 lg:sticky lg:top-20">
           <div className="card !p-3">
             <div className="mb-2 flex items-center justify-between px-2 pt-1">
-              <h3 className="font-bold text-slate-800">เอกสาร</h3>
+              <h3 className="font-bold text-slate-800">{t('เอกสาร')}</h3>
               {previewUrl ? (
                 <div className="flex items-center gap-4">
                   {/* Saves whichever tab is open, under its real name. The PDF
@@ -542,11 +544,11 @@ export default function DocumentDetail() {
                     className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline disabled:opacity-50"
                   >
                     {attBusy === activePreviewId
-                      ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand" /> กำลังเตรียมไฟล์…</>
-                      : <><Icon name="download" className="h-4 w-4" /> ดาวน์โหลด</>}
+                      ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand" /> {t('กำลังเตรียมไฟล์…')}</>
+                      : <><Icon name="download" className="h-4 w-4" /> {t('ดาวน์โหลด')}</>}
                   </button>
                   <button onClick={() => window.open(previewUrl, '_blank')} className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline">
-                    <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอ
+                    <Icon name="eye" className="h-4 w-4" /> {t('เปิดเต็มจอ')}
                   </button>
                 </div>
               ) : null}
@@ -555,12 +557,12 @@ export default function DocumentDetail() {
             {previewUrl && (
               <div className="mb-2 flex gap-2 md:hidden">
                 <button onClick={() => window.open(previewUrl, '_blank')} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white">
-                  <Icon name="eye" className="h-4 w-4" /> เปิดเต็มจอเพื่ออ่าน
+                  <Icon name="eye" className="h-4 w-4" /> {t('เปิดเต็มจอเพื่ออ่าน')}
                 </button>
                 <button
                   onClick={() => downloadAttachment(activePreviewId, activePreview?.fileName)}
                   disabled={attBusy === activePreviewId}
-                  aria-label="ดาวน์โหลดไฟล์ที่กำลังเปิด"
+                  aria-label={t('ดาวน์โหลดไฟล์ที่กำลังเปิด')}
                   className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
                 >
                   {attBusy === activePreviewId
@@ -572,7 +574,7 @@ export default function DocumentDetail() {
             {combinePending && (
               <div className="mb-2 flex items-center gap-1.5 px-2 text-xs text-slate-400">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-brand" />
-                กำลังรวมไฟล์แนบเข้าเอกสาร… (จะแสดงอัตโนมัติเมื่อเสร็จ)
+                {t('กำลังรวมไฟล์แนบเข้าเอกสาร… (จะแสดงอัตโนมัติเมื่อเสร็จ)')}
               </div>
             )}
             {previewables.length > 1 && (
@@ -594,7 +596,7 @@ export default function DocumentDetail() {
             )}
             {otherFiles.length > 0 && (
               <div className="mb-2 space-y-1 px-2">
-                <div className="text-xs font-semibold text-slate-500">ไฟล์แนบอื่น ๆ (เปิด/ดาวน์โหลด)</div>
+                <div className="text-xs font-semibold text-slate-500">{t('ไฟล์แนบอื่น ๆ (เปิด/ดาวน์โหลด)')}</div>
                 {otherFiles.map((a) => (
                   <button
                     key={a.id}
@@ -606,7 +608,7 @@ export default function DocumentDetail() {
                     <Icon name="paperclip" className="h-4 w-4 shrink-0 text-slate-400" />
                     <span className="min-w-0 flex-1 truncate">{a.file_name}</span>
                     {attBusy === a.id
-                      ? <Spinner className="h-4 w-4 shrink-0" tone="inherit" label="กำลังเตรียม…" />
+                      ? <Spinner className="h-4 w-4 shrink-0" tone="inherit" label={t('กำลังเตรียม…')} />
                       : <>
                           {a.size_bytes != null && <span className="shrink-0 text-xs text-slate-400">{fmtSize(a.size_bytes)}</span>}
                           <Icon name="download" className="h-4 w-4 shrink-0 text-brand" />
@@ -616,9 +618,9 @@ export default function DocumentDetail() {
                 {/* Where the files actually live. The acceptance criteria require the
                     storage location to be stated plainly, not just implied. */}
                 <details className="px-1 pt-1">
-                  <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600">ตำแหน่งจัดเก็บไฟล์</summary>
+                  <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600">{t('ตำแหน่งจัดเก็บไฟล์')}</summary>
                   <div className="mt-1 space-y-1 rounded-lg bg-slate-50 p-2 text-[11px] leading-relaxed text-slate-500">
-                    <div>ระบบจัดเก็บ: <b className="text-slate-700">Supabase Storage</b> (สำรองข้อมูลอัตโนมัติ)</div>
+                    <div>{t('ระบบจัดเก็บ:')} <b className="text-slate-700">Supabase Storage</b> {t('(สำรองข้อมูลอัตโนมัติ)')}</div>
                     {otherFiles.filter((a) => a.storage_key).map((a) => (
                       <div key={a.id} className="break-all">
                         <span className="text-slate-600">{a.file_name}</span> → <code className="text-slate-500">{a.storage_key}</code>
@@ -632,11 +634,11 @@ export default function DocumentDetail() {
               activeIsImage ? (
                 // images: fit to the panel width so they don't open zoomed-in (#1)
                 <div className="h-[calc(100vh-220px)] min-h-[560px] w-full overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <img src={previewUrl} alt="ไฟล์แนบ" className="mx-auto h-auto max-w-full" />
+                  <img src={previewUrl} alt={t('ไฟล์แนบ')} className="mx-auto h-auto max-w-full" />
                 </div>
               ) : (
                 <iframe
-                  title="เอกสาร"
+                  title={t('เอกสาร')}
                   // #view=FitH tells the PDF viewer to fit page width (no over-zoom) (#1)
                   src={`${previewUrl}#view=FitH`}
                   className="h-[calc(100vh-220px)] min-h-[560px] w-full rounded-xl border border-slate-200 bg-slate-50"
@@ -645,7 +647,7 @@ export default function DocumentDetail() {
             ) : (
               <div className="flex h-[560px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 text-center">
                 <Icon name="file" className="h-10 w-10 text-slate-300" />
-                <p className="text-sm text-slate-400">ยังไม่มีไฟล์หนังสือสำหรับเอกสารนี้</p>
+                <p className="text-sm text-slate-400">{t('ยังไม่มีไฟล์หนังสือสำหรับเอกสารนี้')}</p>
                 <button onClick={generatePdf} disabled={busy} className="btn-primary">
                   <Icon name="file" className="h-4 w-4" /> {busy ? 'กำลังสร้าง…' : 'สร้างไฟล์หนังสือ'}
                 </button>
@@ -658,13 +660,13 @@ export default function DocumentDetail() {
             messages, all in a single chronological thread (#4/#5). */}
         <div className="space-y-5 lg:col-span-2">
           <div className="card">
-            <h3 className="mb-4 font-bold text-slate-800">บันทึกและการพิจารณา</h3>
+            <h3 className="mb-4 font-bold text-slate-800">{t('บันทึกและการพิจารณา')}</h3>
 
             <Timeline doc={doc} openAttachment={openAttachment} />
 
             {/* composer */}
             <div ref={composerRef} className={`mt-4 rounded-xl border bg-slate-50 p-3 ${consultForMe ? 'border-brand/40 ring-2 ring-brand/15' : 'border-slate-200'}`}>
-              {consultForMe && <div className="mb-1.5 text-xs font-semibold text-brand">ให้ความเห็นของคุณที่นี่</div>}
+              {consultForMe && <div className="mb-1.5 text-xs font-semibold text-brand">{t('ให้ความเห็นของคุณที่นี่')}</div>}
               <div className="relative">
                 <textarea
                   value={msgText}
@@ -717,17 +719,17 @@ export default function DocumentDetail() {
               </div>
               {mentions.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-slate-500">แจ้งเตือนถึง:</span>
+                  <span className="text-slate-500">{t('แจ้งเตือนถึง:')}</span>
                   {mentions.map((m) => (
                     <span key={m.id} className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 font-medium text-violet-700">
                       {m.full_name || m.email}
                       <button type="button" onClick={() => setMentions((prev) => prev.filter((x) => x.id !== m.id))}
-                        title="เอาออก" className="text-violet-400 hover:text-red-600">
+                        title={t('เอาออก')} className="text-violet-400 hover:text-red-600">
                         <Icon name="x" className="h-3 w-3" />
                       </button>
                     </span>
                   ))}
-                  <span className="text-slate-400">· จะได้รับอีเมลพร้อมลิงก์มาที่เอกสารนี้</span>
+                  <span className="text-slate-400">{t('· จะได้รับอีเมลพร้อมลิงก์มาที่เอกสารนี้')}</span>
                 </div>
               )}
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -743,7 +745,7 @@ export default function DocumentDetail() {
                   }} />
                 </label>
                 <div className="flex items-center gap-2">
-                  {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">ลบไฟล์</button>}
+                  {msgFile && <button onClick={() => setMsgFile(null)} className="text-xs text-slate-400 hover:text-red-600">{t('ลบไฟล์')}</button>}
                   <button onClick={postMessage} disabled={posting || (!msgText.trim() && !msgFile)} className="btn-primary px-3 py-1.5 text-xs">
                     {posting ? 'กำลังส่ง…' : consultForMe ? 'ส่งความเห็น' : 'ส่งข้อความ'}
                   </button>
@@ -762,8 +764,8 @@ export default function DocumentDetail() {
           onClose={() => setDupData(null)}
           onCreated={(newId, meta) => {
             setDupData(null);
-            if (meta?.emailFailed) toast.error('สร้างเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง');
-            else toast.success('สร้างเอกสารจากใบเดิมแล้ว');
+            if (meta?.emailFailed) toast.error(t('สร้างเอกสารแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'));
+            else toast.success(t('สร้างเอกสารจากใบเดิมแล้ว'));
             if (newId) navigate(`/memos/${newId}`);
           }}
         />
@@ -780,7 +782,7 @@ export default function DocumentDetail() {
           prefill={doc.draft_approvers || chainPrefill(doc.approval_steps)}
           resubmit={isResubmit}
           onClose={() => setShowSubmit(false)}
-          onSubmitted={(emailFailed) => { setShowSubmit(false); if (emailFailed) toast.error('ส่งเข้าสายอนุมัติแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง'); else toast.success('ส่งเข้าสายอนุมัติแล้ว'); load(); }}
+          onSubmitted={(emailFailed) => { setShowSubmit(false); if (emailFailed) toast.error(t('ส่งเข้าสายอนุมัติแล้ว แต่ส่งอีเมลแจ้งผู้อนุมัติไม่สำเร็จ — กรุณาแจ้งผู้อนุมัติด้วยตนเอง')); else toast.success(t('ส่งเข้าสายอนุมัติแล้ว')); load(); }}
         />
       )}
 
@@ -788,7 +790,7 @@ export default function DocumentDetail() {
         <EditDocumentModal
           doc={doc}
           onClose={() => setShowEdit(false)}
-          onSaved={() => { setShowEdit(false); toast.success('บันทึกการแก้ไขแล้ว'); load(); }}
+          onSaved={() => { setShowEdit(false); toast.success(t('บันทึกการแก้ไขแล้ว')); load(); }}
         />
       )}
 
@@ -830,6 +832,7 @@ const TIMELINE_LIFECYCLE = new Set(['created', 'submitted', 'edited', 'cancelled
  * steps, audit events and messages sort by their timestamp.
  */
 function Timeline({ doc, openAttachment }) {
+  const t = useT();
   const steps = doc.approval_steps || [];
   const messages = doc.messages || [];
   const audit = doc.audit || [];
@@ -854,7 +857,7 @@ function Timeline({ doc, openAttachment }) {
   events.sort((a, b) => a.at - b.at);
 
   if (events.length === 0) {
-    return <p className="text-sm text-slate-500">ยังไม่มีการพิจารณาหรือข้อความ — เริ่มการสนทนาด้านล่างได้เลย</p>;
+    return <p className="text-sm text-slate-500">{t('ยังไม่มีการพิจารณาหรือข้อความ — เริ่มการสนทนาด้านล่างได้เลย')}</p>;
   }
 
   const truncate = (s) => (s && s.length > 40 ? `${s.slice(0, 40)}…` : s);
@@ -879,7 +882,7 @@ function Timeline({ doc, openAttachment }) {
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
                   <span className={`font-medium ${warn ? 'text-amber-600' : 'text-slate-600'}`}>{AUDIT_ACTION_TH[a.action] || a.action}</span>
-                  {a.actor_label && <span className="text-slate-500">โดย {a.actor_label}</span>}
+                  {a.actor_label && <span className="text-slate-500">{t('โดย')} {a.actor_label}</span>}
                   <span className="text-slate-400">{formatThaiDateTime(a.created_at)}</span>
                 </div>
                 {changes.length > 0 && (
@@ -919,7 +922,7 @@ function Timeline({ doc, openAttachment }) {
                 <div className={`flex flex-wrap items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
                   <span className="truncate">{s.approver_name || s.approver_email}</span>
                   {/* #10: mark the signer clearly as the project manager */}
-                  {s.is_signer && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ผู้จัดการโครงการ</span>}
+                  {s.is_signer && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">{t('ผู้จัดการโครงการ')}</span>}
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : ev.isCurrent ? 'กำลังพิจารณา' : m.label}</span>
                   {s.acted_at && <span className="text-[11px] text-slate-500">{formatThaiDateTime(s.acted_at)}</span>}
                 </div>
@@ -927,7 +930,7 @@ function Timeline({ doc, openAttachment }) {
                 {/* #9: once approved, show that their signature is now on the letter */}
                 {s.action === 'approved' && s.has_signature && (
                   <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-                    <Icon name="check" className="h-3.5 w-3.5" /> ลงลายเซ็นบนเอกสารแล้ว
+                    <Icon name="check" className="h-3.5 w-3.5" /> {t('ลงลายเซ็นบนเอกสารแล้ว')}
                   </div>
                 )}
                 {s.comment && <div className="mt-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-600">{s.comment}</div>}
@@ -948,7 +951,7 @@ function Timeline({ doc, openAttachment }) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-slate-800">{m.author_name || m.author_label || 'ผู้ใช้'}</span>
-                {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">ขอความเห็น</span>}
+                {isConsult && <span className="rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">{t('ขอความเห็น')}</span>}
                 <span className="text-[11px] text-slate-500">{formatThaiDateTime(m.created_at)}</span>
               </div>
               <div className={`mt-1 whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${isConsult ? 'border border-brand-border bg-brand-tint text-slate-700' : 'bg-slate-100 text-slate-700'}`}>{m.body}</div>
@@ -970,7 +973,7 @@ function Timeline({ doc, openAttachment }) {
                       className="flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
                     >
                       <Icon name="eye" className="h-3.5 w-3.5 shrink-0" />
-                      <span className="max-w-[220px] truncate">เปิดดูเอกสาร: {a.file_name}</span>
+                      <span className="max-w-[220px] truncate">{t('เปิดดูเอกสาร:')} {a.file_name}</span>
                     </button>
                   ))}
                 </div>

@@ -8,6 +8,7 @@ import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import MeetingDetail from './MeetingDetail.jsx';
 import MeetingForm from './MeetingForm.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * รายงานการประชุม — the list, and one meeting open beside it.
@@ -16,6 +17,7 @@ import MeetingForm from './MeetingForm.jsx';
  * decision or a name, not a title they already remember.
  */
 export default function Meetings() {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [sp, setSp] = useSearchParams();
@@ -46,11 +48,11 @@ export default function Meetings() {
   if (error) {
     return (
       <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error}<button onClick={() => window.location.reload()} className="ml-2 font-semibold underline">ลองใหม่</button>
+        {error}<button onClick={() => window.location.reload()} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     );
   }
-  if (!boot || !rows) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลดรายงานการประชุม…" /></div>;
+  if (!boot || !rows) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดรายงานการประชุม…')} /></div>;
 
   const { groups, canEdit } = boot;
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
@@ -58,9 +60,9 @@ export default function Meetings() {
 
   const removeRow = async (r) => {
     const ok = await confirm({
-      title: 'ลบรายงานการประชุม',
+      title: t('ลบรายงานการประชุม'),
       message: `ลบ "${r.title}"?\nไฟล์แนบ ความเห็น และประวัติทุกเวอร์ชันของรายงานฉบับนี้จะถูกลบไปด้วย`,
-      confirmLabel: 'ลบ', danger: true,
+      confirmLabel: t('ลบ'), danger: true,
     });
     if (!ok) return;
     try {
@@ -74,18 +76,18 @@ export default function Meetings() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="รายงานการประชุม"
+        title={t('รายงานการประชุม')}
         subtitle={`บันทึกการประชุมแยกตามโครงการและฝ่าย · ${boot.total} ฉบับ`}
         right={canEdit ? (
           <button onClick={() => setEditing('new')} className="btn-primary !py-2 !text-sm">
-            <Icon name="plus" className="h-4 w-4" /> เพิ่มรายงาน
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายงาน')}
           </button>
         ) : undefined}
       />
 
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setGroup('')} className={chip(group === '')}>
-          ทุกกลุ่ม <span className="ml-1 text-xs opacity-70">{boot.total}</span>
+          {t('ทุกกลุ่ม')} <span className="ml-1 text-xs opacity-70">{boot.total}</span>
         </button>
         {groups.filter((g) => !g.is_inbox).map((g) => (
           <button key={g.id} onClick={() => setGroup(group === g.id ? '' : g.id)} className={chip(group === g.id)}>
@@ -97,7 +99,7 @@ export default function Meetings() {
         {groups.some((g) => g.is_inbox) && <span className="mx-1 h-5 w-px bg-slate-200" />}
         {groups.filter((g) => g.is_inbox).map((g) => (
           <button key={g.id} onClick={() => setGroup(group === g.id ? '' : g.id)}
-            title="บันทึกเสียงที่ยังไม่ได้จัดเก็บเข้ากลุ่ม"
+            title={t('บันทึกเสียงที่ยังไม่ได้จัดเก็บเข้ากลุ่ม')}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
               group === g.id ? 'border-slate-600 bg-slate-600 text-white'
                 : 'border-dashed border-slate-300 bg-white text-slate-500 hover:border-slate-500'}`}>
@@ -110,13 +112,13 @@ export default function Meetings() {
 
       <div className="relative">
         <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหารายงานการประชุม"
-          placeholder="ค้นหาชื่อเรื่อง มติ ผู้เข้าประชุม หรือข้อความในรายงาน…" className="field !pl-9" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('ค้นหารายงานการประชุม')}
+          placeholder={t('ค้นหาชื่อเรื่อง มติ ผู้เข้าประชุม หรือข้อความในรายงาน…')} className="field !pl-9" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,340px)_1fr] xl:items-start">
         <div className="space-y-2">
-          <p className="text-xs text-slate-500">พบ {rows.length} ฉบับ</p>
+          <p className="text-xs text-slate-500">{t('พบ')} {rows.length} {t('ฉบับ')}</p>
           {rows.length === 0 && (
             <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">
               {q ? 'ไม่พบรายงานที่ตรงกับคำค้น' : 'ยังไม่มีรายงานในกลุ่มนี้'}
@@ -130,8 +132,8 @@ export default function Meetings() {
                   openId === r.id ? 'border-brand bg-brand-tint' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {g && <span className="chip" style={{ backgroundColor: `${g.color}1a`, color: g.color }}>{g.name}</span>}
-                  {r.pinned && <Icon name="pin" className="h-3.5 w-3.5 text-amber-500" title="ปักหมุด" />}
-                  {!r.visible && <span className="chip bg-slate-100 text-slate-500">ยังไม่เผยแพร่</span>}
+                  {r.pinned && <Icon name="pin" className="h-3.5 w-3.5 text-amber-500" title={t('ปักหมุด')} />}
+                  {!r.visible && <span className="chip bg-slate-100 text-slate-500">{t('ยังไม่เผยแพร่')}</span>}
                 </div>
                 <div className="mt-1 text-sm font-semibold text-slate-800">{r.title}</div>
                 <div className="text-xs text-slate-500">
@@ -156,7 +158,7 @@ export default function Meetings() {
             />
           ) : (
             <p className="rounded-2xl border border-dashed border-slate-200 py-20 text-center text-sm text-slate-500">
-              เลือกรายงานทางซ้ายเพื่ออ่าน
+              {t('เลือกรายงานทางซ้ายเพื่ออ่าน')}
             </p>
           )}
         </div>

@@ -9,6 +9,7 @@ import NodeDetail from './NodeDetail.jsx';
 import FunctionsView from './FunctionsView.jsx';
 import AiView from './AiView.jsx';
 import EditModal from './EditModal.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * แผนผังระบบ — how the group actually works, as something you can read and click.
@@ -24,6 +25,7 @@ const TABS = [
 ];
 
 export default function SystemMap() {
+  const t = useT();
   const [sp, setSp] = useSearchParams();
   const [boot, setBoot] = useState(null);
   const [fns, setFns] = useState(null);
@@ -61,11 +63,11 @@ export default function SystemMap() {
   if (error) {
     return (
       <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error}<button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+        {error}<button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     );
   }
-  if (!boot || !fns || !ai) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลดแผนผัง…" /></div>;
+  if (!boot || !fns || !ai) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดแผนผัง…')} /></div>;
 
   const { depts, modules, lanes, nodes, conns, canEdit, counts } = boot;
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
@@ -74,7 +76,7 @@ export default function SystemMap() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="แผนผังระบบ"
+        title={t('แผนผังระบบ')}
         subtitle={`กระบวนการทำงานของกลุ่มบริษัท · ${counts.lanes} เลน · ${counts.nodes} ขั้นตอน · ${counts.conns} เส้นเชื่อม`}
         right={
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 p-0.5">
@@ -104,7 +106,7 @@ export default function SystemMap() {
       {tab === 'map' && (
         <>
           <div className="flex flex-wrap items-center gap-1.5">
-            <button onClick={() => setDept('')} className={chip(dept === '')}>ทุกแผนก</button>
+            <button onClick={() => setDept('')} className={chip(dept === '')}>{t('ทุกแผนก')}</button>
             {depts.map((d) => (
               <button key={d.key} onClick={() => setDept(dept === d.key ? '' : d.key)} className={chip(dept === d.key)}>
                 {pick(lang, d.name_th, d.name_en)}
@@ -116,14 +118,14 @@ export default function SystemMap() {
             ))}
             {canEdit && (
               <div className="ml-auto flex gap-2">
-                <button onClick={() => setEdit({ kind: 'lane' })} className="btn-outline !py-1.5 !text-sm"><Icon name="plus" className="h-4 w-4" /> เลน</button>
-                <button onClick={() => setEdit({ kind: 'node' })} className="btn-primary !py-1.5 !text-sm"><Icon name="plus" className="h-4 w-4" /> กล่องงาน</button>
+                <button onClick={() => setEdit({ kind: 'lane' })} className="btn-outline !py-1.5 !text-sm"><Icon name="plus" className="h-4 w-4" /> {t('เลน')}</button>
+                <button onClick={() => setEdit({ kind: 'node' })} className="btn-primary !py-1.5 !text-sm"><Icon name="plus" className="h-4 w-4" /> {t('กล่องงาน')}</button>
               </div>
             )}
           </div>
 
           <p className="text-xs text-slate-500">
-            กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น — เส้นทั้ง {counts.conns} เส้นถ้าวาดพร้อมกันจะอ่านไม่ออก จึงแสดงเฉพาะของกล่องที่เลือก
+            {t('กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น — เส้นทั้ง')} {counts.conns} {t('เส้นถ้าวาดพร้อมกันจะอ่านไม่ออก จึงแสดงเฉพาะของกล่องที่เลือก')}
           </p>
 
           <LaneMap
@@ -140,7 +142,7 @@ export default function SystemMap() {
           )}
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500">
-            <span className="font-medium text-slate-600">ความหมายของเส้น:</span>
+            <span className="font-medium text-slate-600">{t('ความหมายของเส้น:')}</span>
             {Object.entries(CONN_META).map(([k, m]) => (
               <span key={k} className="inline-flex items-center gap-1.5">
                 <span className="inline-block h-0.5 w-5 rounded" style={{ backgroundColor: m.color }} /> {m.label}

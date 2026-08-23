@@ -6,10 +6,12 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /** One meeting: the body, what was attached, what the team said, and what it
  *  used to say before somebody changed it. */
 export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdit, onDelete, onChanged }) {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const { profile } = useAuth();
@@ -26,7 +28,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
   useEffect(() => { load(); }, [load]);
 
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!m) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
+  if (!m) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const act = async (fn, ok) => {
     setBusy(true);
@@ -53,7 +55,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
   };
 
   const dropComment = async (c) => {
-    const ok = await confirm({ title: 'ลบความเห็น', message: 'ลบความเห็นนี้?', confirmLabel: 'ลบ', danger: true });
+    const ok = await confirm({ title: t('ลบความเห็น'), message: t('ลบความเห็นนี้?'), confirmLabel: t('ลบ'), danger: true });
     if (ok) act(() => meetingsApi.removeComment(m.id, c.id), 'ลบแล้ว');
   };
 
@@ -63,8 +65,8 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="chip" style={{ backgroundColor: `${m.group_color}1a`, color: m.group_color }}>{m.group_name}</span>
-            {m.pinned && <span className="chip bg-amber-50 text-amber-700">ปักหมุด</span>}
-            {!m.visible && <span className="chip bg-slate-100 text-slate-500">ยังไม่เผยแพร่</span>}
+            {m.pinned && <span className="chip bg-amber-50 text-amber-700">{t('ปักหมุด')}</span>}
+            {!m.visible && <span className="chip bg-slate-100 text-slate-500">{t('ยังไม่เผยแพร่')}</span>}
           </div>
           <h2 className="mt-2 text-lg font-bold text-slate-800">{m.title}</h2>
           <p className="text-sm text-slate-500">
@@ -78,7 +80,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
         <div className="flex shrink-0 flex-wrap items-center gap-1">
           {m.versions?.length > 0 && (
             <button onClick={() => setHistory(true)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
-              <Icon name="clock" className="inline h-4 w-4" /> ประวัติ {m.versions.length}
+              <Icon name="clock" className="inline h-4 w-4" /> {t('ประวัติ')} {m.versions.length}
             </button>
           )}
           {canEdit && (
@@ -87,11 +89,11 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                 disabled={busy} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
                 {m.pinned ? 'เอาหมุดออก' : 'ปักหมุด'}
               </button>
-              <button onClick={() => onEdit(m)} className="text-sm font-medium text-brand hover:underline">แก้ไข</button>
-              <button onClick={() => onDelete(m)} className="ml-1 text-sm text-rose-500 hover:underline">ลบ</button>
+              <button onClick={() => onEdit(m)} className="text-sm font-medium text-brand hover:underline">{t('แก้ไข')}</button>
+              <button onClick={() => onDelete(m)} className="ml-1 text-sm text-rose-500 hover:underline">{t('ลบ')}</button>
             </>
           )}
-          <button onClick={onClose} title="ปิด" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <button onClick={onClose} title={t('ปิด')} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
             <Icon name="x" className="h-4 w-4" />
           </button>
         </div>
@@ -100,7 +102,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
       {m.recording_url && (
         <a href={m.recording_url} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-brand hover:bg-slate-50">
-          <Icon name="link" className="h-4 w-4" /> เปิดไฟล์บันทึกเสียง
+          <Icon name="link" className="h-4 w-4" /> {t('เปิดไฟล์บันทึกเสียง')}
         </a>
       )}
 
@@ -109,15 +111,15 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
       {(m.is_inbox || (m.tags || []).length > 0) && (
         <section className="rounded-xl bg-slate-50 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-medium text-slate-500">จัดเก็บเข้ากลุ่ม:</span>
-            {(m.tags || []).length === 0 && <span className="text-xs text-slate-400">ยังไม่ได้จัดเก็บ</span>}
-            {(m.tags || []).map((t) => (
-              <span key={t.id} className="chip inline-flex items-center gap-1"
-                style={{ backgroundColor: `${t.color}1a`, color: t.color }}>
-                {t.name}
+            <span className="text-xs font-medium text-slate-500">{t('จัดเก็บเข้ากลุ่ม:')}</span>
+            {(m.tags || []).length === 0 && <span className="text-xs text-slate-400">{t('ยังไม่ได้จัดเก็บ')}</span>}
+            {(m.tags || []).map((tag) => (
+              <span key={tag.id} className="chip inline-flex items-center gap-1"
+                style={{ backgroundColor: `${tag.color}1a`, color: tag.color }}>
+                {tag.name}
                 {canEdit && (
-                  <button onClick={() => act(() => meetingsApi.untag(m.id, t.id), 'เอาออกจากกลุ่มแล้ว')}
-                    title="เอาออกจากกลุ่มนี้" className="opacity-60 hover:opacity-100">
+                  <button onClick={() => act(() => meetingsApi.untag(m.id, tag.id), 'เอาออกจากกลุ่มแล้ว')}
+                    title={t('เอาออกจากกลุ่มนี้')} className="opacity-60 hover:opacity-100">
                     <Icon name="x" className="h-3 w-3" />
                   </button>
                 )}
@@ -130,21 +132,21 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                     if (v) act(() => meetingsApi.tag(m.id, v), 'จัดเก็บเข้ากลุ่มแล้ว'); }}
                   onBlur={() => setFiling(false)}
                   className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm">
-                  <option value="">— เลือกกลุ่มปลายทาง —</option>
+                  <option value="">{t('— เลือกกลุ่มปลายทาง —')}</option>
                   {groups.filter((g) => !g.is_inbox && g.id !== m.group_id
                     && !(m.tags || []).some((t) => t.id === g.id))
                     .map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               ) : (
                 <button onClick={() => setFiling(true)} className="text-xs font-medium text-brand hover:underline">
-                  + จัดเก็บเข้ากลุ่ม
+                  {t('+ จัดเก็บเข้ากลุ่ม')}
                 </button>
               )
             )}
           </div>
           {m.is_inbox && (
             <p className="mt-1 text-[11px] text-slate-400">
-              บันทึกนี้อยู่ในกล่องรอจัดเก็บถาวร การจัดเก็บเป็นการเพิ่มที่ให้หาเจอ ไม่ได้ย้ายออกจากกล่อง
+              {t('บันทึกนี้อยู่ในกล่องรอจัดเก็บถาวร การจัดเก็บเป็นการเพิ่มที่ให้หาเจอ ไม่ได้ย้ายออกจากกล่อง')}
             </p>
           )}
         </section>
@@ -153,11 +155,11 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
       {m.content
         ? <div className="mtg-body border-t border-slate-100 pt-4 text-[15px] leading-relaxed text-slate-800"
             dangerouslySetInnerHTML={{ __html: m.content }} />
-        : <p className="border-t border-slate-100 pt-4 text-sm text-slate-400">ยังไม่มีเนื้อหา</p>}
+        : <p className="border-t border-slate-100 pt-4 text-sm text-slate-400">{t('ยังไม่มีเนื้อหา')}</p>}
 
       {m.attachments?.length > 0 && (
         <section className="border-t border-slate-100 pt-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">ไฟล์แนบ</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('ไฟล์แนบ')}</h3>
           <div className="flex flex-wrap gap-2">
             {m.attachments.map((a) => (
               <button key={a.id} onClick={() => openFile(a)}
@@ -174,7 +176,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
           ความเห็น {m.comments?.length ? `(${m.comments.length})` : ''}
         </h3>
         <div className="space-y-2">
-          {(m.comments || []).length === 0 && <p className="text-sm text-slate-400">ยังไม่มีความเห็น</p>}
+          {(m.comments || []).length === 0 && <p className="text-sm text-slate-400">{t('ยังไม่มีความเห็น')}</p>}
           {(m.comments || []).map((c) => (
             <div key={c.id} className="rounded-xl bg-slate-50 px-3 py-2">
               <div className="flex items-baseline justify-between gap-2">
@@ -182,7 +184,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                 <span className="flex items-center gap-2 text-xs text-slate-400">
                   {thaiDate(c.created_at)}
                   {(c.author_id === profile?.id || profile?.role === 'admin') && (
-                    <button onClick={() => dropComment(c)} className="text-rose-400 hover:text-rose-600">ลบ</button>
+                    <button onClick={() => dropComment(c)} className="text-rose-400 hover:text-rose-600">{t('ลบ')}</button>
                   )}
                 </span>
               </div>
@@ -191,17 +193,17 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
           ))}
         </div>
         <form onSubmit={send} className="mt-2 flex gap-2">
-          <input value={text} onChange={(e) => setText(e.target.value)} aria-label="เขียนความเห็น"
-            placeholder="เขียนความเห็น…" className="field flex-1" />
-          <button type="submit" disabled={busy || !text.trim()} className="btn-primary disabled:opacity-50">ส่ง</button>
+          <input value={text} onChange={(e) => setText(e.target.value)} aria-label={t('เขียนความเห็น')}
+            placeholder={t('เขียนความเห็น…')} className="field flex-1" />
+          <button type="submit" disabled={busy || !text.trim()} className="btn-primary disabled:opacity-50">{t('ส่ง')}</button>
         </form>
       </section>
 
       {history && (
-        <Modal title="ประวัติการแก้ไข" onClose={() => setHistory(false)} size="md"
-          footer={<button onClick={() => setHistory(false)} className="btn-outline">ปิด</button>}>
+        <Modal title={t('ประวัติการแก้ไข')} onClose={() => setHistory(false)} size="md"
+          footer={<button onClick={() => setHistory(false)} className="btn-outline">{t('ปิด')}</button>}>
           <p className="mb-3 text-xs text-slate-500">
-            ทุกครั้งที่แก้ ระบบเก็บของเดิมไว้พร้อมชื่อเรื่องและวันที่ ณ ขณะนั้น กดดูได้ว่าตอนนั้นเขียนไว้ว่าอย่างไร
+            {t('ทุกครั้งที่แก้ ระบบเก็บของเดิมไว้พร้อมชื่อเรื่องและวันที่ ณ ขณะนั้น กดดูได้ว่าตอนนั้นเขียนไว้ว่าอย่างไร')}
           </p>
           <div className="space-y-2">
             {m.versions.map((v) => (
@@ -224,7 +226,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
 
       {preview && (
         <Modal title={`ฉบับก่อนแก้ครั้งที่ ${preview.seq}`} onClose={() => setPreview(null)} size="lg"
-          footer={<button onClick={() => setPreview(null)} className="btn-outline">ปิด</button>}>
+          footer={<button onClick={() => setPreview(null)} className="btn-outline">{t('ปิด')}</button>}>
           <p className="mb-3 text-sm text-slate-600">
             <b className="text-slate-800">{preview.title}</b>
             <span className="text-slate-500"> · {thaiDate(preview.meeting_date)}{preview.time_label ? ` · ${preview.time_label}` : ''}</span>

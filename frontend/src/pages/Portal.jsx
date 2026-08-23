@@ -6,6 +6,8 @@ import { apps, roleLabels } from '../config/nav.js';
 import { formatThaiLongDate, ememoApi } from '../lib/ememo.js';
 import { portalApi } from '../lib/portal.js';
 import Icon from '../components/Icon.jsx';
+import LangToggle from '../components/LangToggle.jsx';
+import { useT } from '../lib/i18n.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
 import HolidayCalendar from '../components/HolidayCalendar.jsx';
 import HelpModal from '../components/HelpModal.jsx';
@@ -47,6 +49,7 @@ function WelcomeCard({ name }) {
  *  Portal's render would be a NEW type every render, so React would unmount +
  *  remount every card (losing hover/focus) on each state change. */
 function AppCard({ app, soon, awaiting, onOpen }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -63,15 +66,15 @@ function AppCard({ app, soon, awaiting, onOpen }) {
           <Icon name={app.icon} className="h-6 w-6" />
         </div>
         {soon
-          ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">เร็วๆ นี้</span>
+          ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500">{t('เร็วๆ นี้')}</span>
           : awaiting > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-[#0f172a]">
-              <Icon name="clock" className="h-3.5 w-3.5" /> รออนุมัติ {awaiting}
+              <Icon name="clock" className="h-3.5 w-3.5" /> {t('รออนุมัติ')} {awaiting}
             </span>
           )}
       </div>
-      <h3 className="mt-4 text-base font-bold text-slate-800">{app.title}</h3>
-      <p className="mt-1 flex-1 text-sm leading-relaxed text-slate-500">{app.desc}</p>
+      <h3 className="mt-4 text-base font-bold text-slate-800">{t(app.title)}</h3>
+      <p className="mt-1 flex-1 text-sm leading-relaxed text-slate-500">{t(app.desc)}</p>
       {!soon && (
         <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-brand">
           เปิดใช้งาน <Icon name="arrowRight" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -104,6 +107,7 @@ const ANNOUNCE_STYLE = {
 };
 
 export default function Portal() {
+  const t = useT();
   const { profile, user, logout } = useAuth();
   const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
@@ -146,7 +150,7 @@ export default function Portal() {
   }, [navOpen]);
 
   const term = q.trim().toLowerCase();
-  const match = (a) => !term || `${a.title} ${a.desc}`.toLowerCase().includes(term);
+  const match = (a) => !term || `${t(a.title)} ${t(a.desc)}`.toLowerCase().includes(term);
   const shownLive = liveApps.filter(match);
   const shownSoon = soonApps.filter(match); // searchable too — "แผนผัง" must find System Map
 
@@ -179,7 +183,7 @@ export default function Portal() {
             </div>
             <div className="leading-tight">
               <div className="text-sm font-extrabold tracking-tight text-white">VCB CONNECT</div>
-              <div className="text-[10px] text-slate-400">ระบบงานภายใน</div>
+              <div className="text-[10px] text-slate-400">{t('ระบบงานภายใน')}</div>
             </div>
           </div>
 
@@ -192,10 +196,10 @@ export default function Portal() {
           </div>
 
           <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="แอปพลิเคชัน">
-            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">แอปพลิเคชัน</div>
-            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={a.navTitle || a.title} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
-            <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">ช่วยเหลือ</div>
-            <NavRow icon="help" label="ช่วยเหลือ / แจ้งปัญหา" onClick={() => { setNavOpen(false); setHelp(true); }} />
+            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('แอปพลิเคชัน')}</div>
+            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
+            <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ช่วยเหลือ')}</div>
+            <NavRow icon="help" label={t('ช่วยเหลือ / แจ้งปัญหา')} onClick={() => { setNavOpen(false); setHelp(true); }} />
           </nav>
 
           <div className="border-t border-white/10 px-3 py-3">
@@ -224,9 +228,10 @@ export default function Portal() {
             </button>
             <div className="relative max-w-md flex-1">
               <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาแอปพลิเคชัน…" aria-label="ค้นหาแอปพลิเคชัน"
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ค้นหาแอปพลิเคชัน…')} aria-label="ค้นหาแอปพลิเคชัน"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
             </div>
+            <LangToggle />
             <button onClick={toggle} aria-label="สลับธีมสว่าง/มืด" aria-pressed={isDark}
               className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100">
               <Icon name={isDark ? 'sun' : 'moon'} className="h-[18px] w-[18px]" />
@@ -251,12 +256,12 @@ export default function Portal() {
                       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
                         โหลดประกาศไม่สำเร็จ
                         <button onClick={() => { setAnnErr(false); portalApi.announcements().then((r) => setAnnouncements(r.data || [])).catch(() => setAnnErr(true)); }}
-                          className="ml-2 font-semibold text-brand hover:underline">ลองใหม่</button>
+                          className="ml-2 font-semibold text-brand hover:underline">{t('ลองใหม่')}</button>
                       </div>
                     ) : announcements.map((a) => (
                       <div key={a.id} className={`rounded-xl border px-4 py-3 ${ANNOUNCE_STYLE[a.level] || ANNOUNCE_STYLE.info}`}>
                         <div className="flex items-center gap-1.5 text-sm font-semibold">
-                          {a.pinned && <Icon name="pin" className="h-3.5 w-3.5 shrink-0" />}{a.title}
+                          {a.pinned && <Icon name="pin" className="h-3.5 w-3.5 shrink-0" />}{t(a.title)}
                         </div>
                         {a.body && <div className="mt-0.5 whitespace-pre-wrap text-sm opacity-90">{a.body}</div>}
                       </div>
@@ -267,7 +272,7 @@ export default function Portal() {
                 {/* apps grid */}
                 <div>
                   <div className="mb-3 flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-700">แอปพลิเคชัน</h2>
+                    <h2 className="text-sm font-bold text-slate-700">{t('แอปพลิเคชัน')}</h2>
                     <span className="text-xs text-slate-500" aria-live="polite">{shownLive.length + shownSoon.length} รายการ</span>
                   </div>
                   {/* a third column once the window is wide enough to carry it */}

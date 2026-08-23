@@ -3,12 +3,14 @@ import { ememoApi } from '../../lib/ememo.js';
 import { Modal } from '../../components/ui/index.js';
 import ReferencePicker from './ReferencePicker.jsx';
 import CcPicker from './CcPicker.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Edit a document's content (subject / recipient / body / remarks / type /
  * work-unit / date). The project, doc code and running number are immutable.
  */
 export default function EditDocumentModal({ doc, onClose, onSaved }) {
+  const t = useT();
   const [docTypes, setDocTypes] = useState([]);
   const [form, setForm] = useState({
     subject: doc.subject || '',
@@ -77,34 +79,34 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
       size="2xl"
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">เรื่อง <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('เรื่อง')} <span className="text-red-500">*</span></label>
           <input value={form.subject} onChange={(e) => set('subject', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">เรียน</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เรียน')}</label>
             <input value={form.recipient} onChange={(e) => set('recipient', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ประเภทเอกสาร</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทเอกสาร')}</label>
             <select value={form.docTypeId} onChange={(e) => set('docTypeId', e.target.value)} className="field">
-              <option value="">— ไม่ระบุ —</option>
+              <option value="">{t('— ไม่ระบุ —')}</option>
               {docTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วันที่รับ</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันที่รับ')}</label>
             <input type="date" value={form.dateReceived} onChange={(e) => set('dateReceived', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">อ้างถึง</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อ้างถึง')}</label>
             {/* #3: pick a real in-system document */}
             <ReferencePicker
               value={{ docId: form.referenceDocId, text: form.reference }}
@@ -113,25 +115,25 @@ export default function EditDocumentModal({ doc, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">สำเนาเรียน / CC</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('สำเนาเรียน / CC')}</label>
             <CcPicker value={form.ccProfileIds} onChange={(v) => set('ccProfileIds', v)} />
-            <p className="mt-1 text-xs text-slate-400">ใส่อีเมลได้ — จะส่ง “เพื่อทราบ” ให้ตอนส่งอนุมัติ (ไม่ต้องอนุมัติ)</p>
+            <p className="mt-1 text-xs text-slate-400">{t('ใส่อีเมลได้ — จะส่ง “เพื่อทราบ” ให้ตอนส่งอนุมัติ (ไม่ต้องอนุมัติ)')}</p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ผู้ลงนาม (ผู้เซ็น)</label>
-            <input value={form.signerName} onChange={(e) => set('signerName', e.target.value)} placeholder="เว้นว่าง = ผู้จัดทำเซ็นเอง" className="field" />
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้ลงนาม (ผู้เซ็น)')}</label>
+            <input value={form.signerName} onChange={(e) => set('signerName', e.target.value)} placeholder={t('เว้นว่าง = ผู้จัดทำเซ็นเอง')} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่งผู้ลงนาม</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ตำแหน่งผู้ลงนาม')}</label>
             <input value={form.signerTitle} onChange={(e) => set('signerTitle', e.target.value)} className="field" />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">เนื้อความ</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('เนื้อความ')}</label>
           <textarea rows={5} value={form.body} onChange={(e) => set('body', e.target.value)} className="field" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">หมายเหตุ</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมายเหตุ')}</label>
           <input value={form.remarks} onChange={(e) => set('remarks', e.target.value)} className="field" />
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}

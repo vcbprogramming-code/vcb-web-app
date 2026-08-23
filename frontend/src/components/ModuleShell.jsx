@@ -94,7 +94,7 @@ export default function ModuleShell() {
                   need the width, and this text used to collide with them */}
               <span className="hidden min-w-0 text-left leading-tight sm:block">
                 <span className={`block text-sm font-bold tracking-tight ${navyHeader ? 'text-white' : 'text-slate-900'}`}>{brand}</span>
-                {title && <span className={`block truncate text-[11px] ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{title}</span>}
+                {title && <span className={`block truncate text-[11px] ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{t(title)}</span>}
               </span>
             </button>
 
@@ -108,17 +108,17 @@ export default function ModuleShell() {
                     ? [{ to: '/dashboard', label: t('ภาพรวม'), active: location.pathname.startsWith('/dashboard') }]
                     : []),
                   { to: '/memos', label: t('ทะเบียนเอกสาร'), active: location.pathname === '/memos' || location.pathname.startsWith('/memos/') },
-                ].map((t) => (
+                ].map((item) => (
                   <button
-                    key={t.to}
-                    onClick={() => navigate(t.to)}
+                    key={item.to}
+                    onClick={() => navigate(item.to)}
                     className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                      t.active
+                      item.active
                         ? (navyHeader ? 'bg-white/10 text-white' : 'bg-brand/10 text-brand')
                         : (navyHeader ? 'text-cyan-100/70 hover:bg-white/5 hover:text-white' : 'text-slate-500 hover:bg-slate-100')
                     }`}
                   >
-                    {t.label}
+                    {item.label}
                   </button>
                 ))}
               </nav>
@@ -150,7 +150,7 @@ export default function ModuleShell() {
               </span>
               <span className="hidden text-left leading-tight sm:block">
                 <span className={`block max-w-[160px] truncate text-sm font-medium ${navyHeader ? 'text-slate-100' : 'text-slate-800'}`}>{profile?.full_name || user?.email}</span>
-                <span className={`block text-xs ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{roleLabels[role] || role}</span>
+                <span className={`block text-xs ${navyHeader ? 'text-cyan-200/60' : 'text-slate-500'}`}>{t(roleLabels[role] || role)}</span>
               </span>
               <Icon name="chevronDown" className={`h-4 w-4 shrink-0 transition ${menuOpen ? 'rotate-180' : ''} ${navyHeader ? 'text-cyan-200/70' : 'text-slate-400'}`} />
             </button>
@@ -159,7 +159,7 @@ export default function ModuleShell() {
               <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-xl">
                 <div className="border-b border-slate-100 px-4 py-2.5 sm:hidden">
                   <div className="truncate text-sm font-medium text-slate-800">{profile?.full_name || user?.email}</div>
-                  <div className="text-xs text-slate-500">{roleLabels[role] || role}</div>
+                  <div className="text-xs text-slate-500">{t(roleLabels[role] || role)}</div>
                 </div>
                 <button
                   onClick={() => { setMenuOpen(false); navigate('/settings?s=signature'); }}

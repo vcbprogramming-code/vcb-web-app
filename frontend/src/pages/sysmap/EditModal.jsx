@@ -94,7 +94,7 @@ export default function EditModal({ kind, row, lanes = [], depts = [], modules =
     setError(null);
     for (const f of fields) {
       if (f.required && !String(form[f.k] ?? '').trim() && !(editing && f.newOnly)) {
-        setError(`กรุณากรอก "${f.label}"`); return;
+        setError(t('กรุณากรอก "{f}"', { f: t(f.label) })); return;
       }
     }
     const body = {};
@@ -139,7 +139,7 @@ export default function EditModal({ kind, row, lanes = [], depts = [], modules =
         <label className="flex cursor-pointer items-center gap-2 py-1">
           <input type="checkbox" checked={Boolean(form[f.k])} onChange={(e) => set(f.k, e.target.checked)}
             className="h-4 w-4 rounded border-slate-300" />
-          <span className="text-sm text-slate-700">{f.label}</span>
+          <span className="text-sm text-slate-700">{t(f.label)}</span>
         </label>
       );
     }
@@ -150,18 +150,18 @@ export default function EditModal({ kind, row, lanes = [], depts = [], modules =
     return (
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-600">
-          {f.label} {f.required && <span className="text-red-500">*</span>}
+          {t(f.label)} {f.required && <span className="text-red-500">*</span>}
         </label>
         {opts ? (
           <select value={form[f.k] ?? ''} onChange={(e) => set(f.k, e.target.value)} className={common}>
-            {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {opts.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
           </select>
         ) : (f.multiline || f.type === 'list') ? (
           <textarea value={form[f.k] ?? ''} onChange={(e) => set(f.k, e.target.value)} rows={f.rows || 2} className={common} />
         ) : (
           <input value={form[f.k] ?? ''} onChange={(e) => set(f.k, e.target.value)} className={common} />
         )}
-        {f.hint && <p className="mt-1 text-xs text-slate-400">{f.hint}</p>}
+        {f.hint && <p className="mt-1 text-xs text-slate-400">{t(f.hint)}</p>}
       </div>
     );
   };

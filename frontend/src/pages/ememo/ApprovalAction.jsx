@@ -48,8 +48,8 @@ function DoneScreen({ done }) {
       window.location.href = appUrl;
       return;
     }
-    const t = setTimeout(() => setSecs((s) => s - 1), 1000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setSecs((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
   }, [secs, appUrl]);
 
   const m = APPROVAL_META[done.action];
@@ -66,8 +66,8 @@ function DoneScreen({ done }) {
         </div>
         <h2 className="text-lg font-bold text-slate-800">{t('บันทึกการ')}{m.label}{t('เรียบร้อย')}</h2>
         <p className="text-slate-500 text-sm">
-          {t('สถานะเอกสารปัจจุบัน:')} <b>{(STATUS_META[done.documentStatus] || {}).label || done.documentStatus}</b>
-          {done.advanced && ' — ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว'}
+          {t('สถานะเอกสารปัจจุบัน:')} <b>{t((STATUS_META[done.documentStatus] || {}).label || done.documentStatus, null, 'status')}</b>
+          {done.advanced && ` — ${t('ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว')}`}
         </p>
         <div className="pt-2">
           <a
@@ -118,7 +118,7 @@ export default function ApprovalAction() {
 
   const forward = async () => {
     if (!fwdEmail.trim()) {
-      setError('กรุณาระบุอีเมลผู้ที่ต้องการส่งต่อ');
+      setError(t('กรุณาระบุอีเมลผู้ที่ต้องการส่งต่อ'));
       return;
     }
     setBusy(true);
@@ -137,12 +137,12 @@ export default function ApprovalAction() {
     const sig = sigMode === 'upload' ? sigUpload : signature;
     // approving requires a signature (drawn or uploaded)
     if (action === 'approved' && !sig) {
-      setError('กรุณาเซ็นหรืออัปโหลดลายเซ็นก่อนอนุมัติ');
+      setError(t('กรุณาเซ็นหรืออัปโหลดลายเซ็นก่อนอนุมัติ'));
       return;
     }
     // returning / rejecting requires a reason
     if (action !== 'approved' && !comment.trim()) {
-      setError(action === 'returned' ? 'กรุณาระบุเหตุผลที่ส่งกลับแก้ไข' : 'กรุณาระบุเหตุผลที่ไม่อนุมัติ');
+      setError(action === 'returned' ? t('กรุณาระบุเหตุผลที่ส่งกลับแก้ไข') : t('กรุณาระบุเหตุผลที่ไม่อนุมัติ'));
       return;
     }
     setBusy(true);
@@ -164,8 +164,8 @@ export default function ApprovalAction() {
 
   const pickSigUpload = (f) => {
     if (!f) return;
-    if (!f.type.startsWith('image/')) { setError('ลายเซ็นต้องเป็นรูปภาพ'); return; }
-    if (f.size > 2 * 1024 * 1024) { setError('รูปลายเซ็นใหญ่เกิน 2 MB'); return; }
+    if (!f.type.startsWith('image/')) { setError(t('ลายเซ็นต้องเป็นรูปภาพ')); return; }
+    if (f.size > 2 * 1024 * 1024) { setError(t('รูปลายเซ็นใหญ่เกิน 2 MB')); return; }
     setError(null);
     const reader = new FileReader();
     reader.onload = () => setSigUpload(reader.result);
@@ -217,7 +217,7 @@ export default function ApprovalAction() {
             <Icon name="clock" className="h-7 w-7" />
           </div>
           <h2 className="text-lg font-bold text-slate-800">
-            {info.expired ? 'ลิงก์หมดอายุแล้ว' : 'รายการนี้ถูกดำเนินการไปแล้ว'}
+            {info.expired ? t('ลิงก์หมดอายุแล้ว') : t('รายการนี้ถูกดำเนินการไปแล้ว')}
           </h2>
         </div>
       </Wrap>
@@ -321,11 +321,11 @@ export default function ApprovalAction() {
                     <div className="min-w-0 flex-1">
                       <div className={`flex items-center gap-2 font-medium ${isWaiting ? 'text-slate-400' : 'text-slate-800'}`}>
                         <span className="truncate">{s.approver_name || s.approver_email}</span>
-                        {isCurrent && <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">กำลังพิจารณา{i === currentIdx && myStep === currentIdx + 1 ? ' (ท่าน)' : ''}</span>}
+                        {isCurrent && <span className="shrink-0 rounded-full bg-brand-tint px-2 py-0.5 text-[10px] font-semibold text-brand">{t('กำลังพิจารณา')}{i === currentIdx && myStep === currentIdx + 1 ? ' (ท่าน)' : ''}</span>}
                       </div>
                       {s.comment && <div className="truncate text-xs text-slate-400">{s.comment}</div>}
                     </div>
-                    <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${m.chip}`}>{isWaiting ? 'รอลำดับ' : m.label}</span>
+                    <span className={`h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${m.chip}`}>{isWaiting ? t('รอลำดับ') : t(m.label, null, 'status')}</span>
                   </li>
                 );
               })}
@@ -343,7 +343,7 @@ export default function ApprovalAction() {
               <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="flex items-center gap-2 text-slate-700">
                   <Icon name={a.version === 'original' ? 'file' : 'paperclip'} className="h-4 w-4 text-slate-400" />
-                  {a.file_name}{a.version === 'original' ? ' (หนังสือฉบับเต็ม)' : ''}
+                  {a.file_name}{a.version === 'original' ? ` (${t('หนังสือฉบับเต็ม')})` : ''}
                 </span>
                 <button onClick={() => openAttachment(a.id)} disabled={attBusy === a.id} className="inline-flex items-center gap-1 text-brand hover:underline disabled:opacity-60">
                   {attBusy === a.id
@@ -398,7 +398,7 @@ export default function ApprovalAction() {
                   <div className="mt-3 flex justify-end gap-2">
                     <button onClick={() => setShowForward(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-white">{t('ยกเลิก')}</button>
                     <button onClick={forward} disabled={busy} className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-light disabled:opacity-50">
-                      <Icon name="arrowRight" className="h-4 w-4" /> {busy ? 'กำลังส่ง…' : 'ส่ง'}
+                      <Icon name="arrowRight" className="h-4 w-4" /> {busy ? t('กำลังส่ง…') : t('ส่ง')}
                     </button>
                   </div>
                 </div>
@@ -412,7 +412,7 @@ export default function ApprovalAction() {
               <Icon name="arrowLeft" className="h-4 w-4" /> {t('ย้อนกลับ')}
             </button>
             <h3 className="mb-3 font-bold text-slate-800">
-              {chosen === 'approved' ? 'ยืนยันการอนุมัติ' : chosen === 'returned' ? 'ส่งกลับแก้ไข' : 'ไม่อนุมัติ'}
+              {chosen === 'approved' ? t('ยืนยันการอนุมัติ') : chosen === 'returned' ? t('ส่งกลับแก้ไข') : t('ไม่อนุมัติ')}
             </h3>
 
             {chosen === 'approved' ? (

@@ -34,7 +34,7 @@ export default function Meetings() {
     .catch((e) => setError(e.message)), [group, q]);
 
   useEffect(() => { meetingsApi.bootstrap().then((r) => setBoot(r.data)).catch((e) => setError(e.message)); }, []);
-  useEffect(() => { const t = setTimeout(load, q ? 300 : 0); return () => clearTimeout(t); }, [load, q]);
+  useEffect(() => { const timer = setTimeout(load, q ? 300 : 0); return () => clearTimeout(timer); }, [load, q]);
   useEffect(() => {
     const next = {};
     if (group) next.group = group;

@@ -55,7 +55,7 @@ suite('2. สลับเป็นอังกฤษ');
   await open('/', 'en');
   const en = await body();
   happy('หัวข้อเปลี่ยนเป็นอังกฤษ', en.includes('Applications'), '');
-  happy('ชื่อโมดูลเปลี่ยนเป็นอังกฤษ', en.includes('HR Work Log'), '');
+  happy('ชื่อโมดูลเปลี่ยนเป็นอังกฤษ', en.includes('HR work log'), '');
   happy('คำอธิบายโมดูลเปลี่ยนด้วย', en.includes('by site') || en.includes('each day'), '');
   bad('ไม่เหลือคำที่แปลแล้วเป็นไทยค้าง', !en.includes('แอปพลิเคชัน'), '');
   await page.screenshot({ path: `${SHOTS}/2-อังกฤษ.png` });
@@ -96,6 +96,31 @@ suite('4. ตัวสลับภาษาหาเจอทุกหน้า 
   await page.reload({ waitUntil: 'networkidle2' });
   await settle(3000);
   happy('โหลดหน้าใหม่ยังเป็นภาษาที่เลือกไว้', (await body()).includes('ทะเบียน') || (await body()).includes('คู่มือ'), '');
+}
+
+// ── 4ข. เอกสารเป็นภาษาไทยเสมอ แม้เลือก English ─────────────────────────────
+// The preview is a picture of the PDF, and that PDF is always Thai. Translating
+// the canvas once made the app show an English letter and hand over a Thai one.
+suite('4ข. ตัวหนังสือไม่แปลตามภาษาที่เลือก');
+{
+  await open('/memos', 'en');
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('button,a')].find((x) => /เพิ่มเอกสาร|New document/.test(x.innerText));
+    if (el) el.click();
+  });
+  await settle(3500);
+  const paper = await page.evaluate(() => {
+    const el = [...document.querySelectorAll('div')]
+      .find((x) => /บันทึกข้อความ|Memorandum/.test(x.innerText || '') && x.innerText.length < 900);
+    return el ? el.innerText : '';
+  });
+  happy('หัวหนังสือยังเป็น "บันทึกข้อความ"', paper.includes('บันทึกข้อความ'), paper.slice(0, 60));
+  bad('ไม่กลายเป็น Memorandum', !paper.includes('Memorandum'), '');
+  for (const w of ['เลขที่', 'วันที่', 'เรื่อง', 'ขอแสดงความนับถือ']) {
+    happy(`ยังมีคำว่า "${w}" บนกระดาษ`, paper.includes(w), '');
+  }
+  bad('ไม่มีคำแปลอังกฤษปนบนกระดาษ', !/\b(No\.|Date|Subject|Enclosures)\b/.test(paper), '');
+  await page.screenshot({ path: `${SHOTS}/7-กระดาษยังเป็นไทย.png` });
 }
 
 // ── 5. E-Memo ต้องไม่ได้รับผลกระทบ ─────────────────────────────────────────

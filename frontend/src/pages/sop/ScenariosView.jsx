@@ -29,7 +29,7 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
       .catch((e) => setErr(e.message));
   }, [module, q]);
 
-  useEffect(() => { setList(null); const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
+  useEffect(() => { setList(null); const timer = setTimeout(load, q ? 250 : 0); return () => clearTimeout(timer); }, [load, q]);
   // Changing the module filter clears the open case. Compare against the previous
   // value rather than counting renders: React runs effects twice on mount in
   // development, and a "skip the first run" flag gets used up by the first pass —

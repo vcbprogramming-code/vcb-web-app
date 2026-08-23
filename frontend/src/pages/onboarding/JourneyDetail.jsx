@@ -71,8 +71,8 @@ export default function JourneyDetail({ journeyId, onBack }) {
       {/* 30-60-90 task checklist */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {PHASES.map((phase) => {
-          const tasks = j.tasks.filter((t) => t.phase === phase);
-          const done = tasks.filter((t) => t.done).length;
+          const tasks = j.tasks.filter((task) => task.phase === phase);
+          const done = tasks.filter((task) => task.done).length;
           return (
             <div key={phase} className="card">
               <div className="mb-3 flex items-center justify-between">
@@ -82,12 +82,12 @@ export default function JourneyDetail({ journeyId, onBack }) {
               <div className="space-y-2">
                 {tasks.length === 0 ? (
                   <p className="text-xs text-slate-400">{t('ไม่มีรายการ')}</p>
-                ) : tasks.map((t) => (
-                  <label key={t.id} className="flex cursor-pointer items-start gap-2 text-sm">
-                    <input type="checkbox" checked={t.done} onChange={(e) => toggleTask(t.id, e.target.checked)} className="mt-0.5" />
-                    <span className={t.done ? 'text-slate-400 line-through' : 'text-slate-700'}>
-                      {t.title}
-                      {t.owner && <span className="ml-1 text-[11px] text-slate-400">({t.owner})</span>}
+                ) : tasks.map((task) => (
+                  <label key={task.id} className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input type="checkbox" checked={task.done} onChange={(e) => toggleTask(task.id, e.target.checked)} className="mt-0.5" />
+                    <span className={task.done ? 'text-slate-400 line-through' : 'text-slate-700'}>
+                      {task.title}
+                      {task.owner && <span className="ml-1 text-[11px] text-slate-400">({task.owner})</span>}
                     </span>
                   </label>
                 ))}

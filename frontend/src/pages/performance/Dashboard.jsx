@@ -72,7 +72,7 @@ function TopList({ items }) {
       ))}
       {items.length > 5 && (
         <button onClick={() => setAll((v) => !v)} className="pt-0.5 text-[11px] text-brand hover:underline">
-          {all ? 'ย่อ' : `ดูทั้งหมด (${items.length})`}
+          {all ? t('ย่อ', null, 'list') : t('ดูทั้งหมด ({n})', { n: items.length })}
         </button>
       )}
     </div>
@@ -107,7 +107,7 @@ export default function Dashboard({ cur, onOpenSite }) {
         {MODES.map(([k, label]) => (
           <button key={k} onClick={() => setMode(k)}
             className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>

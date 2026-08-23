@@ -17,10 +17,11 @@ const greeting = (h) => (h < 12 ? 'สวัสดีตอนเช้า' : h 
 /** Ticking clock + greeting. Owns its own 1s interval so only THIS subtree
  *  re-renders each second — the Portal (nav, app cards, calendar) does not. */
 function WelcomeCard({ name }) {
+  const t = useT();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
   // A wall-clock the size of the greeting competed with it for attention and made
   // the card read like a screensaver. The status pill carries the "system is up"
@@ -29,12 +30,12 @@ function WelcomeCard({ name }) {
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#132a54] to-[#0d1b36] p-6 text-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-extrabold leading-tight">{greeting(now.getHours())}, {name}</h1>
-          <p className="mt-1 text-sm text-white/70">ความเคลื่อนไหวของ VCB Connect ในวันนี้</p>
+          <h1 className="text-2xl font-extrabold leading-tight">{t(greeting(now.getHours()))}, {name}</h1>
+          <p className="mt-1 text-sm text-white/70">{t('ความเคลื่อนไหวของ VCB Connect ในวันนี้')}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-400/30">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> ระบบออนไลน์
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> {t('ระบบออนไลน์')}
           </span>
           <div className="text-xs text-white/70">
             {formatThaiLongDate(now)} · <span className="tabular-nums">{now.toLocaleTimeString('th-TH', { hour12: false })}</span>
@@ -77,7 +78,7 @@ function AppCard({ app, soon, awaiting, onOpen }) {
       <p className="mt-1 flex-1 text-sm leading-relaxed text-slate-500">{t(app.desc)}</p>
       {!soon && (
         <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-brand">
-          เปิดใช้งาน <Icon name="arrowRight" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          {t('เปิดใช้งาน')} <Icon name="arrowRight" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </span>
       )}
     </button>
@@ -121,8 +122,8 @@ export default function Portal() {
   const soonApps = apps.filter((a) => a.comingSoon && a.enabled === false && allowed(a));
 
   // greeting should use a person's first name, not their whole email address
-  const displayName = profile?.full_name || user?.email || 'ผู้ใช้งาน';
-  const shortName = profile?.full_name ? profile.full_name.trim().split(' ')[0] : (user?.email || '').split('@')[0] || 'ผู้ใช้งาน';
+  const displayName = profile?.full_name || user?.email || t('ผู้ใช้งาน');
+  const shortName = profile?.full_name ? profile.full_name.trim().split(' ')[0] : (user?.email || '').split('@')[0] || t('ผู้ใช้งาน');
   const initial = displayName.trim().slice(0, 1).toUpperCase();
 
   const [awaiting, setAwaiting] = useState(0);
@@ -175,7 +176,7 @@ export default function Portal() {
         {/* The sidebar is navy in BOTH themes — it's the app's spine, and a white
             rail against a white page gave the launcher no shape. Fixed colours,
             not `dark:` variants, so it looks the same either way. */}
-        <aside id="portal-sidebar" aria-label="เมนูหลัก"
+        <aside id="portal-sidebar" aria-label={t('เมนูหลัก')}
           className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0d1b36] transition-transform lg:static lg:z-auto lg:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="flex items-center gap-3 px-5 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
@@ -191,11 +192,11 @@ export default function Portal() {
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{initial}</div>
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold text-white">{displayName}</div>
-              <div className="text-[11px] text-slate-400">{roleLabels[role] || role}</div>
+              <div className="text-[11px] text-slate-400">{t(roleLabels[role] || role)}</div>
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="แอปพลิเคชัน">
+          <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label={t('แอปพลิเคชัน')}>
             <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('แอปพลิเคชัน')}</div>
             {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
             <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ช่วยเหลือ')}</div>
@@ -204,17 +205,17 @@ export default function Portal() {
 
           <div className="border-t border-white/10 px-3 py-3">
             <button onClick={handleSwitchAccount}
-              title="ออกจากระบบแล้วเข้าด้วยบัญชีอื่น"
+              title={t('ออกจากระบบแล้วเข้าด้วยบัญชีอื่น')}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/10 hover:text-slate-200">
-              <Icon name="people" className="h-[18px] w-[18px]" /> สลับบัญชี
+              <Icon name="people" className="h-[18px] w-[18px]" /> {t('สลับบัญชี')}
             </button>
             <button onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300">
-              <Icon name="logout" className="h-[18px] w-[18px]" /> ออกจากระบบ
+              <Icon name="logout" className="h-[18px] w-[18px]" /> {t('ออกจากระบบ')}
             </button>
           </div>
           <div className="px-5 pb-4 text-[10px] leading-tight text-slate-500">
-            VCB Group · สำหรับใช้งานภายในเท่านั้น
+            {t('VCB Group · สำหรับใช้งานภายในเท่านั้น')}
           </div>
         </aside>
 
@@ -222,17 +223,17 @@ export default function Portal() {
         <div className="flex min-w-0 flex-1 flex-col">
           {/* topbar */}
           <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
-            <button onClick={() => setNavOpen((v) => !v)} aria-label="เมนู" aria-expanded={navOpen} aria-controls="portal-sidebar"
+            <button onClick={() => setNavOpen((v) => !v)} aria-label={t('เมนู')} aria-expanded={navOpen} aria-controls="portal-sidebar"
               className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden">
               <Icon name="menu" className="h-5 w-5" />
             </button>
             <div className="relative max-w-md flex-1">
               <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ค้นหาแอปพลิเคชัน…')} aria-label="ค้นหาแอปพลิเคชัน"
+              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ค้นหาแอปพลิเคชัน…')} aria-label={t('ค้นหาแอปพลิเคชัน')}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
             </div>
             <LangToggle />
-            <button onClick={toggle} aria-label="สลับธีมสว่าง/มืด" aria-pressed={isDark}
+            <button onClick={toggle} aria-label={t('สลับธีมสว่าง/มืด')} aria-pressed={isDark}
               className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100">
               <Icon name={isDark ? 'sun' : 'moon'} className="h-[18px] w-[18px]" />
             </button>
@@ -254,7 +255,7 @@ export default function Portal() {
                     <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700"><Icon name="bell" className="h-4 w-4 text-brand" /> ประกาศ</h2>
                     {annErr ? (
                       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                        โหลดประกาศไม่สำเร็จ
+                        {t('โหลดประกาศไม่สำเร็จ')}
                         <button onClick={() => { setAnnErr(false); portalApi.announcements().then((r) => setAnnouncements(r.data || [])).catch(() => setAnnErr(true)); }}
                           className="ml-2 font-semibold text-brand hover:underline">{t('ลองใหม่')}</button>
                       </div>
@@ -273,7 +274,7 @@ export default function Portal() {
                 <div>
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-sm font-bold text-slate-700">{t('แอปพลิเคชัน')}</h2>
-                    <span className="text-xs text-slate-500" aria-live="polite">{shownLive.length + shownSoon.length} รายการ</span>
+                    <span className="text-xs text-slate-500" aria-live="polite">{shownLive.length + shownSoon.length} {t('รายการ')}</span>
                   </div>
                   {/* a third column once the window is wide enough to carry it */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
@@ -283,7 +284,7 @@ export default function Portal() {
                     {shownSoon.map((a) => <AppCard key={a.to} app={a} soon />)}
                   </div>
                   {shownLive.length + shownSoon.length === 0 && term && (
-                    <p className="py-8 text-center text-sm text-slate-500" aria-live="polite">ไม่พบแอปที่ตรงกับ “{q.trim()}”</p>
+                    <p className="py-8 text-center text-sm text-slate-500" aria-live="polite">{t('ไม่พบแอปที่ตรงกับ “{q}”', { q: q.trim() })}</p>
                   )}
                 </div>
               </div>
@@ -294,7 +295,7 @@ export default function Portal() {
               </div>
             </div>
 
-            <p className="mt-10 text-center text-[11px] text-slate-500">VCB Connect · ระบบงานภายใน กลุ่มวิจิตรภัณฑ์ก่อสร้าง</p>
+            <p className="mt-10 text-center text-[11px] text-slate-500">{t('VCB Connect · ระบบงานภายใน กลุ่มวิจิตรภัณฑ์ก่อสร้าง')}</p>
           </main>
         </div>
       </div>

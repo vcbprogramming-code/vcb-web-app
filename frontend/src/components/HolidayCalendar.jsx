@@ -121,7 +121,7 @@ export default function HolidayCalendar() {
 
       {nextHoliday && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
-          <span className="min-w-0 text-slate-600">{t('วันหยุดถัดไป:')} <b>{nextHoliday.name}</b> ({nextHoliday.date})</span>
+          <span className="min-w-0 text-slate-600">{t('วันหยุดถัดไป:')} <b>{t(nextHoliday.name)}</b> ({nextHoliday.date})</span>
           <span className="shrink-0 font-semibold text-brand">{nextHoliday.daysAway === 0 ? 'วันนี้' : `อีก ${nextHoliday.daysAway} วัน`}</span>
         </div>
       )}

@@ -40,10 +40,15 @@ export function LangProvider({ children }) {
 
   useEffect(() => { document.documentElement.setAttribute('lang', lang); }, [lang]);
 
-  const t = useCallback((s, vars) => {
+  // `ctx` disambiguates a homograph. One Thai string can be two English ones —
+  // "ยกเลิก" is the Cancel button and also the Cancelled status — and with the
+  // Thai text as the key there is nothing else to tell them apart. A context
+  // makes the difference explicit at the call site instead of letting whichever
+  // dictionary entry came last win everywhere.
+  const t = useCallback((s, vars, ctx) => {
     if (s == null) return s;
     const src = String(s);
-    let out = lang === 'en' ? (EN[src] ?? src) : src;
+    let out = lang === 'en' ? (ctx && EN[`${ctx}::${src}`]) ?? EN[src] ?? src : src;
     // "เหลือ {n} วัน" — interpolation stays outside the dictionary so a number
     // never ends up baked into a translation key
     if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
@@ -54,7 +59,7 @@ export function LangProvider({ children }) {
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
 }
 
-/** `const { t, lang, setLang } = useLang()` */
+/** `const { t, lang, setLang } = useLang()` — t(text, vars, ctx) */
 export function useLang() { return useContext(LangContext); }
 
 /** For the common case where only the function is wanted: `const t = useT()`. */

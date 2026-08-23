@@ -85,8 +85,8 @@ export default function SettingsPage() {
       <PageHeader
         title={t('ตั้งค่า')}
         subtitle={isAdmin
-          ? 'ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว'
-          : 'ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน'}
+          ? t('ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว')
+          : t('ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน')}
       />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_1fr] lg:items-start">
@@ -95,7 +95,7 @@ export default function SettingsPage() {
           {groups.map((g) => (
             <div key={g.key} className="mb-1 last:mb-0">
               <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                {g.label}
+                {t(g.label)}
               </div>
               {g.items.map((i) => (
                 <button
@@ -108,7 +108,7 @@ export default function SettingsPage() {
                   }`}
                 >
                   <Icon name={i.icon} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate">{i.label}</span>
+                  <span className="min-w-0 truncate">{t(i.label)}</span>
                 </button>
               ))}
             </div>

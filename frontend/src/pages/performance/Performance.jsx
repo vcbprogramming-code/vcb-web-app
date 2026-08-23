@@ -63,7 +63,7 @@ export default function Performance() {
     { key: 'leave', label: t('การลา'), show: true },
     { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
-  ].filter((t) => t.show);
+  ].filter((x) => x.show);
 
   return (
     <div className="space-y-4">
@@ -85,10 +85,10 @@ export default function Performance() {
 
       {/* view tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setView(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === t.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            {t.label}
+        {tabs.map((tab) => (
+          <button key={tab.key} onClick={() => setView(tab.key)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === tab.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            {tab.label}
           </button>
         ))}
         {/* Which site you are looking at matters to both views: the grid shows its

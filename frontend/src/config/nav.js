@@ -63,6 +63,15 @@ export const apps = [
     enabled: true,
   },
   {
+    to: '/meetings',
+    title: 'รายงานการประชุม',
+    desc: 'บันทึกการประชุมแยกตามโครงการ เก็บทุกเวอร์ชัน ไฟล์แนบ และความเห็นของทีม',
+    icon: 'book',
+    color: 'bg-amber-50 text-amber-600',
+    perm: ['meetings', 'view'],
+    enabled: true,
+  },
+  {
     to: '/sysmap',
     title: 'แผนผังระบบ (System Map)',
     desc: 'กระบวนการทำงานของกลุ่ม ทะเบียนฟังก์ชันรายแผนก และจุดที่ใช้ AI ช่วยได้',

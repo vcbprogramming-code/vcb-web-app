@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { query, queryOne } from '../config/db.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
+import { hasPermission } from '../config/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
@@ -50,8 +51,8 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
       lanes: lanes.rows,
       nodes: nodes.rows,
       conns: conns.rows,
-      canEdit: req.profile.role === 'admin'
-        || Boolean(req.profile.permissions?.sysmap?.edit),
+      // via the resolver: a right granted by the role is not in the override map
+      canEdit: hasPermission(req.profile, 'sysmap', 'edit'),
       counts: { lanes: lanes.rows.length, nodes: nodes.rows.length, conns: conns.rows.length },
     },
   });

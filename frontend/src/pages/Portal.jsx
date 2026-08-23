@@ -93,7 +93,7 @@ function NavRow({ icon, label, onClick, badge = 0, opens = false }) {
     <button onClick={onClick}
       className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
       <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-slate-400 transition group-hover:text-white" />
-      <span className="flex-1 truncate text-left">{label}</span>
+      <span className="flex-1 truncate text-left" title={label}>{label}</span>
       {badge > 0 && <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-[#0f172a]">{badge}</span>}
       {opens && badge === 0 && (
         <Icon name="arrowUpRight" className="h-3.5 w-3.5 shrink-0 text-slate-500 opacity-0 transition group-hover:opacity-100" />

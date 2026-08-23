@@ -77,7 +77,7 @@ export default function Meetings() {
     <div className="space-y-5">
       <PageHeader
         title={t('รายงานการประชุม')}
-        subtitle={`บันทึกการประชุมแยกตามโครงการและฝ่าย · ${boot.total} ฉบับ`}
+        subtitle={t('บันทึกการประชุมแยกตามโครงการและฝ่าย · {n} ฉบับ', { n: boot.total })}
         right={canEdit ? (
           <button onClick={() => setEditing('new')} className="btn-primary !py-2 !text-sm">
             <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายงาน')}
@@ -97,7 +97,10 @@ export default function Meetings() {
         {/* the inboxes sit apart: they are a queue to work through, not a place
             minutes belong */}
         {groups.some((g) => g.is_inbox) && <span className="mx-1 h-5 w-px bg-slate-200" />}
-        {groups.filter((g) => g.is_inbox).map((g) => (
+        {/* An empty inbox chip promises a feed that does not exist yet — the
+            Fathom / Transkriptor ingestion is still waiting on the client's API
+            keys. Show a source only once something has actually arrived in it. */}
+        {groups.filter((g) => g.is_inbox && g.count > 0).map((g) => (
           <button key={g.id} onClick={() => setGroup(group === g.id ? '' : g.id)}
             title={t('บันทึกเสียงที่ยังไม่ได้จัดเก็บเข้ากลุ่ม')}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
@@ -121,7 +124,7 @@ export default function Meetings() {
           <p className="text-xs text-slate-500">{t('พบ')} {rows.length} {t('ฉบับ')}</p>
           {rows.length === 0 && (
             <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">
-              {q ? 'ไม่พบรายงานที่ตรงกับคำค้น' : 'ยังไม่มีรายงานในกลุ่มนี้'}
+              {q ? t('ไม่พบรายงานที่ตรงกับคำค้น') : t('ยังไม่มีรายงานในกลุ่มนี้')}
             </p>
           )}
           {rows.map((r) => {
@@ -158,7 +161,8 @@ export default function Meetings() {
             />
           ) : (
             <p className="rounded-2xl border border-dashed border-slate-200 py-20 text-center text-sm text-slate-500">
-              {t('เลือกรายงานทางซ้ายเพื่ออ่าน')}
+              {/* telling someone to pick from a list that is empty is a dead end */}
+              {rows.length === 0 ? t('ยังไม่มีรายงานให้อ่าน — กด “เพิ่มรายงาน” เพื่อเริ่มฉบับแรก') : t('เลือกรายงานทางซ้ายเพื่ออ่าน')}
             </p>
           )}
         </div>

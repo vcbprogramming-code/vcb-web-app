@@ -24,7 +24,9 @@ function ProjectChip({ code, color, active, onClick, subtle }) {
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+      // py-1 left these 30px tall — under the 32px a fingertip reliably hits, and
+      // there are a dozen of them side by side on a phone
+      className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
         active
           ? activeClass
           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'

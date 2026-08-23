@@ -113,7 +113,12 @@ export default function Dashboard({ cur, onOpenSite }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="card text-center text-sm text-slate-400">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</div>
+        <div className="card py-10 text-center">
+          <h3 className="font-bold text-slate-700">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            {t('โมดูลนี้แสดงข้อมูลตามไซต์งานที่ท่านดูแล — ขอให้ผู้ดูแลระบบผูกไซต์งานให้ท่านที่ ตั้งค่า → ผู้ใช้และสังกัดโครงการ แล้วกลับมาที่หน้านี้อีกครั้ง')}
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((s) => {

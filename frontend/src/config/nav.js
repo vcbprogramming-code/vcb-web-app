@@ -74,6 +74,9 @@ export const apps = [
   {
     to: '/sysmap',
     title: 'แผนผังระบบ (System Map)',
+    // the sidebar row is 152px wide and the full title needs 166 — it was being
+    // cut mid-word, so the menu gets the short form the way E-Memo does
+    navTitle: 'แผนผังระบบ',
     desc: 'กระบวนการทำงานของกลุ่ม ทะเบียนฟังก์ชันรายแผนก และจุดที่ใช้ AI ช่วยได้',
     icon: 'sysmap',
     color: 'bg-pink-50 text-pink-600',

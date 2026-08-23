@@ -61,7 +61,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
 
   return (
     <Modal
-      title={editing ? 'แก้ไขวงเงินสินเชื่อ' : 'เพิ่มวงเงินสินเชื่อ'}
+      title={editing ? t('แก้ไขวงเงินสินเชื่อ') : t('เพิ่มวงเงินสินเชื่อ')}
       onClose={onClose}
       size="2xl"
       footer={
@@ -197,13 +197,14 @@ function DrawdownModal({ facility, onClose, onSaved }) {
   );
 }
 
-export default function FacilitiesTab({ projects, onChanged }) {
+export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
   const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
+  useEffect(() => { if (openNew) setEdit(null); }, [openNew]);
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
   const [drawdown, setDrawdown] = useState(null);
 

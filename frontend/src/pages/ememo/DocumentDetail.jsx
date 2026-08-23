@@ -319,7 +319,7 @@ export default function DocumentDetail() {
     <div className="space-y-3">
       <button onClick={() => navigate('/memos')} className="text-sm text-brand hover:underline">{t('← กลับทะเบียนเอกสาร')}</button>
       <div className="rounded-xl bg-red-50 px-4 py-3 text-red-700">
-        {loadError}
+        {t(loadError)}{' '}
         <button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     </div>

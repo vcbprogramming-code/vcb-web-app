@@ -1248,4 +1248,49 @@ export const EN = {
   'audit::ไม่อนุมัติ': 'Refused',
   'audit::ส่งกลับแก้ไข': 'Sent back for amendment',
   'list::ย่อ': 'Show less',
+
+  // ── ข้อความผิดพลาดที่มาจากเซิร์ฟเวอร์ (แปลงเป็นไทยที่ lib/api.js ก่อน) ──
+  'ไม่พบเอกสารนี้': 'Document not found',
+  'ไม่พบโครงการนี้': 'Project not found',
+  'ไม่พบผู้ใช้รายนี้': 'User not found',
+  'ไม่พบวงเงินนี้': 'Facility not found',
+  'ไม่พบรายการสินเชื่อนี้': 'Credit entry not found',
+  'ไม่พบคำขอนี้': 'Request not found',
+  'ไม่พบไฟล์แนบนี้': 'Attachment not found',
+  'ไม่พบข้อความนี้': 'Message not found',
+  'ไม่พบบริษัทนี้': 'Company not found',
+  'ไม่พบรหัสเอกสารนี้': 'Document code not found',
+  'ไม่พบประเภทนี้': 'Type not found',
+  'ไม่พบงวดแผนเงินสดนี้': 'Cash plan period not found',
+  'ไม่พบไฟล์ในที่จัดเก็บ': 'The file is not in storage',
+  'ไม่พบข้อมูลที่ต้องการ': 'Not found',
+  'ข้อมูลที่กรอกไม่ถูกต้อง': 'Some of what you entered is not valid',
+  'ไม่มีข้อมูลที่เปลี่ยนแปลง': 'Nothing was changed',
+  'ยังไม่ได้เลือกไฟล์': 'No file chosen',
+  'กรุณาเข้าสู่ระบบใหม่': 'Please sign in again',
+  'ไม่มีสิทธิ์ดำเนินการนี้': 'You do not have permission to do that',
+  'เซิร์ฟเวอร์ตอบสนองช้ากว่าปกติ (ระบบอาจกำลังเริ่มทำงาน) กรุณาลองใหม่อีกครั้ง':
+    'The server is slower than usual (it may be starting up) — please try again',
+  'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่':
+    'Could not reach the server — check your connection and try again',
+  'ลิงก์นี้ชี้ไปที่ “{section}” ซึ่งเปิดได้เฉพาะผู้ดูแลระบบ — จึงพาท่านมาที่หน้าที่ท่านเปิดได้แทน':
+    'That link points at "{section}", which only an administrator can open — you have been brought to a section you can use instead',
+  'ยังไม่มีวงเงินให้ส่งออก': 'No facilities to export yet',
+  'ดาวน์โหลดวงเงินทั้งหมดเป็นไฟล์ Excel': 'Download every facility as an Excel file',
+  'ยังไม่มีวงเงินสินเชื่อในระบบ': 'No credit facilities yet',
+  'เริ่มจากเพิ่มวงเงินที่ธนาคารอนุมัติให้แต่ละโครงการ แล้วจึงบันทึกการเบิกใช้ — ยอดคงเหลือและรายการครบกำหนดจะคำนวณให้เอง':
+    'Start by adding the facility the bank approved for a project, then record each drawdown — the remaining limit and what falls due are worked out for you',
+  'เพิ่มวงเงินแรก': 'Add the first facility',
+  'แก้ไขวงเงินสินเชื่อ': 'Edit facility',
+  'เพิ่มวงเงินสินเชื่อ': 'Add facility',
+  'โมดูลนี้แสดงข้อมูลตามไซต์งานที่ท่านดูแล — ขอให้ผู้ดูแลระบบผูกไซต์งานให้ท่านที่ ตั้งค่า → ผู้ใช้และสังกัดโครงการ แล้วกลับมาที่หน้านี้อีกครั้ง':
+    'This module shows the sites you look after — ask an administrator to assign you one under Settings → Users and projects, then come back',
+  'ไม่พบรายงานที่ตรงกับคำค้น': 'Nothing matches that search',
+  'ยังไม่มีรายงานในกลุ่มนี้': 'No minutes in this group yet',
+  'ยังไม่มีรายงานให้อ่าน — กด “เพิ่มรายงาน” เพื่อเริ่มฉบับแรก':
+    'Nothing to read yet — press "Add minutes" to write the first',
+  'ออกโดยระบบ VCB E-Memo': 'Issued by the VCB E-Memo system',
+  'ความครบถ้วน': 'Coverage',
+  'รายสัปดาห์': 'Weekly',
+  'บันทึกการประชุมแยกตามโครงการและฝ่าย · {n} ฉบับ': 'Minutes by project and department · {n} in all',
 };

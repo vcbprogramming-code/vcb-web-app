@@ -64,6 +64,8 @@ export default function CreditFacility() {
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState(null);
   const [showRequests, setShowRequests] = useState(false);
+  // set by the empty state so its button opens the add form, not just the tab
+  const [openNew, setOpenNew] = useState(0);
 
   const loadOverview = useCallback(() => {
     creditApi.overview().then((r) => setOverview(r.data)).catch((e) => setError(e.message));
@@ -75,6 +77,9 @@ export default function CreditFacility() {
   }, [loadOverview]);
 
   const byType = Object.fromEntries((overview?.byType || []).map((row) => [row.type, row]));
+  // Nothing has been entered yet. Four dashes and a row of ฿0 tell a first-time
+  // user nothing about where to start, and Export would hand them an empty file.
+  const empty = overview != null && (overview.byType || []).length === 0;
 
   const handleExport = async () => {
     try {
@@ -100,14 +105,32 @@ export default function CreditFacility() {
                 <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-700">{overview.pendingCount}</span>
               ) : null}
             </button>
-            <button onClick={handleExport} className="btn-outline">
-              <Icon name="download" className="h-4 w-4" /> Export Excel
+            <button onClick={handleExport} disabled={empty} className="btn-outline disabled:opacity-40"
+              title={empty ? t('ยังไม่มีวงเงินให้ส่งออก') : t('ดาวน์โหลดวงเงินทั้งหมดเป็นไฟล์ Excel')}>
+              <Icon name="download" className="h-4 w-4" /> {t('ส่งออก Excel')}
             </button>
           </div>
         }
       />
 
-      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+      {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{t(error)}</div>}
+
+      {empty && (
+        <div className="card flex flex-col items-center gap-3 py-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-tint text-brand">
+            <Icon name="card" className="h-6 w-6" />
+          </span>
+          <div>
+            <h3 className="font-bold text-slate-800">{t('ยังไม่มีวงเงินสินเชื่อในระบบ')}</h3>
+            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+              {t('เริ่มจากเพิ่มวงเงินที่ธนาคารอนุมัติให้แต่ละโครงการ แล้วจึงบันทึกการเบิกใช้ — ยอดคงเหลือและรายการครบกำหนดจะคำนวณให้เอง')}
+            </p>
+          </div>
+          <button onClick={() => { setTab('facilities'); setOpenNew((n) => n + 1); }} className="btn-primary">
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มวงเงินแรก')}
+          </button>
+        </div>
+      )}
 
       {/* headline cards */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -169,7 +192,7 @@ export default function CreditFacility() {
         ))}
       </div>
 
-      <TabComp projects={projects} onChanged={loadOverview} />
+      <TabComp projects={projects} onChanged={loadOverview} openNew={openNew} />
 
       {showRequests && (
         <RequestsPanel

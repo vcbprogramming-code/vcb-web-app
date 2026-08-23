@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toneOf } from '../../lib/sop.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 // ── geometry ────────────────────────────────────────────────────────────────
 // Lanes are rows (one per department/module), `rank` is the column. The data
@@ -112,6 +113,7 @@ const SHAPE = {
 
 /** Renders one flow document as a real swimlane chart. */
 export default function Swimlane({ flow }) {
+  const t = useT();
   const [zoom, setZoom] = useState(1);
   const g = useMemo(() => layout(flow), [flow]);
   const markers = [...new Set(g.edges.map((e) => e.color))];
@@ -119,13 +121,13 @@ export default function Swimlane({ flow }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-end gap-1 text-slate-500">
-        <span className="mr-auto text-xs">เลื่อนดูแนวนอนได้ · ย่อ/ขยายได้</span>
-        <button onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))} title="ย่อ"
+        <span className="mr-auto text-xs">{t('เลื่อนดูแนวนอนได้ · ย่อ/ขยายได้')}</span>
+        <button onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))} title={t('ย่อ')}
           className="rounded-lg border border-slate-200 px-2 py-1 text-sm hover:bg-slate-50">−</button>
         <button onClick={() => setZoom(1)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">
           {Math.round(zoom * 100)}%
         </button>
-        <button onClick={() => setZoom((z) => Math.min(1.6, +(z + 0.1).toFixed(2)))} title="ขยาย"
+        <button onClick={() => setZoom((z) => Math.min(1.6, +(z + 0.1).toFixed(2)))} title={t('ขยาย')}
           className="rounded-lg border border-slate-200 px-2 py-1 text-sm hover:bg-slate-50">+</button>
       </div>
 
@@ -150,7 +152,7 @@ export default function Swimlane({ flow }) {
             {g.ranks.map((r, i) => (
               <div key={r} className="absolute text-center text-[10px] font-medium text-slate-400"
                 style={{ left: HEAD_W + i * COL_W, top: 6, width: COL_W }}>
-                ขั้นที่ {i + 1}
+                {t('ขั้นที่')} {i + 1}
               </div>
             ))}
 
@@ -199,19 +201,19 @@ export default function Swimlane({ flow }) {
 
       {/* legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-5 rounded-full border border-slate-300 bg-slate-50" /> เริ่ม / จบ</span>
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-5 rounded border border-slate-300 bg-white" /> ขั้นตอน</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-5 rounded-full border border-slate-300 bg-slate-50" /> {t('เริ่ม / จบ')}</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-3 w-5 rounded border border-slate-300 bg-white" /> {t('ขั้นตอน')}</span>
         <span className="inline-flex items-center gap-1.5">
-          <i className="inline-block h-3.5 w-3.5 border border-amber-300 bg-amber-50" style={{ clipPath: 'polygon(50% 0%,100% 50%,50% 100%,0% 50%)' }} /> จุดตัดสินใจ
+          <i className="inline-block h-3.5 w-3.5 border border-amber-300 bg-amber-50" style={{ clipPath: 'polygon(50% 0%,100% 50%,50% 100%,0% 50%)' }} /> {t('จุดตัดสินใจ')}
         </span>
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-0.5 w-5" style={{ background: '#16a34a' }} /> อนุมัติ / ใช่</span>
-        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-0.5 w-5" style={{ background: '#e11d48' }} /> ไม่อนุมัติ</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-0.5 w-5" style={{ background: '#16a34a' }} /> {t('อนุมัติ / ใช่')}</span>
+        <span className="inline-flex items-center gap-1.5"><i className="inline-block h-0.5 w-5" style={{ background: '#e11d48' }} /> {t('ไม่อนุมัติ')}</span>
       </div>
 
       {Array.isArray(flow.narrative) && flow.narrative.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
           <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Icon name="document" className="h-4 w-4" /> คำอธิบายขั้นตอน
+            <Icon name="document" className="h-4 w-4" /> {t('คำอธิบายขั้นตอน')}
           </h4>
           <ul className="space-y-1.5">
             {flow.narrative.map((line, i) => {

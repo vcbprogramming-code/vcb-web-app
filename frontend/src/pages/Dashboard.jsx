@@ -10,6 +10,7 @@ import {
 import Icon from '../components/Icon.jsx';
 import { StatCard } from '../components/ui/index.js';
 import { TrendChart, BarList } from '../components/Charts.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const STATUS_ORDER = ['pending', 'approved', 'returned', 'rejected', 'draft', 'cancelled'];
 
@@ -53,6 +54,7 @@ const RANGES = [
  * month opens the matching slice of the document register.
  */
 export default function Dashboard() {
+  const t = useT();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -122,7 +124,7 @@ export default function Dashboard() {
       {/* ── filter row — scopes everything below ─────────────────────────── */}
       <div className="card-sm !p-3">
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-slate-500">ช่วงเวลา:</span>
+          <span className="text-slate-500">{t('ช่วงเวลา:')}</span>
           {RANGES.map((r) => (
             <button
               key={r.key}
@@ -135,14 +137,14 @@ export default function Dashboard() {
             </button>
           ))}
 
-          <span className="ml-3 text-slate-500">โครงการ:</span>
+          <span className="ml-3 text-slate-500">{t('โครงการ:')}</span>
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5">
             <button
               onClick={() => setProjectId('')}
               className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
                 !projectId ? 'bg-slate-800 text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
-            >ทุกโครงการ</button>
+            >{t('ทุกโครงการ')}</button>
             {projects.map((p) => (
               <button
                 key={p.id}
@@ -162,20 +164,20 @@ export default function Dashboard() {
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
           >
             {exporting
-              ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-600" /> กำลังเตรียมไฟล์…</>
-              : <><Icon name="download" className="h-3.5 w-3.5" /> ดาวน์โหลด Excel</>}
+              ? <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-600" /> {t('กำลังเตรียมไฟล์…')}</>
+              : <><Icon name="download" className="h-3.5 w-3.5" /> {t('ดาวน์โหลด Excel')}</>}
           </button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-slate-400">
-          ตัวเลขทุกตัวกดเพื่อดูรายการจริงได้ · ข้อมูลตามตัวกรองด้านบน
+          {t('ตัวเลขทุกตัวกดเพื่อดูรายการจริงได้ · ข้อมูลตามตัวกรองด้านบน')}
         </span>
         <span className="flex items-center gap-3">
           {fetchedAt && (
             <span className="hidden items-center gap-1.5 text-xs text-slate-400 sm:inline-flex">
-              <Icon name="clock" className="h-4 w-4" /> อัปเดต: {formatThaiDateTime(fetchedAt)}
+              <Icon name="clock" className="h-4 w-4" /> {t('อัปเดต:')} {formatThaiDateTime(fetchedAt)}
             </span>
           )}
           <span className="chip bg-brand/10 text-brand">{formatThaiLongDate(new Date())}</span>
@@ -184,29 +186,29 @@ export default function Dashboard() {
 
       {error && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-          <span>โหลดภาพรวมไม่สำเร็จ: {error}</span>
-          <button onClick={load} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">ลองใหม่</button>
+          <span>{t('โหลดภาพรวมไม่สำเร็จ:')} {error}</span>
+          <button onClick={load} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">{t('ลองใหม่')}</button>
         </div>
       )}
 
       {!s ? (
-        !error && <div className="text-slate-400">กำลังโหลดภาพรวม…</div>
+        !error && <div className="text-slate-400">{t('กำลังโหลดภาพรวม…')}</div>
       ) : (
         // holds the previous render at reduced opacity while refetching — no
         // skeleton flash, no layout jump
         <div className={`space-y-5 transition-opacity ${reloading ? 'opacity-60' : ''}`}>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <button onClick={() => drill()} className="text-left">
-              <StatCard label="เอกสารทั้งหมด" value={s.total} icon="document" iconColor="bg-brand/10 text-brand" />
+              <StatCard label={t('เอกสารทั้งหมด')} value={s.total} icon="document" iconColor="bg-brand/10 text-brand" />
             </button>
             <button onClick={() => drill()} className="text-left">
-              <StatCard label="รับเข้าเดือนนี้" value={s.thisMonth} accent="text-blue-600" icon="calendar" iconColor="bg-blue-50 text-blue-600" />
+              <StatCard label={t('รับเข้าเดือนนี้')} value={s.thisMonth} accent="text-blue-600" icon="calendar" iconColor="bg-blue-50 text-blue-600" />
             </button>
             <button onClick={() => drill({ status: 'pending' })} className="text-left">
-              <StatCard label="รออนุมัติ" value={s.byStatus.pending || 0} accent="text-amber-600" icon="clock" iconColor="bg-amber-50 text-amber-600" />
+              <StatCard label={t('รออนุมัติ')} value={s.byStatus.pending || 0} accent="text-amber-600" icon="clock" iconColor="bg-amber-50 text-amber-600" />
             </button>
             <button onClick={() => drill({ status: 'pending' })} className="text-left">
-              <StatCard label="ค้างเกิน 14 วัน" value={overdue} accent={overdue ? 'text-rose-600' : 'text-emerald-600'}
+              <StatCard label={t('ค้างเกิน 14 วัน')} value={overdue} accent={overdue ? 'text-rose-600' : 'text-emerald-600'}
                 icon={overdue ? 'warning' : 'check'} iconColor={overdue ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'} />
             </button>
           </div>
@@ -214,8 +216,8 @@ export default function Dashboard() {
           {/* trend — the one chart that needs the full width */}
           <div className="card">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-bold text-slate-800">แนวโน้มจำนวนเอกสาร 12 เดือน</h3>
-              <span className="text-xs text-slate-400">กดที่เดือนเพื่อดูเอกสารของเดือนนั้น</span>
+              <h3 className="font-bold text-slate-800">{t('แนวโน้มจำนวนเอกสาร 12 เดือน')}</h3>
+              <span className="text-xs text-slate-400">{t('กดที่เดือนเพื่อดูเอกสารของเดือนนั้น')}</span>
             </div>
             <TrendChart
               data={s.monthly}
@@ -230,8 +232,8 @@ export default function Dashboard() {
             {/* aging — the actionable one, so it goes first */}
             <div className="card">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-bold text-slate-800">เอกสารรออนุมัติ ค้างมานานแค่ไหน</h3>
-                <span className="text-xs text-slate-400">นับจากวันที่รับเอกสาร</span>
+                <h3 className="font-bold text-slate-800">{t('เอกสารรออนุมัติ ค้างมานานแค่ไหน')}</h3>
+                <span className="text-xs text-slate-400">{t('นับจากวันที่รับเอกสาร')}</span>
               </div>
               <BarList
                 unit=" ฉบับ"
@@ -242,7 +244,7 @@ export default function Dashboard() {
               {overdue > 0 && (
                 <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
                   <Icon name="warning" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  มี {overdue} ฉบับค้างเกิน 14 วัน — ควรตามผู้อนุมัติที่ค้างอยู่
+                  {t('มี')} {overdue} {t('ฉบับค้างเกิน 14 วัน — ควรตามผู้อนุมัติที่ค้างอยู่')}
                 </p>
               )}
             </div>
@@ -250,11 +252,11 @@ export default function Dashboard() {
             {/* who is slow */}
             <div className="card">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="font-bold text-slate-800">เวลาพิจารณาเฉลี่ย รายผู้อนุมัติ</h3>
-                <span className="text-xs text-slate-400">นับจากที่ถึงคิวของแต่ละคน</span>
+                <h3 className="font-bold text-slate-800">{t('เวลาพิจารณาเฉลี่ย รายผู้อนุมัติ')}</h3>
+                <span className="text-xs text-slate-400">{t('นับจากที่ถึงคิวของแต่ละคน')}</span>
               </div>
               {s.turnaround.length === 0 ? (
-                <div className="py-8 text-center text-sm text-slate-400">ยังไม่มีการอนุมัติในช่วงที่เลือก</div>
+                <div className="py-8 text-center text-sm text-slate-400">{t('ยังไม่มีการอนุมัติในช่วงที่เลือก')}</div>
               ) : (
                 <BarList
                   unit=" วัน"
@@ -271,7 +273,7 @@ export default function Dashboard() {
 
             {/* status — labels always visible, colour is never the only cue */}
             <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">สถานะเอกสาร</h3>
+              <h3 className="mb-3 font-bold text-slate-800">{t('สถานะเอกสาร')}</h3>
               <BarList
                 unit=" ฉบับ"
                 rows={STATUS_ORDER.filter((st) => s.byStatus[st]).map((st) => ({
@@ -288,7 +290,7 @@ export default function Dashboard() {
 
             {/* by project — each keeps its own colour AND its code as a label */}
             <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">เอกสารแยกตามโครงการ</h3>
+              <h3 className="mb-3 font-bold text-slate-800">{t('เอกสารแยกตามโครงการ')}</h3>
               <BarList
                 unit=" ฉบับ"
                 rows={s.byProject.filter((p) => p.count > 0).map((p) => ({
@@ -305,13 +307,13 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
             <div className="card">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">เอกสารล่าสุด</h3>
+                <h3 className="font-bold text-slate-800">{t('เอกสารล่าสุด')}</h3>
                 <button onClick={() => drill()} className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
-                  ดูทั้งหมด <Icon name="arrowRight" className="h-4 w-4" />
+                  {t('ดูทั้งหมด')} <Icon name="arrowRight" className="h-4 w-4" />
                 </button>
               </div>
               {s.recent.length === 0 ? (
-                <p className="text-sm text-slate-400">ยังไม่มีเอกสาร</p>
+                <p className="text-sm text-slate-400">{t('ยังไม่มีเอกสาร')}</p>
               ) : (
                 <ul className="divide-y divide-slate-100">
                   {s.recent.map((d) => (
@@ -335,14 +337,14 @@ export default function Dashboard() {
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 font-bold text-slate-800">
                   <Icon name="inbox" className="h-5 w-5 text-amber-500" />
-                  รออนุมัตินานที่สุด
+                  {t('รออนุมัตินานที่สุด')}
                 </h3>
                 <button onClick={() => drill({ status: 'pending' })} className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
-                  ดูทั้งหมด <Icon name="arrowRight" className="h-4 w-4" />
+                  {t('ดูทั้งหมด')} <Icon name="arrowRight" className="h-4 w-4" />
                 </button>
               </div>
               {s.pending.length === 0 ? (
-                <p className="text-sm text-slate-400">ไม่มีเอกสารรออนุมัติ</p>
+                <p className="text-sm text-slate-400">{t('ไม่มีเอกสารรออนุมัติ')}</p>
               ) : (
                 <ul className="space-y-3">
                   {s.pending.map((d) => {
@@ -354,7 +356,7 @@ export default function Dashboard() {
                           <span className="rounded-md px-2 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: d.project_color || '#64748b' }}>{d.project_code}</span>
                           <span className="text-xs text-slate-400">{formatThaiDate(d.date_received)}</span>
                           <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${days > 14 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
-                            ค้าง {days} วัน
+                            {t('ค้าง')} {days} {t('วัน')}
                           </span>
                         </div>
                         <div className="text-sm font-medium text-slate-800">{d.doc_number}</div>

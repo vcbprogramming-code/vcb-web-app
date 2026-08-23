@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { perfApi, perfPrefs } from '../../lib/performance.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const dnum = (iso) => Number(iso.slice(8, 10));
 const dow = (iso) => new Date(iso + 'T00:00:00').getDay();
@@ -51,8 +52,9 @@ function MiniCal({ daysFilled, today }) {
 }
 
 function TopList({ items }) {
+  const t = useT();
   const [all, setAll] = useState(false);
-  if (!items?.length) return <p className="py-3 text-center text-xs text-slate-400">ยังไม่มีข้อมูล</p>;
+  if (!items?.length) return <p className="py-3 text-center text-xs text-slate-400">{t('ยังไม่มีข้อมูล')}</p>;
   const shown = all ? items : items.slice(0, 5);
   const max = Math.max(...items.map((i) => i.count), 1);
   return (
@@ -80,6 +82,7 @@ function TopList({ items }) {
 const MODES = [['progress', 'ความคืบหน้า'], ['topact', 'กิจกรรมหลัก'], ['topcost', 'หมวดงานหลัก']];
 
 export default function Dashboard({ cur, onOpenSite }) {
+  const t = useT();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('progress');
@@ -94,7 +97,7 @@ export default function Dashboard({ cur, onOpenSite }) {
   }, [cur.y, cur.m]);
 
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!data) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลดภาพรวม…" /></div>;
+  if (!data) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดภาพรวม…')} /></div>;
   const hidden = new Set(perfPrefs.get().hiddenSites);
   const rows = (data.rows || []).filter((r) => !hidden.has(r.site_key));
 
@@ -110,7 +113,7 @@ export default function Dashboard({ cur, onOpenSite }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="card text-center text-sm text-slate-400">ยังไม่มีไซต์งานในขอบเขตของคุณ</div>
+        <div className="card text-center text-sm text-slate-400">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((s) => {
@@ -129,11 +132,11 @@ export default function Dashboard({ cur, onOpenSite }) {
                   </div>
 
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <div><div className="text-base font-bold text-slate-900">{s.n_emp}</div><div className="text-[10px] text-slate-400">พนักงาน</div></div>
-                    <div><div className="text-base font-bold text-slate-900">{s.entries}</div><div className="text-[10px] text-slate-400">บันทึก</div></div>
-                    <div><div className="text-base font-bold text-slate-900">{started}/{s.n_emp}</div><div className="text-[10px] text-slate-400">เริ่มบันทึก</div></div>
+                    <div><div className="text-base font-bold text-slate-900">{s.n_emp}</div><div className="text-[10px] text-slate-400">{t('พนักงาน')}</div></div>
+                    <div><div className="text-base font-bold text-slate-900">{s.entries}</div><div className="text-[10px] text-slate-400">{t('บันทึก')}</div></div>
+                    <div><div className="text-base font-bold text-slate-900">{started}/{s.n_emp}</div><div className="text-[10px] text-slate-400">{t('เริ่มบันทึก')}</div></div>
                   </div>
-                  <div className="mt-1 text-center text-[10px] text-slate-400">{s.n_operation} ปฏิบัติการ · {s.n_support} สนับสนุน</div>
+                  <div className="mt-1 text-center text-[10px] text-slate-400">{s.n_operation} {t('ปฏิบัติการ ·')} {s.n_support} {t('สนับสนุน')}</div>
 
                   <div className="mt-3">
                     {mode === 'progress' && <MiniCal daysFilled={s.daysFilled} today={data.today} />}
@@ -143,7 +146,7 @@ export default function Dashboard({ cur, onOpenSite }) {
 
                   <button onClick={() => onOpenSite?.(s.site_key)}
                     className="mt-3 w-full rounded-xl py-2 text-sm font-semibold text-white transition hover:opacity-90" style={{ backgroundColor: color }}>
-                    เปิดบันทึก <Icon name="arrowRight" className="inline h-4 w-4 align-[-3px]" />
+                    {t('เปิดบันทึก')} <Icon name="arrowRight" className="inline h-4 w-4 align-[-3px]" />
                   </button>
                 </div>
               </div>

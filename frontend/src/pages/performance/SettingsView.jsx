@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { perfApi, perfPrefs } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Module settings. Server-side: per-site back-date lock window (lock-days).
@@ -10,6 +11,7 @@ import { BusyLabel } from '../../components/Spinner.jsx';
  * hidden on the dashboard.
  */
 export default function SettingsView({ sites, onSitesChange }) {
+  const t = useT();
   const toast = useToast();
   const [prefs, setPrefs] = useState(perfPrefs.get());
   const [lockDraft, setLockDraft] = useState(() => Object.fromEntries(sites.map((s) => [s.key, s.lockDays ?? 3])));
@@ -23,9 +25,9 @@ export default function SettingsView({ sites, onSitesChange }) {
   };
   const saveLock = async (key) => {
     const v = Number(lockDraft[key]);
-    if (!Number.isInteger(v) || v < 0 || v > 60) { toast.error('จำนวนวันต้องอยู่ระหว่าง 0–60'); return; }
+    if (!Number.isInteger(v) || v < 0 || v > 60) { toast.error(t('จำนวนวันต้องอยู่ระหว่าง 0–60')); return; }
     setSavingLock(key);
-    try { await perfApi.updateSite(key, { lockDays: v }); onSitesChange?.(key, v); toast.success('บันทึกจำนวนวันล็อกแล้ว'); }
+    try { await perfApi.updateSite(key, { lockDays: v }); onSitesChange?.(key, v); toast.success(t('บันทึกจำนวนวันล็อกแล้ว')); }
     catch (e) { toast.error(e.message); }
     finally { setSavingLock(null); }
   };
@@ -34,9 +36,9 @@ export default function SettingsView({ sites, onSitesChange }) {
     <div className="max-w-2xl space-y-5">
       {/* display */}
       <section className="card space-y-3">
-        <h3 className="font-bold text-slate-800">การแสดงผล</h3>
+        <h3 className="font-bold text-slate-800">{t('การแสดงผล')}</h3>
         <div>
-          <div className="mb-1.5 text-sm font-medium text-slate-600">แสดงในตารางสัปดาห์เป็น</div>
+          <div className="mb-1.5 text-sm font-medium text-slate-600">{t('แสดงในตารางสัปดาห์เป็น')}</div>
           <div className="inline-flex rounded-lg border border-slate-200 p-0.5">
             {[['code', 'รหัสงาน (A-1 / 5)'], ['name', 'ชื่อกิจกรรม']].map(([k, label]) => (
               <button key={k} onClick={() => savePref({ cellNames: k })}
@@ -49,8 +51,8 @@ export default function SettingsView({ sites, onSitesChange }) {
       {/* per-site lock window */}
       <section className="card space-y-3">
         <div>
-          <h3 className="font-bold text-slate-800">ล็อกการแก้ไขย้อนหลัง (ต่อไซต์)</h3>
-          <p className="text-xs text-slate-400">จำนวนวันที่ยังแก้ไขข้อมูลย้อนหลังได้ · เกินกว่านี้จะล็อกอัตโนมัติ (ผู้ดูแลระบบปลดล็อกได้)</p>
+          <h3 className="font-bold text-slate-800">{t('ล็อกการแก้ไขย้อนหลัง (ต่อไซต์)')}</h3>
+          <p className="text-xs text-slate-400">{t('จำนวนวันที่ยังแก้ไขข้อมูลย้อนหลังได้ · เกินกว่านี้จะล็อกอัตโนมัติ (ผู้ดูแลระบบปลดล็อกได้)')}</p>
         </div>
         <div className="divide-y divide-slate-100">
           {sites.map((s) => (
@@ -63,9 +65,9 @@ export default function SettingsView({ sites, onSitesChange }) {
                 <input type="number" min={0} max={60} value={lockDraft[s.key]}
                   onChange={(e) => setLockDraft((p) => ({ ...p, [s.key]: e.target.value }))}
                   className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                <span className="text-xs text-slate-400">วัน</span>
+                <span className="text-xs text-slate-400">{t('วัน')}</span>
                 <button onClick={() => saveLock(s.key)} disabled={savingLock === s.key} className="btn-outline !py-1.5 !text-sm disabled:opacity-50">
-                  <BusyLabel busy={savingLock === s.key} busyText="กำลังบันทึก…">บันทึก</BusyLabel>
+                  <BusyLabel busy={savingLock === s.key} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel>
                 </button>
               </div>
             </div>
@@ -76,8 +78,8 @@ export default function SettingsView({ sites, onSitesChange }) {
       {/* hidden sites on dashboard */}
       <section className="card space-y-3">
         <div>
-          <h3 className="font-bold text-slate-800">ซ่อนไซต์บนแดชบอร์ด</h3>
-          <p className="text-xs text-slate-400">ติ๊กเพื่อซ่อนการ์ดไซต์นั้นในหน้าภาพรวม (เฉพาะเครื่องนี้)</p>
+          <h3 className="font-bold text-slate-800">{t('ซ่อนไซต์บนแดชบอร์ด')}</h3>
+          <p className="text-xs text-slate-400">{t('ติ๊กเพื่อซ่อนการ์ดไซต์นั้นในหน้าภาพรวม (เฉพาะเครื่องนี้)')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {sites.map((s) => {

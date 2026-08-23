@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { onboardingApi } from '../../lib/modules.js';
 import { formatThaiDate } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const PHASES = [30, 60, 90];
 const RESULT_LABEL = { pass: 'ผ่านทดลองงาน', extend: 'ขยายเวลา', fail: 'ไม่ผ่าน' };
 const CRITERIA = ['คุณภาพงาน', 'ความรับผิดชอบ', 'การทำงานเป็นทีม', 'การปรับตัว', 'ทัศนคติ'];
 
 export default function JourneyDetail({ journeyId, onBack }) {
+  const t = useT();
   const [j, setJ] = useState(null);
   const [error, setError] = useState(null);
   const [review, setReview] = useState({ reviewer: '', scores: {}, strengths: '', improvements: '', result: '', note: '' });
@@ -47,12 +49,12 @@ export default function JourneyDetail({ journeyId, onBack }) {
   };
 
   if (error) return <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3">{error}</div>;
-  if (!j) return <div className="text-slate-400">กำลังโหลด…</div>;
+  if (!j) return <div className="text-slate-400">{t('กำลังโหลด…')}</div>;
 
   return (
     <div className="space-y-5">
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
-        <Icon name="arrowLeft" className="h-4 w-4" /> กลับรายชื่อพนักงานใหม่
+        <Icon name="arrowLeft" className="h-4 w-4" /> {t('กลับรายชื่อพนักงานใหม่')}
       </button>
 
       <div className="card flex flex-wrap items-center justify-between gap-4">
@@ -62,7 +64,7 @@ export default function JourneyDetail({ journeyId, onBack }) {
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-brand">{j.progress}%</div>
-          <div className="text-xs text-slate-400">{j.tasks_done}/{j.tasks_total} งาน</div>
+          <div className="text-xs text-slate-400">{j.tasks_done}/{j.tasks_total} {t('งาน')}</div>
         </div>
       </div>
 
@@ -74,12 +76,12 @@ export default function JourneyDetail({ journeyId, onBack }) {
           return (
             <div key={phase} className="card">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">{phase} วัน</h3>
+                <h3 className="font-bold text-slate-800">{phase} {t('วัน')}</h3>
                 <span className="text-xs text-slate-400">{done}/{tasks.length}</span>
               </div>
               <div className="space-y-2">
                 {tasks.length === 0 ? (
-                  <p className="text-xs text-slate-400">ไม่มีรายการ</p>
+                  <p className="text-xs text-slate-400">{t('ไม่มีรายการ')}</p>
                 ) : tasks.map((t) => (
                   <label key={t.id} className="flex cursor-pointer items-start gap-2 text-sm">
                     <input type="checkbox" checked={t.done} onChange={(e) => toggleTask(t.id, e.target.checked)} className="mt-0.5" />
@@ -97,24 +99,24 @@ export default function JourneyDetail({ journeyId, onBack }) {
 
       {/* probation review */}
       <div className="card space-y-4">
-        <h3 className="font-bold text-slate-800">แบบประเมินทดลองงาน</h3>
+        <h3 className="font-bold text-slate-800">{t('แบบประเมินทดลองงาน')}</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ผู้ประเมิน</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้ประเมิน')}</label>
             <input value={review.reviewer} onChange={(e) => setReview({ ...review, reviewer: e.target.value })} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ผลการประเมิน</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผลการประเมิน')}</label>
             <select value={review.result} onChange={(e) => setReview({ ...review, result: e.target.value })} className="field">
-              <option value="">— ยังไม่สรุป —</option>
-              <option value="pass">ผ่านทดลองงาน</option>
-              <option value="extend">ขยายเวลาทดลองงาน</option>
-              <option value="fail">ไม่ผ่าน</option>
+              <option value="">{t('— ยังไม่สรุป —')}</option>
+              <option value="pass">{t('ผ่านทดลองงาน')}</option>
+              <option value="extend">{t('ขยายเวลาทดลองงาน')}</option>
+              <option value="fail">{t('ไม่ผ่าน')}</option>
             </select>
           </div>
         </div>
         <div>
-          <div className="mb-2 text-sm font-medium text-slate-600">คะแนนรายด้าน (1–5)</div>
+          <div className="mb-2 text-sm font-medium text-slate-600">{t('คะแนนรายด้าน (1–5)')}</div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {CRITERIA.map((c) => (
               <div key={c} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
@@ -137,17 +139,17 @@ export default function JourneyDetail({ journeyId, onBack }) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">จุดเด่น</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('จุดเด่น')}</label>
             <textarea rows={2} value={review.strengths} onChange={(e) => setReview({ ...review, strengths: e.target.value })} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">สิ่งที่ควรพัฒนา</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('สิ่งที่ควรพัฒนา')}</label>
             <textarea rows={2} value={review.improvements} onChange={(e) => setReview({ ...review, improvements: e.target.value })} className="field" />
           </div>
         </div>
         <div className="flex items-center justify-between">
           {j.review?.result && (
-            <span className="text-sm text-slate-500">ผลล่าสุด: <b>{RESULT_LABEL[j.review.result]}</b></span>
+            <span className="text-sm text-slate-500">{t('ผลล่าสุด:')} <b>{RESULT_LABEL[j.review.result]}</b></span>
           )}
           <button onClick={saveReview} disabled={savingReview} className="btn-primary ml-auto">
             {savingReview ? 'กำลังบันทึก…' : 'บันทึกผลประเมิน'}

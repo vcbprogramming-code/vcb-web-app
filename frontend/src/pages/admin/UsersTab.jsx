@@ -7,6 +7,7 @@ import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
 import UserPermissions from './UserPermissions.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const ROLE_CHIP = {
   admin: 'bg-purple-50 text-purple-700',
@@ -21,6 +22,7 @@ const ROLE_CHIP = {
  * never leaves a stale image behind.
  */
 function UserSignature({ user }) {
+  const t = useT();
   const toast = useToast();
   const [url, setUrl] = useState(null);
   const [has, setHas] = useState(Boolean(user?.has_signature));
@@ -37,32 +39,32 @@ function UserSignature({ user }) {
 
   const pick = async (f) => {
     if (!f) return;
-    if (!f.type.startsWith('image/')) { toast.error('ลายเซ็นต้องเป็นรูปภาพ'); return; }
-    if (f.size > 2 * 1024 * 1024) { toast.error('รูปลายเซ็นใหญ่เกิน 2 MB'); return; }
+    if (!f.type.startsWith('image/')) { toast.error(t('ลายเซ็นต้องเป็นรูปภาพ')); return; }
+    if (f.size > 2 * 1024 * 1024) { toast.error(t('รูปลายเซ็นใหญ่เกิน 2 MB')); return; }
     setBusy(true);
-    try { await adminApi.uploadUserSignature(user.id, f); setHas(true); toast.success('บันทึกลายเซ็นแล้ว'); }
+    try { await adminApi.uploadUserSignature(user.id, f); setHas(true); toast.success(t('บันทึกลายเซ็นแล้ว')); }
     catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
   const clear = async () => {
     setBusy(true);
-    try { await adminApi.clearUserSignature(user.id); setHas(false); toast.success('ลบลายเซ็นแล้ว'); }
+    try { await adminApi.clearUserSignature(user.id); setHas(false); toast.success(t('ลบลายเซ็นแล้ว')); }
     catch (e) { toast.error(e.message); } finally { setBusy(false); }
   };
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-600">ลายเซ็นของผู้ใช้รายนี้</label>
+      <label className="mb-1 block text-sm font-medium text-slate-600">{t('ลายเซ็นของผู้ใช้รายนี้')}</label>
       <p className="mb-2 text-xs text-slate-400">
-        ใช้พิมพ์บนหนังสือที่ผู้ใช้รายนี้อนุมัติ · การเปลี่ยนแปลงถูกบันทึกในประวัติระบบว่าผู้ดูแลคนใดเป็นผู้ตั้งให้
+        {t('ใช้พิมพ์บนหนังสือที่ผู้ใช้รายนี้อนุมัติ · การเปลี่ยนแปลงถูกบันทึกในประวัติระบบว่าผู้ดูแลคนใดเป็นผู้ตั้งให้')}
       </p>
       {has ? (
         <div className="flex items-center gap-4 rounded-xl border border-slate-200 p-3">
           {url
-            ? <img src={url} alt="ลายเซ็น" className="h-14 w-auto object-contain" />
-            : <span className="text-xs text-slate-400">กำลังโหลด…</span>}
+            ? <img src={url} alt={t('ลายเซ็น')} className="h-14 w-auto object-contain" />
+            : <span className="text-xs text-slate-400">{t('กำลังโหลด…')}</span>}
           <div className="flex gap-3">
             <label className={`cursor-pointer text-sm font-medium text-blue-600 hover:underline ${busy ? 'pointer-events-none opacity-50' : ''}`}>
-              เปลี่ยนรูป
+              {t('เปลี่ยนรูป')}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pick(f); }} />
             </label>
             <button type="button" onClick={clear} disabled={busy} className="text-sm text-red-500 hover:underline disabled:opacity-50">ลบลายเซ็น</button>
@@ -183,22 +185,22 @@ function UserModal({ user, onClose, onSaved }) {
         <div className={tab === 'perms' ? 'hidden' : ''}>
         <form id="user-form" onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('ชื่อ-นามสกุล')} <span className="text-red-500">*</span></label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={field} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">อีเมล <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('อีเมล')} <span className="text-red-500">*</span></label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
-            {isGoogle && <p className="mt-1 text-xs text-slate-400">ต้องเป็นอีเมล Google (Gmail/Workspace) ที่จะใช้ Sign in with Google</p>}
+            {isGoogle && <p className="mt-1 text-xs text-slate-400">{t('ต้องเป็นอีเมล Google (Gmail/Workspace) ที่จะใช้ Sign in with Google')}</p>}
           </div>
 
           {/* login method — how this account signs in */}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">วิธีเข้าสู่ระบบ <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('วิธีเข้าสู่ระบบ')} <span className="text-red-500">*</span></label>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setLoginMethod('email')}
                 className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${loginMethod === 'email' ? 'border-brand bg-brand-tint text-brand' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
-                อีเมล
+                {t('อีเมล')}
               </button>
               <button type="button" onClick={() => setLoginMethod('google')}
                 className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${loginMethod === 'google' ? 'border-brand bg-brand-tint text-brand' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
@@ -221,11 +223,11 @@ function UserModal({ user, onClose, onSaved }) {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">บทบาท <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('บทบาท')} <span className="text-red-500">*</span></label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
-              <option value="hr">เจ้าหน้าที่ HR</option>
-              <option value="executive">ผู้บริหาร</option>
-              <option value="admin">ผู้ดูแลระบบ</option>
+              <option value="hr">{t('เจ้าหน้าที่ HR')}</option>
+              <option value="executive">{t('ผู้บริหาร')}</option>
+              <option value="admin">{t('ผู้ดูแลระบบ')}</option>
             </select>
           </div>
 
@@ -248,6 +250,7 @@ function UserModal({ user, onClose, onSaved }) {
 }
 
 export default function UsersTab() {
+  const t = useT();
   const { profile } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
@@ -263,7 +266,7 @@ export default function UsersTab() {
 
   const toggleActive = async (u) => {
     if (u.is_active) {
-      const ok = await confirm({ title: 'ปิดใช้งานผู้ใช้', message: `ปิดใช้งาน "${u.full_name}"?\nผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`, confirmLabel: 'ปิดใช้งาน' });
+      const ok = await confirm({ title: t('ปิดใช้งานผู้ใช้'), message: `ปิดใช้งาน "${u.full_name}"?\nผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`, confirmLabel: t('ปิดใช้งาน') });
       if (!ok) return;
     }
     setBusyKey(`toggle:${u.id}`);
@@ -276,12 +279,12 @@ export default function UsersTab() {
   };
 
   const removeUser = async (u) => {
-    const ok = await confirm({ title: 'ลบผู้ใช้', message: `ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`, confirmLabel: 'ลบผู้ใช้' });
+    const ok = await confirm({ title: t('ลบผู้ใช้'), message: `ลบผู้ใช้ "${u.full_name}" (${u.email})?\nเอกสารที่เขาเคยสร้าง/อนุมัติจะยังอยู่ แต่จะไม่แสดงชื่อผู้ใช้นี้ · ลบแล้วกู้คืนไม่ได้`, confirmLabel: t('ลบผู้ใช้') });
     if (!ok) return;
     setBusyKey(`del:${u.id}`);
     try {
       await adminApi.deleteUser(u.id);
-      toast.success('ลบผู้ใช้แล้ว');
+      toast.success(t('ลบผู้ใช้แล้ว'));
       await load();
     } catch (e) { toast.error(e.message); setBusyKey(null); }
   };
@@ -289,7 +292,7 @@ export default function UsersTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setEditUser(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มผู้ใช้</button>
+        <button onClick={() => setEditUser(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มผู้ใช้')}</button>
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
@@ -297,21 +300,21 @@ export default function UsersTab() {
         <table className="tbl min-w-[720px]">
           <thead>
             <tr className="tbl-head">
-              <th className="tbl-th">ชื่อ</th>
-              <th className="tbl-th">อีเมล</th>
-              <th className="tbl-th">เข้าระบบด้วย</th>
-              <th className="tbl-th">บทบาท</th>
-              <th className="tbl-th">สถานะ</th>
-              <th className="tbl-th">สังกัดโครงการ</th>
-              <th className="tbl-th">ลายเซ็น</th>
-              <th className="tbl-th text-right">จัดการ</th>
+              <th className="tbl-th">{t('ชื่อ')}</th>
+              <th className="tbl-th">{t('อีเมล')}</th>
+              <th className="tbl-th">{t('เข้าระบบด้วย')}</th>
+              <th className="tbl-th">{t('บทบาท')}</th>
+              <th className="tbl-th">{t('สถานะ')}</th>
+              <th className="tbl-th">{t('สังกัดโครงการ')}</th>
+              <th className="tbl-th">{t('ลายเซ็น')}</th>
+              <th className="tbl-th text-right">{t('จัดการ')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">{t('กำลังโหลด…')}</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">ยังไม่มีผู้ใช้ — กด “เพิ่มผู้ใช้” เพื่อเริ่ม</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีผู้ใช้ — กด “เพิ่มผู้ใช้” เพื่อเริ่ม')}</td></tr>
             ) : users.map((u) => (
               <tr key={u.id} className="tbl-row">
                 <td className="tbl-td font-medium text-slate-800">{u.full_name}</td>
@@ -334,7 +337,7 @@ export default function UsersTab() {
                     data rather than "sees everything". */}
                 <td className="tbl-td">
                   {(u.projects || []).length === 0 ? (
-                    <span className="text-xs text-slate-400">ทุกโครงการ</span>
+                    <span className="text-xs text-slate-400">{t('ทุกโครงการ')}</span>
                   ) : (
                     <span className="flex flex-wrap gap-1">
                       {u.projects.map((p) => (
@@ -346,11 +349,11 @@ export default function UsersTab() {
                 </td>
                 <td className="tbl-td">
                   {u.has_signature
-                    ? <span className="chip bg-emerald-50 text-emerald-700">มีแล้ว</span>
-                    : <span className="text-xs text-slate-400">ยังไม่มี</span>}
+                    ? <span className="chip bg-emerald-50 text-emerald-700">{t('มีแล้ว')}</span>
+                    : <span className="text-xs text-slate-400">{t('ยังไม่มี')}</span>}
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setEditUser(u)} disabled={rowBusy(u)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>
+                  <button onClick={() => setEditUser(u)} disabled={rowBusy(u)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">{t('แก้ไข')}</button>
                   <button onClick={() => toggleActive(u)} disabled={rowBusy(u)} className="text-slate-500 hover:underline text-sm mr-3 disabled:opacity-50">
                     <BusyLabel busy={busyKey === `toggle:${u.id}`} busyText="กำลังบันทึก…">
                       {u.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
@@ -359,7 +362,7 @@ export default function UsersTab() {
                   {/* can't delete your own account */}
                   {u.id !== profile?.id && (
                     <button onClick={() => removeUser(u)} disabled={rowBusy(u)} className="text-sm text-red-500 hover:underline disabled:opacity-50">
-                      <BusyLabel busy={busyKey === `del:${u.id}`} busyText="กำลังลบ…">ลบ</BusyLabel>
+                      <BusyLabel busy={busyKey === `del:${u.id}`} busyText="กำลังลบ…">{t('ลบ')}</BusyLabel>
                     </button>
                   )}
                 </td>
@@ -370,7 +373,7 @@ export default function UsersTab() {
       </div>
 
       {editUser !== undefined && (
-        <UserModal user={editUser} onClose={() => setEditUser(undefined)} onSaved={() => { setEditUser(undefined); toast.success('บันทึกผู้ใช้แล้ว'); load(); }} />
+        <UserModal user={editUser} onClose={() => setEditUser(undefined)} onSaved={() => { setEditUser(undefined); toast.success(t('บันทึกผู้ใช้แล้ว')); load(); }} />
       )}
     </div>
   );

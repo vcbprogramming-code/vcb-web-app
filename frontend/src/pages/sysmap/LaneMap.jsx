@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { pick, connMeta } from '../../lib/sysmap.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * The process map: one row per lane, boxes left to right in sequence.
@@ -11,6 +12,7 @@ import Icon from '../../components/Icon.jsx';
  * is the question people actually bring to this diagram.
  */
 export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, onSelect, filterDept, layer }) {
+  const t = useT();
   const wrapRef = useRef(null);
   const boxRefs = useRef(new Map());
   const [edges, setEdges] = useState([]);
@@ -108,7 +110,7 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
               </div>
               <div className="flex gap-3">
                 {list.length === 0 && (
-                  <span className="self-center text-xs text-slate-400">ยังไม่มีกล่องงานในเลนนี้</span>
+                  <span className="self-center text-xs text-slate-400">{t('ยังไม่มีกล่องงานในเลนนี้')}</span>
                 )}
                 {list.map((n) => {
                   const d = deptOf.get(n.dept);
@@ -131,7 +133,7 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
                         <span className="truncate text-[10px] font-medium uppercase tracking-wide text-slate-400">
                           {n.node_type === 'erp' ? (n.module || 'ERP') : 'ทำมือ'}
                         </span>
-                        {n.at_site && <Icon name="building" className="ml-auto h-3 w-3 text-slate-400" title="ทำที่หน้างาน" />}
+                        {n.at_site && <Icon name="building" className="ml-auto h-3 w-3 text-slate-400" title={t('ทำที่หน้างาน')} />}
                       </div>
                       <div className="mt-1 whitespace-pre-line text-[13px] font-semibold leading-snug text-slate-800">
                         {pick(lang, n.label_th, n.label_en)}
@@ -141,7 +143,7 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
                       )}
                       {n.unverified && (
                         <span className="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                          ยังไม่ยืนยัน
+                          {t('ยังไม่ยืนยัน')}
                         </span>
                       )}
                     </button>

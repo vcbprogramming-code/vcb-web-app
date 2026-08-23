@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useT } from '../lib/i18n.jsx';
 
 /**
  * Hand-drawn SVG charts for the E-Memo dashboard.
@@ -47,12 +48,13 @@ function Tip({ tip }) {
  * a 2px line.
  */
 export function TrendChart({ data, onPick }) {
+  const t = useT();
   const gid = useId().replace(/:/g, '');
   const [tip, setTip] = useState(null);
   const [hover, setHover] = useState(null);
   const W = 720; const H = 200; const P = { t: 12, r: 12, b: 26, l: 34 };
   const pts = data || [];
-  if (pts.length < 2) return <div className="py-10 text-center text-sm text-slate-400">ยังไม่มีข้อมูลพอจะแสดงแนวโน้ม</div>;
+  if (pts.length < 2) return <div className="py-10 text-center text-sm text-slate-400">{t('ยังไม่มีข้อมูลพอจะแสดงแนวโน้ม')}</div>;
 
   const max = Math.max(1, ...pts.map((p) => p.count));
   const x = (i) => P.l + (i * (W - P.l - P.r)) / (pts.length - 1);
@@ -66,7 +68,7 @@ export function TrendChart({ data, onPick }) {
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="แนวโน้มจำนวนเอกสารรายเดือน">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t('แนวโน้มจำนวนเอกสารรายเดือน')}>
         <defs>
           <linearGradient id={`g${gid}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={CHART.accent} stopOpacity="0.22" />
@@ -127,9 +129,10 @@ export function TrendChart({ data, onPick }) {
  * everything else recedes so the eye lands on the point, not on a rainbow.
  */
 export function BarList({ rows, onPick, unit = '', emphasisKey = null }) {
+  const t = useT();
   const [tip, setTip] = useState(null);
   const max = Math.max(1, ...rows.map((r) => r.value));
-  if (!rows.length) return <div className="py-8 text-center text-sm text-slate-400">ไม่มีข้อมูลในช่วงที่เลือก</div>;
+  if (!rows.length) return <div className="py-8 text-center text-sm text-slate-400">{t('ไม่มีข้อมูลในช่วงที่เลือก')}</div>;
   return (
     <div className="relative space-y-2.5">
       {rows.map((r) => {

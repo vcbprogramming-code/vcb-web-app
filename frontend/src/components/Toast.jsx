@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import Icon from './Icon.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const ToastContext = createContext(null);
 
@@ -20,6 +21,7 @@ const VARIANTS = {
  * the top-right and auto-dismiss. No dependencies.
  */
 export function ToastProvider({ children }) {
+  const t = useT();
   const [toasts, setToasts] = useState([]);
 
   const dismiss = useCallback((id) => setToasts((t) => t.filter((x) => x.id !== id)), []);
@@ -54,7 +56,7 @@ export function ToastProvider({ children }) {
                 <Icon name={v.icon} className="h-4 w-4" strokeWidth={2.4} />
               </span>
               <p className="flex-1 py-0.5 pr-1 text-sm text-slate-700">{t.message}</p>
-              <button onClick={() => dismiss(t.id)} className="mt-0.5 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="ปิด">
+              <button onClick={() => dismiss(t.id)} className="mt-0.5 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label={t('ปิด')}>
                 <Icon name="x" className="h-4 w-4" />
               </button>
             </div>

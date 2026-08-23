@@ -6,9 +6,11 @@ import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import ShareButton from './ShareButton.jsx';
 import ScenarioModal from './ScenarioModal.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /** Case studies: searchable list on the left, full case on the right. */
 export default function ScenariosView({ modules, module, canEdit, onChanged, sharedNo }) {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [list, setList] = useState(null);
@@ -62,14 +64,14 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
 
   const remove = async (s) => {
     const ok = await confirm({
-      title: 'ลบกรณีศึกษา',
+      title: t('ลบกรณีศึกษา'),
       message: `ลบ "${s.title_th}"?\nขั้นตอนทั้งหมดของกรณีนี้จะถูกลบด้วย`,
-      confirmLabel: 'ลบ', danger: true,
+      confirmLabel: t('ลบ'), danger: true,
     });
     if (!ok) return;
     try {
       await sopApi.deleteScenario(s.no);
-      toast.success('ลบกรณีศึกษาแล้ว');
+      toast.success(t('ลบกรณีศึกษาแล้ว'));
       if (openNo === s.no) setOpenNo(null);
       load(); onChanged?.();
     } catch (e) { toast.error(e.message); }
@@ -78,7 +80,7 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
   const move = async (s, direction) => {
     try {
       const r = await sopApi.moveScenario(s.no, direction);
-      if (r.data?.moved === false) { toast.error('อยู่ตำแหน่งสุดขอบแล้ว'); return; }
+      if (r.data?.moved === false) { toast.error(t('อยู่ตำแหน่งสุดขอบแล้ว')); return; }
       load(); setRev((n) => n + 1); // display_no shifts with the new order
     } catch (e) { toast.error(e.message); }
   };
@@ -88,23 +90,23 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[240px] flex-1">
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="ค้นหากรณีศึกษา"
-            placeholder="ค้นหาจากชื่อเรื่อง ปัญหา หรือขั้นตอน…"
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('ค้นหากรณีศึกษา')}
+            placeholder={t('ค้นหาจากชื่อเรื่อง ปัญหา หรือขั้นตอน…')}
             className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         </div>
         {canEdit && (
           <button onClick={() => setEdit(null)} className="btn-primary !py-2 !text-sm">
-            <Icon name="plus" className="h-4 w-4" /> เพิ่มกรณีศึกษา
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มกรณีศึกษา')}
           </button>
         )}
       </div>
 
       {err ? (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-          {err}<button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+          {err}<button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
         </div>
       ) : !list ? (
-        <div className="flex justify-center py-12"><Spinner label="กำลังโหลดกรณีศึกษา…" /></div>
+        <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดกรณีศึกษา…')} /></div>
       ) : list.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
           {q ? `ไม่พบกรณีศึกษาที่ตรงกับ “${q}”` : 'ยังไม่มีกรณีศึกษาในหมวดนี้'}
@@ -139,14 +141,14 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
             {openNo != null && (
               <div style={{ top: barTop }} className="sticky z-10 -mx-5 mb-3 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-5 py-2 lg:hidden">
                 <button onClick={() => setOpenNo(null)} className="inline-flex items-center gap-1 text-sm font-medium text-brand">
-                  <Icon name="arrowLeft" className="h-4 w-4" /> กลับไปที่รายการ
+                  <Icon name="arrowLeft" className="h-4 w-4" /> {t('กลับไปที่รายการ')}
                 </button>
                 {detail && (
                   <div className="flex shrink-0 items-center gap-1">
                     <ShareButton param="case" value={detail.no} />
                     {canEdit && (
                       <button onClick={() => setEdit(detail)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-brand">
-                        แก้ไข
+                        {t('แก้ไข')}
                       </button>
                     )}
                   </div>
@@ -154,9 +156,9 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
               </div>
             )}
             {openNo == null ? (
-              <p className="py-16 text-center text-sm text-slate-500">เลือกกรณีศึกษาทางซ้ายเพื่อดูรายละเอียด</p>
+              <p className="py-16 text-center text-sm text-slate-500">{t('เลือกกรณีศึกษาทางซ้ายเพื่อดูรายละเอียด')}</p>
             ) : !detail ? (
-              <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>
+              <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>
             ) : (
               <article className="space-y-4">
                 <header className="flex flex-wrap items-start justify-between gap-2">
@@ -172,14 +174,14 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
                     <ShareButton param="case" value={detail.no} />
                   {canEdit && (
                     <>
-                      <button onClick={() => move(detail, 'up')} title="เลื่อนขึ้น" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+                      <button onClick={() => move(detail, 'up')} title={t('เลื่อนขึ้น')} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
                         <Icon name="arrowLeft" className="h-4 w-4 rotate-90" />
                       </button>
-                      <button onClick={() => move(detail, 'down')} title="เลื่อนลง" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+                      <button onClick={() => move(detail, 'down')} title={t('เลื่อนลง')} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
                         <Icon name="arrowRight" className="h-4 w-4 rotate-90" />
                       </button>
-                      <button onClick={() => setEdit(detail)} className="text-sm font-medium text-brand hover:underline">แก้ไข</button>
-                      <button onClick={() => remove(detail)} className="ml-2 text-sm text-rose-500 hover:underline">ลบ</button>
+                      <button onClick={() => setEdit(detail)} className="text-sm font-medium text-brand hover:underline">{t('แก้ไข')}</button>
+                      <button onClick={() => remove(detail)} className="ml-2 text-sm text-rose-500 hover:underline">{t('ลบ')}</button>
                     </>
                   )}
                   </div>
@@ -187,14 +189,14 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
 
                 {detail.problem && (
                   <section>
-                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">ปัญหา / สถานการณ์</h4>
+                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('ปัญหา / สถานการณ์')}</h4>
                     <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{detail.problem}</p>
                   </section>
                 )}
 
                 {detail.steps?.length > 0 && (
                   <section>
-                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">แนวปฏิบัติ</h4>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('แนวปฏิบัติ')}</h4>
                     <ol className="space-y-2">
                       {detail.steps.map((st, i) => (
                         <li key={i} className={`flex gap-2 text-sm leading-relaxed text-slate-700 ${st.is_substep ? 'ml-6' : ''}`}>
@@ -211,7 +213,7 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
                     <b>[!]</b> {detail.note}
                   </p>
                 )}
-                {detail.ref && <p className="text-xs text-slate-500">อ้างอิง: {detail.ref}</p>}
+                {detail.ref && <p className="text-xs text-slate-500">{t('อ้างอิง:')} {detail.ref}</p>}
               </article>
             )}
           </div>

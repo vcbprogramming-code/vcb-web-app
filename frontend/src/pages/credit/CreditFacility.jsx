@@ -7,6 +7,7 @@ import FacilitiesTab from './FacilitiesTab.jsx';
 import LedgerTab from './LedgerTab.jsx';
 import CashPlanTab from './CashPlanTab.jsx';
 import RequestsPanel from './RequestsPanel.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const TABS = [
   { key: 'facilities', label: 'วงเงินสินเชื่อ (Facilities)' },
@@ -18,6 +19,7 @@ const TABS = [
 const LONG_TERM = ['T/L', 'L/G (BG)', 'LGM (L/G)'];
 
 function FacilityStat({ label, item }) {
+  const t = useT();
   if (!item) {
     return (
       <div className="card-sm">
@@ -39,7 +41,7 @@ function FacilityStat({ label, item }) {
           style={{ width: `${Math.min(100, item.pct)}%` }}
         />
       </div>
-      <div className="mt-1 text-[11px] text-slate-400">ใช้ไปแล้ว {item.pct}% · วงเงิน {formatMoney(item.limit)}</div>
+      <div className="mt-1 text-[11px] text-slate-400">{t('ใช้ไปแล้ว')} {item.pct}{t('% · วงเงิน')} {formatMoney(item.limit)}</div>
     </div>
   );
 }
@@ -55,6 +57,7 @@ function BucketStat({ label, bucket, accent }) {
 }
 
 export default function CreditFacility() {
+  const t = useT();
   const [tab, setTab] = useState('facilities');
   const [overview, setOverview] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -86,7 +89,7 @@ export default function CreditFacility() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="บริหารวงเงินสินเชื่อโครงการ"
+        title={t('บริหารวงเงินสินเชื่อโครงการ')}
         subtitle="ติดตามวงเงินสินเชื่อทุกโครงการ · Credit Facility Manager"
         right={
           <div className="flex items-center gap-2">
@@ -108,24 +111,24 @@ export default function CreditFacility() {
       {/* headline cards */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="card">
-          <h3 className="mb-3 font-bold text-slate-800">วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <FacilityStat label="T/L" item={byType['T/L']} />
             <FacilityStat label="L/G (BG)" item={byType['L/G (BG)']} />
           </div>
         </div>
         <div className="card">
-          <h3 className="mb-3 font-bold text-slate-800">วงเงินสินเชื่อ (วงเงินหมุนเวียน)</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('วงเงินสินเชื่อ (วงเงินหมุนเวียน)')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <FacilityStat label="B/E (AVAL)" item={byType['B/E (AVAL)']} />
             <FacilityStat label="P/N" item={byType['P/N']} />
           </div>
         </div>
         <div className="card">
-          <h3 className="mb-3 font-bold text-slate-800">ครบกำหนด</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('ครบกำหนด')}</h3>
           <div className="grid grid-cols-2 gap-3">
-            <BucketStat label="ครบกำหนด — เดือนนี้" bucket={overview?.buckets?.thisMonth} accent="text-amber-600" />
-            <BucketStat label="ครบกำหนด — เดือนหน้า" bucket={overview?.buckets?.nextMonth} />
+            <BucketStat label={t('ครบกำหนด — เดือนนี้')} bucket={overview?.buckets?.thisMonth} accent="text-amber-600" />
+            <BucketStat label={t('ครบกำหนด — เดือนหน้า')} bucket={overview?.buckets?.nextMonth} />
           </div>
           {overview?.buckets?.overdue?.count ? (
             <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -135,15 +138,15 @@ export default function CreditFacility() {
           ) : null}
         </div>
         <div className="card">
-          <h3 className="mb-3 font-bold text-slate-800">สถานะคำขอ</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('สถานะคำขอ')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="card-sm">
-              <div className="text-xs font-semibold text-slate-500">อยู่ระหว่างเสนออนุมัติ</div>
+              <div className="text-xs font-semibold text-slate-500">{t('อยู่ระหว่างเสนออนุมัติ')}</div>
               <div className="mt-1 text-xl font-bold text-slate-900">{overview?.pendingCount || 0} รายการ</div>
               <div className="mt-1 text-[11px] text-slate-400">{formatMoney(overview?.pendingAmount || 0)}</div>
             </div>
             <div className="card-sm">
-              <div className="text-xs font-semibold text-slate-500">อนุมัติแล้ว (คำขอ)</div>
+              <div className="text-xs font-semibold text-slate-500">{t('อนุมัติแล้ว (คำขอ)')}</div>
               <div className="mt-1 text-xl font-bold text-emerald-600">{overview?.approvedCount || 0} รายการ</div>
             </div>
           </div>

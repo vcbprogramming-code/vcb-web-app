@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { copyText, shareUrl } from '../../lib/copyText.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Copies a direct link to one case study or process flow.
@@ -12,6 +13,7 @@ import Icon from '../../components/Icon.jsx';
  * `param` is 'case' or 'flow'; `value` the number or id.
  */
 export default function ShareButton({ param, value, className = '' }) {
+  const t = useT();
   // 'busy' matters: when the browser's clipboard call stalls instead of
   // answering, the button would otherwise sit unchanged for seconds and the
   // reader would press it again.
@@ -29,7 +31,7 @@ export default function ShareButton({ param, value, className = '' }) {
     <button
       type="button"
       onClick={copy}
-      title="คัดลอกลิงก์มาที่รายการนี้"
+      title={t('คัดลอกลิงก์มาที่รายการนี้')}
       className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition ${
         state === 'busy'
           ? 'border-slate-200 text-slate-400'

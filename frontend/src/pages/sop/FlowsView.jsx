@@ -3,9 +3,11 @@ import { sopApi, toneOf } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
 import Swimlane from './Swimlane.jsx';
 import ShareButton from './ShareButton.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /** Process flows: pick a document on the left, read its swimlane on the right. */
 export default function FlowsView({ module, sharedId }) {
+  const t = useT();
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
   // a ?flow=ID link lands on that diagram; an id that no longer exists just
@@ -28,13 +30,13 @@ export default function FlowsView({ module, sharedId }) {
   if (err) {
     return (
       <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-        {err}<button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+        {err}<button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
       </div>
     );
   }
-  if (!list) return <div className="flex justify-center py-12"><Spinner label="กำลังโหลดผังกระบวนการ…" /></div>;
+  if (!list) return <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดผังกระบวนการ…')} /></div>;
   if (list.length === 0) {
-    return <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">ยังไม่มีผังกระบวนการในหมวดนี้</p>;
+    return <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">{t('ยังไม่มีผังกระบวนการในหมวดนี้')}</p>;
   }
 
   const flow = list.find((f) => f.id === openId) || list[0];
@@ -43,7 +45,7 @@ export default function FlowsView({ module, sharedId }) {
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,300px)_1fr]">
       {/* below xl the sidebar of 33 flows would bury the diagram — pick from a
           dropdown instead */}
-      <select value={flow.id} onChange={(e) => setOpenId(e.target.value)} aria-label="เลือกผังกระบวนการ" className="field xl:hidden">
+      <select value={flow.id} onChange={(e) => setOpenId(e.target.value)} aria-label={t('เลือกผังกระบวนการ')} className="field xl:hidden">
         {list.map((f) => <option key={f.id} value={f.id}>{f.id} · {f.title_th}</option>)}
       </select>
 

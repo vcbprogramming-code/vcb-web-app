@@ -5,6 +5,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const COLORS = ['#2563eb', '#db2777', '#9333ea', '#0891b2', '#65a30d', '#7c3aed', '#16a34a', '#ea580c', '#dc2626', '#0d9488'];
 
@@ -17,6 +18,7 @@ const emptyLetter = {
 };
 
 function ProjectModal({ project, onClose, onSaved }) {
+  const t = useT();
   const editing = Boolean(project);
   const [code, setCode] = useState(project?.code || '');
   const [name, setName] = useState(project?.name || '');
@@ -106,7 +108,7 @@ function ProjectModal({ project, onClose, onSaved }) {
       size="xl"
       footer={
         <>
-          <button type="button" onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button type="button" onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button type="submit" form="project-form" disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }
@@ -114,20 +116,20 @@ function ProjectModal({ project, onClose, onSaved }) {
         <form id="project-form" onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">รหัสโครงการ <span className="text-red-500">*</span></label>
-              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="เช่น BT1" className={field} />
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('รหัสโครงการ')} <span className="text-red-500">*</span></label>
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('เช่น BT1')} className={field} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">อักษรนำหน้าเลขเอกสาร <span className="text-red-500">*</span></label>
-              <input value={docPrefix} onChange={(e) => setDocPrefix(e.target.value)} placeholder="เช่น BT" className={field} />
+              <label className="block text-sm font-medium text-slate-600 mb-1">{t('อักษรนำหน้าเลขเอกสาร')} <span className="text-red-500">*</span></label>
+              <input value={docPrefix} onChange={(e) => setDocPrefix(e.target.value)} placeholder={t('เช่น BT')} className={field} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อโครงการ <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-600 mb-1">{t('ชื่อโครงการ')} <span className="text-red-500">*</span></label>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-2">สีประจำโครงการ</label>
+            <label className="block text-sm font-medium text-slate-600 mb-2">{t('สีประจำโครงการ')}</label>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setColor(c)}
@@ -135,70 +137,70 @@ function ProjectModal({ project, onClose, onSaved }) {
                   style={{ backgroundColor: c }} />
               ))}
             </div>
-            <div className="mt-2 text-sm text-slate-500">ตัวอย่าง: <span className="px-2 py-0.5 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: color }}>{code || 'รหัส'}</span></div>
+            <div className="mt-2 text-sm text-slate-500">{t('ตัวอย่าง:')} <span className="px-2 py-0.5 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: color }}>{code || 'รหัส'}</span></div>
           </div>
 
           {/* ── หัวจดหมายของโครงการนี้ (per-project letterhead) ── */}
           <div className="border-t border-slate-100 pt-4">
             <div className="flex items-center gap-2">
-              <h4 className="text-sm font-bold text-slate-700">หัวจดหมายของโครงการนี้</h4>
-              {lhLoading && <Spinner className="h-4 w-4" label="กำลังโหลดข้อมูล…" />}
+              <h4 className="text-sm font-bold text-slate-700">{t('หัวจดหมายของโครงการนี้')}</h4>
+              {lhLoading && <Spinner className="h-4 w-4" label={t('กำลังโหลดข้อมูล…')} />}
             </div>
-            <p className="mb-3 text-xs text-slate-400">ชื่อบริษัท/หน่วยงานและข้อมูลนี้จะแสดงบนหนังสือของโครงการนี้ (แต่ละโครงการตั้งได้ต่างกัน)</p>
+            <p className="mb-3 text-xs text-slate-400">{t('ชื่อบริษัท/หน่วยงานและข้อมูลนี้จะแสดงบนหนังสือของโครงการนี้ (แต่ละโครงการตั้งได้ต่างกัน)')}</p>
             <div className="space-y-3">
               {/* บริษัท/ตราหัวจดหมายเริ่มต้น — ล็อกตราของโครงการนี้ (#4) */}
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">หัวกระดาษเริ่มต้น (บริษัท / ตรา)</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('หัวกระดาษเริ่มต้น (บริษัท / ตรา)')}</label>
                 <select value={letter.companyId} onChange={(e) => setL('companyId', e.target.value)} className={field}>
-                  <option value="">— ใช้ค่าเริ่มต้นของระบบ —</option>
+                  <option value="">{t('— ใช้ค่าเริ่มต้นของระบบ —')}</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}{c.is_default ? ' (ค่าเริ่มต้น)' : ''}</option>
                   ))}
                 </select>
-                <p className="mt-1 text-[11px] text-slate-400">เอกสารทุกใบของโครงการนี้จะใช้หัวกระดาษนี้โดยอัตโนมัติ (ผู้สร้างเอกสารเปลี่ยนได้หากจำเป็น)</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('เอกสารทุกใบของโครงการนี้จะใช้หัวกระดาษนี้โดยอัตโนมัติ (ผู้สร้างเอกสารเปลี่ยนได้หากจำเป็น)')}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อบริษัท / หน่วยงาน (ไทย)</label>
-                <input value={letter.companyName} onChange={(e) => setL('companyName', e.target.value)} placeholder="เช่น กิจการร่วมค้า ซีวีอี" className={field} />
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('ชื่อบริษัท / หน่วยงาน (ไทย)')}</label>
+                <input value={letter.companyName} onChange={(e) => setL('companyName', e.target.value)} placeholder={t('เช่น กิจการร่วมค้า ซีวีอี')} className={field} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">ชื่อบริษัท (อังกฤษ)</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('ชื่อบริษัท (อังกฤษ)')}</label>
                 <input value={letter.companyNameEn} onChange={(e) => setL('companyNameEn', e.target.value)} className={field} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">ที่อยู่</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('ที่อยู่')}</label>
                 <textarea value={letter.address} onChange={(e) => setL('address', e.target.value)} rows={2} className={field} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">โทรศัพท์</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('โทรศัพท์')}</label>
                   <input value={letter.phone} onChange={(e) => setL('phone', e.target.value)} className={field} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">เทเล็กซ์</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('เทเล็กซ์')}</label>
                   <input value={letter.telex} onChange={(e) => setL('telex', e.target.value)} className={field} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">โทรสาร</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('โทรสาร')}</label>
                   <input value={letter.fax} onChange={(e) => setL('fax', e.target.value)} className={field} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ / ผู้ลงนาม</label>
-                  <input value={letter.signatoryName} onChange={(e) => setL('signatoryName', e.target.value)} placeholder="ชื่อผู้จัดการโครงการ" className={field} />
-                  <p className="mt-1 text-[11px] text-slate-400">ชื่อนี้จะไปอยู่ใต้ “ขอแสดงความนับถือ” ของทุกเอกสารในโครงการนี้</p>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('ผู้จัดการโครงการ / ผู้ลงนาม')}</label>
+                  <input value={letter.signatoryName} onChange={(e) => setL('signatoryName', e.target.value)} placeholder={t('ชื่อผู้จัดการโครงการ')} className={field} />
+                  <p className="mt-1 text-[11px] text-slate-400">{t('ชื่อนี้จะไปอยู่ใต้ “ขอแสดงความนับถือ” ของทุกเอกสารในโครงการนี้')}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">ตำแหน่งผู้ลงนาม</label>
-                  <input value={letter.signatoryTitle} onChange={(e) => setL('signatoryTitle', e.target.value)} placeholder="เช่น ผู้จัดการโครงการ" className={field} />
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('ตำแหน่งผู้ลงนาม')}</label>
+                  <input value={letter.signatoryTitle} onChange={(e) => setL('signatoryTitle', e.target.value)} placeholder={t('เช่น ผู้จัดการโครงการ')} className={field} />
                 </div>
               </div>
 
               {/* ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ) — auto-route approval here (#3) */}
               <div className="rounded-xl border border-blue-100 bg-blue-50/40 dark:bg-blue-500/10 p-3">
-                <label className="block text-sm font-medium text-slate-600 mb-1">ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ)</label>
-                <p className="mb-2 text-[11px] text-slate-400">เลือกบัญชีผู้ใช้ในระบบที่เป็นผู้จัดการโครงการ — เวลาสร้าง/ส่งอนุมัติเอกสารของโครงการนี้ ระบบจะส่งให้ท่านนี้อนุมัติโดยอัตโนมัติ (แก้เปลี่ยนได้ตอนส่ง)</p>
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('ผู้จัดการโครงการ (บัญชีสำหรับอนุมัติ)')}</label>
+                <p className="mb-2 text-[11px] text-slate-400">{t('เลือกบัญชีผู้ใช้ในระบบที่เป็นผู้จัดการโครงการ — เวลาสร้าง/ส่งอนุมัติเอกสารของโครงการนี้ ระบบจะส่งให้ท่านนี้อนุมัติโดยอัตโนมัติ (แก้เปลี่ยนได้ตอนส่ง)')}</p>
                 <select
                   value={letter.managerEmail}
                   onChange={(e) => {
@@ -210,11 +212,11 @@ function ProjectModal({ project, onClose, onSaved }) {
                   }}
                   className={field}
                 >
-                  <option value="">— ยังไม่กำหนด (เลือกผู้อนุมัติเองตอนส่ง) —</option>
+                  <option value="">{t('— ยังไม่กำหนด (เลือกผู้อนุมัติเองตอนส่ง) —')}</option>
                   {/* keep the saved manager visible even if that account was since
                       deactivated (listApprovers only returns active users) */}
                   {letter.managerEmail && !users.some((u) => u.email === letter.managerEmail) && (
-                    <option value={letter.managerEmail}>{letter.managerEmail} (บัญชีถูกปิดใช้งาน)</option>
+                    <option value={letter.managerEmail}>{letter.managerEmail} {t('(บัญชีถูกปิดใช้งาน)')}</option>
                   )}
                   {users.map((u) => (
                     <option key={u.email} value={u.email}>{u.full_name} ({u.email})</option>
@@ -224,17 +226,17 @@ function ProjectModal({ project, onClose, onSaved }) {
 
               {/* ลายเซ็นของผู้ลงนาม — ประทับอัตโนมัติบนทุกเอกสารของโครงการ (#6) */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/60 p-3">
-                <label className="block text-sm font-medium text-slate-600 mb-1">ลายเซ็นผู้ลงนาม (อัตโนมัติ)</label>
-                <p className="mb-2 text-[11px] text-slate-400">อัปโหลดรูปลายเซ็น (พื้นหลังโปร่งใส .png จะสวยที่สุด) — ระบบจะประทับลายเซ็นนี้ใต้ “ขอแสดงความนับถือ” ให้อัตโนมัติทุกเอกสาร ไม่ต้องรอเซ็นทีละใบ</p>
+                <label className="block text-sm font-medium text-slate-600 mb-1">{t('ลายเซ็นผู้ลงนาม (อัตโนมัติ)')}</label>
+                <p className="mb-2 text-[11px] text-slate-400">{t('อัปโหลดรูปลายเซ็น (พื้นหลังโปร่งใส .png จะสวยที่สุด) — ระบบจะประทับลายเซ็นนี้ใต้ “ขอแสดงความนับถือ” ให้อัตโนมัติทุกเอกสาร ไม่ต้องรอเซ็นทีละใบ')}</p>
                 <div className="flex items-center gap-3">
                   {(sigPreview || letter.signatureUrl) ? (
                     <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-slate-200 bg-white">
                       {sigPreview
-                        ? <img src={sigPreview} alt="ลายเซ็น" className="max-h-12 max-w-[120px] object-contain" />
-                        : <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> มีลายเซ็นแล้ว</span>}
+                        ? <img src={sigPreview} alt={t('ลายเซ็น')} className="max-h-12 max-w-[120px] object-contain" />
+                        : <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Icon name="check" className="h-3.5 w-3.5" /> {t('มีลายเซ็นแล้ว')}</span>}
                     </div>
                   ) : (
-                    <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-400">ยังไม่มี</div>
+                    <div className="flex h-14 w-32 items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-400">{t('ยังไม่มี')}</div>
                   )}
                   <div className="flex flex-col gap-1.5">
                     <label className={`btn-outline cursor-pointer ${!editing ? 'pointer-events-none opacity-50' : ''}`}>
@@ -243,19 +245,19 @@ function ProjectModal({ project, onClose, onSaved }) {
                         onChange={(e) => { uploadSignature(e.target.files?.[0]); e.target.value = ''; }} />
                     </label>
                     {(sigPreview || letter.signatureUrl) && (
-                      <button type="button" onClick={() => { setL('signatureUrl', ''); setSigPreview(null); }} className="text-xs text-red-500 hover:underline">ลบลายเซ็น</button>
+                      <button type="button" onClick={() => { setL('signatureUrl', ''); setSigPreview(null); }} className="text-xs text-red-500 hover:underline">{t('ลบลายเซ็น')}</button>
                     )}
-                    {!editing && <span className="text-[11px] text-amber-600">บันทึกโครงการก่อน จึงจะอัปโหลดลายเซ็นได้</span>}
+                    {!editing && <span className="text-[11px] text-amber-600">{t('บันทึกโครงการก่อน จึงจะอัปโหลดลายเซ็นได้')}</span>}
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">คำลงท้าย</label>
-                  <input value={letter.closingLine} onChange={(e) => setL('closingLine', e.target.value)} placeholder="ขอแสดงความนับถือ" className={field} />
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('คำลงท้าย')}</label>
+                  <input value={letter.closingLine} onChange={(e) => setL('closingLine', e.target.value)} placeholder={t('ขอแสดงความนับถือ')} className={field} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">ผู้รับเริ่มต้น (เรียน)</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">{t('ผู้รับเริ่มต้น (เรียน)')}</label>
                   <input value={letter.defaultRecipient} onChange={(e) => setL('defaultRecipient', e.target.value)} className={field} />
                 </div>
               </div>
@@ -269,6 +271,7 @@ function ProjectModal({ project, onClose, onSaved }) {
 }
 
 export default function ProjectsTab() {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [projects, setProjects] = useState([]);
@@ -283,7 +286,7 @@ export default function ProjectsTab() {
 
   const toggleActive = async (p) => {
     if (p.is_active) {
-      const ok = await confirm({ title: 'ปิดใช้งานโครงการ', message: `ปิดใช้งานโครงการ "${p.code}"?\nจะไม่แสดงให้เลือกตอนสร้างเอกสารใหม่`, confirmLabel: 'ปิดใช้งาน' });
+      const ok = await confirm({ title: t('ปิดใช้งานโครงการ'), message: `ปิดใช้งานโครงการ "${p.code}"?\nจะไม่แสดงให้เลือกตอนสร้างเอกสารใหม่`, confirmLabel: t('ปิดใช้งาน') });
       if (!ok) return;
     }
     setBusyKey(`toggle:${p.id}`);
@@ -295,7 +298,7 @@ export default function ProjectsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มโครงการ</button>
+        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มโครงการ')}</button>
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
@@ -303,19 +306,19 @@ export default function ProjectsTab() {
         <table className="tbl min-w-[720px]">
           <thead>
             <tr className="tbl-head">
-              <th className="tbl-th">โครงการ</th>
-              <th className="tbl-th">ชื่อ</th>
-              <th className="tbl-th">อักษรนำหน้า</th>
-              <th className="tbl-th">ผู้จัดการโครงการ (ผู้ลงนาม)</th>
-              <th className="tbl-th">สถานะ</th>
-              <th className="tbl-th text-right">จัดการ</th>
+              <th className="tbl-th">{t('โครงการ')}</th>
+              <th className="tbl-th">{t('ชื่อ')}</th>
+              <th className="tbl-th">{t('อักษรนำหน้า')}</th>
+              <th className="tbl-th">{t('ผู้จัดการโครงการ (ผู้ลงนาม)')}</th>
+              <th className="tbl-th">{t('สถานะ')}</th>
+              <th className="tbl-th text-right">{t('จัดการ')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">กำลังโหลด…</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">{t('กำลังโหลด…')}</td></tr>
             ) : projects.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">ยังไม่มีโครงการ — กด “เพิ่มโครงการ” เพื่อเริ่ม</td></tr>
+              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีโครงการ — กด “เพิ่มโครงการ” เพื่อเริ่ม')}</td></tr>
             ) : projects.map((p) => (
               <tr key={p.id} className="tbl-row">
                 <td className="tbl-td">
@@ -328,21 +331,21 @@ export default function ProjectsTab() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-slate-700">{p.signatory_name}</span>
                       {p.has_signature
-                        ? <span className="chip bg-emerald-50 text-emerald-700" title="ตั้งลายเซ็นแล้ว"><Icon name="check" className="h-3 w-3" /> ลายเซ็น</span>
-                        : <span className="chip bg-amber-50 text-amber-700" title="ยังไม่ได้ตั้งลายเซ็น">ยังไม่มีลายเซ็น</span>}
+                        ? <span className="chip bg-emerald-50 text-emerald-700" title={t('ตั้งลายเซ็นแล้ว')}><Icon name="check" className="h-3 w-3" /> {t('ลายเซ็น')}</span>
+                        : <span className="chip bg-amber-50 text-amber-700" title={t('ยังไม่ได้ตั้งลายเซ็น')}>{t('ยังไม่มีลายเซ็น')}</span>}
                       {p.manager_email
-                        ? <span className="chip bg-blue-50 text-blue-700" title={`อนุมัติอัตโนมัติไปที่ ${p.manager_email}`}><Icon name="check" className="h-3 w-3" /> ผูกอีเมลอนุมัติ</span>
-                        : <span className="chip bg-slate-100 text-slate-400" title="ยังไม่ผูกบัญชีสำหรับอนุมัติ">ยังไม่ผูกอีเมล</span>}
+                        ? <span className="chip bg-blue-50 text-blue-700" title={`อนุมัติอัตโนมัติไปที่ ${p.manager_email}`}><Icon name="check" className="h-3 w-3" /> {t('ผูกอีเมลอนุมัติ')}</span>
+                        : <span className="chip bg-slate-100 text-slate-400" title={t('ยังไม่ผูกบัญชีสำหรับอนุมัติ')}>{t('ยังไม่ผูกอีเมล')}</span>}
                     </div>
                   ) : (
-                    <span className="chip bg-amber-50 text-amber-700">ยังไม่ได้ตั้ง</span>
+                    <span className="chip bg-amber-50 text-amber-700">{t('ยังไม่ได้ตั้ง')}</span>
                   )}
                 </td>
                 <td className="tbl-td">
                   <span className={`chip ${p.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{p.is_active ? 'ใช้งาน' : 'ปิด'}</span>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setEdit(p)} disabled={rowBusy(p)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">แก้ไข</button>
+                  <button onClick={() => setEdit(p)} disabled={rowBusy(p)} className="text-blue-600 hover:underline text-sm mr-3 disabled:opacity-50">{t('แก้ไข')}</button>
                   <button onClick={() => toggleActive(p)} disabled={rowBusy(p)} className="text-slate-500 hover:underline text-sm disabled:opacity-50">
                     <BusyLabel busy={busyKey === `toggle:${p.id}`} busyText="กำลังบันทึก…">{p.is_active ? 'ปิด' : 'เปิด'}</BusyLabel>
                   </button>
@@ -354,7 +357,7 @@ export default function ProjectsTab() {
       </div>
 
       {edit !== undefined && (
-        <ProjectModal project={edit} onClose={() => setEdit(undefined)} onSaved={() => { setEdit(undefined); toast.success('บันทึกโครงการแล้ว'); load(); }} />
+        <ProjectModal project={edit} onClose={() => setEdit(undefined)} onSaved={() => { setEdit(undefined); toast.success(t('บันทึกโครงการแล้ว')); load(); }} />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import Picker from './Picker.jsx';
 import EmployeesPanel from './EmployeesPanel.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 // Add n days to a YYYY-MM-DD string. Built purely in UTC so it never shifts a
@@ -27,6 +28,7 @@ const dnum = (iso) => Number(iso.slice(8, 10));
  *    + optional 2nd task (pm). Click a slot → Picker. Autosaves per field.
  */
 export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) {
+  const t = useT();
   const toast = useToast();
   const [base, setBase] = useState(null);   // SiteMonth from server
   const [entries, setEntries] = useState({});
@@ -113,9 +115,9 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
     setMode('week');
   };
 
-  if (loading) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลดข้อมูลไซต์งาน…" /></div>;
+  if (loading) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดข้อมูลไซต์งาน…')} /></div>;
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!siteKey) return <div className="card text-center text-sm text-slate-400">เลือกไซต์งานด้านบนเพื่อเริ่มบันทึก</div>;
+  if (!siteKey) return <div className="card text-center text-sm text-slate-400">{t('เลือกไซต์งานด้านบนเพื่อเริ่มบันทึก')}</div>;
   if (!base) return null;
 
   const { today, lockDays, days } = base;
@@ -142,18 +144,18 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
         </div>
         {canEdit && (
           <button onClick={() => setShowEmp(true)} className="btn-outline !py-1.5 !text-sm">
-            <Icon name="people" className="h-4 w-4" /> จัดการพนักงาน
+            <Icon name="people" className="h-4 w-4" /> {t('จัดการพนักงาน')}
           </button>
         )}
         {flash && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">{flash}</span>}
-        {!canEdit && <span className="text-xs text-slate-400">· โหมดดูอย่างเดียว</span>}
+        {!canEdit && <span className="text-xs text-slate-400">{t('· โหมดดูอย่างเดียว')}</span>}
       </div>
 
       {base.employees.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 py-12 text-center">
           <Icon name="people" className="h-8 w-8 text-slate-300" />
-          <p className="text-sm text-slate-500">ยังไม่มีพนักงานในไซต์นี้</p>
-          {canEdit && <button onClick={() => setShowEmp(true)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มพนักงาน</button>}
+          <p className="text-sm text-slate-500">{t('ยังไม่มีพนักงานในไซต์นี้')}</p>
+          {canEdit && <button onClick={() => setShowEmp(true)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มพนักงาน')}</button>}
         </div>
       ) : mode === 'coverage'
         ? <Coverage d={d} today={today} cutoff={cutoff} ahead={ahead} lockDays={lockDays} jump={jump} ccodes={ccodes} cellTitle={cellTitle} />
@@ -173,6 +175,7 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
 
 // ── Coverage: per-day % strip + employee×day heatmap ─────────────────────────
 function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }) {
+  const t = useT();
   const perDay = {};
   d.days.forEach((day) => { perDay[day.date] = { f: 0, t: 0 }; });
   d.employees.forEach((e) => {
@@ -217,7 +220,7 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
         <table className="border-separate" style={{ borderSpacing: '2px' }}>
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-white px-2 text-left text-xs font-semibold text-slate-500">พนักงาน ({d.employees.length})</th>
+              <th className="sticky left-0 z-10 bg-white px-2 text-left text-xs font-semibold text-slate-500">{t('พนักงาน (')}{d.employees.length})</th>
               {d.days.map((day) => (
                 <th key={day.date} className={`w-7 text-center text-[10px] font-semibold ${day.weekend ? 'text-amber-600' : 'text-slate-400'} ${day.date === today ? 'text-brand' : ''}`}>
                   {dnum(day.date)}
@@ -263,13 +266,14 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-400">คลิกเซลล์เพื่อกระโดดไปแก้พนักงาน/วันนั้นในมุมมองสัปดาห์</p>
+      <p className="mt-2 text-[11px] text-slate-400">{t('คลิกเซลล์เพื่อกระโดดไปแก้พนักงาน/วันนั้นในมุมมองสัปดาห์')}</p>
     </div>
   );
 }
 
 // ── Weekly: 7-day grid, each cell has primary + 2nd (pm) slot ─────────────────
 function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, focus, canEdit, isAdmin, openPicker, cellDisplay, cellTitle }) {
+  const t = useT();
   const start = Math.min(Math.max(0, weekStart), Math.max(0, d.days.length - 1));
   const count = Math.min(7, d.days.length - start);
   const visible = d.days.slice(start, start + count);
@@ -297,14 +301,14 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
     <div className="card !p-3">
       <div className="mb-2 flex items-center gap-2">
         <button onClick={() => setWeekStart(Math.max(0, start - 7))} disabled={start <= 0} className="btn-outline !px-2 !py-1 disabled:opacity-40"><Icon name="arrowLeft" className="h-4 w-4" /></button>
-        <span className="text-sm font-semibold text-slate-700">วันที่ {wkLabel}</span>
+        <span className="text-sm font-semibold text-slate-700">{t('วันที่')} {wkLabel}</span>
         <button onClick={() => setWeekStart(Math.min(Math.max(0, d.days.length - 1), start + 7))} disabled={start + 7 >= d.days.length} className="btn-outline !px-2 !py-1 disabled:opacity-40"><Icon name="arrowRight" className="h-4 w-4" /></button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-separate" style={{ borderSpacing: '3px' }}>
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-white px-2 text-left text-xs font-semibold text-slate-500">พนักงาน ({d.employees.length})</th>
+              <th className="sticky left-0 z-10 bg-white px-2 text-left text-xs font-semibold text-slate-500">{t('พนักงาน (')}{d.employees.length})</th>
               {visible.map((day) => (
                 <th key={day.date} className={`min-w-[92px] rounded-t px-1 py-1 text-center text-xs ${day.weekend ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-600'} ${day.date === today ? 'ring-1 ring-brand' : ''}`}>
                   {dnum(day.date)} <span className="text-[10px] font-normal">{DOW[day.dow]}</span>
@@ -344,7 +348,7 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-400">คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · เซลล์ที่เกิน {lockDays} วันจะล็อกอัตโนมัติ</p>
+      <p className="mt-2 text-[11px] text-slate-400">{t('คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · เซลล์ที่เกิน')} {lockDays} {t('วันจะล็อกอัตโนมัติ')}</p>
     </div>
   );
 }

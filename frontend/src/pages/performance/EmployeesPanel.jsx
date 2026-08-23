@@ -5,6 +5,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Manage the employee roster for one site — add / edit / activate. Employees are
@@ -12,6 +13,7 @@ import Icon from '../../components/Icon.jsx';
  * HR can log work. Opened from the Entry screen.
  */
 export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }) {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [list, setList] = useState(null);
@@ -26,66 +28,66 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
 
   const add = async (e) => {
     e.preventDefault();
-    if (!form.fullName.trim()) { toast.error('กรุณากรอกชื่อพนักงาน'); return; }
+    if (!form.fullName.trim()) { toast.error(t('กรุณากรอกชื่อพนักงาน')); return; }
     setBusy(true);
     try {
       await perfApi.createEmployee({ site: siteKey, fullName: form.fullName.trim(), employeeCode: form.employeeCode.trim() || null, kind: form.kind });
       setForm({ fullName: '', employeeCode: '', kind: form.kind });
-      setDirty(true); toast.success('เพิ่มพนักงานแล้ว'); await load();
+      setDirty(true); toast.success(t('เพิ่มพนักงานแล้ว')); await load();
     } catch (e2) { toast.error(e2.message); } finally { setBusy(false); }
   };
   const toggleKind = async (emp) => {
     setRowBusy(emp.eid);
-    try { await perfApi.updateEmployee(emp.eid, { kind: emp.kind === 'operation' ? 'support' : 'operation' }); setDirty(true); toast.success('เปลี่ยนประเภทพนักงานแล้ว'); await load(); }
+    try { await perfApi.updateEmployee(emp.eid, { kind: emp.kind === 'operation' ? 'support' : 'operation' }); setDirty(true); toast.success(t('เปลี่ยนประเภทพนักงานแล้ว')); await load(); }
     catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
   };
   const toggleActive = async (emp) => {
     const ok = await confirm({
-      title: 'ปิดใช้งานพนักงาน',
+      title: t('ปิดใช้งานพนักงาน'),
       message: `ปิดใช้งาน "${emp.name}"?\nจะไม่ปรากฏในตารางบันทึกงานอีก (ข้อมูลเดิมยังอยู่)`,
-      confirmLabel: 'ปิดใช้งาน', danger: true,
+      confirmLabel: t('ปิดใช้งาน'), danger: true,
     });
     if (!ok) return;
     setRowBusy(emp.eid);
-    try { await perfApi.updateEmployee(emp.eid, { isActive: false }); setDirty(true); toast.success('ปิดใช้งานพนักงานแล้ว'); await load(); }
+    try { await perfApi.updateEmployee(emp.eid, { isActive: false }); setDirty(true); toast.success(t('ปิดใช้งานพนักงานแล้ว')); await load(); }
     catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
   };
 
   const field = 'field';
   return (
     <Modal title={`จัดการพนักงาน · ${siteName || ''}`} onClose={() => { onClose(); if (dirty) onChanged?.(); }} size="2xl"
-      footer={<button onClick={() => { onClose(); if (dirty) onChanged?.(); }} className="btn-primary">เสร็จสิ้น</button>}>
+      footer={<button onClick={() => { onClose(); if (dirty) onChanged?.(); }} className="btn-primary">{t('เสร็จสิ้น')}</button>}>
       {/* add form */}
       <form onSubmit={add} className="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_120px_140px_auto]">
-        <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} placeholder="ชื่อ-นามสกุล" className={field} />
-        <input value={form.employeeCode} onChange={(e) => setForm((f) => ({ ...f, employeeCode: e.target.value }))} placeholder="รหัส (ถ้ามี)" className={field} />
+        <input value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} placeholder={t('ชื่อ-นามสกุล')} className={field} />
+        <input value={form.employeeCode} onChange={(e) => setForm((f) => ({ ...f, employeeCode: e.target.value }))} placeholder={t('รหัส (ถ้ามี)')} className={field} />
         <select value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} className={field}>
-          <option value="operation">สายปฏิบัติการ</option>
-          <option value="support">สายสนับสนุน</option>
+          <option value="operation">{t('สายปฏิบัติการ')}</option>
+          <option value="support">{t('สายสนับสนุน')}</option>
         </select>
-        <button type="submit" disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังเพิ่ม…"><Icon name="plus" className="h-4 w-4" /> เพิ่ม</BusyLabel></button>
+        <button type="submit" disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังเพิ่ม…"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่ม')}</BusyLabel></button>
       </form>
 
       {error ? <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        : !list ? <div className="flex justify-center py-10"><Spinner label="กำลังโหลด…" /></div>
-        : list.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">ยังไม่มีพนักงานในไซต์นี้ — เพิ่มด้านบนได้เลย</p>
+        : !list ? <div className="flex justify-center py-10"><Spinner label={t('กำลังโหลด…')} /></div>
+        : list.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">{t('ยังไม่มีพนักงานในไซต์นี้ — เพิ่มด้านบนได้เลย')}</p>
         : (
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="tbl min-w-[440px]">
-              <thead><tr className="tbl-head"><th className="tbl-th">ชื่อ</th><th className="tbl-th">รหัส</th><th className="tbl-th">ประเภท</th><th className="tbl-th text-right">จัดการ</th></tr></thead>
+              <thead><tr className="tbl-head"><th className="tbl-th">{t('ชื่อ')}</th><th className="tbl-th">{t('รหัส')}</th><th className="tbl-th">{t('ประเภท')}</th><th className="tbl-th text-right">{t('จัดการ')}</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {list.map((e) => (
                   <tr key={e.eid} className="tbl-row">
                     <td className="tbl-td font-medium text-slate-800">{e.name}</td>
                     <td className="tbl-td text-slate-500">{e.emp_id || '—'}</td>
                     <td className="tbl-td">
-                      <button onClick={() => toggleKind(e)} disabled={rowBusy === e.eid} title="สลับประเภท" className={`chip disabled:opacity-50 ${e.kind === 'operation' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}`}>
+                      <button onClick={() => toggleKind(e)} disabled={rowBusy === e.eid} title={t('สลับประเภท')} className={`chip disabled:opacity-50 ${e.kind === 'operation' ? 'bg-sky-50 text-sky-700' : 'bg-violet-50 text-violet-700'}`}>
                         {e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'} ⇄
                       </button>
                     </td>
                     <td className="tbl-td text-right">
                       <button onClick={() => toggleActive(e)} disabled={rowBusy === e.eid} className="text-sm text-red-500 hover:underline disabled:opacity-50">
-                        <BusyLabel busy={rowBusy === e.eid} busyText="…">ปิดใช้งาน</BusyLabel>
+                        <BusyLabel busy={rowBusy === e.eid} busyText="…">{t('ปิดใช้งาน')}</BusyLabel>
                       </button>
                     </td>
                   </tr>

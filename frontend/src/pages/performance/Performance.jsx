@@ -10,12 +10,14 @@ import WorkIndex from './WorkIndex.jsx';
 import SettingsView from './SettingsView.jsx';
 import LeaveView from './LeaveView.jsx';
 import LeaveApprovers from './LeaveApprovers.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const monthLabel = ({ y, m }) => `${THAI_MONTHS[m - 1]} ${y + 543}`;
 const shift = ({ y, m }, delta) => { const d = new Date(y, m - 1 + delta, 1); return { y: d.getFullYear(), m: d.getMonth() + 1 }; };
 
 export default function Performance() {
+  const t = useT();
   const now = new Date();
   const toast = useToast();
   const [boot, setBoot] = useState(null);
@@ -53,14 +55,14 @@ export default function Performance() {
   }, []);
 
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!boot) return <div className="flex justify-center py-16"><Spinner label="กำลังโหลด…" /></div>;
+  if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const tabs = [
-    { key: 'dashboard', label: 'ภาพรวม', show: true },
-    { key: 'entry', label: 'ลงบันทึกรายวัน', show: boot.canEntry },
-    { key: 'leave', label: 'การลา', show: true },
-    { key: 'index', label: 'ทะเบียนงาน', show: boot.isAdmin },
-    { key: 'settings', label: 'ตั้งค่า', show: boot.isAdmin },
+    { key: 'dashboard', label: t('ภาพรวม'), show: true },
+    { key: 'entry', label: t('ลงบันทึกรายวัน'), show: boot.canEntry },
+    { key: 'leave', label: t('การลา'), show: true },
+    { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
+    { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
   ].filter((t) => t.show);
 
   return (
@@ -69,14 +71,14 @@ export default function Performance() {
           not a clock-in system and carries no OT — the old wording ("การลงเวลา …
           ตารางเวลาทำงาน") promised both. */}
       <PageHeader
-        title="บันทึกงานฝ่ายบุคคล"
+        title={t('บันทึกงานฝ่ายบุคคล')}
         subtitle="บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน"
         right={
           <div className="flex items-center gap-2">
             {/* icon-only: the month they move to has to be readable, not guessable */}
-            <button onClick={() => setCur(shift(cur, -1))} aria-label="เดือนก่อนหน้า" title="เดือนก่อนหน้า" className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, -1))} aria-label={t('เดือนก่อนหน้า')} title={t('เดือนก่อนหน้า')} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
             <span className="chip bg-brand/10 text-brand min-w-[130px] justify-center">{monthLabel(cur)}</span>
-            <button onClick={() => setCur(shift(cur, 1))} aria-label="เดือนถัดไป" title="เดือนถัดไป" className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, 1))} aria-label={t('เดือนถัดไป')} title={t('เดือนถัดไป')} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
           </div>
         }
       />
@@ -95,14 +97,14 @@ export default function Performance() {
         {(view === 'entry' || view === 'leave') && boot.sites.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             {view === 'entry' && (
-              <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
-                <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> ส่งออก Excel</BusyLabel>
+              <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title={t('ส่งออกเป็น Excel')}>
+                <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> {t('ส่งออก Excel')}</BusyLabel>
               </button>
             )}
             {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
                 with no bg class the control kept the browser's white default while
                 its text was lifted to near-white (unreadable). */}
-            <select aria-label="เลือกไซต์งาน" value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
+            <select aria-label={t('เลือกไซต์งาน')} value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
               {boot.sites.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
             </select>
@@ -116,7 +118,7 @@ export default function Performance() {
 
       {view === 'entry' && (
         boot.sites.length === 0
-          ? <div className="card text-center text-sm text-slate-400">ยังไม่มีไซต์งานในขอบเขตของคุณ</div>
+          ? <div className="card text-center text-sm text-slate-400">{t('ยังไม่มีไซต์งานในขอบเขตของคุณ')}</div>
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
 

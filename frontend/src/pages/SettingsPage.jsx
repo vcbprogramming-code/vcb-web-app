@@ -11,6 +11,7 @@ import CompaniesTab from './admin/CompaniesTab.jsx';
 import DocTypesTab from './admin/DocTypesTab.jsx';
 import DocCodeApproversTab from './admin/DocCodeApproversTab.jsx';
 import MySignatureTab from './settings/MySignatureTab.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 /**
  * One settings page.
@@ -54,6 +55,7 @@ const GROUPS = [
 ];
 
 export default function SettingsPage() {
+  const t = useT();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const [sp, setSp] = useSearchParams();
@@ -81,7 +83,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="ตั้งค่า"
+        title={t('ตั้งค่า')}
         subtitle={isAdmin
           ? 'ตั้งค่าทั้งหมดของระบบและโมดูล E-Memo รวมอยู่ที่นี่ที่เดียว'
           : 'ตั้งค่าโปรไฟล์และลายเซ็นที่จะแสดงในเอกสารของท่าน'}

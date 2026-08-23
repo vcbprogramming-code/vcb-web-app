@@ -5,6 +5,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import { Modal } from '../../components/ui/index.js';
 import { BusyLabel } from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const LEVELS = { info: 'ทั่วไป', warning: 'เตือน', success: 'สำเร็จ' };
 // explicit dark variants: the global .dark remaps recolour the *backgrounds* but
@@ -17,6 +18,7 @@ const LEVEL_CHIP = {
 const field = 'field';
 
 function AnnouncementModal({ item, onClose, onSaved }) {
+  const t = useT();
   const toast = useToast();
   const editing = item && item.id;
   const [form, setForm] = useState({
@@ -28,7 +30,7 @@ function AnnouncementModal({ item, onClose, onSaved }) {
 
   const save = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) { toast.error('กรุณากรอกหัวข้อ'); return; }
+    if (!form.title.trim()) { toast.error(t('กรุณากรอกหัวข้อ')); return; }
     setBusy(true);
     try {
       const body = { title: form.title.trim(), body: form.body.trim() || null, level: form.level, isActive: form.isActive, pinned: form.pinned };
@@ -44,28 +46,28 @@ function AnnouncementModal({ item, onClose, onSaved }) {
   return (
     <Modal title={editing ? 'แก้ไขประกาศ' : 'เพิ่มประกาศ'} onClose={onClose} size="lg"
       footer={<>
-        <button onClick={onClose} className="btn-outline">ยกเลิก</button>
-        <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">บันทึก</BusyLabel></button>
+        <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
+        <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button>
       </>}>
       <form onSubmit={save} className="space-y-3">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">หัวข้อ *</label>
-          <input value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="เช่น ปิดปรับปรุงระบบ" className={field} />
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('หัวข้อ *')}</label>
+          <input value={form.title} onChange={(e) => set('title', e.target.value)} placeholder={t('เช่น ปิดปรับปรุงระบบ')} className={field} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">รายละเอียด</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('รายละเอียด')}</label>
           <textarea value={form.body} onChange={(e) => set('body', e.target.value)} rows={3} className={`${field} resize-none`} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ระดับ</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ระดับ')}</label>
             <select value={form.level} onChange={(e) => set('level', e.target.value)} className={field}>
               {Object.entries(LEVELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div className="flex items-end gap-4 pb-1">
-            <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} /> แสดงผล</label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={form.pinned} onChange={(e) => set('pinned', e.target.checked)} /> ปักหมุด</label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={form.isActive} onChange={(e) => set('isActive', e.target.checked)} /> {t('แสดงผล')}</label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={form.pinned} onChange={(e) => set('pinned', e.target.checked)} /> {t('ปักหมุด')}</label>
           </div>
         </div>
       </form>
@@ -74,6 +76,7 @@ function AnnouncementModal({ item, onClose, onSaved }) {
 }
 
 export default function AnnouncementsTab() {
+  const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [list, setList] = useState(null);
@@ -86,8 +89,8 @@ export default function AnnouncementsTab() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const remove = async (a) => {
-    if (!(await confirm({ title: 'ลบประกาศ', message: `ลบ "${a.title}" หรือไม่?`, confirmLabel: 'ลบ', danger: true }))) return;
-    try { await portalApi.deleteAnnouncement(a.id); toast.success('ลบแล้ว'); load(); } catch (e) { toast.error(e.message); }
+    if (!(await confirm({ title: t('ลบประกาศ'), message: `ลบ "${a.title}" หรือไม่?`, confirmLabel: t('ลบ'), danger: true }))) return;
+    try { await portalApi.deleteAnnouncement(a.id); toast.success(t('ลบแล้ว')); load(); } catch (e) { toast.error(e.message); }
   };
   const toggleActive = async (a) => {
     try {
@@ -100,20 +103,20 @@ export default function AnnouncementsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มประกาศ</button>
+        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มประกาศ')}</button>
       </div>
 
       {loadErr ? (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
           {loadErr}
-          <button onClick={load} className="ml-2 font-semibold underline">ลองใหม่</button>
+          <button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
         </div>
-      ) : !list ? <div className="py-10 text-center text-sm text-slate-500">กำลังโหลด…</div>
-        : list.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">ยังไม่มีประกาศ — กด “เพิ่มประกาศ”</div>
+      ) : !list ? <div className="py-10 text-center text-sm text-slate-500">{t('กำลังโหลด…')}</div>
+        : list.length === 0 ? <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">{t('ยังไม่มีประกาศ — กด “เพิ่มประกาศ”')}</div>
         : (
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="tbl min-w-[560px]">
-              <thead><tr className="tbl-head"><th className="tbl-th">หัวข้อ</th><th className="tbl-th">ระดับ</th><th className="tbl-th">สถานะ</th><th className="tbl-th text-right">จัดการ</th></tr></thead>
+              <thead><tr className="tbl-head"><th className="tbl-th">{t('หัวข้อ')}</th><th className="tbl-th">{t('ระดับ')}</th><th className="tbl-th">{t('สถานะ')}</th><th className="tbl-th text-right">{t('จัดการ')}</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {list.map((a) => (
                   <tr key={a.id} className="tbl-row">
@@ -125,14 +128,14 @@ export default function AnnouncementsTab() {
                     </td>
                     <td className="tbl-td"><span className={`chip ${LEVEL_CHIP[a.level] || LEVEL_CHIP.info}`}>{LEVELS[a.level] || a.level}</span></td>
                     <td className="tbl-td">
-                      <button onClick={() => toggleActive(a)} title="สลับการแสดงผล"
+                      <button onClick={() => toggleActive(a)} title={t('สลับการแสดงผล')}
                         className={`chip inline-flex items-center gap-1 ${a.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200' : 'bg-slate-100 text-slate-500'}`}>
                         {a.is_active ? 'แสดง' : 'ซ่อน'} <Icon name="undo" className="h-3 w-3" />
                       </button>
                     </td>
                     <td className="tbl-td text-right">
-                      <button onClick={() => setEdit(a)} className="mr-3 text-sm text-brand hover:underline">แก้ไข</button>
-                      <button onClick={() => remove(a)} className="text-sm text-rose-500 hover:underline">ลบ</button>
+                      <button onClick={() => setEdit(a)} className="mr-3 text-sm text-brand hover:underline">{t('แก้ไข')}</button>
+                      <button onClick={() => remove(a)} className="text-sm text-rose-500 hover:underline">{t('ลบ')}</button>
                     </td>
                   </tr>
                 ))}

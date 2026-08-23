@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { creditApi, formatMoney } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const TYPES = ['L/G (BG)', 'LGM (L/G)', 'T/L', 'B/E (AVAL)', 'P/N'];
 const TYPE_CHIP = {
@@ -13,6 +14,7 @@ const TYPE_CHIP = {
 };
 
 function FacilityModal({ facility, projects, onClose, onSaved }) {
+  const t = useT();
   const editing = Boolean(facility);
   const [form, setForm] = useState({
     projectId: facility?.project_id || projects[0]?.id || '',
@@ -64,7 +66,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
       size="2xl"
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }
@@ -72,13 +74,13 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">โครงการ <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('โครงการ')} <span className="text-red-500">*</span></label>
             <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field">
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ประเภทวงเงิน <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทวงเงิน')} <span className="text-red-500">*</span></label>
             <select value={form.type} onChange={(e) => set('type', e.target.value)} className="field">
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
@@ -86,42 +88,42 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">บริษัท</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('บริษัท')}</label>
             <input value={form.company} onChange={(e) => set('company', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ธนาคาร</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ธนาคาร')}</label>
             <input value={form.bank} onChange={(e) => set('bank', e.target.value)} className="field" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">เลขที่วงเงิน</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เลขที่วงเงิน')}</label>
             <input value={form.facilityNo} onChange={(e) => set('facilityNo', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">อัตราดอกเบี้ย (%/ปี)</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อัตราดอกเบี้ย (%/ปี)')}</label>
             <input type="number" step="0.01" value={form.interestRate} onChange={(e) => set('interestRate', e.target.value)} className="field" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วงเงินที่อนุมัติ <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วงเงินที่อนุมัติ')} <span className="text-red-500">*</span></label>
             <input type="number" value={form.limit} onChange={(e) => set('limit', e.target.value)} className="field" />
           </div>
           {!editing && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">ยอดใช้ไปเริ่มต้น (baseline)</label>
+              <label className="mb-1 block text-sm font-medium text-slate-600">{t('ยอดใช้ไปเริ่มต้น (baseline)')}</label>
               <input type="number" value={form.usedBaseline} onChange={(e) => set('usedBaseline', e.target.value)} className="field" />
             </div>
           )}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วันครบกำหนด</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันครบกำหนด')}</label>
             <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">หมายเหตุ</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมายเหตุ')}</label>
           <input value={form.notes} onChange={(e) => set('notes', e.target.value)} className="field" />
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
@@ -131,6 +133,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
 }
 
 function DrawdownModal({ facility, onClose, onSaved }) {
+  const t = useT();
   const [form, setForm] = useState({ amount: '', startDate: '', dueDate: '', ref: '', note: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -164,29 +167,29 @@ function DrawdownModal({ facility, onClose, onSaved }) {
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">จำนวนเงิน <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('จำนวนเงิน')} <span className="text-red-500">*</span></label>
           <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วันเริ่ม</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันเริ่ม')}</label>
             <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ครบกำหนด</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ครบกำหนด')}</label>
             <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">อ้างอิง / หมายเหตุ</label>
-          <input value={form.ref} onChange={(e) => set('ref', e.target.value)} className="field" placeholder="เลขที่เอกสาร / อ้างอิง" />
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('อ้างอิง / หมายเหตุ')}</label>
+          <input value={form.ref} onChange={(e) => set('ref', e.target.value)} className="field" placeholder={t('เลขที่เอกสาร / อ้างอิง')} />
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
       </form>
@@ -195,6 +198,7 @@ function DrawdownModal({ facility, onClose, onSaved }) {
 }
 
 export default function FacilitiesTab({ projects, onChanged }) {
+  const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
@@ -219,18 +223,18 @@ export default function FacilitiesTab({ projects, onChanged }) {
       {/* filters */}
       <div className="flex flex-wrap items-center gap-3">
         <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="field !w-auto">
-          <option value="">ทุกโครงการ</option>
+          <option value="">{t('ทุกโครงการ')}</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="field !w-auto">
-          <option value="">ทุกประเภท</option>
+          <option value="">{t('ทุกประเภท')}</option>
           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <div className="relative min-w-[200px] flex-1">
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหา ธนาคาร / เลขที่วงเงิน" className="field pl-9" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('ค้นหา ธนาคาร / เลขที่วงเงิน')} className="field pl-9" />
         </div>
-        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มวงเงิน</button>
+        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มวงเงิน')}</button>
       </div>
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
@@ -240,18 +244,18 @@ export default function FacilitiesTab({ projects, onChanged }) {
           <thead>
             <tr className="tbl-head">
               <th className="tbl-th w-10">#</th>
-              <th className="tbl-th">โครงการ</th>
-              <th className="tbl-th">ประเภท</th>
-              <th className="tbl-th text-right">วงเงิน</th>
-              <th className="tbl-th text-right">ใช้ไป</th>
-              <th className="tbl-th text-right">คงเหลือ</th>
-              <th className="tbl-th w-40">การใช้</th>
-              <th className="tbl-th text-right">จัดการ</th>
+              <th className="tbl-th">{t('โครงการ')}</th>
+              <th className="tbl-th">{t('ประเภท')}</th>
+              <th className="tbl-th text-right">{t('วงเงิน')}</th>
+              <th className="tbl-th text-right">{t('ใช้ไป')}</th>
+              <th className="tbl-th text-right">{t('คงเหลือ')}</th>
+              <th className="tbl-th w-40">{t('การใช้')}</th>
+              <th className="tbl-th text-right">{t('จัดการ')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {facilities.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">ยังไม่มีวงเงินสินเชื่อ</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีวงเงินสินเชื่อ')}</td></tr>
             ) : facilities.map((f, i) => (
               <tr key={f.id} className="tbl-row">
                 <td className="tbl-td text-slate-400">{i + 1}</td>
@@ -278,7 +282,7 @@ export default function FacilitiesTab({ projects, onChanged }) {
                   <div className="mt-0.5 text-[11px] text-slate-400">{f.pct}%</div>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setDrawdown(f)} className="mr-2 text-sm text-brand hover:underline">เบิกใช้</button>
+                  <button onClick={() => setDrawdown(f)} className="mr-2 text-sm text-brand hover:underline">{t('เบิกใช้')}</button>
                   <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700"><Icon name="edit" className="inline h-4 w-4" /></button>
                 </td>
               </tr>

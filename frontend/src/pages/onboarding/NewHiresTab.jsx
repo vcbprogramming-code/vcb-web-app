@@ -4,6 +4,7 @@ import { formatThaiDate } from '../../lib/ememo.js';
 import { Modal, Avatar } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import JourneyDetail from './JourneyDetail.jsx';
+import { useT } from '../../lib/i18n.jsx';
 
 const STATUS_CHIP = {
   active: 'bg-blue-50 text-blue-700',
@@ -13,6 +14,7 @@ const STATUS_CHIP = {
 const STATUS_LABEL = { active: 'กำลังติดตาม', completed: 'ผ่านทดลองงาน', left: 'พ้นสภาพ' };
 
 function AddHireModal({ onClose, onSaved }) {
+  const t = useT();
   const [form, setForm] = useState({ fullName: '', position: '', startDate: new Date().toISOString().slice(0, 10), email: '', phone: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -34,39 +36,39 @@ function AddHireModal({ onClose, onSaved }) {
 
   return (
     <Modal
-      title="เพิ่มพนักงานใหม่"
+      title={t('เพิ่มพนักงานใหม่')}
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} className="btn-outline">ยกเลิก</button>
+          <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
           <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'สร้างแผนติดตาม'}</button>
         </>
       }
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-นามสกุล <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อ-นามสกุล')} <span className="text-red-500">*</span></label>
           <input value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className="field" required />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">ตำแหน่ง</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ตำแหน่ง')}</label>
             <input value={form.position} onChange={(e) => set('position', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">วันเริ่มงาน <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันเริ่มงาน')} <span className="text-red-500">*</span></label>
             <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">อีเมล</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อีเมล')}</label>
             <input value={form.email} onChange={(e) => set('email', e.target.value)} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">เบอร์โทร</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เบอร์โทร')}</label>
             <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="field" />
           </div>
         </div>
-        <p className="text-xs text-slate-400">แผนงาน 30-60-90 วันจะถูกสร้างจากเทมเพลตที่ใช้งานอยู่ให้อัตโนมัติ</p>
+        <p className="text-xs text-slate-400">{t('แผนงาน 30-60-90 วันจะถูกสร้างจากเทมเพลตที่ใช้งานอยู่ให้อัตโนมัติ')}</p>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
       </form>
     </Modal>
@@ -74,6 +76,7 @@ function AddHireModal({ onClose, onSaved }) {
 }
 
 export default function NewHiresTab() {
+  const t = useT();
   const [journeys, setJourneys] = useState([]);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -91,12 +94,12 @@ export default function NewHiresTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setAdding(true)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> เพิ่มพนักงานใหม่</button>
+        <button onClick={() => setAdding(true)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มพนักงานใหม่')}</button>
       </div>
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       {journeys.length === 0 ? (
-        <div className="card text-center text-slate-400">ยังไม่มีพนักงานใหม่ในระบบติดตาม</div>
+        <div className="card text-center text-slate-400">{t('ยังไม่มีพนักงานใหม่ในระบบติดตาม')}</div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {journeys.map((j) => (
@@ -111,14 +114,14 @@ export default function NewHiresTab() {
               </div>
               <div className="mt-4">
                 <div className="mb-1 flex justify-between text-xs text-slate-400">
-                  <span>ความคืบหน้า {j.tasks_done}/{j.tasks_total}</span>
+                  <span>{t('ความคืบหน้า')} {j.tasks_done}/{j.tasks_total}</span>
                   <span>{j.progress}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-brand" style={{ width: `${j.progress}%` }} />
                 </div>
               </div>
-              <div className="mt-3 text-[11px] text-slate-400">เริ่มงาน {formatThaiDate(j.start_date)}</div>
+              <div className="mt-3 text-[11px] text-slate-400">{t('เริ่มงาน')} {formatThaiDate(j.start_date)}</div>
             </button>
           ))}
         </div>

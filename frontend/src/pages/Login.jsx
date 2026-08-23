@@ -6,6 +6,7 @@ import Icon from '../components/Icon.jsx';
 import Spinner from '../components/Spinner.jsx';
 import GlowOrb from '../components/GlowOrb.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -30,6 +31,7 @@ function loadGis() {
 }
 
 export default function Login() {
+  const t = useT();
   const { login, loginWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -155,7 +157,7 @@ export default function Login() {
           <h1 className="cyber-title text-2xl font-extrabold tracking-wide text-white">
             VCB <span className="text-cyan-300 drop-shadow-[0_0_16px_rgba(34,211,238,0.5)]">CONNECT</span>
           </h1>
-          <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง</p>
+          <p className="cyber-label mt-2 text-[10px] text-cyan-200/50">{t('ระบบงานภายใน · วิจิตรภัณฑ์ก่อสร้าง')}</p>
         </div>
 
         {/* context strip — reassures a user who arrived from an email link. When
@@ -163,12 +165,12 @@ export default function Login() {
             several Google accounts doesn't send them round the loop again. */}
         {hint ? (
           <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2.5 text-center text-sm text-amber-100">
-            กรุณาเข้าสู่ระบบด้วยบัญชี <b className="break-all">{hint}</b>
-            <span className="mt-1 block text-[11px] text-amber-200/70">เสร็จแล้วระบบจะพากลับไปที่เอกสารเดิมให้เอง</span>
+            {t('กรุณาเข้าสู่ระบบด้วยบัญชี')} <b className="break-all">{hint}</b>
+            <span className="mt-1 block text-[11px] text-amber-200/70">{t('เสร็จแล้วระบบจะพากลับไปที่เอกสารเดิมให้เอง')}</span>
           </div>
         ) : (location.state?.from?.pathname || '').startsWith('/memos/') && (
           <div className="mb-4 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2.5 text-center text-sm text-cyan-100">
-            เข้าสู่ระบบด้วยบัญชีของท่าน เพื่อเปิดดูเอกสารที่ส่งถึงท่าน
+            {t('เข้าสู่ระบบด้วยบัญชีของท่าน เพื่อเปิดดูเอกสารที่ส่งถึงท่าน')}
           </div>
         )}
 
@@ -189,12 +191,12 @@ export default function Login() {
             </div>
             {googleBusy && (
               <div className="mt-3 flex justify-center text-cyan-200">
-                <Spinner tone="inherit" className="h-4 w-4" label="กำลังเข้าสู่ระบบด้วย Google…" />
+                <Spinner tone="inherit" className="h-4 w-4" label={t('กำลังเข้าสู่ระบบด้วย Google…')} />
               </div>
             )}
             <div className="my-5 flex items-center gap-3">
               <span className="h-px flex-1 bg-cyan-300/15" />
-              <span className="cyber-label text-[10px] text-cyan-200/50">หรือ</span>
+              <span className="cyber-label text-[10px] text-cyan-200/50">{t('หรือ')}</span>
               <span className="h-px flex-1 bg-cyan-300/15" />
             </div>
           </>
@@ -202,7 +204,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">อีเมล</label>
+            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">{t('อีเมล')}</label>
             <input
               type="email"
               className="cyber-input"
@@ -213,7 +215,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">รหัสผ่าน</label>
+            <label className="cyber-label mb-1.5 block text-[11px] font-semibold text-cyan-200">{t('รหัสผ่าน')}</label>
             <input
               type="password"
               className="cyber-input"
@@ -222,7 +224,7 @@ export default function Login() {
               required
               autoComplete="current-password"
             />
-            <p className="mt-1.5 text-xs text-slate-500">บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)</p>
+            <p className="mt-1.5 text-xs text-slate-500">{t('บัญชีที่ผู้ดูแลระบบสร้างให้ (อีเมล + รหัสผ่าน)')}</p>
           </div>
 
           <button type="submit" className="cyber-btn w-full" disabled={submitting}>

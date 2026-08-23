@@ -170,7 +170,14 @@ suite('5. ไฟล์แนบและการรวมไฟล์');
   const comb = await call(`/documents/${d.id}/combine`, { method: 'POST', user: B });
   happy(`รวมไฟล์สำเร็จแม้มีภาพเสีย ไม่ค้าง (${((Date.now() - t0) / 1000).toFixed(1)} วิ)`, [200, 201].includes(comb.status), `${comb.status}`);
   happy('ระบบยังตอบสนองหลังเจอไฟล์เสีย', (await call('/documents/stats', { user: B })).status === 200, '');
-  const cd = await call(`/documents/${d.id}`, { user: B });
+  // The skip is recorded by the background combine, so against a slower server
+  // the note can land after the response. Wait for it rather than guess at a
+  // delay — a flaky check on production is worse than a slow one.
+  let cd = await call(`/documents/${d.id}`, { user: B });
+  for (let i = 0; i < 20 && !cd.data.audit.some((a) => a.action === 'combine_skipped'); i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    cd = await call(`/documents/${d.id}`, { user: B });
+  }
   happy('มีไฟล์รวมเล่มเดียว และแจ้งในประวัติว่ามีไฟล์ที่รวมไม่ได้',
     cd.data.attachments.some((a) => a.kind === 'combined_pdf') && cd.data.audit.some((a) => a.action === 'combine_skipped'), '');
 

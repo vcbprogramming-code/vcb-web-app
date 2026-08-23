@@ -5,6 +5,7 @@ import { moduleTitles, roleLabels } from '../config/nav.js';
 import { useTheme } from '../theme/ThemeContext.jsx';
 import { useHeaderSlotValue } from './HeaderSlot.jsx';
 import Icon from './Icon.jsx';
+import LangToggle from './LangToggle.jsx';
 import GlobeMark from './GlobeMark.jsx';
 
 /** Resolve the module title from the current path (longest matching prefix). */
@@ -127,6 +128,10 @@ export default function ModuleShell() {
               {headerSlot}
             </div>
           )}
+          {/* Language sits next to the user menu, in the same place on every
+              module, so it can be found without hunting. */}
+          <div className="mr-2 hidden shrink-0 sm:block"><LangToggle dark={navyHeader} /></div>
+
           {/* user menu (#4): one avatar/name button opens a dropdown holding
               profile, theme toggle and logout — declutters the bar and prevents
               accidental logout next to the "add document" action. */}

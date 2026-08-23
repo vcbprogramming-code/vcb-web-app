@@ -1,3 +1,4 @@
+import LeaveApprovers from './LeaveApprovers.jsx';
 import { useState } from 'react';
 import { perfApi, perfPrefs } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
@@ -90,6 +91,9 @@ export default function SettingsView({ sites, onSitesChange }) {
           })}
         </div>
       </section>
+      <div className="mt-6 border-t border-slate-200 pt-6">
+        <LeaveApprovers />
+      </div>
     </div>
   );
 }

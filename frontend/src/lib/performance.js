@@ -26,6 +26,18 @@ export const perfApi = {
   updateEmployee: (id, body) => api(`/performance/employees/${id}`, { method: 'PATCH', body }),
   setAway: (id, date, away) => api(`/performance/employees/${id}/away`, { method: 'POST', body: { date, away } }),
 
+  // ระบบลางาน — the request behind a day off
+  leaveTypes: () => api('/performance/leave/types'),
+  myLeave: () => api('/performance/leave/mine'),
+  pendingLeave: () => api('/performance/leave/pending'),
+  decidedLeave: () => api('/performance/leave/decided'),
+  requestLeave: (body) => api('/performance/leave', { method: 'POST', body }),
+  decideLeave: (id, approve, note) => api(`/performance/leave/${id}/decide`, { method: 'POST', body: { approve, note } }),
+  cancelLeave: (id) => api(`/performance/leave/${id}/cancel`, { method: 'POST' }),
+  leaveApprovers: () => api('/performance/leave/approvers'),
+  setLeaveApprover: (approverId, employeeIds) =>
+    api(`/performance/leave/approvers/${approverId}`, { method: 'PUT', body: { employeeIds } }),
+
   // month grid for one site
   siteMonth: (site, year, month) => api(`/performance/site-month${qs({ site, year, month })}`),
 

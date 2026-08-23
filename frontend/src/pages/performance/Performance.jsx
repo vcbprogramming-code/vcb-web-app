@@ -8,6 +8,8 @@ import EntryView from './EntryView.jsx';
 import Dashboard from './Dashboard.jsx';
 import WorkIndex from './WorkIndex.jsx';
 import SettingsView from './SettingsView.jsx';
+import LeaveView from './LeaveView.jsx';
+import LeaveApprovers from './LeaveApprovers.jsx';
 
 const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const monthLabel = ({ y, m }) => `${THAI_MONTHS[m - 1]} ${y + 543}`;
@@ -21,6 +23,8 @@ export default function Performance() {
   const [view, setView] = useState('entry'); // entry | dashboard | index | settings
   const [cur, setCur] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const [siteKey, setSiteKey] = useState('');
+  const [roster, setRoster] = useState([]);
+  const [rosterKey, setRosterKey] = useState(0);
   const [exporting, setExporting] = useState(false);
 
   const downloadExcel = async () => {
@@ -36,6 +40,12 @@ export default function Performance() {
     finally { setExporting(false); }
   };
 
+  // The leave form picks a person, so it needs the roster of the site in view.
+  useEffect(() => {
+    if (!siteKey) { setRoster([]); return; }
+    perfApi.employees(siteKey).then((r) => setRoster(r.data || [])).catch(() => setRoster([]));
+  }, [siteKey, rosterKey]);
+
   useEffect(() => {
     perfApi.bootstrap()
       .then((r) => { setBoot(r); if (r.sites?.length) setSiteKey(r.sites[0].key); if (!r.canEntry) setView('dashboard'); })
@@ -48,6 +58,7 @@ export default function Performance() {
   const tabs = [
     { key: 'dashboard', label: 'ภาพรวม', show: true },
     { key: 'entry', label: 'ลงบันทึกรายวัน', show: boot.canEntry },
+    { key: 'leave', label: 'การลา', show: true },
     { key: 'index', label: 'ทะเบียนงาน', show: boot.isAdmin },
     { key: 'settings', label: 'ตั้งค่า', show: boot.isAdmin },
   ].filter((t) => t.show);
@@ -78,12 +89,16 @@ export default function Performance() {
             {t.label}
           </button>
         ))}
-        {/* site picker + export (entry view) */}
-        {view === 'entry' && boot.sites.length > 0 && (
+        {/* Which site you are looking at matters to both views: the grid shows its
+            month, and a leave request is filed for one of its people. Only the
+            grid has anything to export. */}
+        {(view === 'entry' || view === 'leave') && boot.sites.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
-              <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> ส่งออก Excel</BusyLabel>
-            </button>
+            {view === 'entry' && (
+              <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title="ส่งออกเป็น Excel">
+                <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> ส่งออก Excel</BusyLabel>
+              </button>
+            )}
             {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
                 with no bg class the control kept the browser's white default while
                 its text was lifted to near-white (unreadable). */}
@@ -103,6 +118,10 @@ export default function Performance() {
         boot.sites.length === 0
           ? <div className="card text-center text-sm text-slate-400">ยังไม่มีไซต์งานในขอบเขตของคุณ</div>
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
+      )}
+
+      {view === 'leave' && (
+        <LeaveView employees={roster} canEntry={boot.canEntry} onChanged={() => setRosterKey((k) => k + 1)} />
       )}
 
       {view === 'index' && <WorkIndex />}

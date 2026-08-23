@@ -32,6 +32,14 @@ const pad = (n) => String(n).padStart(2, '0');
 const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 const daysInMonthN = (y, m) => new Date(y, m, 0).getDate();
 /** Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts. */
+// ประเภทการลา — declared up here because the roster loader labels a day off with
+// it, and the leave endpoints further down share the same list.
+const LEAVE_TYPES_TH = {
+  sick: 'ลาป่วย', personal: 'ลากิจ', vacation: 'ลาพักผ่อน',
+  maternity: 'ลาคลอด', ordination: 'ลาบวช', other: 'อื่น ๆ',
+};
+const LEAVE_TH = LEAVE_TYPES_TH;
+
 const dateStr = (v) => {
   const d = v instanceof Date ? v : new Date(v);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -169,21 +177,33 @@ async function employeesForUnit(unitId, month) {
   )).rows;
   const ids = emps.map((e) => e.id);
   let awayBy = {};
+  const leaveBy = {};
   if (ids.length) {
     // real month bounds — a literal `${month}-31` is an invalid date for 30/28-day
     // months and makes the whole query 500.
     const [mY, mM] = month ? month.split('-').map(Number) : [];
     const from = month ? `${month}-01` : null;
     const to = month ? `${month}-${pad(daysInMonthN(mY, mM))}` : null;
+    // Carry the leave type along: a blank day says the person was not here, but
+    // "ลาป่วย" says why — and that is the whole point of having asked.
     const rows = month
-      ? (await query('select employee_id, ymd from employee_away where employee_id = any($1) and ymd >= $2 and ymd <= $3', [ids, from, to])).rows
-      : (await query('select employee_id, ymd from employee_away where employee_id = any($1)', [ids])).rows;
-    for (const r of rows) (awayBy[r.employee_id] ||= []).push(dateStr(r.ymd));
+      ? (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
+                        left join leave_requests r on r.id = a.leave_request_id
+                       where a.employee_id = any($1) and a.ymd >= $2 and a.ymd <= $3`, [ids, from, to])).rows
+      : (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
+                        left join leave_requests r on r.id = a.leave_request_id
+                       where a.employee_id = any($1)`, [ids])).rows;
+    for (const r of rows) {
+      const d = dateStr(r.ymd);
+      (awayBy[r.employee_id] ||= []).push(d);
+      if (r.leave_type) (leaveBy[r.employee_id] ||= {})[d] = LEAVE_TH[r.leave_type] || r.leave_type;
+    }
   }
   return emps.map((e) => ({
     eid: e.id, name: e.full_name, emp_id: e.employee_code || '',
     department: e.department_name || '', position: e.position_name || '',
     kind: e.kind, team: e.team || '', away: awayBy[e.id] || [],
+    leave: leaveBy[e.id] || {},
     moved_in: '', moved_out: '',
   }));
 }
@@ -435,6 +455,234 @@ router.get('/export', asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="worklog-${key}-${Y}-${pad(M)}.xlsx"`);
   res.send(Buffer.from(buf));
+}));
+
+// =============================================================================
+// ระบบลางาน — the request behind a day off.
+//
+// employee_away already recorded THAT someone was away. This records why, who
+// asked, and who agreed — and then writes the days into employee_away itself, so
+// every screen that already reads it shows approved leave with no change.
+//
+// Who may decide is not a role: the client's own framing is "หัวหน้ามีลูกน้อง
+// เป็นใครบ้าง", so leave_approvers pairs a supervisor with the people who report
+// to them. An employee with nobody assigned falls through to the admins — a
+// request must never be invisible to everyone.
+// =============================================================================
+
+const LEAVE_TYPES_DEF = [
+  { code: 'sick', th: 'ลาป่วย' },
+  { code: 'personal', th: 'ลากิจ' },
+  { code: 'vacation', th: 'ลาพักผ่อน' },
+  { code: 'maternity', th: 'ลาคลอด' },
+  { code: 'ordination', th: 'ลาบวช' },
+  { code: 'other', th: 'อื่น ๆ' },
+];
+
+
+const leaveSelect = `
+  select r.id, r.employee_id, r.unit_id, r.leave_type, r.from_date, r.to_date,
+         r.reason, r.status, r.requested_at, r.decided_at, r.decide_note,
+         e.full_name as employee_name, e.employee_code,
+         u.code as site_key, u.name as site_name,
+         rp.full_name as requested_by_name, dp.full_name as decided_by_name,
+         (r.to_date - r.from_date + 1) as days
+    from leave_requests r
+    join employees e on e.id = r.employee_id
+    left join units u on u.id = r.unit_id
+    left join profiles rp on rp.id = r.requested_by
+    left join profiles dp on dp.id = r.decided_by`;
+
+const leaveOut = (r) => ({ ...r, leave_type_th: LEAVE_TH[r.leave_type] || r.leave_type });
+
+/** The employee ids this person may decide for. null = every one of them (admin). */
+async function approvableEmployeeIds(profile) {
+  if (profile.role === 'admin') return null;
+  const { rows } = await query(
+    'select employee_id from leave_approvers where approver_id = $1', [profile.id]);
+  return rows.map((r) => r.employee_id);
+}
+
+/** GET /api/performance/leave/types */
+router.get('/leave/types', asyncHandler(async (req, res) => {
+  res.json({ ok: true, types: LEAVE_TYPES_DEF });
+}));
+
+/** GET /api/performance/leave/mine — requests this user submitted. */
+router.get('/leave/mine', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `${leaveSelect} where r.requested_by = $1 order by r.requested_at desc limit 200`,
+    [req.profile.id]
+  );
+  res.json({ ok: true, rows: rows.map(leaveOut) });
+}));
+
+/** GET /api/performance/leave/pending — my team's requests still waiting. */
+router.get('/leave/pending', asyncHandler(async (req, res) => {
+  const ids = await approvableEmployeeIds(req.profile);
+  // An admin also picks up anyone nobody was assigned to, which is what stops a
+  // request from sitting in a queue no human can see.
+  const where = ids === null
+    ? `r.status = 'pending'`
+    : `r.status = 'pending' and r.employee_id = any($1)`;
+  const { rows } = await query(
+    `${leaveSelect} where ${where} order by r.requested_at`,
+    ids === null ? [] : [ids]
+  );
+  res.json({ ok: true, rows: rows.map(leaveOut), canDecide: ids === null || ids.length > 0 });
+}));
+
+/** GET /api/performance/leave/decided — what my team's requests came to. */
+router.get('/leave/decided', asyncHandler(async (req, res) => {
+  const ids = await approvableEmployeeIds(req.profile);
+  const where = ids === null
+    ? `r.status <> 'pending'`
+    : `r.status <> 'pending' and r.employee_id = any($1)`;
+  const { rows } = await query(
+    `${leaveSelect} where ${where} order by r.decided_at desc nulls last, r.requested_at desc limit 200`,
+    ids === null ? [] : [ids]
+  );
+  res.json({ ok: true, rows: rows.map(leaveOut) });
+}));
+
+const leaveSchema = z.object({
+  employeeId: z.string().uuid(),
+  leaveType: z.enum(['sick', 'personal', 'vacation', 'maternity', 'ordination', 'other']).default('other'),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reason: z.string().trim().max(1000).optional().default(''),
+});
+
+/** POST /api/performance/leave — ask for leave (HR files it for the employee). */
+router.post('/leave', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = leaveSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const { employeeId, leaveType, from, to, reason } = p.data;
+  if (to < from) throw new ApiError(400, 'วันสิ้นสุดต้องไม่ก่อนวันเริ่มลา');
+
+  const emp = await queryOne('select id, unit_id, full_name from employees where id = $1', [employeeId]);
+  if (!emp) throw new ApiError(404, 'ไม่พบพนักงานคนนี้');
+  // Same rule as the rest of the module: you cannot act on a site you are not
+  // allowed to see. Without this an account scoped to one project could file
+  // leave for anybody in the company.
+  assertUnitInScope(scopedUnitIds(req.profile), emp.unit_id);
+
+  // Two live requests over the same days say nothing extra and would each write
+  // the same days into the work log.
+  const clash = await queryOne(
+    `select id, from_date, to_date from leave_requests
+      where employee_id = $1 and status in ('pending','approved')
+        and from_date <= $3 and to_date >= $2 limit 1`,
+    [employeeId, from, to]
+  );
+  if (clash) {
+    throw new ApiError(409,
+      `ช่วงวันที่ทับกับคำขอที่มีอยู่แล้ว (${String(clash.from_date).slice(0, 10)} ถึง ${String(clash.to_date).slice(0, 10)})`);
+  }
+
+  const row = await queryOne(
+    `insert into leave_requests (employee_id, unit_id, leave_type, from_date, to_date, reason, requested_by)
+     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
+    [employeeId, emp.unit_id, leaveType, from, to, reason, req.profile.id]
+  );
+  const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);
+  res.status(201).json({ ok: true, row: leaveOut(full) });
+}));
+
+/** POST /api/performance/leave/:id/decide — approve or refuse one request. */
+router.post('/leave/:id/decide', asyncHandler(async (req, res) => {
+  const p = z.object({
+    approve: z.boolean(),
+    note: z.string().trim().max(1000).optional().default(''),
+  }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+
+  const row = await queryOne('select * from leave_requests where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบคำขอลานี้');
+  if (row.status !== 'pending') throw new ApiError(409, 'คำขอนี้ถูกตัดสินไปแล้ว');
+
+  const ids = await approvableEmployeeIds(req.profile);
+  if (ids !== null && !ids.includes(row.employee_id)) {
+    throw new ApiError(403, 'ท่านไม่ได้เป็นผู้อนุมัติของพนักงานคนนี้');
+  }
+  // Deciding your own request is not a decision.
+  if (row.requested_by === req.profile.id && req.profile.role !== 'admin') {
+    throw new ApiError(403, 'ผู้ยื่นคำขอตัดสินคำขอของตัวเองไม่ได้');
+  }
+
+  const status = p.data.approve ? 'approved' : 'rejected';
+  await query(
+    `update leave_requests set status = $2, decided_by = $3, decided_at = now(),
+            decide_note = $4, updated_at = now() where id = $1`,
+    [row.id, status, req.profile.id, p.data.note]
+  );
+
+  // Approval is what puts the days into the work log. Tagged with the request id
+  // so reversing the decision takes back exactly these days and leaves any an
+  // admin marked by hand alone.
+  if (p.data.approve) {
+    await query(
+      `insert into employee_away (employee_id, ymd, leave_request_id)
+       select $1, d::date, $2 from generate_series($3::date, $4::date, interval '1 day') d
+       on conflict do nothing`,
+      [row.employee_id, row.id, row.from_date, row.to_date]
+    );
+  }
+
+  const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);
+  res.json({ ok: true, row: leaveOut(full) });
+}));
+
+/** POST /api/performance/leave/:id/cancel — the requester's own way out.
+ *  Only while pending: once decided the row is a record, not a draft. */
+router.post('/leave/:id/cancel', asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from leave_requests where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบคำขอลานี้');
+  if (row.requested_by !== req.profile.id && req.profile.role !== 'admin') {
+    throw new ApiError(403, 'ยกเลิกได้เฉพาะคำขอที่ท่านเป็นผู้ยื่น');
+  }
+  if (row.status !== 'pending') throw new ApiError(409, 'คำขอที่ถูกตัดสินแล้วยกเลิกไม่ได้');
+  await query(`update leave_requests set status = 'cancelled', updated_at = now() where id = $1`, [row.id]);
+  res.json({ ok: true });
+}));
+
+/** GET /api/performance/leave/approvers — the supervisor → team map. Admin only. */
+router.get('/leave/approvers', requireRole('admin'), asyncHandler(async (req, res) => {
+  const [pairs, people, emps] = await Promise.all([
+    query('select approver_id, employee_id from leave_approvers'),
+    query(`select id, full_name, email, role from profiles where is_active = true order by full_name`),
+    query(`select e.id, e.full_name, e.employee_code, u.code as site_key, u.name as site_name
+             from employees e left join units u on u.id = e.unit_id
+            where e.is_active = true order by u.name nulls last, e.full_name`),
+  ]);
+  const assigned = new Set(pairs.rows.map((r) => r.employee_id));
+  res.json({
+    ok: true,
+    pairs: pairs.rows,
+    people: people.rows,
+    employees: emps.rows,
+    // Say plainly who nobody is watching: those requests land on the admins,
+    // which works but is not what anyone intended.
+    unassigned: emps.rows.filter((e) => !assigned.has(e.id)).map((e) => e.id),
+  });
+}));
+
+/** PUT /api/performance/leave/approvers/:approverId — set one supervisor's team. */
+router.put('/leave/approvers/:approverId', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ employeeIds: z.array(z.string().uuid()).max(500) }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const who = await queryOne('select id from profiles where id = $1 and is_active = true', [req.params.approverId]);
+  if (!who) throw new ApiError(404, 'ไม่พบผู้ใช้คนนี้');
+
+  await query('delete from leave_approvers where approver_id = $1', [req.params.approverId]);
+  if (p.data.employeeIds.length) {
+    await query(
+      `insert into leave_approvers (approver_id, employee_id)
+       select $1, x from unnest($2::uuid[]) x on conflict do nothing`,
+      [req.params.approverId, p.data.employeeIds]
+    );
+  }
+  res.json({ ok: true, count: p.data.employeeIds.length });
 }));
 
 export default router;

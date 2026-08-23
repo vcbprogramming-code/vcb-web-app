@@ -29,6 +29,9 @@ export const meetingsApi = {
   comment: (id, body) => api(`/meetings/${id}/comments`, { method: 'POST', body: { body } }),
   removeComment: (id, cid) => api(`/meetings/${id}/comments/${cid}`, { method: 'DELETE' }),
 
+  tag: (id, groupId) => api(`/meetings/${id}/tags`, { method: 'POST', body: { groupId } }),
+  untag: (id, groupId) => api(`/meetings/${id}/tags/${groupId}`, { method: 'DELETE' }),
+
   createGroup: (body) => api('/meetings/groups/new', { method: 'POST', body }),
   updateGroup: (id, body) => api(`/meetings/groups/${id}`, { method: 'PATCH', body }),
   removeGroup: (id) => api(`/meetings/groups/${id}`, { method: 'DELETE' }),

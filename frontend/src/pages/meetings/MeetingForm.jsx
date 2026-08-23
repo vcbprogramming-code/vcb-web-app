@@ -17,6 +17,7 @@ export default function MeetingForm({ row, groups, defaultGroupId, onClose, onSa
     timeLabel: row?.time_label || '',
     attendees: (row?.attendees || []).join(', '),
     visible: row?.visible ?? true,
+    recordingUrl: row?.recording_url || '',
   });
   const [content, setContent] = useState(row?.content || '');
   const [busy, setBusy] = useState(false);
@@ -36,6 +37,7 @@ export default function MeetingForm({ row, groups, defaultGroupId, onClose, onSa
         timeLabel: form.timeLabel.trim(),
         attendees: form.attendees.split(',').map((s) => s.trim()).filter(Boolean),
         visible: form.visible,
+        recordingUrl: form.recordingUrl.trim(),
         content,
       };
       if (editing) {
@@ -94,6 +96,15 @@ export default function MeetingForm({ row, groups, defaultGroupId, onClose, onSa
           <label className="mb-1 block text-sm font-medium text-slate-600">ผู้เข้าประชุม</label>
           <input value={form.attendees} onChange={(e) => set('attendees', e.target.value)}
             placeholder="คั่นชื่อด้วยเครื่องหมายจุลภาค เช่น ทนงศักดิ์, ชวิน, สุรวัจน์" className="field" />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600">ลิงก์ไฟล์บันทึกเสียง (ถ้ามี)</label>
+          <input value={form.recordingUrl} onChange={(e) => set('recordingUrl', e.target.value)}
+            placeholder="https://…" className="field" />
+          <p className="mt-1 text-xs text-slate-400">
+            ใส่ลิงก์บันทึกจาก Fathom หรือ Transkriptor ได้ · รับเฉพาะลิงก์ที่ขึ้นต้นด้วย https://
+          </p>
         </div>
 
         <label className="flex cursor-pointer items-center gap-2">

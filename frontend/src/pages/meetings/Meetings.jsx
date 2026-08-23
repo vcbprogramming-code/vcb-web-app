@@ -87,9 +87,23 @@ export default function Meetings() {
         <button onClick={() => setGroup('')} className={chip(group === '')}>
           ทุกกลุ่ม <span className="ml-1 text-xs opacity-70">{boot.total}</span>
         </button>
-        {groups.map((g) => (
+        {groups.filter((g) => !g.is_inbox).map((g) => (
           <button key={g.id} onClick={() => setGroup(group === g.id ? '' : g.id)} className={chip(group === g.id)}>
-            {g.name} <span className="ml-1 text-xs opacity-70">{g.count}</span>
+            {g.name} <span className="ml-1 text-xs opacity-70">{g.count + (g.tagged_count || 0)}</span>
+          </button>
+        ))}
+        {/* the inboxes sit apart: they are a queue to work through, not a place
+            minutes belong */}
+        {groups.some((g) => g.is_inbox) && <span className="mx-1 h-5 w-px bg-slate-200" />}
+        {groups.filter((g) => g.is_inbox).map((g) => (
+          <button key={g.id} onClick={() => setGroup(group === g.id ? '' : g.id)}
+            title="บันทึกเสียงที่ยังไม่ได้จัดเก็บเข้ากลุ่ม"
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+              group === g.id ? 'border-slate-600 bg-slate-600 text-white'
+                : 'border-dashed border-slate-300 bg-white text-slate-500 hover:border-slate-500'}`}>
+            <Icon name="inbox" className="h-3.5 w-3.5" />
+            {g.name.replace('กล่องรอจัดเก็บ · ', '')}
+            <span className="text-xs opacity-70">{g.count}</span>
           </button>
         ))}
       </div>
@@ -134,7 +148,7 @@ export default function Meetings() {
         <div className="min-w-0">
           {openId ? (
             <MeetingDetail
-              id={openId} canEdit={canEdit}
+              id={openId} canEdit={canEdit} groups={groups}
               onClose={() => setOpenId(null)}
               onEdit={(row) => setEditing(row)}
               onDelete={removeRow}

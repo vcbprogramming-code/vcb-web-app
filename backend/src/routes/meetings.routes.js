@@ -64,8 +64,13 @@ const inGroups = (ids, col = 'm.group_id') => (ids === null ? '' : ` and ${col} 
 
 const LIST_SELECT = `
   select m.id, m.group_id, m.title, m.meeting_date, m.time_label, m.excerpt,
-         m.attendees, m.pinned, m.visible, m.source, m.created_at, m.updated_at,
-         g.name as group_name, g.code as group_code, g.color as group_color,
+         m.attendees, m.pinned, m.visible, m.source, m.recording_url,
+         m.created_at, m.updated_at,
+         g.name as group_name, g.code as group_code, g.color as group_color, g.is_inbox,
+         (select coalesce(json_agg(json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
+                                   order by tg.sort_order), '[]'::json)
+            from mtg_meeting_tags t join mtg_groups tg on tg.id = t.group_id
+           where t.meeting_id = m.id) as tags,
          cp.full_name as created_by_name,
          (select count(*)::int from mtg_attachments a where a.meeting_id = m.id and a.kind = 'file') as attachment_count,
          (select count(*)::int from mtg_comments c where c.meeting_id = m.id) as comment_count
@@ -79,8 +84,9 @@ const LIST_SELECT = `
 router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
   const ids = await visibleGroupIds(req.profile);
   const groups = await query(
-    `select g.id, g.code, g.name, g.name_en, g.cadence, g.color, g.project_id, g.is_active,
-            (select count(*)::int from mtg_meetings m where m.group_id = g.id) as count
+    `select g.id, g.code, g.name, g.name_en, g.cadence, g.color, g.project_id, g.is_active, g.is_inbox,
+            (select count(*)::int from mtg_meetings m where m.group_id = g.id) as count,
+            (select count(*)::int from mtg_meeting_tags t where t.group_id = g.id) as tagged_count
        from mtg_groups g
       where g.is_active = true${ids === null ? '' : ' and g.id = any($1)'}
       order by g.sort_order, g.name`,
@@ -94,7 +100,9 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
       groups: groups.rows,
       canEdit: hasPermission(req.profile, 'meetings', 'edit'),
       canManage: hasPermission(req.profile, 'meetings', 'manage'),
+      // the headline total counts each meeting once, wherever it is filed
       total: groups.rows.reduce((a, g) => a + g.count, 0),
+      inboxTotal: groups.rows.filter((g) => g.is_inbox).reduce((a, g) => a + g.count, 0),
     },
   });
 }));
@@ -108,7 +116,12 @@ router.get('/', canView, asyncHandler(async (req, res) => {
   const groupId = String(req.query.groupId || '').trim();
   if (groupId) {
     if (!/^[0-9a-f-]{36}$/i.test(groupId)) throw new ApiError(400, 'รหัสกลุ่มไม่ถูกต้อง');
-    params.push(groupId); where.push(`m.group_id = $${params.length}`);
+    // A recording filed into this group belongs in its list too, even though it
+    // still lives in the inbox — that is the point of filing it.
+    params.push(groupId);
+    where.push(`(m.group_id = $${params.length}
+                 or exists (select 1 from mtg_meeting_tags t
+                             where t.meeting_id = m.id and t.group_id = $${params.length}))`);
   }
   if (ids !== null) { params.push(ids); where.push(`m.group_id = any($${params.length})`); }
   // A hidden meeting is a draft: its author still needs to find it.
@@ -133,7 +146,7 @@ router.get('/', canView, asyncHandler(async (req, res) => {
 /** GET /api/meetings/:id — the full record: body, attachments, comments. */
 router.get('/:id', canView, asyncHandler(async (req, res) => {
   const m = await queryOne(
-    `select m.*, g.name as group_name, g.code as group_code, g.color as group_color,
+    `select m.*, g.name as group_name, g.code as group_code, g.color as group_color, g.is_inbox,
             cp.full_name as created_by_name, up.full_name as updated_by_name
        from mtg_meetings m
        join mtg_groups g on g.id = m.group_id
@@ -148,7 +161,7 @@ router.get('/:id', canView, asyncHandler(async (req, res) => {
     throw new ApiError(403, 'รายงานฉบับนี้ยังไม่เผยแพร่');
   }
 
-  const [atts, comments, versions] = await Promise.all([
+  const [atts, comments, versions, tags] = await Promise.all([
     query(`select id, kind, file_name, content_type, size_bytes, created_at
              from mtg_attachments where meeting_id = $1 and kind = 'file' order by created_at`, [m.id]),
     query(`select c.id, c.body, c.created_at, c.author_id, p.full_name as author_name
@@ -157,8 +170,12 @@ router.get('/:id', canView, asyncHandler(async (req, res) => {
     query(`select v.seq, v.title, v.meeting_date, v.time_label, v.saved_at, p.full_name as saved_by_name
              from mtg_versions v left join profiles p on p.id = v.saved_by
             where v.meeting_id = $1 order by v.seq desc`, [m.id]),
+    query(`select g.id, g.name, g.color from mtg_meeting_tags t
+             join mtg_groups g on g.id = t.group_id
+            where t.meeting_id = $1 order by g.sort_order`, [m.id]),
   ]);
-  res.json({ data: { ...m, attachments: atts.rows, comments: comments.rows, versions: versions.rows } });
+  res.json({ data: { ...m, attachments: atts.rows, comments: comments.rows,
+    versions: versions.rows, tags: tags.rows } });
 }));
 
 /** GET /api/meetings/:id/versions/:seq — one earlier version, as it was.
@@ -181,21 +198,33 @@ const meetingSchema = z.object({
   timeLabel: z.string().trim().max(60).optional().default(''),
   content: z.string().max(400000).optional().default(''),
   attendees: z.array(z.string().trim().max(120)).max(100).optional().default([]),
-  visible: z.boolean().optional().default(true),
+  // no .default() on purpose: the caller not saying anything has to stay
+  // distinguishable from the caller saying `true`, or an inbox recording
+  // publishes itself before anyone has listened to it
+  visible: z.boolean().optional(),
+  recordingUrl: z.string().trim().max(600).optional().default(''),
+  source: z.enum(['manual', 'doc-import', 'fathom', 'transkriptor']).optional(),
 });
+
+/** Only http(s) — a recording link is put in front of a reader to click. */
+const safeLink = (v) => (/^https?:\/\//i.test(String(v || '').trim()) ? String(v).trim() : '');
 
 router.post('/', canEdit, asyncHandler(async (req, res) => {
   const p = meetingSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
-  const g = await queryOne('select id from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
+  const g = await queryOne('select id, is_inbox from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
   if (!g) throw new ApiError(400, 'ไม่พบกลุ่มที่ระบุ');
   const html = sanitizeHtml(p.data.content);
+  // A recording arrives before anyone has decided what it is about, so it starts
+  // unpublished — visible once it has been listened to and filed.
+  const visible = p.data.visible !== undefined ? p.data.visible : !g.is_inbox;
   const row = await queryOne(
     `insert into mtg_meetings (group_id, title, meeting_date, time_label, content, excerpt,
-                               attendees, visible, created_by, updated_by)
-     values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$9) returning id`,
+                               attendees, visible, recording_url, source, created_by, updated_by)
+     values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$11) returning id`,
     [p.data.groupId, p.data.title, p.data.meetingDate || null, p.data.timeLabel, html,
-     htmlToText(html).slice(0, 200), JSON.stringify(p.data.attendees), p.data.visible, req.profile.id]
+     htmlToText(html).slice(0, 200), JSON.stringify(p.data.attendees), visible,
+     safeLink(p.data.recordingUrl), p.data.source || (g.is_inbox ? 'manual' : 'manual'), req.profile.id]
   );
   res.status(201).json({ data: { id: row.id } });
 }));
@@ -241,12 +270,14 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
        excerpt = coalesce($6, excerpt),
        attendees = coalesce($7::jsonb, attendees),
        visible = coalesce($8, visible),
+       recording_url = coalesce($10, recording_url),
        updated_by = $9, updated_at = now()
      where id = $1 returning id, title, updated_at`,
     [cur.id, p.data.title ?? null, p.data.meetingDate ?? null, p.data.timeLabel ?? null,
      html, html === null ? null : htmlToText(html).slice(0, 200),
      p.data.attendees ? JSON.stringify(p.data.attendees) : null,
-     p.data.visible ?? null, req.profile.id]
+     p.data.visible ?? null, req.profile.id,
+     p.data.recordingUrl === undefined ? null : safeLink(p.data.recordingUrl)]
   );
   res.json({ data: row });
 }));
@@ -336,6 +367,47 @@ router.delete('/:id/comments/:commentId', canView, asyncHandler(async (req, res)
   }
   await query('delete from mtg_comments where id = $1', [req.params.commentId]);
   res.json({ data: { ok: true } });
+}));
+
+// ── การจัดเก็บเข้ากลุ่ม ─────────────────────────────────────────────────────
+
+/** POST /api/meetings/:id/tags — file this recording against a group.
+ *
+ *  Adds, never moves. The recording keeps living in the inbox so the archive of
+ *  everything recorded stays whole, and a recording that concerns two projects
+ *  can sit under both instead of one stealing it from the other.
+ */
+router.post('/:id/tags', canEdit, asyncHandler(async (req, res) => {
+  const p = z.object({ groupId: z.string().uuid() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const m = await queryOne('select id, group_id from mtg_meetings where id = $1', [req.params.id]);
+  if (!m) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
+  const g = await queryOne('select id, is_inbox from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
+  if (!g) throw new ApiError(400, 'ไม่พบกลุ่มที่ระบุ');
+  if (g.is_inbox) throw new ApiError(400, 'จัดเก็บเข้ากล่องรอจัดเก็บไม่ได้ — เลือกกลุ่มปลายทาง');
+  if (g.id === m.group_id) throw new ApiError(409, 'รายงานนี้อยู่ในกลุ่มนี้อยู่แล้ว');
+
+  await query(
+    `insert into mtg_meeting_tags (meeting_id, group_id, tagged_by) values ($1,$2,$3)
+     on conflict do nothing`, [m.id, g.id, req.profile.id]);
+  const tags = await query(
+    `select g.id, g.name, g.color from mtg_meeting_tags t join mtg_groups g on g.id = t.group_id
+      where t.meeting_id = $1 order by g.sort_order`, [m.id]);
+  res.status(201).json({ data: tags.rows });
+}));
+
+/** DELETE /api/meetings/:id/tags/:groupId — take it out of one group only,
+ *  leaving every other place it was filed alone. */
+router.delete('/:id/tags/:groupId', canEdit, asyncHandler(async (req, res) => {
+  if (!UUID.test(req.params.groupId)) throw new ApiError(404, 'ไม่พบกลุ่มที่ระบุ');
+  const row = await queryOne(
+    'delete from mtg_meeting_tags where meeting_id = $1 and group_id = $2 returning meeting_id',
+    [req.params.id, req.params.groupId]);
+  if (!row) throw new ApiError(404, 'รายงานนี้ไม่ได้ถูกจัดเก็บไว้ในกลุ่มนั้น');
+  const tags = await query(
+    `select g.id, g.name, g.color from mtg_meeting_tags t join mtg_groups g on g.id = t.group_id
+      where t.meeting_id = $1 order by g.sort_order`, [req.params.id]);
+  res.json({ data: tags.rows });
 }));
 
 // ── groups ──────────────────────────────────────────────────────────────────

@@ -29,7 +29,9 @@ let id = null;
 {
   const b = await call('/meetings/bootstrap', { user: A });
   happy('เปิดโมดูลได้ และมีกลุ่มตั้งต้นให้แล้ว', b.status === 200 && b.data.groups.length >= 9, `${b.data?.groups?.length}`);
-  happy('กลุ่มตั้งต้นผูกกับโครงการที่มีอยู่', b.data.groups.every((g) => g.project_id), '');
+  // the two inboxes are queues, not projects, so they carry no project link
+  happy('กลุ่มตั้งต้นผูกกับโครงการที่มีอยู่',
+    b.data.groups.filter((g) => !g.is_inbox).every((g) => g.project_id), '');
 
   const r = await add(A, {
     title: `${MARK} ประชุมความก้าวหน้า ครั้งที่ 1`,
@@ -178,6 +180,61 @@ suite('7. จัดการกลุ่มการประชุม');
   await call(`/meetings/${m.data.id}`, { method: 'DELETE', user: A });
   happy('ลบกลุ่มที่ว่างแล้วได้',
     (await call(`/meetings/groups/${gid}`, { method: 'DELETE', user: A })).status === 200, '');
+}
+
+// ── 9. กล่องรอจัดเก็บและการจัดเก็บเข้ากลุ่ม ────────────────────────────────
+suite('9. กล่องรอจัดเก็บ และการจัดเก็บเข้ากลุ่ม');
+{
+  const b = await call('/meetings/bootstrap', { user: A });
+  const inboxes = b.data.groups.filter((g) => g.is_inbox);
+  const dest = b.data.groups.find((g) => !g.is_inbox);
+  const dest2 = b.data.groups.filter((g) => !g.is_inbox)[1];
+  happy('มีกล่องรอจัดเก็บสองกล่อง', inboxes.length === 2, inboxes.map((g) => g.name).join(' · '));
+
+  const rec = await call('/meetings', { method: 'POST', user: A, body: {
+    groupId: inboxes[0].id, title: `${MARK} บันทึกเสียงรอจัดเก็บ`,
+    recordingUrl: 'https://fathom.video/share/abc', content: '<p>สรุปย่อจากที่ประชุม</p>' } });
+  made.push(rec.data.id);
+  const r0 = await call(`/meetings/${rec.data.id}`, { user: A });
+  bad('บันทึกที่เพิ่งเข้ากล่อง ยังไม่เผยแพร่', r0.data.visible === false, String(r0.data.visible));
+  // the detail has to say it is an inbox row, or the screen cannot explain that
+  // filing adds a place rather than moving it
+  happy('หน้ารายละเอียดรู้ว่าอยู่ในกล่องรอจัดเก็บ', r0.data.is_inbox === true, String(r0.data.is_inbox));
+  happy('เก็บลิงก์ไฟล์บันทึกเสียงไว้', r0.data.recording_url.includes('fathom.video'), r0.data.recording_url);
+
+  bad('ลิงก์ที่ไม่ใช่ http(s) ไม่ถูกเก็บ', (await (async () => {
+    const x = await call('/meetings', { method: 'POST', user: A, body: {
+      groupId: inboxes[0].id, title: `${MARK} ลิงก์อันตราย`, recordingUrl: 'javascript:alert(1)' } });
+    made.push(x.data.id);
+    return (await call(`/meetings/${x.data.id}`, { user: A })).data.recording_url === '';
+  })()), '');
+
+  const t = await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: dest.id } });
+  happy('จัดเก็บเข้ากลุ่มได้', t.status === 201 && t.data.length === 1, `${t.status}`);
+  const t2 = await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: dest2.id } });
+  happy('จัดเก็บเข้าได้มากกว่าหนึ่งกลุ่ม', t2.data.length === 2, `${t2.data?.length}`);
+
+  const inDest = await call(`/meetings?groupId=${dest.id}`, { user: A });
+  happy('เห็นในกลุ่มปลายทาง', (inDest.data || []).some((x) => x.id === rec.data.id), '');
+  const inInbox = await call(`/meetings?groupId=${inboxes[0].id}`, { user: A });
+  happy('และยังอยู่ในกล่องเดิม ไม่ถูกย้ายออก', (inInbox.data || []).some((x) => x.id === rec.data.id), '');
+
+  bad('จัดเก็บซ้ำกลุ่มเดิมไม่เพิ่มรายการ',
+    (await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: dest.id } })).data.length === 2, '');
+  bad('จัดเก็บเข้ากล่องรอจัดเก็บด้วยกันไม่ได้',
+    (await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: inboxes[1].id } })).status === 400, '');
+  bad('จัดเก็บเข้ากลุ่มที่ไม่มีอยู่จริงไม่ได้',
+    (await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: '00000000-0000-0000-0000-000000000000' } })).status === 400, '');
+  bad('ผู้บริหารจัดเก็บไม่ได้',
+    (await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: C, body: { groupId: dest.id } })).status === 403, '');
+
+  const u = await call(`/meetings/${rec.data.id}/tags/${dest.id}`, { method: 'DELETE', user: A });
+  happy('เอาออกจากกลุ่มเดียวได้', u.status === 200 && u.data.length === 1, `${u.data?.length}`);
+  happy('กลุ่มอื่นที่จัดเก็บไว้ยังอยู่', u.data[0]?.id === dest2.id, '');
+  const stillInbox = await call(`/meetings?groupId=${inboxes[0].id}`, { user: A });
+  happy('เอาป้ายออกแล้วยังอยู่ในกล่องเหมือนเดิม', (stillInbox.data || []).some((x) => x.id === rec.data.id), '');
+  bad('เอาออกจากกลุ่มที่ไม่ได้จัดเก็บไว้ → 404',
+    (await call(`/meetings/${rec.data.id}/tags/${dest.id}`, { method: 'DELETE', user: A })).status === 404, '');
 }
 
 // ── เก็บกวาด ───────────────────────────────────────────────────────────────

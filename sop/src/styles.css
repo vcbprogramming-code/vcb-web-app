@@ -14,6 +14,7 @@
     --sans:'Sarabun',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
     --banner-font:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
     --ico:18px;
+  --att-bg:#f2f6fc; --att-line:#dbe6f5;
   }
   /* Base icon: sized by --ico (or local font-size via em fallbacks below) */
   .ico{width:var(--ico);height:var(--ico);flex:0 0 auto;display:inline-block;vertical-align:middle;stroke-width:1.7}
@@ -28,6 +29,7 @@
     --brand-soft:#1c2d4a; --accent:#d2a24a; --accent-soft:#2a2415;
     --ink:#e6edf3; --muted:#9aa4b1; --faint:#7d8590;
     --line:#2a313b; --line-soft:#20262e;
+    --att-bg:#141b26; --att-line:#26303e;
     --shadow-xs:0 1px 2px rgba(0,0,0,.4);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.5);
@@ -357,6 +359,46 @@
   .note b{color:#b5302a}
   .d-ref{margin-top:6px;font-size:.82rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;display:flex;align-items:center;gap:6px}
   .d-ref svg{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+  /* Fixed two-column split inside the detail pane. The rail is a hard 238px and
+     the body takes the rest — neither reflows with content, so every case
+     renders at exactly the same widths. stretch (not flex-start) lets the
+     rail's tint run the full column height. */
+  .d-cols{display:flex;align-items:stretch;gap:0;min-height:100%}
+  .d-cols-main{flex:1 1 auto;min-width:0;width:100%}
+  /* The rail itself stretches to paint the full-height tint; the inner wrapper
+     is what sticks on scroll (a stretched flex item can't itself be sticky). */
+  .d-att-rail{flex:0 0 238px;width:238px;padding:22px 18px;background:var(--att-bg);border-left:1px solid var(--att-line)}
+  .d-att-inner{position:sticky;top:22px}
+  /* Matches .lbl in the main body so both columns share one heading level. */
+  .d-att-h{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
+  /* Stacked vertically — one card under the next when a case has several. */
+  .d-att-card{display:block;margin-bottom:16px;text-decoration:none;color:var(--ink)}
+  .d-att-card:last-child{margin-bottom:0}
+  /* No fixed aspect-ratio and no cropping: the box height follows the image so
+     a wide diagram stays a wide diagram, just scaled down. min-height only
+     applies to the fallback (no image) state. */
+  .d-att-thumb{position:relative;border:1px solid var(--att-line);border-radius:var(--r-sm);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-xs);transition:border-color .12s,box-shadow .12s;line-height:0}
+  .d-att-card:hover .d-att-thumb{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+  .d-att-img{width:100%;height:auto;display:block}
+  .d-att-thumb.no-thumb{min-height:96px;line-height:normal}
+  .d-att-thumb.no-thumb .d-att-img{display:none}
+  .d-att-ico{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;stroke:var(--faint);fill:none;stroke-width:1.5;opacity:0;pointer-events:none}
+  .d-att-thumb.no-thumb .d-att-ico{opacity:1}
+  .d-att-name{margin-top:6px;font-size:.78rem;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .d-att-card:hover .d-att-name{color:var(--brand-2)}
+  .d-att-empty{font-size:.78rem;color:var(--faint);line-height:1.4}
+  /* Narrow viewports: drop the rail under the content instead of squeezing it */
+  @media (max-width:1180px){
+    .d-cols{flex-direction:column}
+    .d-att-rail{flex:none;width:auto;padding:16px 26px;display:flex;flex-wrap:wrap;gap:12px;border-left:0;border-top:1px solid var(--att-line)}
+    .d-att-inner{position:static;display:flex;flex-wrap:wrap;gap:12px;width:100%}
+    .d-att-rail .d-att-h{width:100%;margin-bottom:0}
+    .d-att-card{width:120px;margin-bottom:0}
+    /* Stacked under the content there is no empty space to fill, so an empty
+       rail would just be noise — show it only when it has files. */
+    .d-att-rail.is-empty{display:none}
+  }
+  html.is-mobile .d-att-rail{padding:0 16px 18px}
   .pathbox{font-family:'Consolas','Courier New',monospace;font-size:.95rem;color:var(--brand-dark);
     background:var(--brand-soft);border:1px solid #cdddef;border-radius:9px;padding:13px 16px;line-height:1.6}
 

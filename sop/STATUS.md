@@ -9,6 +9,19 @@ It runs and looks complete, but the data is **mock/sample data** — see
 `src/data/sop.json` and `src/lib/api.ts`. **Nothing is saved** (no real database,
 no login, no persistence).
 
+## Latest sync (2026-08-25)
+Mirrors the live Apps Script app at **@101**. Adds the **Related Files** rail:
+each case can carry reference files (the 31 SOP flow-diagram PDFs), rendered as
+Drive preview thumbnails in a fixed-width column beside the case body. Links
+only — the app never uploads or stores a file, which deliberately avoids the
+`drive` OAuth scope whose absence had been silently hanging every save.
+
+`src/data/sop.json` was re-exported from the live app in the same pass. The
+previous snapshot had drifted badly — **29 of 31 cases** carried a different
+display number, title, or both. Treat that file as a point-in-time snapshot,
+never as truth: re-export from the live app's `/exec?dump=1` before relying on
+case numbering.
+
 ## What's NOT here yet
 A **backend** — a server + database to actually store SOPs/flows, handle logins,
 and enforce rules. Edits update local state only and are lost on refresh.

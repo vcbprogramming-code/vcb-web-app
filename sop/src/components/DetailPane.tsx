@@ -158,6 +158,61 @@ function Steps({ steps }: { steps: string[] }) {
   );
 }
 
+/** Drive file id out of the usual link shapes; '' for a non-Drive URL. */
+function driveFileId(url: string): string {
+  const u = String(url || '');
+  const m =
+    u.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) ||
+    u.match(/[?&]id=([a-zA-Z0-9_-]{10,})/) ||
+    u.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : '';
+}
+
+/** Related Files rail — mirrors the Apps Script build. Renders on every case so
+ * the layout never shifts; a case with no files shows the empty line instead. */
+function AttachmentsRail({ s, sc }: { s: Store; sc: Scenario }) {
+  const atts = sc.attachments || [];
+  return (
+    <aside className={'d-att-rail' + (atts.length ? '' : ' is-empty')}>
+      <div className="d-att-inner">
+        <div className="d-att-h">{s.t('attachmentsLbl')}</div>
+        {atts.length === 0 && <div className="d-att-empty">{s.t('attachmentsNone')}</div>}
+        {atts.map((a, i) => {
+          const id = driveFileId(a.url);
+          const label = a.label && a.label !== a.url ? a.label : s.t('attachmentsFile');
+          return (
+            <a
+              key={i}
+              className="d-att-card"
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={label}
+            >
+              <div className={'d-att-thumb' + (id ? '' : ' no-thumb')}>
+                {id && (
+                  <img
+                    className="d-att-img"
+                    src={`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w600`}
+                    alt={label}
+                    loading="lazy"
+                    onError={(ev) => ev.currentTarget.parentElement?.classList.add('no-thumb')}
+                  />
+                )}
+                <svg className="d-att-ico" viewBox="0 0 24 24">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                </svg>
+              </div>
+              <div className="d-att-name">{label}</div>
+            </a>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 function ScenarioDetail({ s, sc, actionsSlot }: { s: Store; sc: Scenario; actionsSlot: HTMLDivElement | null }) {
   const primaryTitle = s.lang === 'en' && sc.titleEN ? sc.titleEN : sc.titleTH;
   const secondaryTitle = s.lang === 'en' && sc.titleEN ? sc.titleTH : sc.titleEN || '';
@@ -208,6 +263,19 @@ function ScenarioDetail({ s, sc, actionsSlot }: { s: Store; sc: Scenario; action
           {s.t('dateAddedLbl')} {sc.dateAdded}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Case body + the Related Files rail beside it. The rail always renders, so
+ * the column widths are identical from case to case (see .d-cols in styles). */
+function ScenarioDetailWithRail(props: { s: Store; sc: Scenario; actionsSlot: HTMLDivElement | null }) {
+  return (
+    <div className="d-cols">
+      <div className="d-cols-main">
+        <ScenarioDetail {...props} />
+      </div>
+      <AttachmentsRail s={props.s} sc={props.sc} />
     </div>
   );
 }
@@ -320,7 +388,7 @@ export default function DetailPane({ s }: { s: Store }) {
   else if (s.nav.sel === null) body = <Welcome s={s} />;
   else {
     const sc = s.scenarios.find((x) => x.no === s.nav.sel);
-    body = sc ? <ScenarioDetail s={s} sc={sc} actionsSlot={actionsSlot} /> : <Welcome s={s} />;
+    body = sc ? <ScenarioDetailWithRail s={s} sc={sc} actionsSlot={actionsSlot} /> : <Welcome s={s} />;
   }
   return (
     <main className="detail">

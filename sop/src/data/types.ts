@@ -56,6 +56,16 @@ export interface Scenario {
    * (which still drives displayNo/color/chapter ref). Purely additive — the
    * case shows up whenever the sidebar filters to any of these too. */
   extraModules?: string[];
+  /** Reference files for this case (flow-diagram PDFs and the like). Stored as
+   * links only — the app never holds the file itself; see the "ไฟล์แนบ:"
+   * metadata lines in apps-script/Code.js. */
+  attachments?: Attachment[];
+}
+
+/** One reference file attached to a case: a display label plus its URL. */
+export interface Attachment {
+  label: string;
+  url: string;
 }
 
 /** A row in the "which report do I run" table. */

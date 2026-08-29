@@ -105,6 +105,10 @@ export interface ScenarioEdit {
   /** Replaces the case's extra-module tags wholesale, including clearing them
    * with an empty array. Omit to leave existing tags untouched. */
   extraModules?: string[];
+  /** Full replacement set. Omit to leave the case's existing attachments
+   * alone — mirrors editScenario() in Code.js, which only rewrites the
+   * "ไฟล์แนบ:" lines when the key is present. */
+  attachments?: Attachment[];
 }
 
 /** Payload accepted by createScenario() / POST /api/scenario/new. Server/mock
@@ -118,6 +122,7 @@ export interface ScenarioCreate {
   note?: string;
   ref?: string;
   extraModules?: string[];
+  attachments?: Attachment[];
 }
 
 /** Payload accepted by swapScenarioPositions() / POST /api/scenario/swap.

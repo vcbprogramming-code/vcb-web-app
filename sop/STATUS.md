@@ -9,7 +9,16 @@ It runs and looks complete, but the data is **mock/sample data** — see
 `src/data/sop.json` and `src/lib/api.ts`. **Nothing is saved** (no real database,
 no login, no persistence).
 
-## Latest sync (2026-08-25)
+## Latest sync (2026-08-29) — @116
+
+Brought up from @82: full-screen edit/create modals, per-file attachment rows
+(name + URL, replacing `Label | URL` pipe syntax), a grouped swap dropdown, and
+a CSS re-extract carrying the dark-mode contrast fixes plus the iPad layout fix
+(the attachments rail was crushing the case text to 334px at 1366px). See
+`PORT_NOTES.md` for the detail, including the one thing that cannot work here:
+the Drive filename auto-fill needs a server this port doesn't have.
+
+## Earlier sync (2026-08-25)
 Mirrors the live Apps Script app at **@101**. Adds the **Related Files** rail:
 each case can carry reference files (the 31 SOP flow-diagram PDFs), rendered as
 Drive preview thumbnails in a fixed-width column beside the case body. Links

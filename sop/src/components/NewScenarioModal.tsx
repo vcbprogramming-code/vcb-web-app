@@ -7,6 +7,7 @@ import type { Store } from '../store';
 import { MODULES, MODULES_EN } from '../data/config';
 import ExtraModuleChecks from './ExtraModuleChecks';
 import { stepsToStorage } from '../lib/steps';
+import AttachmentRows, { rowsToAttachments, newAttachmentRow, type AttachmentRow } from './AttachmentRows';
 
 export default function NewScenarioModal({ s }: { s: Store }) {
   const labels = s.lang === 'en' ? MODULES_EN : MODULES;
@@ -20,6 +21,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
   const [note, setNote] = useState('');
   const [ref, setRef] = useState('');
   const [extraModules, setExtraModules] = useState<Set<string>>(new Set());
+  const [attRows, setAttRows] = useState<AttachmentRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   function changeModule(next: string) {
@@ -51,6 +53,7 @@ export default function NewScenarioModal({ s }: { s: Store }) {
         note: note.trim(),
         ref: ref.trim(),
         extraModules: Array.from(extraModules),
+        attachments: rowsToAttachments(attRows),
       });
       s.selectModule(module);
       s.selectItem(no);
@@ -63,9 +66,14 @@ export default function NewScenarioModal({ s }: { s: Store }) {
 
   return (
     // Backdrop click intentionally does nothing — see EditModal.tsx.
-    <div className="modal-bg open" id="newScenarioBg">
-      <div className="modal" style={{ maxWidth: '780px' }}>
+    <div className="modal-bg full open" id="newScenarioBg">
+      <div className="modal modal-full">
         <h3>เพิ่มกรณีศึกษาใหม่ · New case</h3>
+        <div className="mf-body">
+          <div className="mf-grid">
+            {/* Left: short metadata. Right: the long free-text fields — same
+                split as EditModal. */}
+            <div className="mf-col mf-meta">
         <div className="row">
           <label>หมวด (Module)</label>
           <select value={module} onChange={(e) => changeModule(e.target.value)}>
@@ -86,33 +94,6 @@ export default function NewScenarioModal({ s }: { s: Store }) {
           <input id="ed_titleEN" type="text" value={titleEN} onChange={(e) => setTitleEN(e.target.value)} />
         </div>
         <div className="row">
-          <label>ปัญหา</label>
-          <textarea id="ed_when" rows={3} value={when} onChange={(e) => setWhen(e.target.value)} />
-        </div>
-        <div className="row">
-          <label>ขั้นตอน</label>
-          <div>
-            <textarea id="ed_steps" rows={10} value={steps} onChange={(e) => setSteps(e.target.value)} />
-            <div className="hint">
-              ขึ้นต้นด้วยตัวเลข (เช่น <code>1.</code>) &nbsp; ขึ้นต้นด้วย <code>&gt;</code> เพื่อให้เป็นหัวข้อย่อย ·{' '}
-              <code>&gt;&gt;</code> เพื่อให้เป็นหัวข้อย่อยชั้นที่ 3
-            </div>
-          </div>
-        </div>
-        <div className="row">
-          <label>หมายเหตุ</label>
-          <div>
-            <textarea
-              id="ed_note"
-              rows={2}
-              placeholder="(ไม่บังคับ)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-            <div className="hint">แสดงเป็นกล่องแดงเตือนใต้ขั้นตอน · เว้นว่างถ้าไม่ต้องการ</div>
-          </div>
-        </div>
-        <div className="row">
           <label>อ้างอิง</label>
           <input
             id="ed_ref"
@@ -122,6 +103,61 @@ export default function NewScenarioModal({ s }: { s: Store }) {
             onChange={(e) => setRef(e.target.value)}
           />
         </div>
+
+        <div className="row">
+          <label>ไฟล์แนบ</label>
+          <div>
+            <AttachmentRows rows={attRows} onChange={setAttRows} />
+            <button
+              className="btn att-add"
+              type="button"
+              onClick={() => setAttRows([...attRows, newAttachmentRow()])}
+            >
+              + เพิ่มไฟล์แนบ
+            </button>
+            <div className="hint">
+              วางลิงก์ Drive แล้วชื่อไฟล์จะเติมให้อัตโนมัติ · แก้ไขได้ · เว้นว่างจะแสดงเป็น “เอกสารแนบ”
+            </div>
+          </div>
+        </div>
+
+            </div>
+
+            <div className="mf-col">
+              <div className="row">
+                <label>ปัญหา</label>
+                <div>
+                  <textarea id="ed_when" rows={3} value={when} onChange={(e) => setWhen(e.target.value)} />
+                </div>
+              </div>
+              {/* .ta-fill must stay a GRID row — see EditModal.tsx. */}
+              <div className="row ta-fill">
+                <label>ขั้นตอน</label>
+                <div>
+                  <textarea id="ed_steps" rows={10} value={steps} onChange={(e) => setSteps(e.target.value)} />
+                  <div className="hint">
+                    ขึ้นต้นด้วยตัวเลข (เช่น <code>1.</code>) &nbsp; ขึ้นต้นด้วย <code>&gt;</code>{' '}
+                    เพื่อให้เป็นหัวข้อย่อย · <code>&gt;&gt;</code> เพื่อให้เป็นหัวข้อย่อยชั้นที่ 3
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <label>หมายเหตุ</label>
+                <div>
+                  <textarea
+                    id="ed_note"
+                    rows={2}
+                    placeholder="(ไม่บังคับ)"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                  <div className="hint">แสดงเป็นกล่องแดงเตือนใต้ขั้นตอน · เว้นว่างถ้าไม่ต้องการ</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="actions">
           <button className="btn" onClick={s.closeNewScenario}>
             ยกเลิก

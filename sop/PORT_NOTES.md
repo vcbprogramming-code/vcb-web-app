@@ -4,7 +4,46 @@ This folder is a **live mirror** of the canonical app. Source of truth =
 `../index.html` (UI) + `../apps-script/Code.gs` (server contract) + `../data/sop.json`
 (seed data). After **any** change to those, re-sync the affected piece here.
 
-- **Last synced from:** the live `script.google.com` deployment **@82** (2026-08-06).
+- **Last synced from:** the live `script.google.com` deployment **@116** (2026-08-29).
+
+  **@82→@116 pass.** The mirror could *display* attachments but had no way to edit
+  them, and the edit modal was still the old 780px box. Transplanted piece by piece
+  rather than copying the folder — this mirror carries `ExtraModuleChecks.tsx`,
+  `NewScenarioModal.tsx` and `STATUS.md` that the source repo's `react-preview/`
+  does not, and a wholesale copy would have destroyed them.
+  - **Full-screen edit + create modals.** `.modal-full` shell, two-column `.mf-grid`
+    body, ปัญหา/หมายเหตุ fixed and ขั้นตอน on `.ta-fill` absorbing the remainder.
+    อ้างอิง moved into the left metadata column to match canonical field order.
+    **`.ta-fill` must stay a grid row** — making it a flex column inherits
+    `align-items:start` from `.modal .row` and packs the textarea to its content
+    width, which is a bug that shipped three times upstream before it was understood.
+  - **Attachment editing** — new `src/components/AttachmentRows.tsx` (name + URL +
+    delete per file). `attachments` added to `ScenarioEdit`/`ScenarioCreate` and to
+    the `editScenario`/`createScenario` mocks; without that the field had nowhere to
+    round-trip. Wired into **both** `EditModal.tsx` and `NewScenarioModal.tsx`.
+  - **Swap target is a grouped `<select>`**, not free text (canonical @93, never
+    mirrored). Added the `swapPick` i18n key, which was missing here entirely — `t()`
+    is typed `(key: string) => any`, so it would have rendered blank with no error.
+  - **CSS re-extracted verbatim** (758 → 907 lines). Brings the dark-mode contrast
+    fixes (flow Start/End pills were 1.06:1 — invisible) **and the iPad layout fix**:
+    the attachments rail stacked only below 1180px, so at 1366px it still took a hard
+    238px and the case title wrapped one word per line. It now stacks below 1600px as
+    a compact chip strip, and the body grid gained a 1440px step.
+
+  **The Drive filename auto-fill is inert here.** `getDriveFileName()` exists and is
+  wired, but always resolves `{name:''}` — reading Drive metadata needs an
+  authenticated server call, this port has no server, and the browser can't fetch it
+  directly. That is also the real function's failure shape, and the caller already
+  treats it as "leave the field alone", so the editor degrades to manual typing. The
+  guards around it are fully ported: a row locks the moment the admin types in it, a
+  stored label is never overwritten, and the async handler re-checks the lock, the
+  name, and that the URL hasn't changed mid-flight.
+
+  **Verified:** typecheck ✓ · build ✓ · attachment helpers unit-tested (12 assertions)
+  · i18n parity checked by importing the compiled config (85 keys each side).
+  **Not browser-verified** — no headless tooling available in that environment.
+
+  Previous marker: **@82** (2026-08-06).
   Brought in everything shipped since `@77`: **shareable direct links** — a
   Share button (`ShareButton` in `DetailPane.tsx`) on both case-study and
   process-flow detail views copies a URL (`?case=N` / `?flow=ID`, built by

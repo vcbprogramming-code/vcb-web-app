@@ -816,3 +816,12 @@ on `isAdmin`/`isEditor` everywhere.
    the GAS app now shows. Deliberately not adding an uncalled `canSeeProject`
    helper here: a rule nothing calls is exactly the dead code that let the
    per-email ACL look implemented for months while granting nothing.
+6. **Tablet-portrait list overlay** is not ported. The GAS app turns the
+   meeting list into a slide-over below 900px (a ☰ toggle, `openList` /
+   `closeList`, tap-to-dismiss) so the A4 document has room to be read; at
+   820px three columns leave it ~390px, which is present but not readable.
+   Only the two column-narrowing bands (1200px, 1040px) are mirrored here —
+   porting the 900px CSS without the toggle would hide this list with nothing
+   able to bring it back. The document scaler (`fitScaleToPane`) is likewise
+   GAS-only: it exists to fit a Paged.js-paginated iframe, which this mirror
+   does not render.

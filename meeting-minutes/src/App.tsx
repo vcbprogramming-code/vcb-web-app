@@ -4,7 +4,7 @@ import { api, getToken } from './api/client'
 import { makeTr } from './lib/i18n'
 import {
   applyLangClass, applyThemeClass, currentLang, currentTheme, isMobile,
-  setMobilePane, type MobilePane, type Range
+  listIsOverlay, setMobilePane, type MobilePane, type Range
 } from './lib/ui'
 import { prefetchLatest, getCached } from './api/contentCache'
 import Topbar from './components/Topbar'
@@ -50,6 +50,10 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [range, setRange] = useState<Range>('all')
+  // Tablet portrait only: the meeting list is a slide-over there so the A4
+  // document has room. Inert at every other width, where .list-open matches
+  // no CSS rule.
+  const [listOpen, setListOpen] = useState(false)
   const [theme, setThemeState] = useState<Theme>(currentTheme())
   const [lang, setLangState] = useState<Lang>(currentLang())
 
@@ -160,6 +164,14 @@ export default function App() {
     return () => document.removeEventListener('click', handler)
   }, [])
 
+  // Leaving the overlay band strands `listOpen`: the CSS stops matching, so
+  // nothing on screen can dismiss it. Clear it on resize instead.
+  useEffect(() => {
+    const onResize = () => { if (!listIsOverlay()) setListOpen(false) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ---- theme / language ----
   const setTheme = (v: Theme) => { setThemeState(v); applyThemeClass(v) }
   const setLang = (v: Lang) => { setLangState(v); applyLangClass(v) }
@@ -168,14 +180,22 @@ export default function App() {
   const pickProject = (id: ProjectId) => {
     setActiveProject(id); setActiveId(null)
     if (isMobile()) setMobilePane('list')
+    // Tablet portrait: the list is off-screen, so choosing a project must
+    // bring it on or the selection appears to do nothing.
+    else if (listIsOverlay()) setListOpen(true)
   }
   const openTimeline = () => {
     setActiveProject(TIMELINE_PROJECT); setActiveId(null)
     if (isMobile()) setMobilePane('list')
+    // Timeline hides the list, the ☰ toggle and the scrim, so anything left
+    // open there could never be dismissed.
+    setListOpen(false)
   }
   const openMeeting = (id: string) => {
     setActiveId(id)
     if (isMobile()) setMobilePane('detail')
+    // Picking from the overlay dismisses it, or the document loads behind.
+    setListOpen(false)
   }
   const onQuery = (q: string) => {
     setQuery(q); queryRef.current = q
@@ -255,7 +275,13 @@ export default function App() {
 
       <Topbar session={session} query={query} onQuery={onQuery} onSettings={() => setSettingsOpen(true)} tr={tr} />
 
-      <div className={'body' + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')}>
+      <div className={'body'
+        + (activeProject === TIMELINE_PROJECT ? ' timeline-mode' : '')
+        // Narrower than timeline-mode: the timeline VIEW is showing, i.e. no
+        // meeting is open. Opening one from a dot keeps activeProject on
+        // TIMELINE, and the rules that hide the list must stop applying then.
+        + (activeProject === TIMELINE_PROJECT && !activeId ? ' timeline-only' : '')
+        + (listOpen ? ' list-open' : '')}>
         <Sidebar
           projects={session.projects} meetings={meetings} byId={byId} isAdmin={session.isAdmin} isEditor={session.isEditor} loaded={loaded}
           active={activeProject} onPick={pickProject} onOpen={openMeeting} onNew={openNew}
@@ -267,11 +293,25 @@ export default function App() {
           activeProject={activeProject} activeId={activeId} query={query} searchMatchIds={searchMatchIds} range={range}
           loaded={loaded} onRange={setRange} onOpen={openMeeting} tr={tr}
         />
-        <main className="detail">
+        {/* Tapping the document dismisses the overlay — the scrim is a
+            ::before on .detail, so the click lands here. onClick rather than
+            a document listener: the click that OPENS the panel starts in the
+            sidebar and never reaches this element, so there is no
+            open-then-immediately-close race to guard against. */}
+        <main className="detail" onClick={() => { if (listOpen) setListOpen(false) }}>
           <div className="mobile-backbar">
             <button type="button" className="mobile-back-btn" data-back-to="list">{tr('backMeetings')}</button>
             <span className="backbar-actions" />
           </div>
+          {/* Tablet portrait only (CSS-gated): the list gives up its column
+              there so the document can be read, and this calls it back. */}
+          <button
+            type="button" className="list-peek" aria-label={tr('meetingsLabel')}
+            onClick={e => { e.stopPropagation(); setListOpen(true) }}
+          >
+            <span className="list-peek-ic">☰</span>
+            <span className="list-peek-lbl">{tr('meetingsLabel')}</span>
+          </button>
           <div id="detailContent" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {detailPane}
           </div>

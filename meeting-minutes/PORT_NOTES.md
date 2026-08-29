@@ -13,9 +13,40 @@ change to the GAS source, diff it against this folder and update only what chang
 
 ## Last synced
 - **GAS source:** `Code.js`, `Auth.js`, `Config.js`, `Index.html`, `JavaScript.html`, `Stylesheet.html`
-- **Synced at:** 2026-08-20
-- **Live deployment referenced:** `@216` (per `PROJECT_SUMMARY.md`); the React build
+- **Synced at:** 2026-08-29
+- **Live deployment referenced:** `@219` (per `PROJECT_SUMMARY.md`); the React build
   does not call it (see *Data layer* below).
+
+- **2026-08-29 — per-project guest lists, and the responsive tablet layout.**
+
+  Two GAS changes landed together and both are mirrored here.
+
+  **Per-project access by named email.** A project is now either 🔓 Public
+  (anyone with the link, no sign-in) or 🔒 Locked (admins, editors and the
+  exact addresses named on it — *not* the whole `@vcb-con.com` domain).
+  `AccessModal.tsx` was rebuilt from a 640px dialog into a full-page
+  workspace: pinned header, Projects/Editors tabs, and a filter matching
+  project names **and** addresses. Each project card carries its own guest
+  list as removable chips, takes a pasted address list, and can copy that
+  list onto other locked projects. `mock.ts` gained a runtime public-override
+  store mirroring `PROJECT_PUBLIC` in Config.js, plus `addProjectViewers` and
+  `copyProjectViewers`; `getProjectAccess` no longer fakes `domain` from the
+  public state. See gap 5 below for what is deliberately *not* mirrored.
+
+  **Responsive layout.** The GAS app was clipping the A4 document on iPads —
+  one breakpoint at 1100px left an iPad Pro ~446px of reading pane against a
+  sheet needing ~900px, with no way to scroll to the lost text. Ported here:
+  the 1200/1040px column bands and the tablet-portrait list overlay. See gap
+  6 for the one deliberate implementation difference (React state vs. a
+  hand-toggled DOM class) and what stays GAS-only.
+
+  **Also tightened, TypeScript-only:** `Tr` was `(key: string) => string`
+  with a `|| key` fallback, so a mistyped key rendered as its own name with
+  no compile *or* runtime error — `tr('meetings')` would have shipped a
+  button labelled "meetings". `I18N` now uses `satisfies Record<Lang, Dict>`
+  instead of a `: Record<Lang, Dict>` annotation (which widened every key to
+  `string` and made `keyof` useless), and `Tr` takes the derived `TrKey`
+  union. Verified by introducing a typo and confirming `tsc` rejects it.
 
 - **2026-08-20 — editor sign-in, PINs, and the shared team PIN.**
 
@@ -816,12 +847,19 @@ on `isAdmin`/`isEditor` everywhere.
    the GAS app now shows. Deliberately not adding an uncalled `canSeeProject`
    helper here: a rule nothing calls is exactly the dead code that let the
    per-email ACL look implemented for months while granting nothing.
-6. **Tablet-portrait list overlay** is not ported. The GAS app turns the
-   meeting list into a slide-over below 900px (a ☰ toggle, `openList` /
-   `closeList`, tap-to-dismiss) so the A4 document has room to be read; at
-   820px three columns leave it ~390px, which is present but not readable.
-   Only the two column-narrowing bands (1200px, 1040px) are mirrored here —
-   porting the 900px CSS without the toggle would hide this list with nothing
-   able to bring it back. The document scaler (`fitScaleToPane`) is likewise
-   GAS-only: it exists to fit a Paged.js-paginated iframe, which this mirror
-   does not render.
+6. **Document scaler** (`fitScaleToPane` / `applyMobileScale`) is GAS-only: it
+   exists to fit a Paged.js-paginated iframe into a narrow pane, and this
+   mirror renders no such iframe. The responsive *layout* around it IS ported
+   in full — the 1200/1040px column bands and the tablet-portrait list overlay
+   (☰ toggle, tap-to-dismiss, cleared on resize out of the band and on
+   entering Timeline).
+
+   One deliberate difference in HOW it is ported: the GAS build toggles a
+   `.list-open` class on the DOM by hand and needs a document-level click
+   listener with `.sidebar`/`#listPeek` exemptions, because the click that
+   opens the panel also bubbles to the dismiss handler. Here `listOpen` is
+   React state and the class is derived in the render, so dismissal is an
+   `onClick` on `.detail` — the opening click starts in the sidebar and never
+   reaches that element, so the open-then-immediately-close race does not
+   exist and needs no exemptions. `tools/layout-checks/css-audit-react.js`
+   audits this mirror's stylesheet the same way the GAS one is audited.

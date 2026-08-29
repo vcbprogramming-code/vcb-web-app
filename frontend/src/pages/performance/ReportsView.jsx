@@ -18,6 +18,12 @@ const GROUPS = [
 ];
 const iso = (d) => d.toISOString().slice(0, 10);
 
+/**
+ * §7/§8 read across every project the viewer is allowed to see, not just the
+ * one selected above — "manpower by project" with a single project in it is not
+ * a comparison, and the monthly report is explicitly required to cover them all.
+ * The site picker still scopes the audit trail, which is about one site's rows.
+ */
 export default function ReportsView({ site }) {
   const t = useT();
   const toast = useToast();
@@ -34,7 +40,7 @@ export default function ReportsView({ site }) {
   const load = useCallback(() => {
     setBusy(true);
     Promise.all([
-      perfApi.manpower({ from, to, site }),
+      perfApi.manpower({ from, to }),
       perfApi.mandayReport({ from, to, groupBy }),
       perfApi.workAudit({ site, from, to }),
       perfApi.alerts(),

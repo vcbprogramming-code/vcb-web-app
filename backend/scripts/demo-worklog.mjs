@@ -76,6 +76,23 @@ async function load() {
     }
   }
 
+  // a few trail entries so the audit panel shows the shape of a real one during
+  // the walkthrough, rather than an empty box that reads as a broken feature
+  const actor = (await query("select id, full_name from profiles where role = 'admin' order by created_at limit 1")).rows[0];
+  const sample = emps.slice(0, 3);
+  for (const [i, e] of sample.entries()) {
+    const day = ds(new Date(today.getTime() - (i + 1) * 86400000));
+    const log = (await query('select id from work_logs where employee_id = $1 and ymd = $2', [e.id, day])).rows[0];
+    await query(
+      `insert into work_log_audit (work_log_id, employee_id, unit_id, ymd, action, before_val, after_val, reason, actor_id, actor_label)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [log?.id || null, e.id, unit.id, day, i === 2 ? 'verify' : (i === 1 ? 'edit' : 'create'),
+       i === 1 ? JSON.stringify({ manDay: 0.5, workStatus: 'Standby' }) : null,
+       JSON.stringify({ manDay: 1, workStatus: 'ปกติ' }),
+       i === 1 ? 'แก้ตามที่หน้างานแจ้งกลับมา' : null,
+       actor?.id || null, actor?.full_name || 'ผู้ดูแลระบบ']);
+  }
+
   const leaveFrom = ds(new Date(today.getTime() + 2 * 86400000));
   await query(
     `insert into leave_requests (employee_id, unit_id, leave_type, from_date, to_date, reason, requested_by, day_part, days, status)

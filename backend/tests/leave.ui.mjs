@@ -118,7 +118,11 @@ suite('2. ผู้อนุมัติเห็นคิวและตัด�
 // ── 3. อนุมัติแล้วเข้าตารางงาน ─────────────────────────────────────────────
 suite('3. อนุมัติแล้ววันลาเข้าตารางงาน');
 {
-  await call(`/performance/leave/${reqId}/decide`, { method: 'POST', user: A, body: { approve: true } });
+  // §6 ผู้ยื่นกับผู้อนุมัติต้องเป็นคนละคน — ผูกหัวหน้าให้พนักงานคนนี้ก่อน
+  await query('insert into leave_approvers (approver_id, employee_id) values ($1,$2) on conflict do nothing', [U.exec.id, emp.id]);
+  await call(`/performance/leave/${reqId}/decide`, { method: 'POST', user: U.exec, body: { approve: true } });
+  // ปลดการผูกทันที ไม่ให้กระทบข้อถัดไปที่ตรวจว่ายังมีพนักงานที่ไม่มีหัวหน้า
+  await query('delete from leave_approvers where approver_id = $1 and employee_id = $2', [U.exec.id, emp.id]);
   const away = await query('select ymd from employee_away where leave_request_id = $1', [reqId]);
   happy('เขียนวันลาลงตารางงาน 3 วัน', away.rows.length === 3, `${away.rows.length}`);
 

@@ -30,6 +30,10 @@ export const PERMISSION_CATALOG = [
     actions: [
       { key: 'view', label: 'ดูข้อมูล' },
       { key: 'edit', label: 'บันทึก/แก้ไขงานรายวัน' },
+      // The acceptance criteria want the person who checks the numbers to be a
+      // different person from the one who keys them, appointed without a code
+      // change — so verification is its own switch, not a role.
+      { key: 'verify', label: 'ตรวจสอบและยืนยันข้อมูล' },
     ],
   },
   {
@@ -83,7 +87,7 @@ export const PERMISSION_CATALOG = [
 const ROLE_DEFAULTS = {
   executive: {
     ememo: { view: true, create: true, submit: true, settings: false },
-    performance: { view: true, edit: false },
+    performance: { view: true, edit: false, verify: true },
     credit: { view: true, edit: true },
     onboarding: { view: true, edit: false },
     sop: { view: true, edit: false },
@@ -94,7 +98,7 @@ const ROLE_DEFAULTS = {
   },
   hr: {
     ememo: { view: true, create: true, submit: true, settings: false },
-    performance: { view: true, edit: true },
+    performance: { view: true, edit: true, verify: false },
     credit: { view: false, edit: false },
     onboarding: { view: true, edit: true },
     sop: { view: true, edit: false },

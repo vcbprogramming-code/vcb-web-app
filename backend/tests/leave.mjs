@@ -109,10 +109,14 @@ suite('2. หัวหน้าเห็นเฉพาะลูกน้อง�
 suite('3. อนุมัติแล้ววันลาไปขึ้นในตารางงาน');
 {
   const emp = await makeEmployee('อนุมัติแล้ว');
+  // เกณฑ์ตรวจรับ §6: ผู้ยื่นคำขอกับผู้อนุมัติต้องเป็นคนละคน — ผู้ดูแลยื่นแทน
+  // พนักงาน แล้วหัวหน้าที่ถูกผูกไว้เป็นผู้อนุมัติ
   const r = await ask(A, emp, '2026-11-03', '2026-11-05'); mine.reqs.push(r.row.id);
-
-  const dec = await call(`/performance/leave/${r.row.id}/decide`, { method: 'POST', user: A, body: { approve: true, note: 'อนุมัติตามที่ขอ' } });
-  happy('ผู้ดูแลอนุมัติได้', dec.status === 200 && dec.row.status === 'approved', dec.row?.status);
+  await query('insert into leave_approvers (approver_id, employee_id) values ($1,$2) on conflict do nothing', [C.id, emp]);
+  bad('ผู้ยื่นอนุมัติคำขอที่ตัวเองยื่นไม่ได้',
+    (await call(`/performance/leave/${r.row.id}/decide`, { method: 'POST', user: A, body: { approve: true } })).status === 403, '');
+  const dec = await call(`/performance/leave/${r.row.id}/decide`, { method: 'POST', user: C, body: { approve: true, note: 'อนุมัติตามที่ขอ' } });
+  happy('ผู้อนุมัติคนละคนกับผู้ยื่นอนุมัติได้', dec.status === 200 && dec.row.status === 'approved', dec.row?.status || dec.error);
   happy('บันทึกว่าใครเป็นผู้ตัดสิน', Boolean(dec.row?.decided_by_name), dec.row?.decided_by_name);
 
   const away = await query('select ymd from employee_away where leave_request_id = $1 order by ymd', [r.row.id]);
@@ -211,6 +215,8 @@ await query('delete from employees where full_name like $1', [`%${MARK}%`]);
 const left = await query(
   `select (select count(*) from employees where full_name like $1)::int e,
           (select count(*) from leave_requests where reason like $1)::int r`, [`%${MARK}%`]);
+await query('delete from leave_approvers where approver_id = $1 and employee_id = any($2)', [C.id, mine.emps]);
+
 suite('6. ไม่ทิ้งข้อมูลทดสอบไว้');
 happy('ลบพนักงานและคำขอทดสอบหมดแล้ว',
   left.rows[0].e === 0 && left.rows[0].r === 0, JSON.stringify(left.rows[0]));

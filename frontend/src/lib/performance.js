@@ -26,6 +26,21 @@ export const perfApi = {
   updateEmployee: (id, body) => api(`/performance/employees/${id}`, { method: 'PATCH', body }),
   setAway: (id, date, away) => api(`/performance/employees/${id}/away`, { method: 'POST', body: { date, away } }),
 
+  // ── เกณฑ์ตรวจรับ: แรงงาน-วัน ยืนยันข้อมูล ปิดงวด ประวัติ แจ้งเตือน รายงาน ──
+  saveDay: (body) => api('/performance/day', { method: 'POST', body }),
+  verify: (site, from, to, undo) => api('/performance/verify', { method: 'POST', body: { site, from, to, undo } }),
+  periodCloses: (site) => api(`/performance/period-closes${qs({ site })}`),
+  closePeriod: (site, ym, note) => api('/performance/period-close', { method: 'POST', body: { site, ym, note } }),
+  openPeriod: (site, ym, reason) => api('/performance/period-open', { method: 'POST', body: { site, ym, reason } }),
+  workAudit: (params) => api(`/performance/audit${qs(params)}`),
+  teams: (site) => api(`/performance/teams${qs({ site })}`),
+  createTeam: (body) => api('/performance/teams', { method: 'POST', body }),
+  updateTeam: (id, body) => api(`/performance/teams/${id}`, { method: 'PATCH', body }),
+  manpower: (params) => api(`/performance/manpower${qs(params)}`),
+  mandayReport: (params) => api(`/performance/report/manday${qs(params)}`),
+  monthlyReportUrl: (ym) => apiBlobUrl(`/performance/report/monthly.xlsx${qs({ ym })}`),
+  alerts: () => api('/performance/alerts'),
+
   // ระบบลางาน — the request behind a day off
   leaveTypes: () => api('/performance/leave/types'),
   myLeave: () => api('/performance/leave/mine'),

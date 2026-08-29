@@ -4,6 +4,8 @@ import { perfApi } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
+import MandayView from './MandayView.jsx';
+import ReportsView from './ReportsView.jsx';
 import Icon from '../../components/Icon.jsx';
 import EntryView from './EntryView.jsx';
 import Dashboard from './Dashboard.jsx';
@@ -78,6 +80,9 @@ export default function Performance() {
   const tabs = [
     { key: 'dashboard', label: t('ภาพรวม'), show: true },
     { key: 'entry', label: t('ลงบันทึกรายวัน'), show: boot.canEntry },
+    // the two screens the acceptance criteria are written around
+    { key: 'manday', label: t('แรงงาน-วัน'), show: true },
+    { key: 'reports', label: t('รายงานและตรวจสอบ'), show: true },
     { key: 'leave', label: t('การลา'), show: true },
     { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
@@ -112,7 +117,7 @@ export default function Performance() {
         {/* Which site you are looking at matters to both views: the grid shows its
             month, and a leave request is filed for one of its people. Only the
             grid has anything to export. */}
-        {(view === 'entry' || view === 'leave') && boot.sites.length > 0 && (
+        {(view === 'entry' || view === 'leave' || view === 'manday' || view === 'reports') && boot.sites.length > 0 && (
           <div className="ml-auto flex items-center gap-2">
             {view === 'entry' && (
               <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title={t('ส่งออกเป็น Excel')}>
@@ -139,6 +144,14 @@ export default function Performance() {
           ? <NoSites />
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
+
+      {view === 'manday' && (
+        boot.sites.length === 0
+          ? <NoSites />
+          : <MandayView site={siteKey} month={`${cur.y}-${String(cur.m).padStart(2, '0')}`} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
+      )}
+
+      {view === 'reports' && <ReportsView site={siteKey} />}
 
       {view === 'leave' && (
         <LeaveView employees={roster} canEntry={boot.canEntry} onChanged={() => setRosterKey((k) => k + 1)} />

@@ -44,6 +44,14 @@ export default function ReportsView({ site }) {
   }, [from, to, groupBy, site, toast]);
   useEffect(load, [load]);
 
+  const downloadPdf = async () => {
+    try {
+      const url = await perfApi.mandayPdfUrl({ from, to, groupBy });
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+
   const download = async () => {
     try {
       const url = await perfApi.monthlyReportUrl(from.slice(0, 7));
@@ -111,9 +119,14 @@ export default function ReportsView({ site }) {
             {GROUPS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}
           </select>
         </div>
-        <button onClick={download} className="btn-outline ml-auto">
-          <Icon name="download" className="h-4 w-4" /> {t('รายงานเดือนนี้ ทุกโครงการ (Excel)')}
-        </button>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button onClick={downloadPdf} className="btn-outline">
+            <Icon name="document" className="h-4 w-4" /> {t('รายงานนี้เป็น PDF')}
+          </button>
+          <button onClick={download} className="btn-outline">
+            <Icon name="download" className="h-4 w-4" /> {t('รายงานเดือนนี้ ทุกโครงการ (Excel)')}
+          </button>
+        </div>
       </div>
 
       {busy && !manpower ? <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div> : (

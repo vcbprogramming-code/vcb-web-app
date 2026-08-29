@@ -25,7 +25,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 router.param('id', (req, res, next, value) =>
   next(UUID_RE.test(value) ? undefined : new ApiError(404, 'ไม่พบรายการที่ต้องการ')));
 
-const ROLES = ['admin', 'executive', 'hr'];
+// §1 of the work-log acceptance criteria names five levels. recorder and
+// verifier are the two the system was missing: the person who keys the site's
+// day, and the person who signs it off — deliberately different people.
+const ROLES = ['admin', 'executive', 'hr', 'recorder', 'verifier'];
 
 // ===========================================================================
 // Users

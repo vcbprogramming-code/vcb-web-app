@@ -104,4 +104,6 @@ export const roleLabels = {
   admin: 'ผู้ดูแลระบบ',
   executive: 'ผู้บริหาร',
   hr: 'เจ้าหน้าที่ HR',
+  recorder: 'ผู้บันทึกข้อมูลหน้างาน',
+  verifier: 'ผู้ตรวจสอบโครงการ',
 };

@@ -803,3 +803,16 @@ on `isAdmin`/`isEditor` everywhere.
    globals — resets on navigating away and back, same as any other React
    component here (e.g. `MeetingList`'s range filter). Not a behavior gap the
    user would notice; noted for anyone diffing against JavaScript.html.
+5. **Per-project read enforcement** (`canSeeProject_` in `Auth.js`, applied in
+   `listMeetings`/`searchMeetings`/`getMeeting`/`addComment` and both bootstrap
+   builders) is **not** reproduced in the mock. The GAS rule is: a 🔓 Public
+   project is readable by anyone with the link, and a 🔒 Locked one only by
+   admins, editors and the emails named on it — not by the whole
+   `@vcb-con.com` domain. The mock's read paths still gate on the per-row
+   `visible` flag alone, because it derives identity from `?admin=1`/`?editor=1`
+   URL flags and has no concept of an arbitrary signed-in viewer to test the
+   rule against. The **management** side is fully ported (lock/unlock, guest
+   lists, bulk paste, copy-to) and `AccessModal.tsx` is the full-page panel
+   the GAS app now shows. Deliberately not adding an uncalled `canSeeProject`
+   helper here: a rule nothing calls is exactly the dead code that let the
+   per-email ACL look implemented for months while granting nothing.

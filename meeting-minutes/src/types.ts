@@ -200,8 +200,11 @@ export interface ProjectAccess {
   name: string
   nameEn: string
   color: string
+  /** Explicit "all @vcb-con.com staff" opt-in. Off unless an admin sets it. */
   domain: boolean
   emails: string[]
+  /** 🔓 readable by anyone with the link; 🔒 admins, editors and `emails` only. */
+  isPublic: boolean
 }
 
 /** Payload accepted by saveMeeting(). */
@@ -272,8 +275,12 @@ export interface ServerApi {
   saveEdit(id: string, html: string, token: string, meta?: SaveEditMeta): Promise<SaveEditResult>
   getProjectAccess(token: string): Promise<ProjectAccess[]>
   setProjectDomain(projectId: ProjectId, allowDomain: boolean, token: string): Promise<ProjectAccess[]>
+  setProjectPublic(projectId: ProjectId, isPublic: boolean, token: string): Promise<ProjectAccess[]>
   addProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
+  /** Accepts a pasted list (commas/semicolons/spaces/newlines); rejects the whole batch on a bad entry. */
+  addProjectViewers(projectId: ProjectId, emailsText: string, token: string): Promise<ProjectAccess[]>
   removeProjectViewer(projectId: ProjectId, email: string, token: string): Promise<ProjectAccess[]>
+  copyProjectViewers(fromProjectId: ProjectId, toProjectIds: ProjectId[], token: string): Promise<ProjectAccess[]>
   /** The current editor email list. Admin only. Mirrors getEditors in Auth.js. */
   getEditors(token: string): Promise<string[]>
   /** Adds an email to the editor tier (self-service, no redeploy). Admin only.

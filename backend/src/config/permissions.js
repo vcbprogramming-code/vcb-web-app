@@ -96,6 +96,27 @@ const ROLE_DEFAULTS = {
     sysmap: { view: true, edit: false },
     meetings: { view: true, edit: false, manage: false },
   },
+  // ผู้บันทึกข้อมูลหน้างาน — keys the day for the sites they are assigned, and
+  // nothing else. No verification: §5 says the recorder cannot sign their own.
+  recorder: {
+    ememo: { view: false, create: false, submit: false, settings: false },
+    performance: { view: true, edit: true, verify: false },
+    credit: { view: false, edit: false },
+    onboarding: { view: false, edit: false },
+    sop: { view: true, edit: false },
+    sysmap: { view: true, edit: false },
+    meetings: { view: false, edit: false, manage: false },
+  },
+  // หัวหน้าโครงการ / วิศวกรผู้ตรวจสอบ — checks and signs off, does not key.
+  verifier: {
+    ememo: { view: true, create: false, submit: false, settings: false },
+    performance: { view: true, edit: false, verify: true },
+    credit: { view: false, edit: false },
+    onboarding: { view: false, edit: false },
+    sop: { view: true, edit: false },
+    sysmap: { view: true, edit: false },
+    meetings: { view: true, edit: false, manage: false },
+  },
   hr: {
     ememo: { view: true, create: true, submit: true, settings: false },
     performance: { view: true, edit: true, verify: false },

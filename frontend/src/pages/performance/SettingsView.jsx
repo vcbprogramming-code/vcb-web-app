@@ -4,6 +4,7 @@ import { perfApi, perfPrefs } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
 import { useT } from '../../lib/i18n.jsx';
+import ImportEmployees from './ImportEmployees.jsx';
 
 /**
  * Module settings. Server-side: per-site back-date lock window (lock-days).
@@ -34,6 +35,8 @@ export default function SettingsView({ sites, onSitesChange }) {
 
   return (
     <div className="max-w-2xl space-y-5">
+      <ImportEmployees />
+
       {/* display */}
       <section className="card space-y-3">
         <h3 className="font-bold text-slate-800">{t('การแสดงผล')}</h3>

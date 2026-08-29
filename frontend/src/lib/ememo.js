@@ -178,6 +178,8 @@ export const ROLE_LABELS = {
   admin: 'ผู้ดูแลระบบ',
   executive: 'ผู้บริหาร',
   hr: 'เจ้าหน้าที่ HR',
+  recorder: 'ผู้บันทึกข้อมูลหน้างาน',
+  verifier: 'ผู้ตรวจสอบโครงการ',
 };
 
 /** Approval action → Thai label + chip classes. */

@@ -1,7 +1,7 @@
 // API client for Module 2 — daily work-activity log (hr-worklog).
 // Mirrors the backend /api/performance contract (bootstrap / site-month /
 // admin-summary / cell save + activity & cost-category catalogs + employees).
-import { api, apiBlobUrl } from './api.js';
+import { api, apiBlobUrl, apiUpload } from './api.js';
 
 const qs = (o) => {
   const s = new URLSearchParams(Object.entries(o).filter(([, v]) => v != null && v !== '')).toString();
@@ -40,6 +40,16 @@ export const perfApi = {
   mandayReport: (params) => api(`/performance/report/manday${qs(params)}`),
   monthlyReportUrl: (ym) => apiBlobUrl(`/performance/report/monthly.xlsx${qs({ ym })}`),
   alerts: () => api('/performance/alerts'),
+  bulkSave: (body) => api('/performance/bulk', { method: 'POST', body }),
+  mandayPdfUrl: (params) => apiBlobUrl(`/performance/report/manday.pdf${qs(params)}`),
+  importTemplateUrl: () => apiBlobUrl('/performance/import/employees/template.xlsx'),
+  importEmployees: (file, dryRun) =>
+    apiUpload(`/performance/import/employees${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  attachments: (params) => api(`/performance/attachments${qs(params)}`),
+  uploadAttachment: (site, employeeId, date, file) =>
+    apiUpload('/performance/attachments', file, { extra: { site, employeeId, date } }),
+  attachmentUrl: (id) => apiBlobUrl(`/performance/attachments/${id}/file`),
+  deleteAttachment: (id) => api(`/performance/attachments/${id}`, { method: 'DELETE' }),
 
   // ระบบลางาน — the request behind a day off
   leaveTypes: () => api('/performance/leave/types'),

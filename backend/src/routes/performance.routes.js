@@ -3,9 +3,14 @@ import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { query, queryOne } from '../config/db.js';
 import { requireAuth, requireRole, requirePermission } from '../middleware/auth.js';
+import { hasPermission } from '../config/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import multer from 'multer';
 import { buildLeaveSlip } from '../services/leaveSlip.js';
+import { buildMandayReportPdf } from '../services/mandayReportPdf.js';
+import { putObject, deleteObject, openDownloadStream } from '../config/storage.js';
+import { env } from '../config/env.js';
 
 // =============================================================================
 // Module 2 — daily work-ACTIVITY log (hr-worklog). API mirrors the reference
@@ -957,10 +962,11 @@ router.post('/verify', asyncHandler(async (req, res) => {
 }));
 
 /** A verifier is named by permission, so the client can appoint one per site
- *  without a code change (§1). */
+ *  without a code change (§1). Read it through hasPermission — the raw override
+ *  map only holds what an admin changed, so a right that comes from the role
+ *  (the whole point of the verifier role) is not in there. */
 function hasVerifyRight(profile) {
-  const p = profile?.permissions?.performance;
-  return Boolean(p && p.verify === true);
+  return hasPermission(profile, 'performance', 'verify');
 }
 
 // ── §4 closing a month ────────────────────────────────────────────────────
@@ -1222,6 +1228,311 @@ router.get('/alerts', asyncHandler(async (req, res) => {
     }
   }
   res.json({ data: alerts });
+}));
+
+// ── §2 นำเข้าข้อมูลหลักจากไฟล์ Excel ──────────────────────────────────────
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+
+/** Read a sheet as objects keyed by the header row, trimmed. */
+function sheetRows(ws) {
+  const head = [];
+  ws.getRow(1).eachCell((cell, i) => { head[i] = String(cell.value ?? '').trim(); });
+  const out = [];
+  for (let r = 2; r <= ws.rowCount; r += 1) {
+    const row = ws.getRow(r);
+    const obj = {}; let any = false;
+    row.eachCell((cell, i) => {
+      const key = head[i];
+      if (!key) return;
+      let v = cell.value;
+      if (v && typeof v === 'object' && 'text' in v) v = v.text;
+      if (v && typeof v === 'object' && 'result' in v) v = v.result;
+      v = v == null ? '' : String(v).trim();
+      obj[key] = v;
+      if (v) any = true;
+    });
+    if (any) out.push({ _row: r, ...obj });
+  }
+  return out;
+}
+const pick = (o, ...names) => { for (const n of names) if (o[n] !== undefined && o[n] !== '') return o[n]; return ''; };
+
+/**
+ * §2 bring the employee register in from a spreadsheet, and say plainly which
+ * rows did not make it and why. An import that silently drops rows is worse
+ * than typing them by hand, so nothing is written unless the whole file parses,
+ * and every rejection carries its row number.
+ */
+router.post('/import/employees', requirePermission('performance', 'edit'), importUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
+    const dryRun = String(req.query.dryRun || req.body?.dryRun || '') === 'true';
+    const wb = new ExcelJS.Workbook();
+    try { await wb.xlsx.load(req.file.buffer); }
+    catch { throw new ApiError(400, 'อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ Excel (.xlsx)'); }
+    const ws = wb.worksheets[0];
+    if (!ws) throw new ApiError(400, 'ไฟล์นี้ไม่มีชีตข้อมูล');
+
+    const rows = sheetRows(ws);
+    if (!rows.length) throw new ApiError(400, 'ไฟล์นี้ไม่มีข้อมูลใต้หัวตาราง');
+
+    const scoped = scopedUnitIds(req.profile);
+    const units = (await query('select id, code, name from units where code is not null')).rows;
+    const bySiteCode = new Map(units.map((u) => [String(u.code).toLowerCase(), u]));
+    const bySiteName = new Map(units.map((u) => [String(u.name).trim(), u]));
+    const depts = (await query('select id, name from departments')).rows;
+    const positions = (await query('select id, name from positions')).rows;
+    const byDept = new Map(depts.map((d) => [d.name.trim(), d.id]));
+    const byPos = new Map(positions.map((d) => [d.name.trim(), d.id]));
+
+    const ok = []; const failed = [];
+    const seenCodes = new Set();
+    for (const r of rows) {
+      const code = pick(r, 'รหัสพนักงาน', 'employee_code', 'code');
+      const name = pick(r, 'ชื่อ-สกุล', 'ชื่อ', 'full_name', 'name');
+      const siteRaw = pick(r, 'โครงการ', 'หน่วยงาน', 'ไซต์งาน', 'site', 'unit');
+      const kindRaw = pick(r, 'ประเภท', 'สาย', 'kind') || 'operation';
+      const deptName = pick(r, 'แผนก', 'department');
+      const posName = pick(r, 'ตำแหน่ง', 'position');
+      const activeRaw = pick(r, 'สถานะ', 'สถานะการจ้าง', 'is_active');
+
+      const problems = [];
+      if (!name) problems.push('ไม่มีชื่อ-สกุล');
+      if (!siteRaw) problems.push('ไม่ได้ระบุโครงการ');
+      const unit = bySiteCode.get(String(siteRaw).toLowerCase()) || bySiteName.get(String(siteRaw).trim());
+      if (siteRaw && !unit) problems.push(`ไม่พบโครงการ "${siteRaw}"`);
+      if (unit && scoped && !scoped.includes(unit.id)) problems.push('โครงการนี้อยู่นอกขอบเขตของท่าน');
+      // §2 one person, one code — a duplicate would split their history in two
+      if (code) {
+        if (seenCodes.has(code)) problems.push('รหัสพนักงานซ้ำภายในไฟล์เดียวกัน');
+        seenCodes.add(code);
+        const clash = await queryOne('select id, unit_id from employees where employee_code = $1', [code]);
+        if (clash && unit && clash.unit_id !== unit.id) problems.push('รหัสพนักงานนี้มีอยู่แล้วในโครงการอื่น');
+      }
+      const kind = /สนับ|support/i.test(kindRaw) ? 'support' : 'operation';
+      const isActive = !/ลาออก|พ้นสภาพ|inactive|false|0/i.test(activeRaw || '');
+      if (deptName && !byDept.has(deptName.trim())) problems.push(`ไม่พบแผนก "${deptName}"`);
+      if (posName && !byPos.has(posName.trim())) problems.push(`ไม่พบตำแหน่ง "${posName}"`);
+
+      if (problems.length) failed.push({ row: r._row, name, code, reason: problems.join(' · ') });
+      else ok.push({ row: r._row, code: code || null, name, unitId: unit.id, kind, isActive,
+        departmentId: deptName ? byDept.get(deptName.trim()) : null,
+        positionId: posName ? byPos.get(posName.trim()) : null });
+    }
+
+    let imported = 0; let updated = 0;
+    if (!dryRun) {
+      for (const e of ok) {
+        const existing = e.code ? await queryOne('select id from employees where employee_code = $1', [e.code]) : null;
+        if (existing) {
+          await query(
+            `update employees set full_name = $2, unit_id = $3, kind = $4, is_active = $5,
+                    department_id = coalesce($6, department_id), position_id = coalesce($7, position_id), updated_at = now()
+              where id = $1`,
+            [existing.id, e.name, e.unitId, e.kind, e.isActive, e.departmentId, e.positionId]);
+          updated += 1;
+        } else {
+          await query(
+            `insert into employees (unit_id, full_name, employee_code, kind, is_active, department_id, position_id)
+             values ($1,$2,$3,$4,$5,$6,$7)`,
+            [e.unitId, e.name, e.code, e.kind, e.isActive, e.departmentId, e.positionId]);
+          imported += 1;
+        }
+      }
+      await logWork({ actor: req.profile, action: 'import-employees',
+        after: { imported, updated, failed: failed.length, file: req.file.originalname } });
+    }
+    res.json({ data: { dryRun, total: rows.length, imported, updated, failedCount: failed.length, failed, accepted: ok.length } });
+  }));
+
+/** §2 the template, so nobody has to guess the column names. */
+router.get('/import/employees/template.xlsx', asyncHandler(async (req, res) => {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('พนักงาน');
+  ws.columns = [
+    { header: 'รหัสพนักงาน', key: 'code', width: 16 },
+    { header: 'ชื่อ-สกุล', key: 'name', width: 28 },
+    { header: 'โครงการ', key: 'site', width: 26 },
+    { header: 'ประเภท', key: 'kind', width: 14 },
+    { header: 'แผนก', key: 'dept', width: 18 },
+    { header: 'ตำแหน่ง', key: 'pos', width: 18 },
+    { header: 'สถานะ', key: 'status', width: 14 },
+  ];
+  const sample = (await query('select code, name from units where code is not null order by name limit 1')).rows[0];
+  ws.addRow({ code: 'EMP-001', name: 'ตัวอย่าง ชื่อจริง', site: sample?.code || 'รหัสโครงการ',
+    kind: 'ปฏิบัติการ', dept: 'ฝ่ายบุคคล', pos: '', status: 'ปฏิบัติงาน' });
+  ws.getRow(1).font = { bold: true };
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="employee-import-template.xlsx"');
+  await wb.xlsx.write(res);
+  res.end();
+}));
+
+// ── §3 บันทึกทั้งทีมในครั้งเดียว ──────────────────────────────────────────
+const bulkSchema = z.object({
+  site: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  employeeIds: z.array(z.string().uuid()).min(1).max(300),
+  manDay: z.number().min(0).max(1).optional().nullable(),
+  workStatus: z.enum(['ปกติ', 'ล่วงเวลา', 'Standby', 'ลา', 'ขาดงาน']).optional().nullable(),
+  team: z.string().optional().nullable(),
+  adminUnlock: z.boolean().optional(),
+  reason: z.string().optional(),
+  // §3 the same batch sent twice must not double-count; the client sends one id
+  // per press and a replay lands on the same rows
+  batchId: z.string().max(80).optional(),
+});
+
+/**
+ * §3 keying a whole team at once. The site foreman has thirty people who all
+ * did a normal day; making them type thirty identical cells is how days go
+ * unrecorded. Each person is still a row of their own, so everything downstream
+ * — verification, audit, reports — is unchanged.
+ */
+router.post('/bulk', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = bulkSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const d = p.data;
+  const unit = await loadUnitByKey(d.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  if (d.date > addDaysStr(todayStr(), 1)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
+
+  const lockDays = unit.lock_days ?? 3;
+  const closed = await closedMonthsFor(unit.id);
+  if (closed.has(d.date.slice(0, 7))) throw new ApiError(409, 'เดือนนี้ปิดงวดแล้ว แก้ไขข้อมูลไม่ได้');
+  const canUnlock = req.profile.role === 'admin' && d.adminUnlock;
+  if (isLocked(d.date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว');
+  if (isLocked(d.date, lockDays) && canUnlock && !(d.reason || '').trim()) {
+    throw new ApiError(400, 'การแก้ไขข้อมูลที่ล็อกแล้วต้องระบุเหตุผล');
+  }
+
+  const emps = (await query(
+    'select id, kind, is_active from employees where id = any($1) and unit_id = $2', [d.employeeIds, unit.id])).rows;
+  const byId = new Map(emps.map((e) => [e.id, e]));
+  const saved = []; const skipped = [];
+  for (const eid of d.employeeIds) {
+    const e = byId.get(eid);
+    if (!e) { skipped.push({ id: eid, reason: 'ไม่ได้อยู่ในไซต์นี้' }); continue; }
+    if (e.is_active === false) { skipped.push({ id: eid, reason: 'พ้นสภาพแล้ว' }); continue; }
+    const existing = await queryOne(
+      'select id, team, detail, pm, man_day, hours, work_status, verified_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+      [eid, d.date]);
+    if (existing?.verified_at && !canUnlock) { skipped.push({ id: eid, reason: 'ยืนยันแล้ว' }); continue; }
+    const hours = d.manDay != null ? Number((d.manDay * HOURS_PER_DAY).toFixed(2)) : null;
+    const row = await queryOne(
+      `insert into work_logs (employee_id, unit_id, ymd, kind, team, man_day, hours, work_status, status, updated_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,'',$9)
+       on conflict (employee_id, ymd) do update set
+         team = coalesce(excluded.team, work_logs.team),
+         man_day = excluded.man_day, hours = excluded.hours, work_status = excluded.work_status,
+         deleted_at = null, deleted_by = null, updated_by = excluded.updated_by, updated_at = now()
+       returning *`,
+      [eid, unit.id, d.date, e.kind, d.team || null, d.manDay ?? null, hours, d.workStatus ?? null, req.profile.id]);
+    await logWork({ actor: req.profile, workLogId: row.id, employeeId: eid, unitId: unit.id, ymd: d.date,
+      action: existing ? 'edit' : 'create', before: existing ? workFields(existing) : null,
+      after: { ...workFields(row), batch: d.batchId || null }, reason: d.reason || 'บันทึกทั้งทีม' });
+    saved.push(eid);
+  }
+  res.json({ data: { ok: true, saved: saved.length, skipped, batchId: d.batchId || null } });
+}));
+
+// ── §8 รายงานเป็น PDF ─────────────────────────────────────────────────────
+const GROUP_TH = { project: 'รายโครงการ', team: 'รายทีม', worktype: 'รายประเภทงาน', employee: 'รายพนักงาน' };
+router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
+  const from = req.query.from, to = req.query.to;
+  if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
+  const groupBy = Object.keys(GROUP_TH).includes(req.query.groupBy) ? req.query.groupBy : 'project';
+  const scoped = scopedUnitIds(req.profile);
+  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
+  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
+  const W = `where ${where.join(' and ')}`;
+  const md = 'coalesce(w.man_day, 1)';
+  const SQL = {
+    project:  `select u.code key, u.name label, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
+                 from work_logs w join units u on u.id = w.unit_id ${W} group by 1,2 order by 3 desc`,
+    team:     `select coalesce(w.team,'-') key, coalesce(w.team,'(ไม่ระบุทีม)') label, sum(${md})::numeric manday,
+                      count(distinct w.employee_id)::int people from work_logs w ${W} group by 1,2 order by 3 desc`,
+    worktype: `select coalesce(l.work_type_code,'-') key, coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') label,
+                      sum(coalesce(l.man_day, ${md}))::numeric manday, count(distinct w.employee_id)::int people
+                 from work_logs w left join work_log_lines l on l.work_log_id = w.id ${W} group by 1,2 order by 3 desc`,
+    employee: `select e.employee_code key, e.full_name label, sum(${md})::numeric manday, count(*)::int people
+                 from work_logs w join employees e on e.id = w.employee_id ${W} group by 1,2 order by 3 desc`,
+  }[groupBy];
+  const { rows } = await query(SQL, params);
+  const totals = rows.reduce((a, r) => ({ manday: a.manday + Number(r.manday || 0), people: a.people + Number(r.people || 0) }), { manday: 0, people: 0 });
+  const pdf = await buildMandayReportPdf({
+    title: 'รายงานแรงงาน-วัน (Man-day Report)',
+    groupLabel: GROUP_TH[groupBy],
+    meta: reportMeta(req, from, to),
+    rows: rows.map((r) => ({ ...r, manday: Number(r.manday || 0) })),
+    totals,
+  });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="manday-${groupBy}-${from}_${to}.pdf"`);
+  res.end(pdf);
+}));
+
+// ── §11 ไฟล์ประกอบการบันทึก ───────────────────────────────────────────────
+const fileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
+router.post('/attachments', requirePermission('performance', 'edit'), fileUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
+    const site = req.body.site, eid = req.body.employeeId, date = req.body.date;
+    if (!site || !eid || !date) throw new ApiError(400, 'ต้องระบุ site, employeeId และ date');
+    const unit = await loadUnitByKey(site);
+    if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+    assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+    const log = await queryOne('select id from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null', [eid, date]);
+    // multipart filenames arrive latin1-decoded; Thai names come back as mojibake
+    const fileName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const key = `worklog/${unit.id}/${date}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await putObject(key, req.file.buffer, req.file.mimetype || 'application/octet-stream');
+    const row = await queryOne(
+      `insert into work_log_attachments (work_log_id, unit_id, employee_id, ymd, file_name, content_type, size_bytes, storage_key, uploaded_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+      [log?.id || null, unit.id, eid, date, fileName, req.file.mimetype, req.file.size, key, req.profile.id]);
+    await logWork({ actor: req.profile, workLogId: log?.id, employeeId: eid, unitId: unit.id, ymd: date,
+      action: 'attach', after: { file: fileName } });
+    res.status(201).json({ data: row });
+  }));
+
+router.get('/attachments', asyncHandler(async (req, res) => {
+  const { site, employeeId, date } = req.query;
+  if (!site) throw new ApiError(400, 'ต้องระบุไซต์งาน');
+  const unit = await loadUnitByKey(site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  const params = [unit.id]; const where = ['unit_id = $1'];
+  if (employeeId) { params.push(employeeId); where.push(`employee_id = $${params.length}`); }
+  if (date) { params.push(date); where.push(`ymd = $${params.length}`); }
+  const { rows } = await query(`select * from work_log_attachments where ${where.join(' and ')} order by created_at desc`, params);
+  res.json({ data: rows });
+}));
+
+router.get('/attachments/:id/file', asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from work_log_attachments where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบไฟล์นี้');
+  assertUnitInScope(scopedUnitIds(req.profile), row.unit_id);
+  // openDownloadStream hands back { stream, contentType, length } — not the
+  // stream itself; piping the wrapper is a 500 with a very unhelpful message
+  const obj = await openDownloadStream(row.storage_key);
+  if (!obj?.stream) throw new ApiError(404, 'ไม่พบไฟล์ในที่จัดเก็บ');
+  res.setHeader('Content-Type', row.content_type || obj.contentType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(row.file_name)}`);
+  if (obj.length != null) res.setHeader('Content-Length', obj.length);
+  obj.stream.pipe(res);
+}));
+
+router.delete('/attachments/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from work_log_attachments where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบไฟล์นี้');
+  assertUnitInScope(scopedUnitIds(req.profile), row.unit_id);
+  await deleteObject(row.storage_key).catch(() => {});
+  await query('delete from work_log_attachments where id = $1', [req.params.id]);
+  await logWork({ actor: req.profile, unitId: row.unit_id, employeeId: row.employee_id, ymd: row.ymd,
+    action: 'detach', before: { file: row.file_name } });
+  res.json({ data: { deleted: true } });
 }));
 
 export default router;

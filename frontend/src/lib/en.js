@@ -1004,6 +1004,8 @@ export const EN = {
   'ผู้ดูแลระบบ': 'Administrator',
   'ผู้บริหาร': 'Executive',
   'เจ้าหน้าที่ HR': 'HR officer',
+  'ผู้บันทึกข้อมูลหน้างาน': 'Site recorder',
+  'ผู้ตรวจสอบโครงการ': 'Project verifier',
 
   // ── สถานะเอกสารและผลการพิจารณา ──────────────────────────────────────────
   'ฉบับร่าง': 'Draft',
@@ -1359,4 +1361,39 @@ export const EN = {
   'รหัสพนักงาน': 'Employee code',
   'ชื่อ-สกุล': 'Name',
   'สถานะการทำงาน': 'Working status',
+
+  // ── เกณฑ์ตรวจรับ: นำเข้า Excel · บันทึกทั้งทีม · ออฟไลน์ · ไฟล์ · PDF ────
+  'นำเข้าทะเบียนพนักงานจาก Excel': 'Import the employee register from Excel',
+  'คอลัมน์ที่รองรับ: รหัสพนักงาน · ชื่อ-สกุล · โครงการ · ประเภท · แผนก · ตำแหน่ง · สถานะ — รหัสพนักงานที่มีอยู่แล้วจะถูกปรับปรุง ไม่สร้างซ้ำ':
+    'Columns understood: employee code · name · project · type · department · position · status — an existing code is updated, never duplicated',
+  'เลือกไฟล์ Excel': 'Choose an Excel file',
+  'ตรวจไฟล์ก่อน': 'Check the file first',
+  'นำเข้าจริง': 'Import for real',
+  'ดาวน์โหลดไฟล์ตัวอย่าง': 'Download a template',
+  'นำเข้าแล้ว {n} คน · ปรับปรุง {u} คน': 'Imported {n} · updated {u}',
+  'ผ่านเงื่อนไข': 'Accepted',
+  'เพิ่มใหม่': 'Added',
+  'ปรับปรุง': 'Updated',
+  'แถวที่': 'Row',
+  'เหตุผลที่ไม่ผ่าน': 'Why it was rejected',
+  'ยังไม่ได้บันทึกลงระบบ — กด “นำเข้าจริง” เมื่อตรวจรายการข้างต้นแล้ว':
+    'Nothing has been saved yet — press "Import for real" once you have read the list above',
+  'บันทึกทั้งทีม': 'Record the whole team',
+  'เลือกแล้ว {n} คน': '{n} selected',
+  'บันทึกให้ทุกคนที่เลือก': 'Apply to everyone selected',
+  'เลือกทั้งหมด': 'Select all',
+  'ล้างที่เลือก': 'Clear selection',
+  'บันทึกทั้งทีมแล้ว {n} คน': 'Recorded for {n} people',
+  'ข้าม {n} คน ({why})': 'Skipped {n} ({why})',
+  'ขณะนี้ออฟไลน์ — ข้อมูลที่บันทึกจะถูกเก็บไว้และส่งให้อัตโนมัติเมื่อกลับมาออนไลน์':
+    'You are offline — what you enter is kept and sent automatically when the connection returns',
+  'ออฟไลน์อยู่ — เก็บไว้ส่งเมื่อกลับมาออนไลน์': 'Offline — kept, and sent when you are back',
+  'มี {n} รายการรอส่ง': '{n} waiting to be sent',
+  'ส่งข้อมูลที่ค้างไว้แล้ว {n} รายการ': 'Sent {n} entries that were waiting',
+  'มี {n} รายการที่ส่งไม่ได้เพราะวันนั้นถูกล็อกหรือยืนยันแล้ว':
+    '{n} could not be sent — those days are locked or already verified',
+  'ไฟล์ประกอบ': 'Files',
+  'แนบ': 'Attach',
+  'แนบไฟล์แล้ว': 'File attached',
+  'รายงานนี้เป็น PDF': 'This report as PDF',
 };

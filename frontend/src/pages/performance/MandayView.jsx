@@ -5,6 +5,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
+import { enqueue, flush, onReconnect, pendingCount } from '../../lib/offlineQueue.js';
 
 /**
  * แรงงาน-วัน — the measure the acceptance criteria are written in.
@@ -31,6 +32,13 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState('');
   const [closes, setCloses] = useState([]);
+  const [picked, setPicked] = useState(() => new Set());
+  const [bulkMd, setBulkMd] = useState('1');
+  const [bulkStatus, setBulkStatus] = useState('ปกติ');
+  const [queued, setQueued] = useState(() => pendingCount());
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [files, setFiles] = useState([]);
+  const [fileFor, setFileFor] = useState(null);
 
   const load = useCallback(() => {
     if (!site) return;
@@ -40,13 +48,39 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   }, [site, month, toast]);
   useEffect(load, [load]);
 
+  // §11 evidence for the day in view
+  useEffect(() => {
+    if (!site) return;
+    perfApi.attachments({ site, date }).then((r) => setFiles(r.data || [])).catch(() => setFiles([]));
+  }, [site, date, busy]);
+
+  // §3 whatever was keyed while the signal was gone goes up when it returns
+  const drain = useCallback(async () => {
+    if (!pendingCount()) return;
+    const r = await flush((item) => perfApi.saveDay(item.body));
+    setQueued(pendingCount());
+    if (r.sent) { toast.success(t('ส่งข้อมูลที่ค้างไว้แล้ว {n} รายการ', { n: r.sent })); load(); }
+    if (r.dropped) toast.error(t('มี {n} รายการที่ส่งไม่ได้เพราะวันนั้นถูกล็อกหรือยืนยันแล้ว', { n: r.dropped }));
+  }, [toast, t, load]);
+  useEffect(() => {
+    const on = () => { setOnline(true); drain(); };
+    const off = () => setOnline(false);
+    window.addEventListener('offline', off);
+    const stop = onReconnect(on);
+    if (navigator.onLine) drain();
+    return () => { window.removeEventListener('offline', off); stop(); };
+  }, [drain]);
+
   const dayState = useMemo(() => {
     const d = (data?.days || []).find((x) => x.date === date);
     return d?.state || 'editable';
   }, [data, date]);
   const locked = dayState === 'locked' || dayState === 'closed';
   const rows = data?.employees || [];
-  const entriesFor = (eid) => data?.entries?.[eid]?.[date] || {};
+  // site-month returns rows shaped {eid, name, emp_id} — not the employees table's
+// own column names — so read them as they arrive rather than renaming server-side
+const entriesFor = (eid) => data?.entries?.[eid]?.[date] || {};
+const idOf = (e) => e.eid || e.id;
 
   const save = async (eid, patch) => {
     const cur = entriesFor(eid);
@@ -58,8 +92,52 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
     }
     setBusy(eid);
     try { await perfApi.saveDay(body); toast.success(t('บันทึกแล้ว')); load(); }
-    catch (e) { toast.error(e.message); }
+    catch (e) {
+      // §3 a network failure must not lose what was typed
+      if (e?.network || e?.timeout || !navigator.onLine) {
+        setQueued(enqueue({ key: `day:${eid}:${date}`, body }));
+        toast.info(t('ออฟไลน์อยู่ — เก็บไว้ส่งเมื่อกลับมาออนไลน์'));
+      } else toast.error(e.message);
+    }
     finally { setBusy(''); }
+  };
+
+  // §3 the whole team in one press
+  const saveBulk = async () => {
+    if (!picked.size) return;
+    const body = {
+      site, date, employeeIds: [...picked],
+      manDay: bulkMd === '' ? null : Number(bulkMd),
+      workStatus: bulkStatus || null,
+      batchId: `${date}-${Date.now()}`,
+    };
+    if (locked) {
+      const reason = window.prompt(t('วันนี้ล็อกแล้ว — ระบุเหตุผลในการแก้ไขย้อนหลัง'));
+      if (!reason) return;
+      body.adminUnlock = true; body.reason = reason;
+    }
+    setBusy('bulk');
+    try {
+      const r = await perfApi.bulkSave(body);
+      toast.success(t('บันทึกทั้งทีมแล้ว {n} คน', { n: r.data?.saved ?? 0 }));
+      const skipped = r.data?.skipped || [];
+      if (skipped.length) toast.info(t('ข้าม {n} คน ({why})', { n: skipped.length, why: skipped[0].reason }));
+      setPicked(new Set());
+      load();
+    } catch (e) {
+      if (e?.network || e?.timeout || !navigator.onLine) {
+        setQueued(enqueue({ key: `bulk:${date}:${[...picked].join(',')}`, body }));
+        toast.info(t('ออฟไลน์อยู่ — เก็บไว้ส่งเมื่อกลับมาออนไลน์'));
+      } else toast.error(e.message);
+    } finally { setBusy(''); }
+  };
+
+  const attach = async (eid, file) => {
+    if (!file) return;
+    setBusy(eid);
+    try { await perfApi.uploadAttachment(site, eid, date, file); toast.success(t('แนบไฟล์แล้ว')); }
+    catch (e) { toast.error(e.message); }
+    finally { setBusy(''); setFileFor(null); }
   };
 
   const verify = async (undo) => {
@@ -95,7 +173,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   if (!data) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const closedThis = closes.find((c) => c.ym === date.slice(0, 7));
-  const total = rows.reduce((a, e) => a + Number(entriesFor(e.id).manDay || 0), 0);
+  const total = rows.reduce((a, e) => a + Number(entriesFor(idOf(e)).manDay || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -115,41 +193,88 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
         </div>
       </div>
 
+      {(queued > 0 || !online) && (
+        <div className="card-sm flex items-center gap-2 border-l-4 border-amber-400 text-sm text-slate-700">
+          <Icon name="clock" className="h-4 w-4 text-amber-500" />
+          {!online && <span>{t('ขณะนี้ออฟไลน์ — ข้อมูลที่บันทึกจะถูกเก็บไว้และส่งให้อัตโนมัติเมื่อกลับมาออนไลน์')}</span>}
+          {queued > 0 && <span>{t('มี {n} รายการรอส่ง', { n: queued })}</span>}
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="card-sm flex flex-wrap items-end gap-3">
+          <div className="text-sm font-medium text-slate-600">
+            {t('บันทึกทั้งทีม')} <span className="text-slate-400">({t('เลือกแล้ว {n} คน', { n: picked.size })})</span>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-500">{t('แรงงาน-วัน')}</label>
+            <input type="number" step="0.25" min="0" max="1" value={bulkMd}
+              onChange={(e) => setBulkMd(e.target.value)} className="field !w-24 tabular-nums" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-500">{t('สถานะการทำงาน')}</label>
+            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="field !w-40">
+              {STATUSES.map((s2) => <option key={s2} value={s2}>{t(s2)}</option>)}
+            </select>
+          </div>
+          <button onClick={saveBulk} disabled={!picked.size || busy === 'bulk'} className="btn-primary disabled:opacity-40">
+            <Icon name="check" className="h-4 w-4" /> {t('บันทึกให้ทุกคนที่เลือก')}
+          </button>
+          <button onClick={() => setPicked(new Set(rows.map(idOf)))} className="btn-outline">{t('เลือกทั้งหมด')}</button>
+          <button onClick={() => setPicked(new Set())} className="btn-outline">{t('ล้างที่เลือก')}</button>
+        </div>
+      )}
+
       <div className="card overflow-hidden !p-0">
         <table className="tbl">
           <thead>
             <tr>
+              <th className="tbl-th w-10">
+                <input type="checkbox" aria-label={t('เลือกทั้งหมด')}
+                  checked={rows.length > 0 && picked.size === rows.length}
+                  onChange={(e) => setPicked(e.target.checked ? new Set(rows.map(idOf)) : new Set())} />
+              </th>
               <th className="tbl-th">{t('รหัสพนักงาน')}</th>
               <th className="tbl-th">{t('ชื่อ-สกุล')}</th>
               <th className="tbl-th w-40">{t('แรงงาน-วัน')}</th>
               <th className="tbl-th w-48">{t('สถานะการทำงาน')}</th>
               <th className="tbl-th">{t('บันทึกเมื่อ')}</th>
               <th className="tbl-th">{t('การยืนยัน')}</th>
+              <th className="tbl-th">{t('ไฟล์ประกอบ')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีพนักงานในไซต์นี้')}</td></tr>
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีพนักงานในไซต์นี้')}</td></tr>
             )}
             {rows.map((e) => {
-              const cur = entriesFor(e.id);
+              const eid = idOf(e);
+              const cur = entriesFor(eid);
               return (
-                <tr key={e.id} className="tbl-row">
-                  <td className="tbl-td text-slate-500">{e.employee_code || '—'}</td>
-                  <td className="tbl-td font-medium text-slate-800">{e.full_name}</td>
+                <tr key={eid} className="tbl-row">
+                  <td className="tbl-td">
+                    <input type="checkbox" aria-label={e.name || e.full_name} checked={picked.has(eid)}
+                      onChange={(ev) => setPicked((prev) => {
+                        const n = new Set(prev);
+                        if (ev.target.checked) n.add(eid); else n.delete(eid);
+                        return n;
+                      })} />
+                  </td>
+                  <td className="tbl-td text-slate-500">{e.emp_id || e.employee_code || '—'}</td>
+                  <td className="tbl-td font-medium text-slate-800">{e.name || e.full_name}</td>
                   <td className="tbl-td">
                     <input
                       type="number" step="0.25" min="0" max="1" defaultValue={cur.manDay ?? ''}
-                      disabled={!canEdit || busy === e.id}
+                      disabled={!canEdit || busy === eid}
                       onBlur={(ev) => {
                         const v = ev.target.value === '' ? null : Number(ev.target.value);
-                        if (v !== (cur.manDay ?? null)) save(e.id, { manDay: v });
+                        if (v !== (cur.manDay ?? null)) save(eid, { manDay: v });
                       }}
                       className="field !w-28 tabular-nums" />
                   </td>
                   <td className="tbl-td">
-                    <select value={cur.workStatus || ''} disabled={!canEdit || busy === e.id}
-                      onChange={(ev) => save(e.id, { workStatus: ev.target.value || null })} className="field !w-40">
+                    <select value={cur.workStatus || ''} disabled={!canEdit || busy === eid}
+                      onChange={(ev) => save(eid, { workStatus: ev.target.value || null })} className="field !w-40">
                       <option value="">{t('— ไม่ระบุ —')}</option>
                       {STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
                     </select>
@@ -161,6 +286,14 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                     {cur.verifiedAt
                       ? <span className="chip bg-emerald-50 text-emerald-700">{t('ยืนยันแล้ว')}</span>
                       : <span className="chip bg-slate-100 text-slate-500">{t('บันทึกแล้ว')}</span>}
+                  </td>
+                  <td className="tbl-td">
+                    <label className="cursor-pointer text-sm text-brand hover:underline">
+                      <input type="file" className="hidden" disabled={!canEdit}
+                        onChange={(ev) => attach(eid, ev.target.files?.[0])} />
+                      <Icon name="paperclip" className="mr-1 inline h-4 w-4" />
+                      {files.filter((f) => f.employee_id === eid).length || t('แนบ')}
+                    </label>
                   </td>
                 </tr>
               );

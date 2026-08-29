@@ -56,6 +56,48 @@ function isLocked(ds, lockDays) {
   if (!lockDays || lockDays <= 0) return false;
   return ds < addDaysStr(today, -lockDays);
 }
+
+/**
+ * §4 wants three states on screen, not two: a day that is still open, a day
+ * about to close, and a day that has closed. "About to close" is what actually
+ * changes behaviour — it is the last chance to fix something.
+ */
+const DUE_SOON_DAYS = 1;
+function lockState(ds, lockDays, closedMonths = new Set()) {
+  if (closedMonths.has(ds.slice(0, 7))) return 'closed';
+  if (isLocked(ds, lockDays)) return 'locked';
+  if (lockDays > 0 && ds <= addDaysStr(todayStr(), -(lockDays - DUE_SOON_DAYS))) return 'due-soon';
+  return 'editable';
+}
+
+/** Months already closed for a unit — a close outranks the rolling window. */
+async function closedMonthsFor(unitId) {
+  const { rows } = await query('select ym from period_closes where unit_id = $1', [unitId]);
+  return new Set(rows.map((r) => r.ym));
+}
+
+/**
+ * §9. The module kept no history of its own — E-Memo's audit_log covers
+ * documents only — so a figure could change with nothing to show who changed it
+ * or why. Every write goes through here.
+ */
+async function logWork({ actor, workLogId, employeeId, unitId, ymd: day, action, before, after, reason }) {
+  await query(
+    `insert into work_log_audit (work_log_id, employee_id, unit_id, ymd, action, before_val, after_val, reason, actor_id, actor_label)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [workLogId || null, employeeId || null, unitId || null, day || null, action,
+     before ? JSON.stringify(before) : null, after ? JSON.stringify(after) : null,
+     reason || null, actor?.id || null, actor?.full_name || actor?.email || null]
+  ).catch(() => {});
+}
+
+/** The fields §3 asks to be recorded, as they are stored. */
+const workFields = (r) => ({
+  team: r?.team ?? null, detail: r?.detail ?? null, pm: r?.pm ?? null,
+  manDay: r?.man_day == null ? null : Number(r.man_day),
+  hours: r?.hours == null ? null : Number(r.hours),
+  workStatus: r?.work_status ?? null,
+});
 const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
 const siteOut = (u) => ({ key: u.code, name: u.name, company: u.company, color: u.color, lockDays: u.lock_days ?? 3 });
@@ -281,7 +323,10 @@ router.get('/site-month', asyncHandler(async (req, res) => {
   }
   const month = `${Y}-${pad(M)}`;
   const employees = await employeesForUnit(unit.id, month);
-  const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+  const logs = (await query(
+    `select employee_id, ymd, team, detail, pm, man_day, hours, work_status, entry_at, updated_at, verified_at
+       from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null`,
+    [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
   const entries = {};
   for (const l of logs) {
     const ds = dateStr(l.ymd);
@@ -289,8 +334,17 @@ router.get('/site-month', asyncHandler(async (req, res) => {
     if (l.team) cell.team = l.team;
     if (l.detail) cell.detail = l.detail;
     if (l.pm) cell.pm = l.pm;
+    if (l.man_day != null) cell.manDay = Number(l.man_day);
+    if (l.hours != null) cell.hours = Number(l.hours);
+    if (l.work_status) cell.workStatus = l.work_status;
+    // §3 the day it describes and the moment it was keyed are different facts
+    if (l.entry_at) cell.entryAt = l.entry_at;
+    if (l.updated_at) cell.updatedAt = l.updated_at;
+    if (l.verified_at) cell.verifiedAt = l.verified_at;
     if (Object.keys(cell).length) (entries[l.employee_id] ||= {})[ds] = cell;
   }
+  const closedMonths = await closedMonthsFor(unit.id);
+  for (const d of days) d.state = lockState(d.date, unit.lock_days ?? 3, closedMonths);
   const teams = (await loadActivities()).map(activityOut);
   const costs = (await loadCategories()).map((c) => ({ code: c.code, name: c.name }));
   res.json({
@@ -307,6 +361,11 @@ const cellSaveSchema = z.object({
   field: z.enum(['team', 'detail', 'pm']),
   value: z.string().optional().default(''),
   adminUnlock: z.boolean().optional(),
+  // §4 unlocking a closed day has to say why, and the reason is kept
+  reason: z.string().optional(),
+  // §12 what the client believed it was editing; a mismatch means someone else
+  // saved first and this write would silently overwrite them
+  seenAt: z.string().optional(),
 });
 router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = cellSaveSchema.safeParse(req.body);
@@ -319,16 +378,41 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   if (!emp || emp.unit_id !== unit.id) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
   if (emp.is_active === false) throw new ApiError(400, 'พนักงานคนนี้ถูกปิดการใช้งานแล้ว');
 
+  // §3 validation — a day in the future is a typo, not a record of work
+  if (date > addDaysStr(todayStr(), 1)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
+
   const lockDays = unit.lock_days ?? 3;
+  const closed = await closedMonthsFor(unit.id);
+  if (closed.has(date.slice(0, 7))) throw new ApiError(409, 'เดือนนี้ปิดงวดแล้ว แก้ไขข้อมูลไม่ได้');
   const canUnlock = req.profile.role === 'admin' && adminUnlock;
   if (isLocked(date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว (ผู้ดูแลระบบปลดล็อกได้)');
+  // §4 an override is allowed, but never silently
+  if (isLocked(date, lockDays) && canUnlock && !(p.data.reason || '').trim()) {
+    throw new ApiError(400, 'การแก้ไขข้อมูลที่ล็อกแล้วต้องระบุเหตุผล');
+  }
 
-  const existing = await queryOne('select team, detail, pm from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
+  const existing = await queryOne(
+    'select id, team, detail, pm, man_day, hours, work_status, verified_at, updated_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+    [eid, date]
+  );
+  // §12 two people on the same cell: the second one is told, not ignored
+  if (existing && p.data.seenAt && new Date(p.data.seenAt).getTime() < new Date(existing.updated_at).getTime() - 1000) {
+    throw new ApiError(409, 'มีผู้อื่นแก้ไขช่องนี้ไปแล้ว กรุณาโหลดข้อมูลใหม่ก่อนบันทึกทับ');
+  }
+  // §5 a verified day is a statement someone signed; re-open it to change it
+  if (existing?.verified_at && !canUnlock) throw new ApiError(409, 'ข้อมูลวันนี้ถูกยืนยันแล้ว ต้องยกเลิกการยืนยันก่อนแก้ไข');
+
+  const before = existing ? workFields(existing) : null;
   const next = { team: existing?.team || null, detail: existing?.detail || null, pm: existing?.pm || null };
   next[field] = value && value.trim() ? value.trim() : null;
 
   if (!next.team && !next.detail && !next.pm) {
-    await query('delete from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
+    // §9 a delete stays visible — the row is marked, never removed
+    if (existing) {
+      await query('update work_logs set deleted_at = now(), deleted_by = $2, updated_at = now() where id = $1', [existing.id, req.profile.id]);
+      await logWork({ actor: req.profile, workLogId: existing.id, employeeId: eid, unitId: unit.id, ymd: date,
+        action: 'delete', before, after: null, reason: p.data.reason });
+    }
     return res.json({ data: { ok: true, cleared: true } });
   }
   await query(
@@ -339,7 +423,11 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
        pm=excluded.pm, updated_by=excluded.updated_by, updated_at=now()`,
     [eid, unit.id, date, emp.kind, next.team, next.detail, next.pm, req.profile.id]
   );
-  res.json({ data: { ok: true } });
+  const saved = await queryOne('select id, team, detail, pm, man_day, hours, work_status, updated_at from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
+  await logWork({ actor: req.profile, workLogId: saved?.id, employeeId: eid, unitId: unit.id, ymd: date,
+    action: existing ? 'edit' : 'create', before, after: workFields(saved),
+    reason: p.data.reason || (canUnlock && isLocked(date, lockDays) ? 'แก้ไขย้อนหลังโดยผู้ดูแลระบบ' : null) });
+  res.json({ data: { ok: true, updatedAt: saved?.updated_at } });
 }));
 
 // ── admin summary (dashboard) ────────────────────────────────────────────────
@@ -555,6 +643,10 @@ const leaveSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: z.string().trim().max(1000).optional().default(''),
+  // §6 a half day is a real case, and counting it as one distorts man-days
+  dayPart: z.enum(['full', 'first_half', 'second_half']).optional().default('full'),
+  attachmentUrl: z.string().url().optional().nullable(),
+  attachmentName: z.string().max(300).optional().nullable(),
 });
 
 /** POST /api/performance/leave — ask for leave (HR files it for the employee). */
@@ -584,13 +676,27 @@ router.post('/leave', requirePermission('performance', 'edit'), asyncHandler(asy
       `ช่วงวันที่ทับกับคำขอที่มีอยู่แล้ว (${String(clash.from_date).slice(0, 10)} ถึง ${String(clash.to_date).slice(0, 10)})`);
   }
 
+  // §6 half a day only makes sense on a single day
+  const dayPart = p.data.dayPart || 'full';
+  if (dayPart !== 'full' && from !== to) throw new ApiError(400, 'ลาครึ่งวันเลือกได้เฉพาะวันเดียว');
+  const spanDays = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+  const days = dayPart === 'full' ? spanDays : 0.5;
+
+  // §6 warn when the days asked for already carry work — the recorder needs to
+  // know they are about to contradict something already entered
+  const worked = (await query(
+    `select ymd from work_logs where employee_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null order by ymd`,
+    [employeeId, from, to])).rows.map((r) => dateStr(r.ymd));
+
   const row = await queryOne(
-    `insert into leave_requests (employee_id, unit_id, leave_type, from_date, to_date, reason, requested_by)
-     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-    [employeeId, emp.unit_id, leaveType, from, to, reason, req.profile.id]
+    `insert into leave_requests (employee_id, unit_id, leave_type, from_date, to_date, reason, requested_by,
+                                day_part, days, attachment_url, attachment_name)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
+    [employeeId, emp.unit_id, leaveType, from, to, reason, req.profile.id,
+     dayPart, days, p.data.attachmentUrl || null, p.data.attachmentName || null]
   );
   const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);
-  res.status(201).json({ ok: true, row: leaveOut(full) });
+  res.status(201).json({ ok: true, row: leaveOut(full), warnWorkedDays: worked });
 }));
 
 /** POST /api/performance/leave/:id/decide — approve or refuse one request. */
@@ -609,10 +715,14 @@ router.post('/leave/:id/decide', asyncHandler(async (req, res) => {
   if (ids !== null && !ids.includes(row.employee_id)) {
     throw new ApiError(403, 'ท่านไม่ได้เป็นผู้อนุมัติของพนักงานคนนี้');
   }
-  // Deciding your own request is not a decision.
-  if (row.requested_by === req.profile.id && req.profile.role !== 'admin') {
+  // Deciding your own request is not a decision. The acceptance criteria say
+  // "no person may approve their own request" with no exception, so the admin
+  // carve-out that used to be here is gone.
+  if (row.requested_by === req.profile.id) {
     throw new ApiError(403, 'ผู้ยื่นคำขอตัดสินคำขอของตัวเองไม่ได้');
   }
+  const self = await queryOne('select id from employees where id = $1 and lower(email) = lower($2)', [row.employee_id, req.profile.email || '']);
+  if (self) throw new ApiError(403, 'อนุมัติคำขอลาของตนเองไม่ได้');
 
   const status = p.data.approve ? 'approved' : 'rejected';
   await query(
@@ -711,6 +821,407 @@ router.put('/leave/approvers/:approverId', requireRole('admin'), asyncHandler(as
     );
   }
   res.json({ ok: true, count: p.data.employeeIds.length });
+}));
+
+// =============================================================================
+// Acceptance criteria (UAT) — what the client's document asks for that the
+// diary did not carry: how much manpower a day cost, who checked it, when it
+// was closed, and a trail of every change.
+// =============================================================================
+
+// ── §3 man-day, hours and working status ──────────────────────────────────
+const daySchema = z.object({
+  site: z.string().min(1),
+  eid: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  manDay: z.number().min(0).max(1).optional().nullable(),
+  hours: z.number().min(0).max(24).optional().nullable(),
+  workStatus: z.enum(['ปกติ', 'ล่วงเวลา', 'Standby', 'ลา', 'ขาดงาน']).optional().nullable(),
+  // §3 one person may spend a day across several activities; the parts may not
+  // add up to more than one man-day, which is the whole point of the measure
+  lines: z.array(z.object({
+    workTypeCode: z.string().optional().nullable(),
+    workTypeName: z.string().optional().nullable(),
+    costCode: z.string().optional().nullable(),
+    manDay: z.number().positive().max(1),
+    hours: z.number().min(0).max(24).optional().nullable(),
+    workStatus: z.string().optional().nullable(),
+    note: z.string().optional().nullable(),
+  })).optional(),
+  adminUnlock: z.boolean().optional(),
+  reason: z.string().optional(),
+});
+const HOURS_PER_DAY = 8;
+
+router.post('/day', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = daySchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const d = p.data;
+  const unit = await loadUnitByKey(d.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+
+  const emp = await queryOne('select id, unit_id, kind, is_active from employees where id = $1', [d.eid]);
+  if (!emp || emp.unit_id !== unit.id) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  // §3 a person who has left cannot have worked
+  if (emp.is_active === false) throw new ApiError(400, 'พนักงานคนนี้พ้นสภาพแล้ว บันทึกงานไม่ได้');
+  if (d.date > addDaysStr(todayStr(), 1)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
+
+  const lockDays = unit.lock_days ?? 3;
+  const closed = await closedMonthsFor(unit.id);
+  if (closed.has(d.date.slice(0, 7))) throw new ApiError(409, 'เดือนนี้ปิดงวดแล้ว แก้ไขข้อมูลไม่ได้');
+  const canUnlock = req.profile.role === 'admin' && d.adminUnlock;
+  if (isLocked(d.date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว');
+  if (isLocked(d.date, lockDays) && canUnlock && !(d.reason || '').trim()) {
+    throw new ApiError(400, 'การแก้ไขข้อมูลที่ล็อกแล้วต้องระบุเหตุผล');
+  }
+
+  const lines = d.lines || [];
+  const lineTotal = lines.reduce((a, l) => a + Number(l.manDay), 0);
+  if (lines.length && lineTotal > 1.0001) {
+    throw new ApiError(400, `รวมแรงงาน-วันของวันนี้ได้ ${lineTotal.toFixed(2)} ซึ่งเกิน 1 แรงงาน-วัน`);
+  }
+  const manDay = lines.length ? Number(lineTotal.toFixed(2)) : (d.manDay ?? null);
+  if (manDay != null && manDay > 1.0001) throw new ApiError(400, 'แรงงาน-วันต่อคนต่อวันเกิน 1 ไม่ได้');
+  // hours and man-day describe the same day; derive whichever is missing so a
+  // report never has to guess which one the site meant
+  const hours = d.hours ?? (manDay != null ? Number((manDay * HOURS_PER_DAY).toFixed(2)) : null);
+  if (hours != null && hours > 24) throw new ApiError(400, 'จำนวนชั่วโมงต่อวันเกิน 24 ไม่ได้');
+
+  const existing = await queryOne(
+    'select id, team, detail, pm, man_day, hours, work_status, verified_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+    [d.eid, d.date]
+  );
+  if (existing?.verified_at && !canUnlock) throw new ApiError(409, 'ข้อมูลวันนี้ถูกยืนยันแล้ว ต้องยกเลิกการยืนยันก่อนแก้ไข');
+  const before = existing ? workFields(existing) : null;
+
+  const row = await queryOne(
+    `insert into work_logs (employee_id, unit_id, ymd, kind, man_day, hours, work_status, status, updated_by)
+     values ($1,$2,$3,$4,$5,$6,$7,'',$8)
+     on conflict (employee_id, ymd) do update set
+       man_day = excluded.man_day, hours = excluded.hours, work_status = excluded.work_status,
+       deleted_at = null, deleted_by = null, updated_by = excluded.updated_by, updated_at = now()
+     returning *`,
+    [d.eid, unit.id, d.date, emp.kind, manDay, hours, d.workStatus ?? null, req.profile.id]
+  );
+  await query('delete from work_log_lines where work_log_id = $1', [row.id]);
+  for (const l of lines) {
+    await query(
+      `insert into work_log_lines (work_log_id, work_type_code, work_type_name, cost_code, man_day, hours, work_status, note)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [row.id, l.workTypeCode || null, l.workTypeName || null, l.costCode || null,
+       l.manDay, l.hours ?? null, l.workStatus || null, l.note || null]
+    );
+  }
+  await logWork({ actor: req.profile, workLogId: row.id, employeeId: d.eid, unitId: unit.id, ymd: d.date,
+    action: existing ? 'edit' : 'create', before, after: { ...workFields(row), lines: lines.length },
+    reason: d.reason });
+  res.json({ data: { ok: true, manDay, hours, lines: lines.length } });
+}));
+
+// ── §5 verification, by someone who did not key it ────────────────────────
+const verifySchema = z.object({
+  site: z.string().min(1),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  undo: z.boolean().optional(),
+});
+router.post('/verify', asyncHandler(async (req, res) => {
+  const p = verifySchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const { site, from, to, undo } = p.data;
+  // §1/§5 verifying is a separate right from recording — a site recorder may
+  // not sign off their own numbers
+  if (!['admin', 'executive'].includes(req.profile.role) && !hasVerifyRight(req.profile)) {
+    throw new ApiError(403, 'ไม่มีสิทธิ์ยืนยันข้อมูล — สิทธิ์นี้แยกจากผู้บันทึก');
+  }
+  const unit = await loadUnitByKey(site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  if (to < from) throw new ApiError(400, 'ช่วงวันที่ไม่ถูกต้อง');
+
+  const rows = (await query(
+    'select id, employee_id, updated_by, verified_at from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null',
+    [unit.id, from, to])).rows;
+  let done = 0; let skippedOwn = 0;
+  for (const r of rows) {
+    // §5 the recorder and the verifier must be different people
+    if (!undo && r.updated_by && r.updated_by === req.profile.id) { skippedOwn += 1; continue; }
+    await query('update work_logs set verified_by = $2, verified_at = $3, updated_at = now() where id = $1',
+      [r.id, undo ? null : req.profile.id, undo ? null : new Date()]);
+    done += 1;
+  }
+  await logWork({ actor: req.profile, unitId: unit.id, ymd: from, action: undo ? 'unverify' : 'verify',
+    after: { from, to, rows: done } });
+  res.json({ data: { ok: true, verified: done, skippedOwn } });
+}));
+
+/** A verifier is named by permission, so the client can appoint one per site
+ *  without a code change (§1). */
+function hasVerifyRight(profile) {
+  const p = profile?.permissions?.performance;
+  return Boolean(p && p.verify === true);
+}
+
+// ── §4 closing a month ────────────────────────────────────────────────────
+router.get('/period-closes', asyncHandler(async (req, res) => {
+  const unit = req.query.site ? await loadUnitByKey(req.query.site) : null;
+  const { rows } = unit
+    ? await query('select p.*, u.code site from period_closes p join units u on u.id = p.unit_id where unit_id = $1 order by ym desc', [unit.id])
+    : await query('select p.*, u.code site from period_closes p join units u on u.id = p.unit_id order by ym desc limit 200');
+  res.json({ data: rows });
+}));
+const closeSchema = z.object({ site: z.string().min(1), ym: z.string().regex(/^\d{4}-\d{2}$/), note: z.string().optional() });
+router.post('/period-close', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = closeSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const unit = await loadUnitByKey(p.data.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  const row = await queryOne(
+    `insert into period_closes (unit_id, ym, closed_by, note) values ($1,$2,$3,$4)
+     on conflict (unit_id, ym) do nothing returning *`,
+    [unit.id, p.data.ym, req.profile.id, p.data.note || null]);
+  if (!row) throw new ApiError(409, 'เดือนนี้ปิดงวดไปแล้ว');
+  await logWork({ actor: req.profile, unitId: unit.id, action: 'period-close', after: { ym: p.data.ym }, reason: p.data.note });
+  res.json({ data: row });
+}));
+router.post('/period-open', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ site: z.string(), ym: z.string().regex(/^\d{4}-\d{2}$/), reason: z.string().min(1) }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'การเปิดงวดที่ปิดแล้วต้องระบุเหตุผล', p.error?.flatten());
+  const unit = await loadUnitByKey(p.data.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  await query('delete from period_closes where unit_id = $1 and ym = $2', [unit.id, p.data.ym]);
+  await logWork({ actor: req.profile, unitId: unit.id, action: 'period-open', after: { ym: p.data.ym }, reason: p.data.reason });
+  res.json({ data: { ok: true } });
+}));
+
+// ── §9 the trail itself ───────────────────────────────────────────────────
+router.get('/audit', asyncHandler(async (req, res) => {
+  const where = []; const params = [];
+  if (req.query.site) {
+    const unit = await loadUnitByKey(req.query.site);
+    if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+    assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+    params.push(unit.id); where.push(`unit_id = $${params.length}`);
+  } else {
+    const scoped = scopedUnitIds(req.profile);
+    if (scoped) { params.push(scoped); where.push(`unit_id = any($${params.length}::uuid[])`); }
+  }
+  if (req.query.employeeId) { params.push(req.query.employeeId); where.push(`employee_id = $${params.length}`); }
+  if (req.query.from) { params.push(req.query.from); where.push(`ymd >= $${params.length}`); }
+  if (req.query.to) { params.push(req.query.to); where.push(`ymd <= $${params.length}`); }
+  const sql = `select * from work_log_audit ${where.length ? 'where ' + where.join(' and ') : ''} order by created_at desc limit 500`;
+  const { rows } = await query(sql, params);
+  res.json({ data: rows });
+}));
+
+// ── §2 the team register ──────────────────────────────────────────────────
+router.get('/teams', asyncHandler(async (req, res) => {
+  const unit = req.query.site ? await loadUnitByKey(req.query.site) : null;
+  const { rows } = unit
+    ? await query('select t.*, u.code site from teams t join units u on u.id = t.unit_id where t.unit_id = $1 order by t.name', [unit.id])
+    : await query('select t.*, u.code site from teams t join units u on u.id = t.unit_id order by u.name, t.name');
+  res.json({ data: rows });
+}));
+router.post('/teams', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ site: z.string(), name: z.string().min(1), code: z.string().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const unit = await loadUnitByKey(p.data.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  const row = await queryOne(
+    `insert into teams (unit_id, code, name) values ($1,$2,$3)
+     on conflict (unit_id, name) do update set is_active = true, updated_at = now() returning *`,
+    [unit.id, p.data.code || null, p.data.name.trim()]);
+  res.status(201).json({ data: row });
+}));
+router.patch('/teams/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ name: z.string().min(1).optional(), code: z.string().optional().nullable(), isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const sets = []; const vals = [];
+  for (const [k, col] of [['name', 'name'], ['code', 'code'], ['isActive', 'is_active']]) {
+    if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
+  }
+  if (!sets.length) throw new ApiError(400, 'ไม่มีข้อมูลที่เปลี่ยนแปลง');
+  vals.push(req.params.id);
+  const row = await queryOne(`update teams set ${sets.join(', ')}, updated_at = now() where id = $${vals.length} returning *`, vals);
+  if (!row) throw new ApiError(404, 'ไม่พบทีมนี้');
+  res.json({ data: row });
+}));
+
+// ── §7 manpower, as of a day or over a range ──────────────────────────────
+router.get('/manpower', asyncHandler(async (req, res) => {
+  const from = req.query.from || todayStr();
+  const to = req.query.to || from;
+  if (to < from) throw new ApiError(400, 'ช่วงวันที่ไม่ถูกต้อง');
+  const scoped = scopedUnitIds(req.profile);
+  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
+  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
+  if (req.query.site) {
+    const unit = await loadUnitByKey(req.query.site);
+    if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+    assertUnitInScope(scoped, unit.id);
+    params.push(unit.id); where.push(`w.unit_id = $${params.length}`);
+  }
+  if (req.query.team) { params.push(req.query.team); where.push(`w.team = $${params.length}`); }
+  if (req.query.departmentId) { params.push(req.query.departmentId); where.push(`e.department_id = $${params.length}`); }
+  const W = `where ${where.join(' and ')}`;
+
+  // A day with no man-day recorded still used a person, so it counts as one
+  // head; the man-day column stays honest about what was actually measured.
+  const md = 'coalesce(w.man_day, 1)';
+  const [byProject, byTeam, byType, byStatus, totals] = await Promise.all([
+    query(`select u.code site, u.name site_name, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
+             from work_logs w join units u on u.id = w.unit_id join employees e on e.id = w.employee_id ${W}
+            group by u.code, u.name order by manday desc`, params),
+    query(`select coalesce(w.team, '(ไม่ระบุทีม)') team, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
+             from work_logs w join employees e on e.id = w.employee_id ${W} group by 1 order by manday desc limit 50`, params),
+    query(`select coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') work_type, sum(coalesce(l.man_day, ${md}))::numeric manday
+             from work_logs w join employees e on e.id = w.employee_id
+             left join work_log_lines l on l.work_log_id = w.id ${W} group by 1 order by manday desc limit 50`, params),
+    query(`select coalesce(w.work_status, '(ไม่ระบุ)') status, sum(${md})::numeric manday
+             from work_logs w join employees e on e.id = w.employee_id ${W} group by 1 order by manday desc`, params),
+    query(`select sum(${md})::numeric manday, count(*)::int rows, count(distinct w.employee_id)::int people
+             from work_logs w join employees e on e.id = w.employee_id ${W}`, params),
+  ]);
+  const num = (rows) => rows.map((r) => ({ ...r, manday: Number(r.manday || 0) }));
+  res.json({ data: {
+    range: { from, to },
+    total: { manday: Number(totals.rows[0]?.manday || 0), rows: totals.rows[0]?.rows || 0, people: totals.rows[0]?.people || 0 },
+    byProject: num(byProject.rows), byTeam: num(byTeam.rows), byWorkType: num(byType.rows), byStatus: num(byStatus.rows),
+    generatedAt: new Date().toISOString(),
+  } });
+}));
+
+// ── §8 the man-day report, and the month in one file ──────────────────────
+/** Every report carries what it covers, when it was taken, and by whom (§8). */
+const reportMeta = (req, from, to) => ({
+  from, to,
+  generatedAt: new Date().toISOString(),
+  generatedBy: req.profile.full_name || req.profile.email,
+});
+
+router.get('/report/manday', asyncHandler(async (req, res) => {
+  const from = req.query.from, to = req.query.to;
+  if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
+  const groupBy = ['project', 'team', 'worktype', 'employee'].includes(req.query.groupBy) ? req.query.groupBy : 'project';
+  const scoped = scopedUnitIds(req.profile);
+  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
+  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
+  const W = `where ${where.join(' and ')}`;
+  const md = 'coalesce(w.man_day, 1)';
+  const SQL = {
+    project:  `select u.code key, u.name label, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
+                 from work_logs w join units u on u.id = w.unit_id ${W} group by 1,2 order by 3 desc`,
+    team:     `select coalesce(w.team,'(ไม่ระบุ)') key, coalesce(w.team,'(ไม่ระบุทีม)') label, sum(${md})::numeric manday,
+                      count(distinct w.employee_id)::int people from work_logs w ${W} group by 1,2 order by 3 desc`,
+    worktype: `select coalesce(l.work_type_code, '-') key, coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') label,
+                      sum(coalesce(l.man_day, ${md}))::numeric manday, count(distinct w.employee_id)::int people
+                 from work_logs w left join work_log_lines l on l.work_log_id = w.id ${W} group by 1,2 order by 3 desc`,
+    employee: `select e.employee_code key, e.full_name label, sum(${md})::numeric manday, count(*)::int people
+                 from work_logs w join employees e on e.id = w.employee_id ${W} group by 1,2 order by 3 desc`,
+  }[groupBy];
+  const { rows } = await query(SQL, params);
+  res.json({ data: { groupBy, meta: reportMeta(req, from, to), rows: rows.map((r) => ({ ...r, manday: Number(r.manday || 0) })) } });
+}));
+
+/** §8 the monthly report has to be one file covering every project. */
+router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
+  const ym = String(req.query.ym || '');
+  if (!/^\d{4}-\d{2}$/.test(ym)) throw new ApiError(400, 'ต้องระบุเดือน (ym=YYYY-MM)');
+  const [Y, M] = ym.split('-').map(Number);
+  const from = ymd(Y, M, 1), to = ymd(Y, M, daysInMonthN(Y, M));
+  const scoped = scopedUnitIds(req.profile);
+  const params = [from, to]; let scopeSql = '';
+  if (scoped) { params.push(scoped); scopeSql = ` and w.unit_id = any($${params.length}::uuid[])`; }
+  const md = 'coalesce(w.man_day, 1)';
+  const { rows } = await query(
+    `select u.code site, u.name site_name, e.employee_code, e.full_name, coalesce(w.team,'') team,
+            w.ymd, ${md}::numeric manday, coalesce(w.hours, 0)::numeric hours,
+            coalesce(w.work_status,'') work_status, coalesce(l.work_type_code,'') work_type_code,
+            coalesce(l.work_type_name, w.detail, '') work_type_name
+       from work_logs w
+       join units u on u.id = w.unit_id
+       join employees e on e.id = w.employee_id
+       left join work_log_lines l on l.work_log_id = w.id
+      where w.ymd >= $1 and w.ymd <= $2 and w.deleted_at is null${scopeSql}
+      order by u.name, e.full_name, w.ymd`, params);
+
+  const wb = new ExcelJS.Workbook();
+  const meta = reportMeta(req, from, to);
+  const info = wb.addWorksheet('ข้อมูลรายงาน');
+  info.columns = [{ width: 26 }, { width: 52 }];
+  info.addRows([
+    ['รายงานแรงงาน-วัน รายเดือน', ''],
+    ['ช่วงข้อมูล', `${from} ถึง ${to}`],
+    ['วันเวลาที่ดึงข้อมูล', new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })],
+    ['ผู้ดึงข้อมูล', meta.generatedBy || ''],
+    ['จำนวนรายการ', rows.length],
+  ]);
+  const ws = wb.addWorksheet('รายละเอียด');
+  ws.columns = [
+    { header: 'รหัสโครงการ', key: 'site', width: 14 },
+    { header: 'โครงการ', key: 'site_name', width: 28 },
+    { header: 'รหัสพนักงาน', key: 'employee_code', width: 14 },
+    { header: 'ชื่อ-สกุล', key: 'full_name', width: 26 },
+    { header: 'ทีม', key: 'team', width: 16 },
+    { header: 'วันที่ปฏิบัติงาน', key: 'ymd', width: 16 },
+    { header: 'รหัสประเภทงาน', key: 'work_type_code', width: 16 },
+    { header: 'ประเภทงาน', key: 'work_type_name', width: 30 },
+    { header: 'สถานะการทำงาน', key: 'work_status', width: 16 },
+    { header: 'แรงงาน-วัน', key: 'manday', width: 12 },
+    { header: 'ชั่วโมง', key: 'hours', width: 10 },
+  ];
+  for (const r of rows) {
+    ws.addRow({
+      ...r, ymd: dateStr(r.ymd),
+      // §8 numbers have to arrive as numbers, or the client cannot total them
+      manday: Number(r.manday), hours: Number(r.hours),
+    });
+  }
+  ws.getRow(1).font = { bold: true };
+  ws.getColumn('manday').numFmt = '0.00';
+  ws.getColumn('hours').numFmt = '0.00';
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="manday-${ym}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+}));
+
+// ── §10 what still needs doing ────────────────────────────────────────────
+/** Sites that have not recorded today, and days about to lock. A notification
+ *  that disappears before it is acted on is worse than none, so this is derived
+ *  from the data every time rather than stored and marked read. */
+router.get('/alerts', asyncHandler(async (req, res) => {
+  const scoped = scopedUnitIds(req.profile);
+  const units = (scoped
+    ? await query('select id, code, name, lock_days from units where id = any($1) and code is not null', [scoped])
+    : await query('select id, code, name, lock_days from units where code is not null')).rows;
+  const today = todayStr();
+  const alerts = [];
+  for (const u of units) {
+    const lockDays = u.lock_days ?? 3;
+    const headcount = Number((await queryOne('select count(*)::int n from employees where unit_id = $1 and is_active', [u.id]))?.n || 0);
+    if (!headcount) continue;
+    const todayRows = Number((await queryOne(
+      'select count(*)::int n from work_logs where unit_id = $1 and ymd = $2 and deleted_at is null', [u.id, today]))?.n || 0);
+    if (todayRows === 0) {
+      alerts.push({ kind: 'not-recorded', site: u.code, siteName: u.name, date: today,
+        message: `${u.name} ยังไม่บันทึกข้อมูลของวันนี้` });
+    } else if (todayRows < headcount) {
+      alerts.push({ kind: 'partial', site: u.code, siteName: u.name, date: today,
+        message: `${u.name} บันทึกแล้ว ${todayRows} จาก ${headcount} คน` });
+    }
+    // the last day still editable — after this it locks on its own
+    const edge = addDaysStr(today, -(lockDays - DUE_SOON_DAYS));
+    const missing = Number((await queryOne(
+      'select count(*)::int n from work_logs where unit_id = $1 and ymd = $2 and deleted_at is null', [u.id, edge]))?.n || 0);
+    if (missing < headcount) {
+      alerts.push({ kind: 'due-soon', site: u.code, siteName: u.name, date: edge,
+        message: `ข้อมูลวันที่ ${edge} ของ ${u.name} จะถูกล็อกเร็ว ๆ นี้ (บันทึกแล้ว ${missing}/${headcount})` });
+    }
+  }
+  res.json({ data: alerts });
 }));
 
 export default router;

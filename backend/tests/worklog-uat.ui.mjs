@@ -308,6 +308,68 @@ suite('§1 บทบาทผู้บันทึกและผู้ตรว
   // whoever verified it, so the rows have to go first
 }
 
+// ── §13 ใช้งานบนมือถือหน้างานได้จริง ──────────────────────────────────────
+suite('§13 หน้าจอบันทึกใช้งานบนมือถือได้จริง');
+{
+  // §5 verified today's rows earlier and a verified row is locked for editing —
+  // release them so this section measures the phone, not the verification rule
+  await call('/performance/verify', { method: 'POST', user: C, body: { site: site.code, from: TODAY, to: TODAY, undo: true } });
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await as(A);
+  await clickText('แรงงาน-วัน'); await settle(1500);
+  await pickSite();
+  await waitForText('แรงงาน-วัน');
+  await settle(2500);
+  const m = await page.evaluate(() => {
+    const tapArea = (el) => {
+      // what a finger actually hits: the control, or the label wrapping it
+      let n = el;
+      for (let i = 0; i < 3 && n; i += 1) {
+        const r = n.getBoundingClientRect();
+        if (r.height >= 40 && r.width >= 40) return r;
+        n = n.parentElement;
+      }
+      return el.getBoundingClientRect();
+    };
+    const controls = [...document.querySelectorAll('input, select, button')]
+      .filter((e) => e.getBoundingClientRect().width > 0);
+    return {
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      offScreen: controls.filter((e) => e.getBoundingClientRect().right > window.innerWidth + 2).length,
+      tooSmall: controls.filter((e) => { const r = tapArea(e); return r.height < 36; }).length,
+      smallList: controls.filter((e) => { const r = tapArea(e); return r.height < 36; })
+        .map((e) => `${e.tagName}:${(e.getAttribute('aria-label') || e.innerText || e.type || '').trim().slice(0, 20)}`),
+      canType: Boolean(document.querySelector('input[type=number]')),
+      hasBulk: document.body.innerText.includes('บันทึกทั้งทีม'),
+    };
+  });
+  bad('หน้าไม่ล้นออกด้านข้างบนมือถือ', m.pageOverflow <= 2, `${m.pageOverflow}px`);
+  bad('ไม่มีปุ่มหรือช่องกรอกหลุดออกนอกจอ', m.offScreen === 0, `${m.offScreen} ชิ้น`);
+  bad('พื้นที่กดไม่เล็กกว่านิ้วสัมผัส', m.tooSmall === 0, (m.smallList || []).join(' | '));
+  happy('ยังกรอกแรงงาน-วันได้บนมือถือ', m.canType, '');
+  happy('ยังบันทึกทั้งทีมได้บนมือถือ', m.hasBulk, '');
+  await shot('12-มือถือ');
+
+  // key one value on the phone and check it lands
+  const typed = await page.evaluate(() => {
+    // the first number input on the page is the bulk bar's; the one that saves
+    // on blur lives inside a person's card
+    const card = [...document.querySelectorAll('.card-sm')].find((c) => c.querySelector('input[type=number]') && c.querySelector('input[type=checkbox]'));
+    const inp = card?.querySelector('input[type=number]');
+    if (!inp) return false;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(inp, '0.75');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    return true;
+  });
+  await settle(3000);
+  const saved = await query(
+    'select count(*)::int n from work_logs where unit_id = $1 and ymd = $2 and man_day = 0.75 and deleted_at is null', [site.id, TODAY]);
+  happy('กรอกจากมือถือแล้วบันทึกลงระบบจริง', typed && saved.rows[0].n === 1, `${saved.rows[0].n}`);
+  await page.setViewport({ width: 1440, height: 950 });
+}
+
 // ── ไม่มีข้อผิดพลาดค้าง ───────────────────────────────────────────────────
 suite('ไม่มีข้อผิดพลาดซ่อนอยู่');
 {

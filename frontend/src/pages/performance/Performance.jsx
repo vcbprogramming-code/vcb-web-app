@@ -99,9 +99,9 @@ export default function Performance() {
         right={
           <div className="flex items-center gap-2">
             {/* icon-only: the month they move to has to be readable, not guessable */}
-            <button onClick={() => setCur(shift(cur, -1))} aria-label={t('เดือนก่อนหน้า')} title={t('เดือนก่อนหน้า')} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, -1))} aria-label={t('เดือนก่อนหน้า')} title={t('เดือนก่อนหน้า')} className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
             <span className="chip bg-brand/10 text-brand min-w-[130px] justify-center">{monthLabel(cur)}</span>
-            <button onClick={() => setCur(shift(cur, 1))} aria-label={t('เดือนถัดไป')} title={t('เดือนถัดไป')} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
+            <button onClick={() => setCur(shift(cur, 1))} aria-label={t('เดือนถัดไป')} title={t('เดือนถัดไป')} className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
           </div>
         }
       />

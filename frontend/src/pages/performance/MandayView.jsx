@@ -225,7 +225,76 @@ const idOf = (e) => e.eid || e.id;
         </div>
       )}
 
-      <div className="card overflow-hidden !p-0">
+      {/* §13 the recorder keys this standing on a site, on a phone. A table 490px
+          wider than the screen put the man-day box out of reach entirely, so the
+          small screen gets a card per person and the table starts at sm. */}
+      <div className="space-y-2 sm:hidden">
+        {rows.length === 0 && (
+          <div className="card py-10 text-center text-sm text-slate-400">{t('ยังไม่มีพนักงานในไซต์นี้')}</div>
+        )}
+        {rows.map((e) => {
+          const eid = idOf(e);
+          const cur = entriesFor(eid);
+          return (
+            <div key={eid} className="card-sm space-y-3">
+              <div className="flex items-start gap-1">
+                {/* the tick itself is 24px, but the tappable area around it is
+                    44 — a fingertip on a site does not aim well */}
+                <label className="-m-1 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center">
+                  <input type="checkbox" aria-label={e.name || e.full_name} checked={picked.has(eid)}
+                    className="h-6 w-6"
+                    onChange={(ev) => setPicked((prev) => {
+                      const n = new Set(prev);
+                      if (ev.target.checked) n.add(eid); else n.delete(eid);
+                      return n;
+                    })} />
+                </label>
+                <div className="min-w-0 flex-1 pt-2">
+                  <div className="font-medium text-slate-800">{e.name || e.full_name}</div>
+                  <div className="text-xs text-slate-400">{e.emp_id || e.employee_code || '—'}</div>
+                </div>
+                {cur.verifiedAt
+                  ? <span className="chip bg-emerald-50 text-emerald-700">{t('ยืนยันแล้ว')}</span>
+                  : <span className="chip bg-slate-100 text-slate-500">{t('บันทึกแล้ว')}</span>}
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-slate-500">{t('แรงงาน-วัน')}</label>
+                  <input type="number" step="0.25" min="0" max="1" inputMode="decimal"
+                    defaultValue={cur.manDay ?? ''} disabled={!canEdit || busy === eid}
+                    onBlur={(ev) => {
+                      const v = ev.target.value === '' ? null : Number(ev.target.value);
+                      if (v !== (cur.manDay ?? null)) save(eid, { manDay: v });
+                    }}
+                    className="field !h-11 !w-24 tabular-nums" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1 block text-xs text-slate-500">{t('สถานะการทำงาน')}</label>
+                  <select value={cur.workStatus || ''} disabled={!canEdit || busy === eid}
+                    onChange={(ev) => save(eid, { workStatus: ev.target.value || null })}
+                    className="field !h-11 w-full">
+                    <option value="">{t('— ไม่ระบุ —')}</option>
+                    {STATUSES.map((st) => <option key={st} value={st}>{t(st)}</option>)}
+                  </select>
+                </div>
+                <label className="flex h-11 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm text-brand">
+                  <input type="file" className="hidden" disabled={!canEdit}
+                    onChange={(ev) => attach(eid, ev.target.files?.[0])} />
+                  <Icon name="paperclip" className="h-4 w-4" />
+                  {files.filter((f) => f.employee_id === eid).length || t('แนบ')}
+                </label>
+              </div>
+              {cur.entryAt && (
+                <p className="text-[11px] text-slate-400">
+                  {t('บันทึกเมื่อ')} {new Date(cur.entryAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card hidden overflow-x-auto !p-0 sm:block">
         <table className="tbl">
           <thead>
             <tr>

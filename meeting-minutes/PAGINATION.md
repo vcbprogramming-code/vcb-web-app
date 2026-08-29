@@ -1,6 +1,14 @@
 # Page-accurate rendering — architecture
 
-*Written 2026-08-19, live @200.*
+*Written 2026-08-19, live @200. Synced from the GAS source 2026-08-29.*
+
+> **Note for this React mirror.** This file is a verbatim copy of the GAS
+> app's, kept here so the rules travel with the port. The mirror does **not**
+> render a Paged.js iframe, so the runtime parts — the scroll-container rule,
+> the two document modes, the post-pagination height, the scalers — describe
+> the GAS app only. What *does* apply here is the page geometry and the
+> responsive column bands; see `PORT_NOTES.md` for exactly what is and is not
+> ported.
 
 **Read this before changing anything about how meetings are displayed, printed,
 or edited.** Getting the reading view to break pages exactly where the PDF
@@ -113,10 +121,49 @@ instead of one scrollbar at the window edge.
 page as its own white sheet, so a white panel behind them reads as a page inside
 a page.
 
-*(Mobile is different on purpose — `html.is-mobile .frame-wrap` scrolls and uses
-`applyMobileScale`. Leave it alone.)*
+### 3. Two document modes, and why a tablet is NOT a phone
 
-### 3. The iframe height is set AFTER pagination finishes
+There are exactly two ways this app renders a meeting, chosen by
+`usesContinuousDoc()`:
+
+| | Phones (`html.is-mobile`) | Everything else |
+|---|---|---|
+| Paged.js | **not run** | runs |
+| Document | one continuous flow | real paginated sheets |
+| Height | set by `applyMobileScale` | set by `fitFrame` after pagination settles |
+| Reveal | `html.is-mobile iframe.render { visibility: visible }` | JS, once the page count settles |
+| Scaling | `applyMobileScale` (owns height too) | `fitScaleToPane` (must NOT touch height) |
+
+`html.is-mobile .frame-wrap` scrolls and uses `applyMobileScale`. Leave that
+alone.
+
+**A narrow pane is not the same question as a phone.** Tablets and narrow
+desktop windows also need the sheet scaled — the page box is a fixed 860px and
+an iPad reading pane can be half that — but they stay on the **paginated**
+path and are scaled *after* Paged.js settles. That is what keeps their page
+breaks identical to the PDF, which is the whole point of this document.
+
+Do not "simplify" that by routing narrow layouts down the phone branch. It
+fails twice over, and both failures are silent:
+
+1. The iframe stays `visibility: hidden` — only `html.is-mobile` reveals it in
+   CSS — so the reading pane goes **permanently blank**, which is worse than
+   the clipping such a change would be trying to fix.
+2. The height is measured on `load`, before pagination, so any multi-page
+   document is sized to its pre-Paged.js height and clips.
+
+`fitScaleToPane` deliberately never assigns `frame.style.height`: on this path
+`fitFrame` has just measured the true paginated height, and overwriting it
+drops the last page. It only sets the transform, and mirrors the visual size
+onto `.paper` so the outer scroll container sees the scaled height.
+
+The CSS side has its own trap: **phones also match `@media (max-width: 900px)`**.
+The phone rules override only `display`/`width`, never `position`/`transform`,
+so any pane selector in that block must be scoped `html:not(.is-mobile)` or the
+phone meeting list slides off-screen with nothing able to bring it back.
+`tools/layout-checks/css-audit.js` asserts exactly this.
+
+### 4. The iframe height is set AFTER pagination finishes
 
 Paged.js works asynchronously. Measuring on `load` sizes the frame to the
 *pre-pagination* document. The code polls for `.pagedjs_pages` (up to ~4s) and
@@ -124,7 +171,7 @@ re-measures once it appears, falling back to a plain measurement if Paged.js
 never runs — so a blocked CDN degrades to a normal continuous document rather
 than a broken view.
 
-### 4. Screen and print must render the SAME document
+### 5. Screen and print must render the SAME document
 
 Any content in one and not the other shifts every page boundary after it. Two
 divergences were found and removed:
@@ -139,7 +186,7 @@ rule left suppresses printed link URLs, which does not affect layout. Breathing
 room above the sheet comes from `.frame-wrap` padding, *outside* the iframe,
 where it cannot shift anything.
 
-### 5. The editor gets its break points FROM the print engine
+### 6. The editor gets its break points FROM the print engine
 
 The editor is a `contenteditable` surface, so Paged.js cannot run on it directly
 — it would rebuild the DOM under the caret and destroy the selection.
@@ -158,7 +205,7 @@ merely become non-zero. Paged.js builds pages progressively; reading at first
 sight of a page reported 2 pages for a document that actually had 7. The polls
 require three consecutive equal counts before trusting the result.
 
-### 6. The editor derives its typography from the print stylesheet
+### 7. The editor derives its typography from the print stylesheet
 
 `buildEditorPageCss_()` takes `OVERRIDE_CSS` — the exact string the print iframe
 uses — strips the rules that describe the sheet rather than the text (`@page`,
@@ -170,7 +217,7 @@ editor used to do, and every copy drifted: the font stack, `h4`, the letterhead,
 body padding. Each drift moved every page break below it. `Stylesheet.html` now
 describes only the *sheet* — width, page margins, background, shadow.
 
-### 7. `@page` declares the page size and ALL four margins, explicitly
+### 8. `@page` declares the page size and ALL four margins, explicitly
 
 This is the single most important rule, and its absence caused the 2026-08-19
 regression.
@@ -253,6 +300,18 @@ frameWrap.scrollHeight <= clientHeight + 2   // no middle scrollbar
 iframe.height >= innerDoc.body.scrollHeight  // no inner scrollbar
 ```
 
+For the **responsive** side there are three dependency-free scripts that run
+without a browser — a cheap first pass, not a replacement for looking at it:
+
+```sh
+node tools/layout-checks/device-widths.js   # is the sheet readable on every device?
+node tools/layout-checks/css-audit.js       # scoping + cascade order of the pane rules
+node tools/layout-checks/scaler.test.js     # fitScaleToPane arithmetic
+```
+
+They check structure and arithmetic, not appearance — they cannot tell you the
+page *looks* right, only that the rules mean what they claim.
+
 ---
 
 ## Current geometry
@@ -265,6 +324,13 @@ iframe.height >= innerDoc.body.scrollHeight  // no inner scrollbar
 | Usable height | **945px** per page | 1123 − 102 − 76 |
 | Body type | 15px / 1.55 Sarabun | `OVERRIDE_CSS` |
 | Editor sheet | `width:210mm; padding:2.7cm 17mm 2cm` | `.ed-area` in `Stylesheet.html` |
+| Page box | **860px** — the layout width the sheet sits in | `.paper`, `DOC_VIRTUAL_W` in `JavaScript.html` |
+| Fixed columns | 294+360 → 258+320 (≤1200) → 214+268 (≤1040) → 188+overlay (≤900) | `.body` grid in `Stylesheet.html` |
+
+A reading pane narrower than the **860px page box** gets the whole thing
+scaled down by `fitScaleToPane`; at or above it, the sheet renders 1:1. The
+fixed columns shrink first so scaling stays gentle — see the device table in
+`tools/layout-checks/device-widths.js` for what each real device ends up at.
 
 `body` contributes **no** geometry — `body{padding:0;max-width:none;margin:0}`.
 All of it lives on `@page`, the only place both pagination engines read it from.

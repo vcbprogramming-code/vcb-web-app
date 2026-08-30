@@ -1,0 +1,2304 @@
+<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Process Flows — PREVIEW (BD pilot)</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fbfcfe;
+    --brand:#1F3864; --brand-dark:#16284a; --brand-2:#2E75B6; --brand-soft:#e9f0f9;
+    --accent:#b8860b; --accent-soft:#f6efdd;
+    --ink:#1b2430; --muted:#5b6675; --faint:#929cab;
+    --line:#e3e8ee; --line-soft:#eef1f5;
+    /* Layered, low-opacity shadows for a calmer, more premium feel */
+    --shadow-xs:0 1px 2px rgba(16,24,40,.05);
+    --shadow-sm:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.05);
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 16px -4px rgba(16,24,40,.08);
+    --shadow-lg:0 2px 4px rgba(16,24,40,.05),0 16px 32px -8px rgba(16,24,40,.14);
+    --ring:0 0 0 3px rgba(46,117,182,.18);
+    --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+    --sans:'Sarabun',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+    --banner-font:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+    --ico:18px;
+    /* Related Files rail — a soft blue wash that reads as its own zone next to
+       the white SOP body without competing with the brand accents. */
+    --att-bg:#f2f6fc; --att-line:#dbe6f5;
+  }
+  /* Base icon: sized by --ico (or local font-size via em fallbacks below) */
+  .ico{width:var(--ico);height:var(--ico);flex:0 0 auto;display:inline-block;vertical-align:middle;stroke-width:1.7}
+  [data-icon]{display:inline-flex;align-items:center;justify-content:center}
+  .m-PO{--mc:#2563eb}.m-IC{--mc:#0891b2}.m-AP{--mc:#9333ea}.m-FA{--mc:#c2410c}
+  .m-PM{--mc:#0d9488}.m-OF{--mc:#ca8a04}.m-GL{--mc:#dc2626}.m-AR{--mc:#db2777}
+  .m-BD{--mc:#4f46e5}.m-SE{--mc:#475569}.m-FIN{--mc:#059669}.m-RP{--mc:#0b3d62}
+
+  /* Night mode — overrides the palette variables defined in :root */
+  html.dark{
+    --bg:#0c1014; --panel:#161b22; --panel-2:#1a2029;
+    --brand-soft:#1c2d4a; --accent:#d2a24a; --accent-soft:#2a2415;
+    --ink:#e6edf3; --muted:#9aa4b1; --faint:#7d8590;
+    --line:#2a313b; --line-soft:#20262e;
+    --att-bg:#141b26; --att-line:#26303e;
+    --shadow-xs:0 1px 2px rgba(0,0,0,.4);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.5);
+    --shadow-lg:0 2px 6px rgba(0,0,0,.5),0 18px 40px rgba(0,0,0,.6);
+    --ring:0 0 0 3px rgba(124,162,214,.25);
+  }
+  html.dark .ptext{background:#1a2230;border-color:#26303d;color:#cdd6e0}
+  html.dark .pathbox{background:#1c2d4a;border-color:#2e4060;color:#a7c1e0}
+  html.dark .w-box{background:#1a2230;border-color:#26303d}
+  /* Welcome / home hero — these use hardcoded light colors (white card
+     backgrounds, dark-navy title, dark-gray body) that are invisible or render
+     as white panels on the dark page. Re-skin them for dark mode. */
+  html.dark .w-title{color:#cdddef}
+  html.dark .w-txt{color:#c3ccd6}
+  html.dark .w-lbl{color:#7fa8d6}
+  html.dark .w-stats{background:#1a2230;border-color:#26303d}
+  html.dark .w-stats span{border-color:#26303d}
+  html.dark .howto-card{background:#1a2230;border-color:#26303d}
+  html.dark .w-notes{background:#2a2415;border-color:#4a3f1a;color:#d6c899}
+  html.dark .w-notes ul{color:#d6c899}
+  html.dark .w-notes ul li::before{color:#caa84d}
+  html.dark .w-notes .w-lbl{color:#caa84d}
+  html.dark .note{background:#3a1f1d;border-color:#5a2c28;color:#e8b6b1}
+  html.dark .note b{color:#ff8a82}
+  html.dark .rep-table tbody tr:hover{background:#1a2230}
+  html.dark .rt-path{color:#a3c1d4}
+  html.dark .lc-no{background:var(--brand-soft);color:#cdddef}
+  /* Descriptions/subtitles need lifting in dark mode — the hero description is a
+     hardcoded light-mode gray, and the muted variable is too dim on dark panels. */
+  html.dark .mhero-desc{color:#c3ccd6}
+  html.dark .mhero-en{color:#aab4be}
+  html.dark .lc-ex{color:#b6bfc9}
+  /* Brand-colored TEXT (uppercase section labels, report numbers, back bar,
+     edit button) stays dark navy in dark mode because --brand is a dark blue.
+     Lift these to a light blue so they're readable on the dark panels. */
+  html.dark .lbl{color:#7fa8d6}
+  html.dark .lbl.accent{color:var(--accent)}
+  html.dark .rt-no{color:#7fa8d6}
+  html.dark .mback{color:#9cc2ea}
+  html.dark .d-edit{background:#1a2230;border-color:#30363d;color:#9cc2ea}
+  html.dark .d-edit:hover{background:var(--brand-soft);border-color:#2e4d7a}
+  html.dark .modal{background:var(--panel);color:var(--ink)}
+  html.dark .modal h3{color:#cdddef}
+  html.dark .modal input,html.dark .modal textarea{background:#0e141d;color:var(--ink);border-color:var(--line)}
+  html.dark .btn{background:var(--panel);color:var(--ink);border-color:var(--line)}
+  html.dark .btn:hover{background:var(--line-soft)}
+  html.dark #modules .mod{background:#1a2230}
+  html.dark #modules .mod.is-empty{background:#161b22}
+  /* Active-module count badge — light-mode flips it to a white pill (.mod.active
+     .cnt{background:#fff}); on the dark page that leaves a stray white chip with
+     low-contrast text. Re-skin it to a dark chip with light text. */
+  html.dark .mod.active .cnt{background:#0e1726;color:#cdddef}
+  /* Sub-step lines under a procedure use a hardcoded dark slate (#3c4a44) that
+     is almost invisible on the dark detail panel. Lift to a light gray. */
+  html.dark li.sub{color:#b9c2cc}
+
+  /* "Signed in as …" label — plain white text at the rightmost edge of the banner */
+  .user-pill{
+    display:inline-flex;align-items:center;
+    padding:0;background:none;border:none;
+    color:#fff;
+    font-family:var(--banner-font);
+    font-size:13px;font-weight:500;letter-spacing:.2px;
+    max-width:260px;min-width:0;
+    cursor:default
+  }
+  .user-pill > span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  html.is-mobile .user-pill{display:none !important} /* mobile: search takes the full row, email shown in settings instead */
+
+  /* Settings button (gear) + dropdown menu — desktop default, mobile overridden above */
+  .settings-wrap{position:relative;flex:0 0 auto;z-index:10}
+  .settings-btn{
+    width:34px;height:34px;padding:0;
+    border-radius:9px;
+    background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.28);
+    color:#fff;
+    font-size:17px;line-height:1;
+    cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:-apple-system,'Segoe UI Symbol',sans-serif
+  }
+  html.is-mobile .settings-btn{width:38px;height:38px;font-size:19px;border-radius:9px;
+    background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24)}
+  .settings-btn:hover{background:rgba(255,255,255,.28)}
+  /* Settings modal — opened from the gear button */
+  .settings-modal{max-width:520px;padding:20px 22px}
+  .settings-modal h3{margin:0 0 6px;font-size:1.2rem;font-weight:800;color:var(--ink);letter-spacing:.2px}
+  .sm-section{padding-top:14px;border-top:1px solid var(--line-soft);margin-top:12px}
+  .sm-section.sm-section-account{padding-top:10px;margin-top:8px}
+  .sm-section-label{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);
+    text-transform:uppercase;margin:0 0 8px}
+  .sm-account{font-size:1rem;font-weight:600;color:var(--ink);margin:0;letter-spacing:.1px;word-break:break-all}
+  .sm-row{margin-bottom:14px}
+  .sm-row:last-child{margin-bottom:0}
+  .sm-row-label{display:block;font-size:.84rem;font-weight:500;color:var(--ink);margin:0 0 8px}
+  .sm-toggle{display:grid;grid-template-columns:1fr 1fr;gap:0;
+    background:var(--line-soft);padding:4px;border-radius:11px}
+  .sm-toggle-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:9px 14px;background:none;border:none;border-radius:8px;
+    font-family:var(--sans);font-size:.92rem;font-weight:600;
+    color:var(--muted);cursor:pointer;
+    transition:background .15s,color .15s,box-shadow .15s
+  }
+  .sm-toggle-btn:hover:not(.active){background:rgba(0,0,0,.04);color:var(--ink)}
+  .sm-toggle-btn.active{background:var(--brand-2);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .sm-action{
+    display:flex;align-items:center;gap:9px;width:100%;
+    padding:11px 14px;background:none;border:1px solid var(--line);
+    border-radius:9px;
+    font-family:var(--sans);font-size:.92rem;font-weight:500;color:var(--ink);
+    text-align:left;cursor:pointer;margin-bottom:8px
+  }
+  .sm-action:last-child{margin-bottom:0}
+  .sm-action:hover{background:var(--line-soft)}
+  .sm-signout{color:#dc2626;border-color:#fecaca}
+  .sm-signout:hover{background:#fef2f2;border-color:#fca5a5}
+  html.dark .sm-toggle{background:#1c2434}
+  html.dark .sm-toggle-btn:hover:not(.active){background:rgba(255,255,255,.05)}
+  html.dark .sm-signout{color:#fca5a5;border-color:#4a2629}
+  html.dark .sm-signout:hover{background:#3a1f1d;border-color:#5a2c28}
+  /* About & Contact (bottom of settings) */
+  .sm-contact{color:var(--brand-2)}
+  .sm-contact:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  /* Contact on one row: label left, click-to-copy email button to its right */
+  .sm-contact-sec{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .sm-contact-sec .sm-section-label{margin:0;flex:0 0 auto}
+  .sm-contact-sec .sm-contact{margin:0;width:auto;flex:1 1 200px;min-width:0;cursor:pointer}
+  .sm-contact .sm-contact-email{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+  .sm-contact .sm-contact-copy{margin-left:auto;--ico:15px;opacity:.55;transition:opacity .14s,color .14s}
+  .sm-contact:hover .sm-contact-copy{opacity:1}
+  .sm-contact.copied{border-color:#2e9e5b;color:#2e9e5b}
+  .sm-contact.copied .sm-contact-copy{opacity:1}
+  html.dark .sm-contact.copied{border-color:#46b277;color:#82d9a4}
+  .sm-about-meta{font-size:.82rem;color:var(--muted);line-height:1.55}
+  .sm-about-meta b{color:var(--ink);font-weight:700}
+  .sm-updates{margin-top:9px}
+  .sm-updates-lbl{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .sm-updates ul{margin:0;padding:0;list-style:none}
+  .sm-updates li{position:relative;padding-left:16px;margin-bottom:4px;font-size:.82rem;color:var(--muted);line-height:1.5}
+  .sm-updates li::before{content:'';position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .sm-select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+    background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:.92rem;font-weight:500;
+    outline:none;cursor:pointer}
+  .sm-select:focus{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(46,117,182,.18)}
+  .sm-hint{font-size:.74rem;color:var(--faint);margin-top:7px;line-height:1.45}
+  html.dark .sm-select{background:#0e141d;border-color:var(--line)}
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:15px}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--brand-2)}
+  /* --brand-2 (#2E75B6) is a mid-blue tuned for white; on the dark panel it
+     lands at 3.57:1, under the 4.5 needed for body-sized text. Same lift the
+     other brand-coloured text gets in night mode. */
+  html.dark a{color:#7fa8d6}
+  html.dark .sm-contact{color:#7fa8d6}
+
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  /* ===== Banner ===== */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 30px;color:#fff;z-index:5;gap:18px;flex-wrap:wrap;
+    background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);
+    box-shadow:0 2px 12px rgba(31,56,100,.25);font-family:var(--banner-font)}
+  .brand-txt{display:flex;align-items:center;gap:16px}
+  .brand-h1{font-size:24px;font-weight:800;letter-spacing:.3px;line-height:1;color:#fff;margin:0}
+  .brand-div{width:1px;height:40px;background:rgba(255,255,255,.45)}
+  .brand-stack{display:flex;flex-direction:column;gap:6px}
+  .brand-sub{font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#fff}
+  .brand-th{font-size:13px;font-weight:500;color:#fff;letter-spacing:.5px;line-height:1.2;font-family:var(--sans)}
+  .search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:7px 11px;width:340px;max-width:40vw}
+  .search input{border:none;background:transparent;color:#fff;outline:none;width:100%;font-size:13.5px;font-family:var(--sans)}
+  .search input::placeholder{color:#b6c6d6}
+  .hdr-right{display:flex;align-items:center;gap:12px}
+  .tbtn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.2);
+    border-radius:9px;padding:7px 13px;font-size:13px;white-space:nowrap;font-family:var(--banner-font);cursor:pointer}
+  .tbtn:hover{background:rgba(255,255,255,.24)}
+  .tbtn[disabled]{opacity:.6;cursor:wait}
+
+  /* ===== Three-pane body ===== */
+  .body{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:324px 418px 1fr}
+  /* Two steps, not one. The single 1100px breakpoint meant a 1280px window
+     still spent 742px on the two left columns, leaving the detail pane
+     narrower than it gets at 1024px — the wider viewport read worse than the
+     smaller one. 1440px trims them, 1100px trims again. */
+  @media (max-width:1440px){.body{grid-template-columns:300px 390px 1fr}}
+  @media (max-width:1100px){.body{grid-template-columns:278px 368px 1fr}}
+  body.reports-mode .list{display:none}
+  body.reports-mode .body{grid-template-columns:324px 1fr}
+  @media (max-width:1440px){body.reports-mode .body{grid-template-columns:300px 1fr}}
+  @media (max-width:1100px){body.reports-mode .body{grid-template-columns:278px 1fr}}
+
+  /* ----- Sidebar ----- */
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px;display:flex;flex-direction:column}
+  .side-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin:10px 8px 7px;font-weight:700}
+  .side-label:first-child{margin-top:4px}
+  .mod{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;border:1px solid transparent;width:100%;text-align:left;background:none}
+  .mod:hover{background:var(--line-soft)}
+  .mod.active{background:var(--brand-soft);border-color:#cdddef}
+  .mod.is-empty{opacity:.55}
+  .mod.is-empty:hover{opacity:1}
+  .mod.is-empty .cnt{background:transparent;color:var(--faint)}
+  .mod .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--mc,#999)}
+  .mod .mn{flex:1 1 auto;min-width:0}
+  .mod .mn b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.2}
+  .mod .mn small{display:block;font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mod .cnt{flex:0 0 auto;font-size:11.5px;color:var(--muted);background:var(--line-soft);border-radius:20px;padding:1px 9px;font-weight:600}
+  .mod.active .cnt{background:#fff}
+
+  /* Top-level nav: Process Flows (primary) · Case Studies (accordion) · Reports.
+     The module buttons live inside #modules and collapse unless the Case Studies
+     branch is active (sidebar gets .cs-open from setActiveSidebar). */
+  .sidebar > .mod{margin-bottom:5px}   /* equal gaps between the 3 top-level branches */
+  .cs-chevron{flex:0 0 auto;width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2.4;
+    transition:transform .18s ease;margin-left:2px}
+  .cs-chevron-spacer{flex:0 0 auto;width:18px}   /* matches chevron width so Reports' count aligns */
+  /* Each root's chevron points down when its own submenu is open, right when closed */
+  .sidebar:not(.flows-open) #flowsHeader .cs-chevron{transform:rotate(-90deg)}
+  .sidebar:not(.cs-open) #csHeader .cs-chevron{transform:rotate(-90deg)}
+  .cs-children{margin:2px 0 2px 10px;padding-left:8px;border-left:2px solid var(--line-soft)}
+  /* #id selectors raise specificity over the mobile grid rule (html.is-mobile #modules) */
+  .sidebar:not(.flows-open) #flowModules{display:none}
+  .sidebar:not(.cs-open) #modules{display:none}
+  html.dark .cs-children{border-left-color:var(--line)}
+  html.is-mobile .cs-children{margin-left:0;padding-left:0;border-left:none}
+  .side-foot{margin-top:auto;padding:10px 8px 4px;font-size:11px;color:var(--faint);line-height:1.5;border-top:1px solid var(--line-soft)}
+
+  /* Process Flows list — module subheaders so 33 flows are scannable */
+  .flow-group-h{display:flex;align-items:center;gap:8px;margin:12px 12px 2px;
+    font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .flow-group-h:first-child{margin-top:6px}
+  .flow-group-h .fg-dot{width:8px;height:8px;border-radius:50%;background:var(--mc,#999);flex:0 0 auto}
+  .flow-group-h .fg-line{flex:1 1 auto;height:1px;background:var(--line-soft)}
+
+  /* ----- Mobile home intro ----- */
+  /* A brief "what is this page / how to use it" block shown at the very top of
+     the first mobile screen (the module picker), so staff know what the portal
+     is for before choosing a module. Hidden on desktop, where the right-pane
+     welcome page already covers this. */
+  .m-home{display:none}
+  html.is-mobile .m-home{display:block;margin:2px 2px 4px;padding:4px 6px 16px;
+    border-bottom:1px solid var(--line-soft)}
+  html.is-mobile .m-home .mh-title{font-size:1.12rem;font-weight:800;color:var(--brand-dark);
+    line-height:1.35;margin:0 0 6px;letter-spacing:.2px}
+  html.is-mobile .m-home .mh-lead{font-size:.86rem;color:var(--muted);line-height:1.6;margin:0}
+  html.dark .m-home .mh-title{color:#cdddef}
+
+  /* ----- Middle list ----- */
+  .list{background:var(--bg);border-right:1px solid var(--line);overflow-y:auto}
+  .list-head{padding:13px 14px 9px;font-size:12.5px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--bg);z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .list-head .lh-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lh-new{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--line);color:var(--brand);
+    border-radius:8px;padding:5px 10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .lh-new:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .lh-new .ico{--ico:13px}
+  html.dark .lh-new{background:#1a2230;border-color:#30363d;color:#9cc2ea}
+  html.dark .lh-new:hover{background:var(--brand-soft);border-color:#2e4d7a}
+  .lcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:8px 12px;padding:10px 12px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+  .lcard:hover{border-color:#c0c8d0;box-shadow:var(--shadow)}
+  .lcard.active{border-color:var(--brand-2);box-shadow:0 0 0 2px rgba(46,117,182,.18)}
+  .lc-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .lc-no{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:var(--brand-soft);color:var(--brand-dark);font-weight:700;font-size:.74rem;display:flex;align-items:center;justify-content:center}
+  .lc-no.lc-no-mod{width:auto;min-width:22px;padding:0 7px;background:var(--mc,var(--brand-soft));color:#fff}
+  .lc-badge{flex:0 0 auto;background:var(--mc,#999);color:#fff;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.5px}
+  .lc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-left:auto}
+  .lc-badge-tag{background:color-mix(in srgb, var(--mc,#999) 16%, #fff);color:var(--mc,#666)}
+  html.dark .lc-badge-tag{background:color-mix(in srgb, var(--mc,#999) 28%, #0e1726);color:color-mix(in srgb, var(--mc,#999) 70%, #fff)}
+  .lc-title{font-weight:700;font-size:.9rem;line-height:1.35;color:var(--ink)}
+  .lc-ex{margin-top:4px;font-size:.8rem;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .empty{padding:30px 16px;color:var(--faint);text-align:center;font-size:.88rem}
+
+  /* ----- Detail ----- */
+  .detail{background:var(--panel);overflow-y:auto}
+  /* ----- Welcome / home page (right pane when nothing is selected) ----- */
+  .welcome{padding:28px 32px;max-width:900px}
+  .w-title{font-size:1.55rem;font-weight:800;color:var(--brand-dark);line-height:1.3;margin:0 0 4px;letter-spacing:.2px}
+  .w-sub{font-size:.95rem;color:var(--muted);margin:0 0 18px}
+  .w-stats{display:inline-flex;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--muted);
+    border:1px solid var(--line);border-radius:9px;background:#fbfcfe;padding:5px 2px;margin-bottom:20px}
+  .w-stats span{padding:2px 13px;border-right:1px solid var(--line)}
+  .w-stats span:last-child{border-right:none}
+  .w-box{background:#fafbfc;border:1px solid var(--line-soft);border-left:4px solid var(--brand);
+    border-radius:9px;padding:14px 18px;margin-bottom:18px}
+  .w-lbl{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand);margin:0 0 7px}
+  .w-txt{font-size:.95rem;color:#3c4650;line-height:1.7;margin:0}
+  .howto{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:20px}
+  @media (max-width:860px){.howto{grid-template-columns:1fr}}
+  .howto-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:13px 15px}
+  .ht-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;
+    background:var(--brand);color:#fff;font-weight:700;font-size:.82rem;margin-bottom:8px}
+  .ht-t{font-weight:700;font-size:.94rem;margin-bottom:3px;color:var(--ink)}
+  .ht-d{font-size:.82rem;color:var(--muted);line-height:1.5}
+  .w-notes{background:#fdf6e3;border:1px solid #f1e1b6;border-radius:9px;padding:13px 16px}
+  .w-notes .w-lbl{color:#a16f12}
+  .w-notes ul{margin:0;padding:0;list-style:none;font-size:.86rem;color:#5d4a18;line-height:1.6}
+  .w-notes ul li{position:relative;padding-left:14px;margin-bottom:3px}
+  .w-notes ul li::before{content:'–';position:absolute;left:0;color:#a16f12}
+
+  /* width (not max-width) so the body column is the same on every case — with
+     max-width alone a short case shrank and a long one filled out, which read
+     as the panel resizing when moving between cases. */
+  .d-wrap{padding:22px 26px;width:100%;max-width:900px}
+  .d-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+  .d-num{flex:0 0 auto;min-width:36px;height:36px;padding:0 11px;border-radius:9px;background:var(--mc,var(--brand));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem;white-space:nowrap;margin-top:1px}
+  .d-titles{flex:1 1 auto;min-width:0}
+  .d-th{font-weight:700;font-size:1.18rem;line-height:1.35}
+  .d-en{font-size:.85rem;color:var(--muted);margin-top:2px}
+  .d-badge{flex:0 0 auto;background:var(--mc,#999);color:#fff;font-size:.72rem;font-weight:700;padding:4px 11px;border-radius:999px;letter-spacing:.5px}
+
+  .d-sec{margin-bottom:18px}
+  .lbl{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
+  .lbl.accent{color:var(--accent)}
+  .ptext{font-size:.95rem;color:#3c4650;line-height:1.6;background:#fafbfc;border:1px solid var(--line-soft);border-radius:9px;padding:12px 14px}
+
+  ol.steps{margin:0;padding:0;counter-reset:s;list-style:none;font-size:.95rem;line-height:1.55}
+  ol.steps>li{position:relative;padding:5px 0 5px 34px;counter-increment:s}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:4px;width:23px;height:23px;
+    background:var(--brand);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.76rem;font-weight:700}
+  li.sub{padding:2px 0 2px 34px !important;counter-increment:none !important;color:#3c4a44}
+  li.sub::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
+  li.sub .stxt{position:relative;padding-left:17px;display:block}
+  li.sub .stxt::before{content:'';position:absolute;left:3px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  /* depth 2 (» » ) — one more indent level, square marker so it reads as
+     distinct from depth 1's dot rather than just "further right". */
+  li.sub-2{padding-left:56px !important}
+  li.sub-2 .stxt{padding-left:17px}
+  li.sub-2 .stxt::before{border-radius:2px;width:6px;height:6px;background:var(--muted)}
+  /* depth 3 (» » » ) clamp — same marker as depth 2, one indent further. */
+  li.sub-3{padding-left:78px !important}
+  /* '· ' captions — plain body text under the previous step, no number, no
+     bullet glyph at all (contrast li.sub, which still shows a dot marker). */
+  li.cap{padding:2px 0 2px 34px !important;counter-increment:none !important;color:#3c4a44}
+  li.cap::before{content:'' !important;width:auto !important;height:auto !important;background:none !important}
+  html.dark li.cap{color:#b9c2cc}
+
+  .note{margin-top:14px;background:#fdeceb;border:1px solid #f6c9c5;border-radius:9px;padding:10px 13px;font-size:.88rem;color:#8d2820}
+  .note b{color:#b5302a}
+  .d-ref{margin-top:6px;font-size:.82rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;display:flex;align-items:center;gap:6px}
+  .d-ref svg{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+  /* Attachments rail — sits in the empty space to the right of the 900px-capped
+     .d-wrap. Only rendered for cases that actually have files, so every other
+     case keeps its existing single-column layout untouched. */
+  /* Fixed two-column split inside the detail pane. The rail is a hard 238px and
+     the body takes the rest — neither reflows with content, so every case
+     renders at exactly the same widths. stretch (not flex-start) lets the
+     rail's tint run the full column height. */
+  .d-cols{display:flex;align-items:stretch;gap:0;min-height:100%}
+  .d-cols-main{flex:1 1 auto;min-width:0;width:100%}
+  /* The rail itself stretches to paint the full-height tint; the inner wrapper
+     is what sticks on scroll (a stretched flex item can't itself be sticky). */
+  .d-att-rail{flex:0 0 238px;width:238px;padding:22px 18px;background:var(--att-bg);border-left:1px solid var(--att-line)}
+  .d-att-inner{position:sticky;top:22px}
+  /* Matches .lbl in the main body so both columns share one heading level. */
+  .d-att-h{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
+  /* Stacked vertically — one card under the next when a case has several. */
+  .d-att-card{display:block;margin-bottom:16px;text-decoration:none;color:var(--ink)}
+  .d-att-card:last-child{margin-bottom:0}
+  /* No fixed aspect-ratio and no cropping: the box height follows the image so
+     a wide diagram stays a wide diagram, just scaled down. min-height only
+     applies to the fallback (no image) state. */
+  .d-att-thumb{position:relative;border:1px solid var(--att-line);border-radius:var(--r-sm);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-xs);transition:border-color .12s,box-shadow .12s;line-height:0}
+  .d-att-card:hover .d-att-thumb{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+  .d-att-img{width:100%;height:auto;display:block}
+  .d-att-thumb.no-thumb{min-height:96px;line-height:normal}
+  .d-att-thumb.no-thumb .d-att-img{display:none}
+  .d-att-ico{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;stroke:var(--faint);fill:none;stroke-width:1.5;opacity:0;pointer-events:none}
+  .d-att-thumb.no-thumb .d-att-ico{opacity:1}
+  .d-att-name{margin-top:6px;font-size:.78rem;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .d-att-card:hover .d-att-name{color:var(--brand-2)}
+  .d-att-empty{font-size:.78rem;color:var(--faint);line-height:1.4}
+  /* The side rail only earns its keep when there is genuinely spare width.
+     The three-column shell already spends 742px on the sidebar + list, so the
+     detail pane gets `viewport - 742`; take another 238px for the rail and
+     52px of padding and the real reading column is `viewport - 1032`. At
+     1366px (iPad Pro landscape) that left **334px** — narrow enough that the
+     case title wrapped one word per line — and 1280px was worse at 248px.
+     The old 1180px breakpoint dated from a two-column era and was never
+     revisited. 1600px is where the reading column clears ~560px with the rail
+     still attached; below that it stacks. */
+  @media (max-width:1600px){
+    .d-cols{flex-direction:column}
+    /* Stacked, the rail becomes a compact strip of links rather than a wall of
+       thumbnails: the files stay one tap away without spending the vertical
+       space a preview grid would. */
+    .d-att-rail{flex:none;width:auto;padding:14px 26px 16px;background:var(--att-bg);
+      border-left:0;border-top:1px solid var(--att-line)}
+    .d-att-inner{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;width:100%}
+    .d-att-rail .d-att-h{width:100%;margin:0 0 2px}
+    /* Thumbnail off, filename on — a chip, not a card. */
+    .d-att-card{display:inline-flex;align-items:center;gap:7px;width:auto;margin:0;
+      max-width:100%;padding:7px 12px;border:1px solid var(--att-line);border-radius:999px;
+      background:var(--panel);box-shadow:var(--shadow-xs);transition:border-color .12s,box-shadow .12s}
+    .d-att-card:hover{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+    /* The thumb box collapses to just its file glyph — the affordance that
+       says "this opens a document". */
+    .d-att-thumb{flex:0 0 auto;width:16px;height:16px;min-height:0;border:0;border-radius:0;
+      background:none;box-shadow:none;overflow:visible}
+    .d-att-card:hover .d-att-thumb{border-color:transparent;box-shadow:none}
+    .d-att-img{display:none}
+    .d-att-ico{position:static;width:16px;height:16px;margin:0;opacity:1;stroke:var(--brand-2)}
+    .d-att-thumb.no-thumb{min-height:0}
+    /* One line, ellipsised — never the 2-line clamp the card layout uses. */
+    .d-att-name{margin:0;font-size:.8rem;line-height:1.3;white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis;display:block;-webkit-line-clamp:none;max-width:32ch}
+    /* Stacked under the content there is no empty space to fill, so an empty
+       rail would just be noise — show it only when it has files. */
+    .d-att-rail.is-empty{display:none}
+  }
+  html.is-mobile .d-att-rail{padding:0 16px 18px}
+  .pathbox{font-family:'Consolas','Courier New',monospace;font-size:.95rem;color:var(--brand-dark);
+    background:var(--brand-soft);border:1px solid #cdddef;border-radius:9px;padding:13px 16px;line-height:1.6}
+
+  /* Module hero — sits at the top of the list pane after a module is picked */
+  .mhero{margin:10px 12px 6px;padding:13px 15px;background:var(--panel);
+    border:1px solid var(--line);border-left:4px solid var(--mc,var(--brand));
+    border-radius:10px;box-shadow:var(--shadow)}
+  .mhero-name{font-size:.98rem;font-weight:800;color:var(--ink);margin:0 0 2px;letter-spacing:.2px}
+  .mhero-en{font-size:.78rem;color:var(--muted);font-style:italic;margin:0 0 8px;letter-spacing:.2px}
+  .mhero-desc{font-size:.83rem;color:#3c4650;line-height:1.6;margin:0}
+
+  /* Reports table (shown in detail pane when "วิธีเรียก Report" is selected) */
+  .rep-wrap{overflow:auto;border:1px solid var(--line);border-radius:9px;margin-top:8px}
+  .rep-table{width:100%;border-collapse:collapse;font-size:.92rem}
+  .rep-table thead th{background:var(--brand);color:#fff;text-align:left;padding:11px 14px;font-weight:600;position:sticky;top:0}
+  .rep-table tbody td{padding:10px 14px;border-top:1px solid var(--line);vertical-align:top}
+  .rep-table tbody tr:hover{background:#fafcfd}
+  .rt-no{font-weight:700;color:var(--brand);width:46px;text-align:center}
+  .rt-path{font-family:'Consolas','Courier New',monospace;font-size:.86rem;color:#2b3a33;white-space:nowrap}
+  @media (max-width:680px){.rt-path{white-space:normal}}
+
+  /* ===== Mobile / iPhone — single-pane stack navigation =====
+     Triggered by html.is-mobile (set by JS in <head>) so it fires reliably
+     even inside the Apps Script iframe wrapper, where @media (max-width) is
+     unreliable in some in-app browsers (Gmail, Slack, etc.). */
+  .mback,.mback-row{display:none}
+  html.is-mobile,html.is-mobile body{height:100%;-webkit-text-size-adjust:100%}
+  html.is-mobile body{font-size:14.5px;overscroll-behavior-y:contain}
+
+  /* Compact topbar with safe-area insets. Gear sits in flex flow next to the
+     brand-txt so they stay vertically aligned. */
+  html.is-mobile .topbar{position:relative;padding:10px 14px;gap:10px;flex-wrap:wrap;
+    align-items:center;
+    padding-top:max(10px,env(safe-area-inset-top));
+    padding-left:max(14px,env(safe-area-inset-left));
+    padding-right:max(14px,env(safe-area-inset-right))}
+  html.is-mobile .brand-txt{gap:9px;flex:1 1 0;min-width:0;order:1;align-self:center}
+  html.is-mobile .brand-h1{font-size:17px;white-space:nowrap;flex:0 0 auto}
+  html.is-mobile .brand-div{height:28px;flex:0 0 auto}
+  html.is-mobile .brand-stack{gap:2px;min-width:0;flex:1 1 0;overflow:hidden}
+  html.is-mobile .brand-sub{font-size:9.5px;letter-spacing:.3px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.is-mobile .brand-th{font-size:9.5px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Mobile: gear sits in flex flow on the right end of the brand row so it's
+     always vertically centered with the brand text — no absolute positioning. */
+  html.is-mobile .settings-wrap{
+    position:relative;
+    order:2;
+    flex:0 0 auto;
+    align-self:center;
+    margin-left:auto;
+    z-index:10
+  }
+
+  /* Bottom row inside topbar: Admin badge + Search spread across full width */
+  html.is-mobile .hdr-right{order:3;flex:1 1 100%;width:100%;
+    display:flex;gap:8px;margin-left:0;margin-top:0;align-items:center;
+    padding-right:0}
+  html.is-mobile .tbtn{padding:8px 12px;font-size:13px;min-height:38px}
+  html.is-mobile .hdr-right #adminBadge{order:1;flex:0 0 auto}
+  html.is-mobile .search{order:2;flex:1 1 auto;width:auto;max-width:none;
+    padding:0 11px;min-height:38px;border-color:rgba(255,255,255,.2)}
+  html.is-mobile .search input{font-size:16px;padding:0;line-height:1.2;height:auto} /* keep ≥16px so iOS doesn't zoom on focus */
+
+  /* Body becomes a single visible pane; CSS class on <body> switches view */
+  html.is-mobile .body{display:block;position:relative;overflow:hidden;grid-template-columns:none}
+  html.is-mobile body.reports-mode .body{grid-template-columns:none}
+  html.is-mobile .sidebar,html.is-mobile .list,html.is-mobile .detail{
+    position:absolute;inset:0;
+    border:none;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:max(16px,env(safe-area-inset-bottom))
+  }
+  html.is-mobile .list,html.is-mobile .detail{display:none}
+  html.is-mobile body.m-list .sidebar,html.is-mobile body.m-list .detail{display:none}
+  html.is-mobile body.m-list .list{display:block}
+  html.is-mobile body.m-detail .sidebar,html.is-mobile body.m-detail .list{display:none}
+  html.is-mobile body.m-detail .detail{display:block}
+
+  /* Back bar at top of list / detail panes. .mback-row is the sticky element
+     (only present in .detail); .mback itself is sticky too so the plain
+     .list back button — which has no wrapping row — still works standalone. */
+  html.is-mobile body.m-list .list .mback,
+  html.is-mobile body.m-detail .detail .mback{
+    display:flex;align-items:center;gap:8px;
+    padding:12px 14px;
+    padding-left:max(14px,env(safe-area-inset-left));
+    background:var(--panel);border:none;
+    color:var(--brand);font-weight:700;font-size:14px;
+    text-align:left;font-family:var(--sans);
+    -webkit-tap-highlight-color:rgba(46,117,182,.18)
+  }
+  html.is-mobile body.m-list .list .mback{
+    width:100%;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:3;
+    padding-right:max(14px,env(safe-area-inset-right));
+  }
+  html.is-mobile .mback svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.5;flex:0 0 auto}
+  /* Detail pane: back button + Share/Edit share one sticky row, so the
+     buttons stay pinned alongside "List" instead of drifting off as the
+     case content scrolls underneath — see moveDetailActionsMobile(). */
+  html.is-mobile body.m-detail .detail .mback-row{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:var(--panel);border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:3;
+    padding-right:max(10px,env(safe-area-inset-right));
+  }
+  html.is-mobile body.m-detail .detail .mback-row .mback{flex:1 1 auto;min-width:0}
+  html.is-mobile body.m-detail .detail #mbackDetailActions:not(:empty){
+    display:flex;align-items:center;gap:6px;flex:0 0 auto
+  }
+  html.is-mobile body.m-detail .detail #mbackDetailActions .d-edit{padding:6px 8px}
+  /* Icon-only on mobile's tight back row: hide every label span, keep only
+     the icon span (share's icon is wrapped in .d-share-ico; edit's icon is a
+     bare svg with no wrapping span, so it's untouched by this rule). */
+  html.is-mobile body.m-detail .detail #mbackDetailActions .d-edit span:not(.d-share-ico){
+    display:none
+  }
+
+  /* Sidebar (full-screen module picker) */
+  html.is-mobile .sidebar{padding:14px 12px;flex-direction:column}
+  html.is-mobile .side-label{font-size:12px;margin:14px 8px 8px}
+  html.is-mobile .side-label:first-child{margin-top:6px}
+  html.is-mobile .mod{padding:13px 12px;min-height:54px;margin-bottom:2px;width:100%}
+  html.is-mobile .mod .mn b{font-size:15px}
+  html.is-mobile .mod .mn small{font-size:12px}
+  html.is-mobile .mod .cnt{font-size:12.5px;padding:2px 10px}
+
+  /* Module submenus (Process Flows + Case Studies share class .cs-children)
+     laid out as a 2-column grid on mobile to use the horizontal space */
+  html.is-mobile .cs-children{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:2px 0 4px;padding:0;border:none}
+  html.is-mobile .cs-children .mod{
+    margin-bottom:0;padding:11px 10px;min-height:62px;
+    background:#fbfcfe;border:1px solid var(--line-soft);border-radius:10px;gap:8px}
+  html.is-mobile .cs-children .mod:hover{background:var(--line-soft)}
+  html.is-mobile .cs-children .mod.active{background:var(--brand-soft);border-color:#cdddef}
+  html.is-mobile .cs-children .mod.is-empty{background:#fafbfc}
+  html.is-mobile .cs-children .mod .dot{width:9px;height:9px}
+  html.is-mobile .cs-children .mod .mn{min-width:0;overflow:hidden}
+  html.is-mobile .cs-children .mod .mn b{font-size:14px;line-height:1.15}
+  html.is-mobile .cs-children .mod .mn small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html.is-mobile .cs-children .mod .cnt{font-size:11.5px;padding:1px 8px;flex:0 0 auto}
+
+  /* Night mode on mobile — the 2-col grid rules above re-set the .mod
+     background/border to light values at the SAME specificity as the global
+     dark rule, so source order lets them win and the cards stay white. Re-apply
+     the dark palette with a more specific selector (html.dark.is-mobile). */
+  html.dark.is-mobile .cs-children .mod{background:#1a2230;border-color:#26303d}
+  html.dark.is-mobile .cs-children .mod:hover{background:var(--line-soft)}
+  html.dark.is-mobile .cs-children .mod.active{background:var(--brand-soft);border-color:#2e4d7a}
+  html.dark.is-mobile .cs-children .mod.is-empty{background:#161b22}
+
+  /* Cases list */
+  html.is-mobile .list-head{padding:12px 14px;font-size:12.5px}
+  html.is-mobile .lcard{margin:8px 12px;padding:13px}
+  html.is-mobile .lc-title{font-size:.95rem}
+  html.is-mobile .lc-ex{font-size:.82rem}
+
+  /* Detail / welcome */
+  html.is-mobile .d-wrap{padding:18px 16px;max-width:none}
+  html.is-mobile .d-head{gap:10px;padding-bottom:12px;margin-bottom:14px}
+  html.is-mobile .d-num{min-width:32px;height:32px;font-size:.95rem}
+  html.is-mobile .d-th{font-size:1.05rem}
+  html.is-mobile .welcome{padding:18px 16px;max-width:none}
+  html.is-mobile .w-title{font-size:1.25rem}
+  html.is-mobile .w-sub{font-size:.88rem}
+  html.is-mobile .w-stats{font-size:.74rem;padding:4px 0}
+  html.is-mobile .w-stats span{padding:3px 10px}
+  html.is-mobile .howto{grid-template-columns:1fr;gap:9px}
+
+  /* Reports table — wrap menu paths so it fits */
+  html.is-mobile .rt-path{white-space:normal;font-size:.82rem}
+
+  /* Edit modal becomes a bottom sheet */
+  html.is-mobile .modal-bg{padding:0;align-items:flex-end}
+  html.is-mobile .modal{max-width:none;border-radius:14px 14px 0 0;
+    padding:16px 16px max(16px,env(safe-area-inset-bottom));
+    max-height:92vh;overflow-y:auto}
+  html.is-mobile .modal .row{grid-template-columns:1fr;gap:4px}
+  html.is-mobile .modal label{padding-top:0;padding-bottom:2px}
+  html.is-mobile .modal input[type=text],
+  html.is-mobile .modal input[type=password],
+  html.is-mobile .modal textarea{font-size:16px}
+
+  /* The full-screen editor is already a full-height sheet on mobile; it keeps
+     its sticky header/footer but drops to one column and tighter padding. */
+  html.is-mobile .modal-full{max-height:none;height:100%;border-radius:0;padding:0;overflow:hidden}
+  html.is-mobile .modal-full > h3{padding:13px 15px}
+  html.is-mobile .modal-full .actions{padding:10px 15px max(10px,env(safe-area-inset-bottom))}
+  html.is-mobile .mf-grid{grid-template-columns:minmax(0,1fr);gap:0;height:auto;min-height:0}
+  /* One narrow column can't fit everything at once, so on a phone the body
+     scrolls as a normal document and the fields revert to fixed heights —
+     the desktop flex-fill (which sizes ขั้นตอน from leftover space) would
+     collapse it to its min-height here. */
+  html.is-mobile .mf-body{padding:14px 15px;overflow-y:auto}
+  html.is-mobile .mf-col,html.is-mobile .mf-col.mf-meta{display:block;overflow:visible}
+  /* The desktop row/wrapper grids hand ขั้นตอน a 1fr track of whatever the
+     column has spare. In a normally-scrolling mobile document that spare is
+     zero, so both grids are reverted to block and the field gets a fixed
+     height again. */
+  html.is-mobile .modal-full .row.ta-fill,
+  html.is-mobile .modal-full .row.ta-fill > div{display:block;grid-template-rows:none}
+  html.is-mobile .modal-full #ed_steps{height:auto;min-height:230px}
+  html.is-mobile .modal-full #ed_when{height:auto;min-height:120px}
+  html.is-mobile .modal-full #ed_note{height:auto;min-height:60px}
+  /* Name over URL over delete — three columns is unusable at phone width. */
+  html.is-mobile .att-row{grid-template-columns:minmax(0,1fr) auto;gap:5px}
+  html.is-mobile .att-row .att-name{grid-column:1 / -1}
+
+  /* iOS tap feedback on interactive elements */
+  html.is-mobile .mod,html.is-mobile .lcard,html.is-mobile .tbtn,
+  html.is-mobile .btn,html.is-mobile .d-edit{-webkit-tap-highlight-color:rgba(46,117,182,.18)}
+
+  /* ===== Modals (admin login + edit scenario) ===== */
+  .modal-bg{position:fixed;inset:0;background:rgba(20,30,45,.55);z-index:100;
+    display:none;align-items:flex-start;justify-content:center;padding:60px 20px;overflow-y:auto}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:100%;max-width:680px;padding:22px 26px;font-family:var(--sans)}
+  .modal h3{margin:0 0 14px;font-size:1.15rem;color:var(--brand-dark)}
+  /* minmax(0,1fr) not 1fr — a grid track sized 1fr still floors at its content's
+     min-content width, so a wide child (e.g. a <select> with long options) can
+     push the field column past the modal edge. */
+  .modal .row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px 14px;margin-bottom:11px;align-items:start}
+  .modal .row > div{min-width:0}
+  .modal label{font-size:.82rem;font-weight:700;color:var(--muted);padding-top:8px}
+  .modal input[type=text],.modal input[type=password],.modal textarea{
+    width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;
+    font-family:var(--sans);font-size:.92rem;outline:none;background:#fff;color:var(--ink)}
+  .modal input:focus,.modal textarea:focus{border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(46,117,182,.18)}
+  .modal textarea{resize:vertical;min-height:60px;line-height:1.55;font-family:var(--sans)}
+  .modal .hint{font-size:.74rem;color:var(--faint);margin-top:4px;line-height:1.5}
+  .modal .hint code{background:var(--line-soft);padding:1px 5px;border-radius:4px;font-size:.86em}
+  .chk-grid{display:flex;flex-wrap:wrap;gap:6px 14px}
+  .chk-grid label{display:inline-flex;align-items:center;gap:5px;font-size:.86rem;font-weight:500;color:var(--ink);cursor:pointer;width:auto}
+  .chk-grid input[type=checkbox]{margin:0;cursor:pointer}
+  .modal .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid var(--line-soft);padding-top:14px}
+
+  /* ===== Full-screen edit modal =====
+     The scenario editor holds several long free-text fields (ปัญหา, ขั้นตอน,
+     ไฟล์แนบ). In the old 780px box every one of them was a 3-10 row textarea
+     with its own tiny scrollbar. .modal-full fills the viewport instead: a
+     sticky header/footer with one scrolling body between them, and a two-column
+     grid so the long fields get real height. */
+  .modal-bg.full{padding:0;align-items:stretch;overflow:hidden}
+  .modal-full{max-width:none;width:100%;height:100%;border-radius:0;padding:0;
+    display:flex;flex-direction:column;min-height:0}
+  .modal-full > h3{flex:0 0 auto;margin:0;padding:16px 26px;
+    border-bottom:1px solid var(--line-soft);background:inherit}
+  /* The body fills exactly the space between header and footer and does NOT
+     scroll — the whole point is that everything fits on one screen. Only the
+     two textareas that can hold unbounded text scroll, internally. */
+  .mf-body{flex:1 1 auto;overflow:hidden;padding:16px 26px;min-height:0}
+  .modal-full .actions{flex:0 0 auto;margin:0;padding:12px 26px;background:inherit}
+  /* Two columns: the short metadata fields on the left, the long free-text
+     fields on the right. Both are full-height flex columns so the tall fields
+     size themselves from what's left over rather than from a vh guess — a
+     fixed vh can't know how tall the header, footer, or the fields above it
+     are, which is what pushed หมายเหตุ off the bottom. */
+  .mf-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);
+    gap:0 30px;align-items:stretch;height:100%;min-height:0}
+  .mf-col{min-width:0;display:flex;flex-direction:column;min-height:0}
+  .mf-col.mf-meta{overflow-y:auto}
+  /* Inside the full-screen editor the label sits above its field (stacked)
+     rather than in a 120px gutter — the columns are narrower than the old
+     single-column modal, so a side gutter would squeeze the inputs. */
+  /* Everything is meant to fit on one screen, so the full-screen editor runs
+     tighter than the small modals: less row spacing, and hints that sit closer
+     to their field. The savings are what keep the left column from scrolling
+     on a case with several attachments. */
+  .modal-full .row{grid-template-columns:minmax(0,1fr);gap:2px;margin-bottom:9px;flex:0 0 auto}
+  .modal-full label{padding-top:0;padding-bottom:0}
+  .modal-full .hint{margin-top:2px;line-height:1.4}
+  .modal-full input[type=text],.modal-full textarea{padding:6px 10px}
+  .modal-full .chk-grid{gap:4px 12px}
+  /* ปัญหา and หมายเหตุ are fixed to their content; ขั้นตอน absorbs whatever is
+     left so the column fills the page exactly — no dead space, no page scroll.
+     This is done on the GRID row, not by turning the row into a flex column.
+     That distinction is the whole bug history of this modal: a flex row
+     inherits `align-items:start` from `.modal .row` and packs the field to its
+     content width, which made ขั้นตอน narrower than its neighbours. A grid row
+     stretches its track by default, so the field keeps full width for free.
+     `grid-template-rows:auto 1fr` gives the label its height and hands the
+     rest to the field wrapper; min-height:0 lets it actually shrink. */
+  .modal-full .row.ta-fill{flex:1 1 auto;min-height:0;grid-template-rows:auto minmax(0,1fr);align-items:stretch}
+  .modal-full .row.ta-fill > div{min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto}
+  .modal-full #ed_steps{height:auto;min-height:0;resize:none}
+  .modal-full #ed_when{height:6.5em;min-height:3em;resize:vertical}
+  .modal-full #ed_note{height:3.2em;min-height:2.4em;resize:vertical}
+
+  /* ===== Attachment rows =====
+     Replaces the "Label | URL" textarea. One row per file so the name is a
+     first-class field and never has to be remembered as pipe syntax. */
+  .att-list{display:flex;flex-direction:column;gap:7px}
+  .att-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) auto;gap:7px;align-items:center}
+  .att-row input[type=text]{margin:0}
+  .att-del{flex:0 0 auto;width:30px;height:30px;padding:0;display:inline-flex;
+    align-items:center;justify-content:center;border:1px solid var(--line);
+    background:#fff;color:#B5302A;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1}
+  .att-del:hover{background:#fdecec;border-color:#e3a9a5}
+  html.dark .att-del{background:#1a2230;border-color:var(--line);color:#ff8a82}
+  html.dark .att-del:hover{background:#2a1a1c;border-color:#5a2f2f}
+  .att-add{margin-top:8px;padding:6px 13px;font-size:.85rem}
+  .btn{padding:8px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:8px;font-family:var(--sans);font-size:.92rem;font-weight:600;cursor:pointer}
+  .btn:hover{background:var(--line-soft)}
+  .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.primary:hover{background:var(--brand-dark)}
+  .btn[disabled]{opacity:.6;cursor:wait}
+  .tbtn.on{background:rgba(40,200,140,.35);border-color:rgba(40,200,140,.65)}
+  .d-edit{background:#fff;border:1px solid var(--line);color:var(--brand);
+    border-radius:8px;padding:5px 11px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:var(--sans);
+    flex:0 0 auto;white-space:nowrap}
+  .d-edit:hover{background:var(--brand-soft);border-color:var(--brand-2)}
+  .d-edit.copied{background:#eafaf1;border-color:#2e9e5b;color:#2e9e5b}
+  html.dark .d-edit.copied{background:#132a1e;border-color:#46b277;color:#82d9a4}
+  .btn-danger{color:#B5302A}
+  .btn-danger:hover{background:#FBEBEA;border-color:#E3A8A2}
+  html.dark .btn-danger{color:#e08b83}
+  html.dark .btn-danger:hover{background:#3a2422;border-color:#5a3330}
+  .btn-danger-solid{background:#B5302A;border-color:#B5302A;color:#fff}
+  .btn-danger-solid:hover{background:#9c2822;border-color:#9c2822}
+  .confirm-msg{font-size:.88rem;line-height:1.6;color:var(--ink);white-space:pre-line;margin:4px 0 0}
+
+  /* ===== Process-flow diagrams (Process Flows view) =====
+     Each flow is a swimlane diagram: lanes = responsible actors/modules,
+     ranks = vertical sequence. Boxes are laid out on a CSS grid; the arrows
+     between them are drawn by JS into an absolutely-positioned <svg> overlay
+     (layoutFlowEdges) that is re-measured on resize / theme change. */
+  .flow-id-badge{flex:0 0 auto;align-self:flex-start;background:var(--brand);color:#fff;
+    font-weight:800;font-size:.82rem;letter-spacing:.4px;border-radius:9px;padding:7px 11px;font-family:var(--banner-font)}
+  .flow-wrap{margin-top:4px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel)}
+  .flow-scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .flow-canvas{--flow-col:212px;width:max-content;min-width:100%}
+  html.is-mobile .flow-canvas{--flow-col:158px}
+  .flow-lanes{display:grid;border-bottom:1px solid var(--line)}
+  .flow-lane-h{padding:9px 10px;border-left:1px solid var(--line-soft);text-align:center;background:var(--bg)}
+  .flow-lane-h:first-child{border-left:none}
+  .flow-lane-h b{display:block;font-size:.79rem;font-weight:700;color:var(--ink);line-height:1.3}
+  .flow-lane-h small{display:block;font-size:.67rem;color:var(--muted);margin-top:2px;letter-spacing:.2px}
+  .flow-body{position:relative}
+  .flow-edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:0}
+  .flow-grid{display:grid;row-gap:34px;padding:24px 0;position:relative;z-index:1}
+  .flow-node{align-self:center;justify-self:center;max-width:calc(var(--flow-col) - 22px);
+    padding:9px 12px;border-radius:9px;font-size:.79rem;line-height:1.32;text-align:center;
+    background:var(--panel);border:1.5px solid var(--brand);color:var(--ink);
+    box-shadow:0 1px 2px rgba(27,31,36,.07);word-break:break-word}
+  .fn-start,.fn-end{border-radius:999px;background:var(--brand-soft);border-color:transparent;
+    color:var(--brand-dark);font-weight:700;padding:7px 20px;font-size:.78rem}
+  .fn-decision{border-color:var(--accent);background:#fff8ec;color:#7a5a16;font-weight:700}
+  html.dark .flow-lane-h{background:#10161f}
+  html.dark .fn-decision{background:#2a2415;color:#e4cd8f}
+  /* Start/End pills and the rail heading both paint a dark-navy brand colour as
+     TEXT. `--brand-dark` / `--brand` are deliberately not redefined for night
+     mode (they are surface colours elsewhere), so without these the pill drew
+     #16284a on #1c2d4a — a contrast ratio of 1.06, i.e. invisible — and the
+     heading drew #1F3864 on #141b26 at 1.49. Lifted to the same light blue the
+     other brand-coloured text uses in dark mode (.lbl, .mback). */
+  html.dark .fn-start,html.dark .fn-end{color:#cdddef}
+  html.dark .d-att-h{color:#7fa8d6}
+  html.dark .flow-id-badge{background:#1a2230;color:#cdddef}
+  /* Narrative (left-column process text) shown under the diagram — readable on
+     mobile where the wide swimlane has to scroll horizontally. */
+  .flow-narr{margin:0;padding:0;list-style:none;font-size:.9rem;line-height:1.6}
+  .flow-narr li.fn-main{padding:4px 0;color:var(--ink)}
+  .flow-narr li.fn-sub{position:relative;padding:2px 0 2px 18px;color:var(--muted);font-size:.85rem}
+  .flow-narr li.fn-sub::before{content:'–';position:absolute;left:4px;color:var(--accent)}
+  .flow-narr li.fn-note{margin-top:8px;color:#8d2820;font-size:.84rem;background:#fdeceb;
+    border:1px solid #f6c9c5;border-radius:8px;padding:8px 11px;line-height:1.55}
+  html.dark .flow-narr li.fn-note{background:#3a1f1d;border-color:#5a2c28;color:#e8b6b1}
+  .flow-legend{display:flex;flex-wrap:wrap;gap:14px;margin:12px 2px 2px;font-size:.74rem;color:var(--muted)}
+  .flow-legend span{display:inline-flex;align-items:center;gap:6px}
+  .flow-legend i{width:18px;height:0;border-top-width:2.4px;border-top-style:solid;display:inline-block}
+
+  /* ============================================================
+     Refined-corporate revamp — appended last so it refines the
+     base styles above (icon sizing, surfaces, states, rhythm).
+     ============================================================ */
+  /* Icon sizing per context (the --ico custom property inherits) */
+  .search .ico{--ico:16px}
+  .settings-btn .ico{--ico:18px}
+  .admin-badge .ico{--ico:13px}
+  .sm-toggle-btn .ico{--ico:16px}
+  .sm-action .ico{--ico:17px}
+  .d-edit .ico{--ico:13px}
+
+  /* Banner — calmer gradient, brand mark, refined type */
+  .topbar{padding:13px 24px;
+    background:linear-gradient(118deg,#1c3a67 0%,#274f7d 52%,#2f76b7 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 18px rgba(20,38,72,.26)}
+  .brand-mark{display:inline-flex;width:34px;height:34px;flex:0 0 auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
+  .brand-mark svg{width:34px;height:34px}
+  .brand-h1{font-size:21px;font-weight:700;letter-spacing:.2px}
+  /* Wordmark doubles as a "back to VCB Connect" link — reads as a logo, not a text link */
+  .brand-link{color:inherit;text-decoration:none;cursor:pointer;transition:opacity .15s}
+  .brand-link:hover,.brand-link:focus-visible{opacity:.82;text-decoration:none}
+  .brand-link:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(255,255,255,.35);border-radius:6px}
+  .brand-div{height:34px;background:rgba(255,255,255,.28)}
+  .brand-sub{font-size:12px;font-weight:600;letter-spacing:.5px;opacity:.96}
+  .brand-th{font-size:12px;opacity:.85;font-weight:500}
+  html.is-mobile .brand-mark,html.is-mobile .brand-mark svg{width:26px;height:26px}
+
+  /* Search field */
+  .search{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+    border-radius:10px;padding:8px 12px;transition:background .15s,border-color .15s,box-shadow .15s}
+  .search:focus-within{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.42)}
+  .search-ico{display:inline-flex;color:#c2d6ec}
+  .search input::placeholder{color:#b9cbe0}
+
+  /* Admin badge + settings/gear */
+  .admin-badge{display:inline-flex;align-items:center;gap:6px;border-radius:9px;font-weight:600}
+  .admin-badge>span[data-icon]{display:inline-flex}
+  .settings-btn{border-radius:10px}
+
+  /* Sidebar — section chips with real icons */
+  .sidebar{padding:14px 12px}
+  .mod{border-radius:10px;transition:background .14s ease,border-color .14s ease,box-shadow .14s ease}
+  .cs-root{padding:10px;gap:11px;border:1px solid transparent}
+  .cs-root .mn b{font-weight:700;font-size:14px;letter-spacing:.1px}
+  .cs-root .mn small{font-size:11px}
+  .mod-ico{width:32px;height:32px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:9px;background:var(--brand-soft);color:var(--brand-2);--ico:18px;
+    transition:background .14s,color .14s,box-shadow .14s}
+  .cs-root:hover .mod-ico{box-shadow:inset 0 0 0 1px rgba(46,117,182,.22)}
+  .cs-root.active{background:var(--brand-soft);border-color:transparent}
+  .m-RP .mod-ico{color:var(--brand)}
+  /* Active icon chip fills navy for ALL top-level branches (Flows, Case Studies, Reports) */
+  .mod.active .mod-ico{background:var(--brand);color:#fff}
+  html.dark .mod-ico{background:#1b2840;color:#9cc2ea}
+  html.dark .mod.active .mod-ico{background:var(--brand-2);color:#fff}
+  .cs-children .mod{padding:8px 10px}
+  .cnt{background:var(--line-soft);color:var(--muted);font-weight:600;border-radius:999px}
+
+  /* Cards */
+  .lcard{border-radius:11px;transition:border-color .14s,box-shadow .14s,transform .12s}
+  .lcard:hover{border-color:#c5d2e2;box-shadow:var(--shadow);transform:translateY(-1px)}
+  .lcard.active{border-color:var(--brand-2);box-shadow:var(--ring)}
+  .lc-no{border-radius:7px;font-weight:700}
+  .lc-badge{font-weight:700;letter-spacing:.4px}
+
+  /* Detail header icon (reports) + edit button + note row */
+  .d-hicon{flex:0 0 auto;width:40px;height:40px;border-radius:11px;display:inline-flex;
+    align-items:center;justify-content:center;background:var(--brand-soft);color:var(--brand-2);--ico:20px}
+  html.dark .d-hicon{background:#1b2840;color:#9cc2ea}
+  .d-edit{display:inline-flex;align-items:center;gap:5px}
+  .d-num{border-radius:10px}
+  .d-badge{font-weight:700;letter-spacing:.4px}
+  .note{display:flex;gap:9px;align-items:flex-start}
+  .note-ico{--ico:17px;flex:0 0 auto;margin-top:1px;color:#b5302a}
+  html.dark .note-ico{color:#ff8a82}
+
+  /* Surfaces, buttons, focus rings */
+  .btn{border-radius:9px;transition:background .14s,border-color .14s,box-shadow .14s}
+  .btn.primary{box-shadow:var(--shadow-xs)}
+  .modal{border-radius:var(--r-lg);box-shadow:var(--shadow-lg)}
+  .btn:focus-visible,.sm-action:focus-visible,.mod:focus-visible,.tbtn:focus-visible,
+  .lcard:focus-visible,.settings-btn:focus-visible,.sm-toggle-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+  .ptext,.pathbox,.w-box{border-radius:11px}
+
+  body{padding:18px 22px;background:var(--bg)}
+  .pv-bar{display:flex;gap:10px;align-items:center;margin-bottom:10px;font-family:var(--sans)}
+  .pv-bar button{padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-weight:600;cursor:pointer}
+  .pv-note{font-family:var(--sans);color:var(--muted);font-size:.82rem;margin:0 0 16px}
+  .detail{background:transparent}
+</style></head>
+<body>
+  <div class="pv-bar">
+    <strong style="font-family:var(--sans);color:var(--ink)">Process Flows — local preview (BD pilot)</strong>
+    <button id="dk">Toggle dark</button>
+  </div>
+  <p class="pv-note">Standalone preview generated from index.html — NOT deployed (excluded by .claspignore). Same diagram code the app uses.</p>
+  <div id="root" class="detail"></div>
+<script>
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+var LANG={flowStepsLbl:"รายละเอียดขั้นตอน · Process",flowLegNormal:"ขั้นตอนปกติ",flowLegApprove:"ส่งอนุมัติ",flowLegYes:"อนุมัติ (Yes)",flowLegReject:"ตีกลับ (Reject)"};
+function t(k){return LANG[k]||k;}
+var SOP_FLOWS = [
+    {
+      id:'BD-1.0', module:'BD',
+      titleTH:'การเปิดโครงการใหม่และการกำหนดข้อมูลงบประมาณ (Budget)',
+      titleEN:'New Project & Budget Setup',
+      lanes:[
+        {key:'bd', name:'ฝ่ายโครงการ', sub:'Module BD', module:'BD'},
+        {key:'pm', name:'ฝ่ายโครงการ', sub:'Module PM', module:'PM'},
+        {key:'ap', name:'ผู้มีอำนาจอนุมัติ', sub:'Module PM', module:'PM'}
+      ],
+      nodes:[
+        {id:'start', lane:'bd', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'bd', rank:1, type:'process', label:'1. สร้าง Tender'},
+        {id:'n2',    lane:'bd', rank:2, type:'process', label:'2. เปิดโครงการ'},
+        {id:'n21',   lane:'bd', rank:3, type:'process', label:'2.1 นำ Tender ผูกกับข้อมูลโครงการ'},
+        {id:'n3',    lane:'bd', rank:4, type:'process', label:'3. Import BOQ Budget'},
+        {id:'n4',    lane:'bd', rank:5, type:'process', label:'4. Init Summary Cost Code'},
+        {id:'n5',    lane:'pm', rank:5, type:'process', label:'5. Init. Budget Cost'},
+        {id:'n6',    lane:'pm', rank:6, type:'process', label:'6. กำหนดการ Control Budget'},
+        {id:'n7',    lane:'ap', rank:6, type:'process', label:'7. Approve Budget'},
+        {id:'end',   lane:'ap', rank:7, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2', label:'ประมูลงานได้ (Award)'},
+        {from:'n2', to:'n21'},
+        {from:'n21', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'n6'},
+        {from:'n6', to:'n7'},
+        {from:'n7', to:'end'}
+      ],
+      narrative:[
+        '1. เมื่อมีการประมูลงาน ฝ่ายงบประมาณโครงการสร้าง Tender ใหม่ ชื่อตามโครงการที่ไปประมูล (BD Module)',
+        '2. เปิดโครงการใหม่ (Create Project) ข้อมูลโครงการที่ BD Module โดยอ้างอิงข้อมูลดังนี้',
+        '» 2.1) Tender ที่สถานะ Award มาผูกกับข้อมูลโครงการ',
+        '3. กำหนดข้อมูล Budget ใน Template BOQ เมื่อข้อมูลเรียบร้อยให้ดำเนินการ Import BOQ/Budget เข้าในระบบ',
+        '4. Initial Budget (ปุ่ม Init Summary Cost Code) ใน BD Module',
+        '5. Initial Project Budget ใน PM Module',
+        '6. กำหนดการ Control Budget (กรณีที่ต้องการ Control งบประมาณ)',
+        '7. Approve Budget (ผู้มีอำนาจอนุมัติทำการ Approve Budget เพื่อล็อคเวอร์ชั่นของ Budget)',
+        '! การกำหนด Control Budget จะต้องกำหนด Control Budget By Summary Cost Code ที่ข้อมูลโครงการก่อน'
+      ]
+    },
+    {
+      id:'BD-1.1', module:'BD',
+      titleTH:'การ Revise Budget',
+      titleEN:'Revise Budget',
+      lanes:[
+        {key:'pm', name:'ฝ่ายโครงการ', sub:'Module PM', module:'PM'},
+        {key:'bd', name:'ฝ่ายโครงการ', sub:'Module BD', module:'BD'}
+      ],
+      nodes:[
+        {id:'start', lane:'pm', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'pm', rank:1, type:'process',  label:'1. Revise Budget (เมนู Project Budget)'},
+        {id:'n2',    lane:'bd', rank:2, type:'process',  label:'2. กำหนด BOQ/Budget'},
+        {id:'n3',    lane:'bd', rank:3, type:'process',  label:'3. Init Summary Cost Code'},
+        {id:'n4',    lane:'pm', rank:3, type:'process',  label:'4. Init. Budget Cost'},
+        {id:'n5',    lane:'pm', rank:4, type:'process',  label:'5. กำหนดการ Control Budget'},
+        {id:'dec',   lane:'bd', rank:4, type:'decision', label:'อนุมัติ?'},
+        {id:'n6',    lane:'pm', rank:5, type:'process',  label:'6. Approve Budget'},
+        {id:'end',   lane:'pm', rank:6, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n6', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n5', label:'Reject', kind:'reject'},
+        {from:'n6', to:'end'}
+      ],
+      narrative:[
+        '1. ฝ่ายงบประมาณโครงการ กดปุ่ม Revise Budget ที่ PM Module > Project Budget ในกรณีที่มีการแก้ไข (ยังไม่ต้องส่งอนุมัติ)',
+        '2. กำหนด BOQ/Budget เข้าไปใหม่โดยวิธีการ Revise ใน Budget ของสัญญาหลัก',
+        '3. Init Summary Cost Code ใน BD Module',
+        '4. Init. Budget Cost ใน PM Module',
+        '5. กำหนดการ Control Budget (กรณีที่ต้องการ Control งบประมาณ และส่งอนุมัติ)',
+        '6. Approve Budget — ผู้มีอำนาจอนุมัติทำการ Approve Budget เพื่อล็อคเวอร์ชั่นของ Budget',
+        '! เมื่อข้อมูลงบประมาณ Budget ถูก Reject ข้อมูลจะส่งกลับมาที่หน้าต่าง Project Budget',
+        '! กรณีต้องการ Revise Budget อีกครั้ง ให้กดปุ่ม Revise เพื่อเปิดให้ทำการ Create VO และ Transfer Budget ต่อไปได้'
+      ]
+    },
+    {
+      id:'BD-1.2', module:'BD',
+      titleTH:'การขออนุมัติงานเปลี่ยนแปลง BOQ (Additional Work)',
+      titleEN:'BOQ Change Request (Additional Work)',
+      lanes:[
+        {key:'bd1', name:'ฝ่ายโครงการ', sub:'Module BD', module:'BD'},
+        {key:'bd2', name:'ฝ่ายโครงการ', sub:'Module BD', module:'BD'},
+        {key:'pm',  name:'PM / ผู้มีอำนาจอนุมัติ', sub:'Module PM', module:'PM'}
+      ],
+      nodes:[
+        {id:'start', lane:'bd1', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'bd1', rank:1, type:'process',  label:'1. Additional Work (VO)'},
+        {id:'dec',   lane:'bd2', rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'n3',    lane:'bd2', rank:2, type:'process',  label:'3. BOQ Budget (Ref VO)'},
+        {id:'n4',    lane:'bd2', rank:3, type:'process',  label:'4. Create VO (Ref VO)'},
+        {id:'n5',    lane:'bd2', rank:4, type:'process',  label:'5. Init Summary Cost Code'},
+        {id:'n6',    lane:'pm',  rank:4, type:'process',  label:'6. Init. Budget Cost'},
+        {id:'n7',    lane:'pm',  rank:5, type:'process',  label:'7. กำหนดการ Control Budget'},
+        {id:'n8',    lane:'pm',  rank:6, type:'process',  label:'8. Approve Budget'},
+        {id:'end',   lane:'pm',  rank:7, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'n6'},
+        {from:'n6', to:'n7'},
+        {from:'n7', to:'n8'},
+        {from:'n8', to:'end'}
+      ],
+      narrative:[
+        'Additional Work (BD Module)',
+        '1. หน่วยงานโครงการ ระบุโครงการเพื่อบันทึกรายการเปลี่ยนแปลง (เพิ่ม/ลด) โดยการ Import ตามไฟล์ Excel หรือคีย์เพิ่มทีละบรรทัด โดยระบุข้อมูลดังนี้',
+        '» Material code : กรณีควบคุม BOQ',
+        '» Cost code : ต้นทุนจัดทำงบประมาณเพิ่ม/ลด',
+        '» Qty./Unit : ปริมาณ และหน่วยของงานเพิ่ม/ลด',
+        '» Unit price : ราคาต่อหน่วยของ Material, Labor',
+        '2. Save และส่งอนุมัติ (Submit Approve)',
+        '3. หน้าต่าง Bill Of Quantity เลือก Tender no. ที่มีรหัสโครงการเดียวกันกับงานเพิ่ม/ลด',
+        '4. Create VO และดึง Ref.VO มาเชื่อมโยงกับ BOQ หลัก (Ref.VO คือเอกสาร Additional Work ที่ผ่านการอนุมัติแล้ว)',
+        '5. Init Summary Cost Code ระบบจะคำนวณ Cost code ที่ใช้ในงานเดียวกันรวมเป็นจำนวนเดียวกัน',
+        '6. Init. Budget Cost ใน PM Module เพื่อรับข้อมูลที่อัพเดตจาก BOQ',
+        '7. กำหนดการ Control Budget กรณีที่ต้องการควบคุมงบประมาณ',
+        '8. Approve Budget เมื่อต้องการ Lock การแก้ไขข้อมูลงบประมาณโครงการ'
+      ]
+    },
+
+    /* ===== PR — Purchase Requisition ===== */
+    {
+      id:'PR-1.1', module:'PO',
+      titleTH:'การเปิดใบขอซื้อ (PR) โดยอ้างอิงจาก BOQ',
+      titleEN:'Purchase Requisition — referencing BOQ',
+      lanes:[
+        {key:'of', name:'Foreman / Admin Site', sub:'Module OF', module:'OF'},
+        {key:'ap', name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'po', name:'ฝ่ายจัดซื้อ', sub:'Module PO', module:'PO'}
+      ],
+      nodes:[
+        {id:'start', lane:'of', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of', rank:1, type:'process',  label:'1. เปิด PR (ดึง Ref. BOQ)'},
+        {id:'dec',   lane:'ap', rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'print', lane:'of', rank:2, type:'process',  label:'พิมพ์ PR'},
+        {id:'n3',    lane:'po', rank:2, type:'process',  label:'3. ดึงไปเปิด PO / WO'},
+        {id:'form',  lane:'of', rank:3, type:'process',  label:'PR Form'},
+        {id:'end',   lane:'of', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'print', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'print', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงาน / ผู้ควบคุมงานเปิดใบขอซื้อ (PR) โดยเลือก Ref. BOQ จากนั้นเลือกประเภทเอกสาร แยกเป็น Type 3 ประเภทหลัก ดังนี้',
+        '» 1.1 PR For PO / WO สำหรับทั้งซื้อวัสดุและงานจ้างเหมาในชุดเอกสารเดียวกัน (PR ใบเดียวมีทั้งซื้อวัสดุและจ้างเหมา)',
+        '» 1.2 PR For PO Only สำหรับซื้อวัสดุต่าง ๆ',
+        '» 1.3 PR For WO Only สำหรับงานจ้างเหมา',
+        '» การอ้างอิงจาก BOQ จะอ้างอิงรายการ/ปริมาณการสั่งซื้อ/สั่งจ้างที่ Control BOQ ไว้ และสัมพันธ์กับ Cost Code ที่มีการ Control Budget',
+        '2. ผู้มีอำนาจอนุมัติในระบบ และมีลายเซ็นลงนามบนเอกสาร',
+        '3. ฝ่ายจัดซื้อดึงใบขอซื้อ (PR) ที่ผ่านการอนุมัติแล้ว ไปเปิดใบสั่งซื้อ (PO) / หนังสือสั่งจ้าง (WO)',
+        '! กรณีซื้อวัสดุของโครงการ ให้เลือก Type เป็น PO Only',
+        '! กรณีจ้าง Subcontractor ให้เลือก Type เป็น WO Only (ทั้งจ้างแรงอย่างเดียว หรือทั้งของและแรง)',
+        '! กรณีค่าบริการ / ค่าเช่า / ค่าซ่อม ฯลฯ ที่มี W/T ให้เลือก Type เป็น WO Only'
+      ]
+    },
+    {
+      id:'PR-1.2', module:'PO',
+      titleTH:'การเปิดใบขอซื้อ (PR) โดยไม่อ้างอิงจาก BOQ',
+      titleEN:'Purchase Requisition — without BOQ',
+      lanes:[
+        {key:'of', name:'Foreman / Admin Site', sub:'Module OF', module:'OF'},
+        {key:'ap', name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'po', name:'ฝ่ายจัดซื้อ', sub:'Module PO', module:'PO'}
+      ],
+      nodes:[
+        {id:'start', lane:'of', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of', rank:1, type:'process',  label:'1. เปิด PR'},
+        {id:'dec',   lane:'ap', rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'print', lane:'of', rank:2, type:'process',  label:'พิมพ์ PR'},
+        {id:'n3',    lane:'po', rank:2, type:'process',  label:'3. ดึงไปเปิด PO / WO'},
+        {id:'form',  lane:'of', rank:3, type:'process',  label:'PR Form'},
+        {id:'end',   lane:'of', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'print', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'print', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอซื้อ (PR) โดยไม่อ้างอิง BOQ เลือกประเภทเอกสาร Type 3 ประเภทหลัก ดังนี้',
+        '» 1.1 PR For PO / WO สำหรับซื้อวัสดุและงานจ้างเหมาในชุดเอกสารเดียวกัน',
+        '» 1.2 PR For PO Only สำหรับซื้อวัสดุต่าง ๆ',
+        '» 1.3 PR For WO Only สำหรับงานจ้างเหมา',
+        '» การบันทึก PR แบบไม่อ้างอิง BOQ เป็นการเลือกรายการซื้อวัสดุ/งานจ้างเหมาแบบอิสระ: เลือก Material Code / Cost Code (M/S/L) / ระบุจำนวน / ราคาต่อหน่วย',
+        '2. ผู้มีอำนาจอนุมัติในระบบ และมีลายเซ็นลงนามบนเอกสาร',
+        '3. ฝ่ายจัดซื้อดึงใบขอซื้อ (PR) ที่ผ่านการอนุมัติแล้ว ไปเปิดใบสั่งซื้อ (PO) / หนังสือสั่งจ้าง (WO)',
+        '! กรณีซื้อวัสดุของโครงการ ให้เลือก Type เป็น PO Only',
+        '! กรณีจ้าง Subcontractor ให้เลือก Type เป็น WO Only',
+        '! กรณีค่าบริการ / ค่าเช่า / ค่าซ่อม ฯลฯ ที่มี W/T ให้เลือก Type เป็น WO Only'
+      ]
+    },
+    {
+      id:'PR-1.3', module:'PO',
+      titleTH:'การเปิดใบขอซื้อ (PR) ซื้อวัสดุให้ผู้รับเหมา',
+      titleEN:'Purchase Requisition — buy materials for subcontractor',
+      lanes:[
+        {key:'of', name:'Foreman / Admin Site', sub:'Module OF', module:'OF'},
+        {key:'ap', name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'po', name:'ฝ่ายจัดซื้อ', sub:'Module PO', module:'PO'}
+      ],
+      nodes:[
+        {id:'start', lane:'of', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of', rank:1, type:'process',  label:'1. เปิด PR (PR For PO Only)'},
+        {id:'dec',   lane:'ap', rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'print', lane:'of', rank:2, type:'process',  label:'พิมพ์ PR'},
+        {id:'n3',    lane:'po', rank:2, type:'process',  label:'3. ดึงไปเปิด PO'},
+        {id:'form',  lane:'of', rank:3, type:'process',  label:'PR Form'},
+        {id:'end',   lane:'of', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'print', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'print', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอซื้อ (PR) เลือกประเภทเอกสาร PR For PO Only สำหรับซื้อวัสดุ และระบุรายละเอียดเพิ่มเติม',
+        '» 1.1) ระบุ Information: ประเภทการสั่งซื้อ "Cost" / ระบุชื่อผู้รับเหมาที่ช่อง Subcontractor / เลือกเอกสารหนังสือสั่งจ้างที่ช่อง "เลขที่เอกสารสัญญาจ้าง (WO)"',
+        '» กรณีซื้อวัสดุให้ผู้รับเหมา ต้องอ้างอิงเลขที่หนังสือสั่งจ้างทุกครั้ง เพื่อให้มีผลต่อการหัก Deduct Material ขั้นตอนรับวางบิลตามหนังสือสั่งจ้าง',
+        '» 1.2) ระบุรายละเอียดการสั่งซื้อ: เลือก Material Code / Cost Code (M / Dummy) / ระบุจำนวน / ราคาต่อหน่วย',
+        '» กรณีเกิดค่าใช้จ่ายในการซื้อของให้ผู้รับเหมา ให้กำหนดรหัสต้นทุน Dummy เป็น "Material Cost Code สำหรับซื้อของให้ผู้รับเหมา" หรือบันทึกเป็นต้นทุนตามแต่ละงานได้',
+        '2. ผู้มีอำนาจอนุมัติในระบบ และมีลายเซ็นลงนามบนเอกสาร',
+        '3. ฝ่ายจัดซื้อดึงใบขอซื้อ (PR) ที่อนุมัติแล้ว ไปเปิดใบสั่งซื้อ (PO)'
+      ]
+    },
+
+    /* ===== PO — Purchase / Work Orders ===== */
+    {
+      id:'PO-1.1', module:'PO',
+      titleTH:'การเปิดใบสั่งซื้อ (PO) โดยการเปรียบเทียบราคา (Compare price)',
+      titleEN:'Purchase Order — via price comparison',
+      lanes:[
+        {key:'po',   name:'ฝ่ายจัดซื้อ', sub:'Module PO', module:'PO'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'shop', name:'ร้านค้า', sub:'', module:''}
+      ],
+      nodes:[
+        {id:'start', lane:'po', rank:0, type:'start',    label:'Start'},
+        {id:'a11',   lane:'po', rank:1, type:'process',  label:'1.1 บันทึกเอกสารขอราคา'},
+        {id:'a12',   lane:'po', rank:2, type:'process',  label:'1.2 Compare ราคาร้านค้า'},
+        {id:'n2',    lane:'po', rank:3, type:'process',  label:'2. เปิด PO'},
+        {id:'dec',   lane:'ap', rank:3, type:'decision', label:'3. อนุมัติ?'},
+        {id:'print', lane:'po', rank:4, type:'process',  label:'พิมพ์ PO'},
+        {id:'form',  lane:'po', rank:5, type:'process',  label:'PO Form'},
+        {id:'shop',  lane:'shop', rank:5, type:'process', label:'4. ร้านค้ารับ PO เตรียมส่งของ'},
+        {id:'end',   lane:'po', rank:6, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'a11'},
+        {from:'a11', to:'a12'},
+        {from:'a12', to:'n2'},
+        {from:'n2', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'print', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n2', label:'Reject', kind:'reject'},
+        {from:'print', to:'form'},
+        {from:'form', to:'shop'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. ฝ่ายจัดซื้อทำการเปรียบเทียบราคา โดยจัดทำเอกสารขอราคา ได้ 2 กรณี: ขอราคาโดยอ้างอิงจาก PR และขอราคาแบบอิสระ (กำหนดรายการวัสดุที่ต้องการขอราคาเอง)',
+        '» 1.1) บันทึกเอกสารขอราคา โดยอ้างอิง PR และระบุร้านค้า (Vendor) — แบบฟอร์มใบขอราคาส่งให้ร้านค้า',
+        '» 1.2) บันทึกราคาตามใบเสนอราคาของร้านค้า แล้วเปรียบเทียบราคาที่ PO > Compare Price โดยอ้างอิงจากเอกสารใบขอราคา',
+        '2. ฝ่ายจัดซื้อดึงใบขอซื้อ (PR) ที่อนุมัติแล้วมาเปิดใบสั่งซื้อ (PO)',
+        '3. ผู้มีอำนาจอนุมัติเอกสารในระบบ และมีลายเซ็นลงนามบนเอกสาร',
+        '4. ฝ่ายจัดซื้อส่งใบสั่งซื้อ (PO) ให้ร้านค้า — ร้านค้ารับ PO และเตรียมของส่ง'
+      ]
+    },
+    {
+      id:'PO-1.2', module:'PO',
+      titleTH:'การเปิดใบสั่งซื้อ (PO) และใบสั่งจ้าง/หนังสือสั่งจ้าง (WO)',
+      titleEN:'Purchase Order (PO) & Work Order (WO)',
+      lanes:[
+        {key:'po',   name:'ฝ่ายจัดซื้อ', sub:'Module PO', module:'PO'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'shop', name:'ร้านค้า / ผู้รับจ้าง / ผู้รับเหมา', sub:'', module:''}
+      ],
+      nodes:[
+        {id:'start', lane:'po', rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'po', rank:1, type:'process',  label:'1. เปิด PO / WO'},
+        {id:'dec',   lane:'ap', rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'print', lane:'po', rank:2, type:'process',  label:'พิมพ์ PO / WO'},
+        {id:'form',  lane:'po', rank:3, type:'process',  label:'PO / WO Form'},
+        {id:'shop',  lane:'shop', rank:3, type:'process', label:'3. ร้านค้าเตรียมส่งของ / ผู้รับเหมาส่งมอบงาน'},
+        {id:'end',   lane:'po', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'print', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'print', to:'form'},
+        {from:'form', to:'shop'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. ฝ่ายจัดซื้อดึงใบขอซื้อ/ขอจ้าง (PR For PO/WO หรือ PO Only / WO Only) ที่อนุมัติแล้วมาเปิดใบสั่งซื้อ (PO)/ใบสั่งจ้าง (WO) และระบุข้อมูลจำเป็น',
+        '» ระบุโครงการ/แผนก (กรณีโครงการต้องระบุ Job ด้วยทุกครั้ง)',
+        '» เลือกเอกสารใบขอซื้อ (PR) โดยกดปุ่มอ้างอิงเอกสารใบขอซื้อ (PR/MR No.)',
+        '» ประเภทการสั่งซื้อ/สั่งจ้าง: 1) Cost ค่าใช้จ่ายของโครงการ/แผนก  2) Asset ทรัพย์สินโครงการ/แผนก  3) Stock สินค้าคงเหลือเพื่อบริหารคลัง (Stock IC)',
+        '2. ผู้มีอำนาจอนุมัติในระบบ และมีลายเซ็นลงนามบนเอกสาร',
+        '3. ฝ่ายจัดซื้อส่งใบสั่งซื้อ (PO) ให้ร้านค้า หรือส่งใบสั่งจ้าง (WO) ให้ผู้รับจ้าง/ผู้รับเหมา',
+        '» ร้านค้ารับ PO เตรียมส่งของ',
+        '» ผู้รับจ้าง/ผู้รับเหมารับ WO เพื่อดำเนินงานตามเอกสารสั่งจ้าง'
+      ]
+    },
+
+    /* ===== IC — Inventory Control ===== */
+    {
+      id:'IC-1.1', module:'IC',
+      titleTH:'บันทึกรับของเข้าสต๊อกผ่านใบรับสินค้า (PO Receive)',
+      titleEN:'Goods receipt via PO (PO Receive)',
+      lanes:[
+        {key:'shop', name:'ร้านค้า', sub:'', module:''},
+        {key:'unit', name:'หน่วยงาน / Admin Site', sub:'Module IC', module:'IC'},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'shop', rank:0, type:'start',    label:'Start'},
+        {id:'s1',    lane:'shop', rank:1, type:'process',  label:'1. ส่งสินค้าตาม PO (แนบ DO/ใบกำกับภาษี)'},
+        {id:'n2',    lane:'unit', rank:1, type:'process',  label:'2. รับสินค้าตาม PO Receive'},
+        {id:'n5',    lane:'acct', rank:1, type:'process',  label:'5. ตรวจเอกสาร / ตั้งหนี้ และทำจ่าย'},
+        {id:'dec',   lane:'unit', rank:2, type:'decision', label:'3. รับเข้าสต๊อก?'},
+        {id:'n4',    lane:'unit', rank:3, type:'process',  label:'4. ทำรับ IC Receive (ระบุ Warehouse)'},
+        {id:'end',   lane:'unit', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'s1'},
+        {from:'s1', to:'n2'},
+        {from:'n2', to:'n5'},
+        {from:'n2', to:'dec'},
+        {from:'dec', to:'n4', label:'Yes', kind:'yes'},
+        {from:'n4', to:'end'}
+      ],
+      narrative:[
+        '1. ร้านค้าส่งสินค้าตามใบสั่งซื้อ (PO) โดยแนบใบกำกับภาษี / ใบส่งของชั่วคราว',
+        '2. หน่วยงานทำการรับสินค้าตามใบสั่งซื้อ (PO) ที่ขั้นตอนรับสินค้า (PO Receive)',
+        '3. พิจารณาว่าวัสดุต้องรับเข้าสต๊อกหรือไม่',
+        '» ถ้าไม่รับเข้าสต๊อก จะไม่อ้างอิงไปขั้นตอนรับ IC Receive (ข้อ 4) — สินค้าบางประเภทไม่นำเข้า Stock เช่น ของที่ซื้อมาใช้ไป บริหารการเบิกไม่ได้',
+        '4. ถ้ารับเข้าสต๊อก หน่วยงานรับสินค้าที่ IC Receive ระบุสถานที่เก็บสินค้า โดยกำหนดข้อมูลคลัง (Warehouse)',
+        '5. แผนกบัญชีดึงรายการที่ทำรับของตามใบสั่งซื้อ (PO Receive) แล้วอ้างอิงไปตั้งเจ้าหนี้ เพื่อทำจ่ายชำระในขั้นถัดไป',
+        '! เมื่อสั่งซื้อและร้านค้าจัดส่งแล้ว ต้องจัดทำเอกสารใบรับของในระบบ เพื่อให้บัญชีอ้างอิง PO Receive ไปตั้งหนี้จนถึงจ่ายชำระเงิน'
+      ]
+    },
+    {
+      id:'IC-1.2', module:'IC',
+      titleTH:'บันทึกรับของเข้าสต๊อก กรณีไม่มีใบสั่งซื้อ (Type: Receive Other)',
+      titleEN:'Stock receipt without PO (Receive Other)',
+      lanes:[
+        {key:'of', name:'หน่วยงาน / สโตร์กลาง', sub:'Module OF', module:'OF'},
+        {key:'ic', name:'หน่วยงาน / สโตร์กลาง', sub:'Module IC', module:'IC'}
+      ],
+      nodes:[
+        {id:'ofstart', lane:'of', rank:0, type:'start',   label:'Start'},
+        {id:'ofn',     lane:'of', rank:1, type:'process', label:'เปิด OF เลือก Type : Petty Cash'},
+        {id:'ofform',  lane:'of', rank:2, type:'process', label:'OF Form'},
+        {id:'ofend',   lane:'of', rank:3, type:'end',     label:'End'},
+        {id:'icstart', lane:'ic', rank:0, type:'start',   label:'Start'},
+        {id:'icn',     lane:'ic', rank:1, type:'process', label:'1. รับ IC Receive Type Other'},
+        {id:'icform',  lane:'ic', rank:2, type:'process', label:'IC Receive Form'},
+        {id:'icend',   lane:'ic', rank:3, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'ofstart', to:'ofn'},
+        {from:'ofn', to:'ofform'},
+        {from:'ofform', to:'ofend'},
+        {from:'ofn', to:'icn'},
+        {from:'icstart', to:'icn'},
+        {from:'icn', to:'icform'},
+        {from:'icform', to:'icend'}
+      ],
+      narrative:[
+        '1. หน่วยงานทำรับสินค้าเข้าคลังผ่าน IC Receive โดยเลือกประเภทเอกสารเป็น Type Other (ต้องใส่ราคาในช่อง IC Cost = ราคารวมทั้งหมด และตัวแปลงหน่วยถ้ามี)',
+        '2. หน่วยงานทำรับ IC Receive ระบุสถานที่เก็บวัสดุหรือคลังสินค้า (Warehouse)',
+        '! เอกสารที่ใช้ทำรับ อาจเป็นใบเสร็จรับเงิน / ใบกำกับภาษี / บิลที่หน่วยงานซื้อวัสดุมา โดยไม่ผ่านกระบวนการจัดซื้อ',
+        '! Receive Other เช่น สินค้าที่ซื้อโดยเงินสด หรือผ่าน Petty Cash ที่ต้องการเก็บเข้าสต๊อก'
+      ]
+    },
+    {
+      id:'IC-1.3', module:'IC',
+      titleTH:'บันทึกการเตรียมเบิกและตัดเบิกของออกจากสต๊อก (Issue)',
+      titleEN:'Material preparation & issue (Issue)',
+      lanes:[
+        {key:'l1', name:'หน่วยงาน / สโตร์กลาง', sub:'Module IC', module:'IC'},
+        {key:'l2', name:'หน่วยงาน / สโตร์กลาง', sub:'Module IC', module:'IC'}
+      ],
+      nodes:[
+        {id:'start', lane:'l1', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'l1', rank:1, type:'process', label:'1. จัดทำใบเบิก (Entry Document Issue)'},
+        {id:'form1', lane:'l1', rank:2, type:'process', label:'Entry Document Issue Form'},
+        {id:'n3',    lane:'l2', rank:2, type:'process', label:'3. ตัดสต๊อก IC Issue'},
+        {id:'form2', lane:'l2', rank:3, type:'process', label:'Material Issue Form'},
+        {id:'end',   lane:'l2', rank:4, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'form1'},
+        {from:'form1', to:'n3'},
+        {from:'n3', to:'form2'},
+        {from:'form2', to:'end'}
+      ],
+      narrative:[
+        '1. จัดทำเอกสารใบเตรียมเบิก โดยเลือก (Entry Document Issue) ระบุ Type Issue',
+        '» เลือกรายการวัสดุที่จะเบิก (ดึงจาก Material Balance)',
+        '» ระบุ Warehouse',
+        '» ระบุ Type และ Area (พื้นที่ที่จะนำวัสดุไปใช้งาน)',
+        '» ระบุชื่อผู้ขอเบิก (Ref. by)',
+        '» ระบุหมายเหตุเพิ่มเติม (Remark)',
+        '2. ดึงเอกสารใบเตรียมเบิกมาตัดสต๊อก โดยเลือก (IC Issue)',
+        '» กดปุ่ม Ref. Document เพื่อดึงเอกสารใบเตรียมเบิกมาตรวจสอบ และบันทึกตัดเบิกในระบบ'
+      ]
+    },
+    {
+      id:'IC-1.4', module:'IC',
+      titleTH:'บันทึกการโอนวัสดุไปหน่วยงานอื่น (IC Transfer) และการรับโอน (IC Receive Transfer)',
+      titleEN:'Material transfer & receive transfer',
+      lanes:[
+        {key:'src', name:'หน่วยงานผู้โอน (ต้นทาง)', sub:'Module IC', module:'IC'},
+        {key:'dst', name:'หน่วยงานผู้รับโอน (ปลายทาง)', sub:'Module IC', module:'IC'}
+      ],
+      nodes:[
+        {id:'start', lane:'src', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'src', rank:1, type:'process', label:'1. จัดทำใบโอน (Entry Document)'},
+        {id:'form1', lane:'src', rank:2, type:'process', label:'Entry Document Issue Form'},
+        {id:'n21',   lane:'src', rank:3, type:'process', label:'2.1 โอนของ (Ref. Entry Document)'},
+        {id:'mform', lane:'src', rank:4, type:'process', label:'Material Transfer Form'},
+        {id:'n3',    lane:'dst', rank:4, type:'process', label:'3. ทำการรับของ (IC Receive Transfer)'},
+        {id:'rform', lane:'dst', rank:5, type:'process', label:'Receive Transfer Form'},
+        {id:'end',   lane:'dst', rank:6, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'form1'},
+        {from:'form1', to:'n21'},
+        {from:'n21', to:'mform'},
+        {from:'mform', to:'n3', label:'นำของมาส่งที่ Site'},
+        {from:'n3', to:'rform'},
+        {from:'rform', to:'end'}
+      ],
+      narrative:[
+        '1. จัดทำเอกสารใบเตรียมเบิก (Entry Document) ระบุข้อมูล Type Transfer',
+        '» ระบุโครงการปลายทาง (To Project) ที่จะรับโอนวัสดุ',
+        '» ระบุ Type และ Area (พื้นที่ที่นำวัสดุไปใช้งาน หรือชื่อโครงการที่โอนไป)',
+        '» ระบุชื่อผู้ขอโอน (Ref. by)',
+        '» เลือกรายการวัสดุที่จะโอน (ดึงจาก Material Balance)',
+        '» ระบุ Cost Code (ต้นทางและปลายทาง)',
+        '2. ทำการโอนวัสดุไปยังหน่วยงานผู้รับโอน (Inventory Transfer) แยกการโอนเป็น 2 ประเภท',
+        '» 2.1) โอนวัสดุโดยอ้างอิงใบเตรียมโอน (Ref. Entry Document (IC))',
+        '» 2.2) สโตร์กลางดึงใบขอวัสดุ (PR For Stock) ที่อนุมัติแล้ว ไปเปิดใบโอนย้ายวัสดุ (IC Transfer) โดย Ref.PR Stock Center',
+        '» เงื่อนไขข้อ 2.2: ต้องมี PR For Stock ส่งมาก่อน / เกิดเมื่อหน่วยงานขอวัสดุจากโครงการสโตร์กลางเท่านั้น / ไม่ต้องทำใบเตรียมโอน (ข้อ 1)',
+        '3. หน่วยงานผู้ขอโอนบันทึกรายการรับโอน ระบุ Warehouse ทำการรับของ (IC Receive Transfer)',
+        '! Inventory Transfer เป็นการโอนให้โครงการ (มีการปรับปรุงต้นทุนระหว่างโครงการ) ส่วนบัญชีบันทึก GL ปรับต้นทุนเข้าโครงการ',
+        '! รับของต้องเท่ากับจำนวนที่โอน ไม่ให้แก้ไขจำนวนที่รับของ'
+      ]
+    },
+
+    /* ===== Billing — Subcontractor billing ===== */
+    {
+      id:'Billing-1.1', module:'AP',
+      titleTH:'การบันทึกรับวางบิลผู้รับเหมา แบบขอเบิกเงินล่วงหน้า (Advance payment)',
+      titleEN:'Subcontractor billing — Advance payment',
+      lanes:[
+        {key:'sub',  name:'ผู้รับจ้าง / ผู้รับเหมา', sub:'', module:''},
+        {key:'unit', name:'หน่วยงาน / สโตร์', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'sub',  rank:0, type:'start',    label:'Start'},
+        {id:'s1',    lane:'sub',  rank:1, type:'process',  label:'1. เอกสารขอเบิกเงินล่วงหน้า'},
+        {id:'n2',    lane:'unit', rank:1, type:'process',  label:'2. บันทึกรับวางบิล (Advance payment)'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'3. อนุมัติ?'},
+        {id:'n4',    lane:'acct', rank:1, type:'process',  label:'4. ตรวจเอกสาร / ตั้งหนี้ APS และทำจ่าย'},
+        {id:'form',  lane:'unit', rank:2, type:'process',  label:'Billing Form'},
+        {id:'end',   lane:'unit', rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'s1'},
+        {from:'s1', to:'n2', label:'ส่งเอกสาร'},
+        {from:'n2', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n4', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n2', label:'Reject', kind:'reject'},
+        {from:'n2', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. ผู้รับเหมารับหนังสือสั่งจ้าง และทำเอกสารขอเบิกเงินล่วงหน้า',
+        '2. หน่วยงานทำบันทึกรับวางบิลตัดผลงานผู้รับเหมา เลือกประเภทการรับวางบิลเป็นเงินล่วงหน้า (Advance Payment)',
+        '» ระบบมีประเภทการรับวางบิล 3 ประเภท: ค่างวดงาน (Progress) / เงินล่วงหน้า (Advance) / เงินประกันผลงาน (Retention)',
+        '3. ผู้มีอำนาจในหน่วยงานอนุมัติเอกสารในระบบ ลงลายเซ็น และส่งเอกสารให้แผนกบัญชี',
+        '4. แผนกบัญชีดึงรายการไปตั้งหนี้ APS'
+      ]
+    },
+    {
+      id:'Billing-1.2', module:'AP',
+      titleTH:'การบันทึกรับวางบิลผู้รับเหมา แบบขอเบิกเงินค่างวดงาน (Progress payment)',
+      titleEN:'Subcontractor billing — Progress payment',
+      lanes:[
+        {key:'sub',  name:'ผู้รับจ้าง / ผู้รับเหมา', sub:'', module:''},
+        {key:'unit', name:'หน่วยงาน', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'sub',  rank:0, type:'start',    label:'Start'},
+        {id:'s1',    lane:'sub',  rank:1, type:'process',  label:'1. ส่งผลงาน (เอกสารส่งผลงาน)'},
+        {id:'n2',    lane:'unit', rank:1, type:'process',  label:'2. บันทึกรับวางบิล (Progress Payment)'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'3. อนุมัติ?'},
+        {id:'n4',    lane:'acct', rank:1, type:'process',  label:'4. ตรวจเอกสาร / ตั้งหนี้ APS'},
+        {id:'form',  lane:'unit', rank:2, type:'process',  label:'Payment Form'},
+        {id:'end',   lane:'unit', rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'s1'},
+        {from:'s1', to:'n2', label:'ส่งเอกสาร'},
+        {from:'n2', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n4', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n2', label:'Reject', kind:'reject'},
+        {from:'n2', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. ผู้รับเหมาส่งผลงาน โดยนำส่งเอกสารส่งผลงานแต่ละงวด / หรือตามมูลค่างาน',
+        '2. หน่วยงานทำบันทึกรับวางบิลตัดผลงานผู้รับเหมา และบันทึกรายการหักต่าง ๆ เช่น ค่าความเสียหาย ค่าเสื้อ',
+        '» ระบุประเภทการรับวางบิลเป็น ค่างวดงาน (Progress Payment)',
+        '» ระบุจำนวนเงินค่างวดงาน',
+        '» ระบุวันที่ส่งมอบงาน / วันที่วางบิล และวันที่ทำจ่าย',
+        '» ระบุหมายเหตุ และข้อมูลต่าง ๆ',
+        '3. ผู้มีอำนาจในหน่วยงานอนุมัติเอกสาร ลงลายเซ็น และส่งให้แผนกบัญชี',
+        '4. แผนกบัญชีดึงรายการไปตั้งหนี้ APS'
+      ]
+    },
+    {
+      id:'Billing-1.3', module:'AP',
+      titleTH:'การบันทึกรับวางบิลผู้รับเหมา แบบขอเบิกเงินประกันผลงาน (Retention payment)',
+      titleEN:'Subcontractor billing — Retention payment',
+      lanes:[
+        {key:'sub',  name:'ผู้รับจ้าง / ผู้รับเหมา', sub:'', module:''},
+        {key:'unit', name:'หน่วยงาน / ฝ่ายบัญชี', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'sub',  rank:0, type:'start',    label:'Start'},
+        {id:'s1',    lane:'sub',  rank:1, type:'process',  label:'1. เอกสารขอเบิกเงินประกันผลงาน'},
+        {id:'n2',    lane:'unit', rank:1, type:'process',  label:'2. บันทึกรับวางบิล (Retention Payment)'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'3. อนุมัติ?'},
+        {id:'n4',    lane:'acct', rank:1, type:'process',  label:'4. ตรวจเอกสาร / ตั้งหนี้ APS และทำจ่าย'},
+        {id:'form',  lane:'unit', rank:2, type:'process',  label:'Billing Form'},
+        {id:'end',   lane:'unit', rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'s1'},
+        {from:'s1', to:'n2', label:'ส่งเอกสาร'},
+        {from:'n2', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n4', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n2', label:'Reject', kind:'reject'},
+        {from:'n2', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หลังจากผู้รับเหมาดำเนินงานตามหนังสือสั่งจ้างเสร็จเรียบร้อย และครบกำหนดการรับประกันผลงานแล้ว ทำเอกสารขอเบิกเงินประกันผลงานคืน',
+        '2. หน่วยงานทำบันทึกรับวางบิลตัดผลงานผู้รับเหมา เลือกประเภทการรับวางบิลเป็นเงินประกันผลงาน (Retention Payment)',
+        '3. ผู้มีอำนาจในหน่วยงานอนุมัติเอกสาร ลงลายเซ็น และส่งให้แผนกบัญชี',
+        '4. แผนกบัญชีดึงรายการไปตั้งหนี้ APS'
+      ]
+    },
+
+    /* ===== OF — Office / Petty Cash & Advances ===== */
+    {
+      id:'OF-1.1', module:'OF',
+      titleTH:'การเปิด OF (None PO/WO) แบบเงินสดย่อย (Petty Cash)',
+      titleEN:'OF — Petty Cash',
+      lanes:[
+        {key:'of',   name:'หน่วยงาน / Admin', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'of',   rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of',   rank:1, type:'process',  label:'1. เปิด OF เลือก Type : Petty cash'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'n3',    lane:'acct', rank:1, type:'process',  label:'3. ตรวจสอบเอกสาร / ตั้งหนี้ APO'},
+        {id:'form',  lane:'of',   rank:2, type:'process',  label:'OF Form'},
+        {id:'end',   lane:'of',   rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'n1', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอเบิกเงิน (OF) เป็นค่าใช้จ่ายต่าง ๆ ที่นำเงินสดย่อยไปจ่าย',
+        '» เลือก Type : Petty cash (ใบเบิกเงินสดย่อย)',
+        '» ระบุ Vendor Type เป็น Employee (ชื่อพนักงานผู้ถือเงินสดย่อย)',
+        '» เลือกโครงการ ระบบงาน หรือแผนก / ระบุหมายเหตุ',
+        '» เลือกเรื่องจ่าย (Expense Code) ตามค่าใช้จ่ายในใบเสร็จรับเงิน',
+        '» ระบุเลขที่เอกสาร / จำนวนเงิน / ภาษีมูลค่าเพิ่ม (ถ้ามี) / ภาษีหัก ณ ที่จ่าย (ถ้ามี)',
+        '2. ผู้มีอำนาจทำการอนุมัติเอกสาร OF',
+        '3. แผนกบัญชีตรวจสอบเอกสาร และดึงรายการไปบันทึกตั้งหนี้',
+        '» เอกสารประกอบการเบิกเงิน',
+        '» บิล / ใบเสร็จรับเงิน / ใบกำกับภาษี / ใบแจ้งหนี้'
+      ]
+    },
+    {
+      id:'OF-1.2', module:'OF',
+      titleTH:'การเปิด OF (None PO/WO) แบบเงินทดรองจ่าย (Advance)',
+      titleEN:'OF — Advance',
+      lanes:[
+        {key:'of',   name:'หน่วยงาน / Admin', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'of',   rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of',   rank:1, type:'process',  label:'1. เปิด OF เลือก Type : Advance'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'n3',    lane:'acct', rank:1, type:'process',  label:'3. ตรวจสอบเอกสาร / ตั้งหนี้ APO'},
+        {id:'form',  lane:'of',   rank:2, type:'process',  label:'OF Form'},
+        {id:'end',   lane:'of',   rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'n1', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอเบิกเงิน (OF) เป็นเงินทดรองจ่าย (Advance)',
+        '» เลือก Type : Advance (เงินทดรองจ่าย)',
+        '» ระบุ Vendor Type เป็น Employee (ชื่อพนักงานผู้ที่ต้องการใช้เงินทดรองจ่าย)',
+        '» เลือกโครงการ ระบบงาน หรือแผนก / ระบุหมายเหตุ',
+        '» เลือกเรื่องจ่าย (Expense Code) เป็นเงินทดรองจ่าย เช่น เงินทดรองจ่าย - พนักงาน',
+        '» ระบุจำนวนเงินที่ต้องการ',
+        '2. ผู้มีอำนาจทำการอนุมัติบนเอกสาร OF',
+        '3. แผนกบัญชีตรวจสอบเอกสาร และดึงรายการไปบันทึกตั้งหนี้',
+        '» เอกสารประกอบการเบิกเงิน',
+        '» บันทึกภายใน ขอเบิกเงินล่วงหน้า'
+      ]
+    },
+    {
+      id:'OF-1.3', module:'OF',
+      titleTH:'การเปิด OF (None PO/WO) แบบเคลียร์เงินทดรองจ่าย (Clear Advance)',
+      titleEN:'OF — Clear Advance',
+      lanes:[
+        {key:'of',   name:'หน่วยงาน / Admin', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'of',   rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of',   rank:1, type:'process',  label:'1. เปิด OF เลือก Type : Clear Advance'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'n3',    lane:'acct', rank:1, type:'process',  label:'3. ตรวจสอบเอกสาร / ตั้งหนี้ APO'},
+        {id:'form',  lane:'of',   rank:2, type:'process',  label:'OF Form'},
+        {id:'end',   lane:'of',   rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'n1', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอเบิกเงิน (OF)',
+        '» เลือก Type : Clear advance (เคลียร์เงินทดรองจ่าย)',
+        '» ระบุ Vendor Type เป็น Employee (ชื่อพนักงานคนเดียวกับผู้ขอเบิกเงินทดรองจ่าย)',
+        '» เลือกโครงการ ระบบงาน หรือแผนก / ระบุหมายเหตุว่าเคลียร์เงินทดรองจ่าย',
+        '» เลือกเรื่องจ่าย (Expense Code) / ระบุเลขที่เอกสาร / จำนวนเงิน / VAT / WHT (ถ้ามี)',
+        '» กดปุ่ม Advance เลือกเอกสารชุดที่เบิกเงินทดรองจ่าย เพื่อเคลียร์ในชุดเดียวกันให้ถูกต้อง',
+        '» ถ้ามีเงินต้องคืน ให้เพิ่มบรรทัดเลือกเป็นธนาคารที่พนักงานโอนเข้า หรือเลือกเป็นเงินสด',
+        '2. ผู้มีอำนาจทำการอนุมัติบนเอกสาร OF',
+        '3. แผนกบัญชีตรวจสอบเอกสาร และดึงรายการไปบันทึกตั้งหนี้ — ถ้ามีส่วนเกิน บัญชีดึงไปทำจ่ายต่อ หากไม่มีส่วนเกิน จบที่ขั้นตั้งหนี้ APO'
+      ]
+    },
+    {
+      id:'OF-1.4', module:'OF',
+      titleTH:'การเปิด OF (None PO/WO) แบบการบันทึกจ่ายอื่น ๆ (Other)',
+      titleEN:'OF — Other payment',
+      lanes:[
+        {key:'of',   name:'หน่วยงาน / Admin', sub:'Module OF', module:'OF'},
+        {key:'ap',   name:'ผู้มีอำนาจอนุมัติ', sub:'', module:''},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'of',   rank:0, type:'start',    label:'Start'},
+        {id:'n1',    lane:'of',   rank:1, type:'process',  label:'1. เปิด OF เลือก Type : Other'},
+        {id:'dec',   lane:'ap',   rank:1, type:'decision', label:'2. อนุมัติ?'},
+        {id:'n3',    lane:'acct', rank:1, type:'process',  label:'3. ตรวจสอบเอกสาร / ตั้งหนี้ APO'},
+        {id:'form',  lane:'of',   rank:2, type:'process',  label:'OF Form'},
+        {id:'end',   lane:'of',   rank:3, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n3', label:'Yes', kind:'yes'},
+        {from:'dec', to:'n1', label:'Reject', kind:'reject'},
+        {from:'n1', to:'form'},
+        {from:'form', to:'end'}
+      ],
+      narrative:[
+        '1. หน่วยงานเปิดใบขอเบิกเงิน (OF) เป็นค่าใช้จ่ายต่าง ๆ ให้กับบุคคลภายนอก',
+        '» เลือก Type : Other (ใบเบิกบันทึกจ่ายอื่น ๆ)',
+        '» ระบุ Vendor Type เป็น External (ชื่อหน่วยงาน/บุคคลภายนอก)',
+        '» เลือกโครงการ ระบบงาน หรือแผนก / ระบุหมายเหตุ',
+        '» เลือกเรื่องจ่าย (Expense Code) / ระบุเลขที่เอกสาร / จำนวนเงิน / VAT / WHT (ถ้ามี)',
+        '2. ผู้มีอำนาจทำการอนุมัติบนเอกสาร OF',
+        '3. แผนกบัญชีตรวจสอบเอกสาร และดึงรายการไปบันทึกตั้งหนี้',
+        '» เอกสารประกอบการเบิกเงิน',
+        '» บิล / ใบเสร็จรับเงิน / ใบกำกับภาษี / ใบแจ้งหนี้'
+      ]
+    },
+
+    /* ===== AP — Accounts Payable ===== */
+    {
+      id:'AP-1.1', module:'AP',
+      titleTH:'การบันทึกตั้งเจ้าหนี้ ประเภท APV',
+      titleEN:'Set up payable — APV',
+      lanes:[
+        {key:'site', name:'จัดซื้อ / หน่วยงาน / Admin Site', sub:'Module IC', module:'IC'},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'},
+        {key:'fin',  name:'ฝ่ายการเงิน', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'site', rank:0, type:'start',   label:'Start'},
+        {id:'rec',   lane:'site', rank:1, type:'process', label:'บันทึกรับสินค้า (PO Receive)'},
+        {id:'n1',    lane:'acct', rank:1, type:'process', label:'1. ทำการตั้งหนี้ APV'},
+        {id:'n2',    lane:'acct', rank:2, type:'process', label:'2. อนุมัติจ่าย (Pre-Payment APV)'},
+        {id:'n3',    lane:'fin',  rank:2, type:'process', label:'3. บันทึกการจ่ายชำระ (PV)'},
+        {id:'n4',    lane:'fin',  rank:3, type:'process', label:'4. บันทึกยืนยันการจ่าย (F)'},
+        {id:'n5',    lane:'acct', rank:3, type:'process', label:'5. บันทึกตัดเจ้าหนี้ (Clear AP)'},
+        {id:'end',   lane:'acct', rank:4, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'rec'},
+        {from:'rec', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'end'}
+      ],
+      narrative:[
+        'การบันทึกตั้งหนี้ APV (Type Normal) — จัดซื้อ/หน่วยงาน/Admin Site บันทึกรับสินค้าตามใบสั่งซื้อ (PO) แล้วส่งเอกสารให้บัญชีตั้งเจ้าหนี้: ใบรับสินค้า (RC) / ใบส่งของ / ใบกำกับภาษี / เอกสารใบสั่งซื้อ (PO)',
+        '1. ฝ่ายบัญชี ดึงตั้งหนี้ ที่มาจากการรับของตามใบสั่งซื้อ (PO) ได้เอกสารตั้งเจ้าหนี้ APV',
+        '2. ฝ่ายบัญชีบันทึกอนุมัติจ่ายจากเอกสารตั้งเจ้าหนี้ APV (Pre-Payment APV)',
+        '3. ฝ่ายการเงินบันทึกการจ่ายชำระ โดยจัดทำเช็ค/โอนเงิน หรือเงินสด (Cheque/Bank Transfer/Cash) ได้ใบสำคัญจ่าย (F)',
+        '4. ฝ่ายการเงินบันทึกยืนยันการจ่าย ได้เอกสาร (PV)',
+        '5. ฝ่ายบัญชีบันทึกตัดเจ้าหนี้ (Clear AP)',
+        '! กรณีจ่ายด้วยเงินสด ต้องดึงเอกสาร PV ไปบันทึกตัดเจ้าหนี้ (Clear AP) ทุกครั้ง',
+        '! การแนบใบกำกับภาษีซื้อ ระบุได้ 2 ขั้นตอน: *1 = ขั้นตอนตั้งหนี้ / *2 = ขั้นตอนจ่ายชำระ'
+      ]
+    },
+    {
+      id:'AP-1.2', module:'AP',
+      titleTH:'การบันทึกตั้งเจ้าหนี้ ประเภท APS',
+      titleEN:'Set up payable — APS',
+      lanes:[
+        {key:'site', name:'หน่วยงาน / Admin Site', sub:'Module OF', module:'OF'},
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'},
+        {key:'fin',  name:'ฝ่ายการเงิน', sub:'Module AP', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'site', rank:0, type:'start',    label:'Start'},
+        {id:'bil',   lane:'site', rank:1, type:'process',  label:'บันทึกเบิกตามใบสั่งจ้าง (WO)'},
+        {id:'dec',   lane:'site', rank:2, type:'decision', label:'อนุมัติ?'},
+        {id:'n1',    lane:'acct', rank:2, type:'process',  label:'1. ทำการตั้งหนี้ APS'},
+        {id:'n2',    lane:'acct', rank:3, type:'process',  label:'2. อนุมัติจ่าย (Pre-Payment APS)'},
+        {id:'n3',    lane:'fin',  rank:3, type:'process',  label:'3. บันทึกการจ่ายชำระ (PV)'},
+        {id:'n4',    lane:'fin',  rank:4, type:'process',  label:'4. บันทึกยืนยันการจ่าย (F)'},
+        {id:'n5',    lane:'acct', rank:4, type:'process',  label:'5. บันทึกตัดเจ้าหนี้ (Clear AP)'},
+        {id:'end',   lane:'acct', rank:5, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'bil'},
+        {from:'bil', to:'dec', label:'Submit Approve', kind:'approve'},
+        {from:'dec', to:'n1', label:'Yes', kind:'yes'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'end'}
+      ],
+      narrative:[
+        'การบันทึกตั้งหนี้ APS — หน่วยงาน/Admin Site บันทึกเบิกตามใบสั่งจ้าง (WO) แบ่งเป็น 3 ประเภทการรับวางบิล: Advance / Progress / Retention เมื่อบันทึกและส่งอนุมัติแล้ว ส่งเอกสารให้บัญชีตั้งเจ้าหนี้',
+        '1. ฝ่ายบัญชี ดึงตั้งหนี้โดยอ้างอิง Bill No. ที่มาจากการบันทึกเบิกผลงานผู้รับเหมา (Billing) ได้เอกสารตั้งเจ้าหนี้ APS',
+        '2. ฝ่ายบัญชีบันทึกอนุมัติจ่ายจากเอกสารตั้งเจ้าหนี้ APS (Pre-Payment APS)',
+        '3. ฝ่ายการเงินบันทึกการจ่ายชำระ โดยจัดทำเช็ค/โอนเงิน หรือเงินสด ได้ใบสำคัญจ่าย (F)',
+        '4. ฝ่ายการเงินบันทึกยืนยันการจ่าย ได้เอกสาร (PV)',
+        '5. ฝ่ายบัญชีบันทึกตัดเจ้าหนี้ (Clear AP)',
+        '! การแนบใบกำกับภาษีซื้อ ระบุได้ 2 ขั้นตอน: *1 = ขั้นตอนตั้งหนี้ / *2 = ขั้นตอนจ่ายชำระ'
+      ]
+    },
+    {
+      id:'AP-1.3', module:'AP',
+      titleTH:'การบันทึกตั้งเจ้าหนี้ ประเภท APO',
+      titleEN:'Set up payable — APO',
+      lanes:[
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AP', module:'AP'},
+        {key:'fin',  name:'ฝ่ายการเงิน', sub:'', module:''}
+      ],
+      nodes:[
+        {id:'start', lane:'acct', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'acct', rank:1, type:'process', label:'1. ทำการตั้งหนี้ APO'},
+        {id:'n2',    lane:'acct', rank:2, type:'process', label:'2. อนุมัติจ่ายและพิมพ์ฟอร์ม (APO)'},
+        {id:'n3',    lane:'fin',  rank:2, type:'process', label:'3. บันทึกการจ่ายชำระ (PV)'},
+        {id:'n4',    lane:'fin',  rank:3, type:'process', label:'4. บันทึกยืนยันการจ่าย (F)'},
+        {id:'n5',    lane:'acct', rank:3, type:'process', label:'5. บันทึกตัดเจ้าหนี้ (Clear AP)'},
+        {id:'end',   lane:'acct', rank:4, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'end'}
+      ],
+      narrative:[
+        '1. ฝ่ายบัญชี ดึงตั้งหนี้ ที่มาจากเอกสารการเบิกอื่น ๆ (APO)',
+        '2. ฝ่ายบัญชีอนุมัติจ่ายจากเอกสารตั้งเจ้าหนี้ APO (Pre-Payment APO)',
+        '3. ฝ่ายการเงินบันทึกการจ่ายชำระ โดยจัดทำเช็ค/โอนเงิน หรือเงินสด ได้ใบสำคัญจ่าย (F)',
+        '4. ฝ่ายการเงินบันทึกยืนยันการจ่าย ได้เอกสาร (PV)',
+        '5. ฝ่ายบัญชีบันทึกตัดเจ้าหนี้ (Clear AP)',
+        '! กรณีจ่ายด้วยเงินสด ต้องดึงเอกสาร PV ไปบันทึกตัดเจ้าหนี้ (Clear AP) ทุกครั้ง',
+        '! *1 = ถ้า OF เป็น Type : Employee ได้ใบกำกับภาษีในขั้นตอนทำ OF / *2 = ถ้า OF เป็น Type : External ได้รับใบกำกับภาษีในขั้นตอนยืนยันการจ่าย'
+      ]
+    },
+
+    /* ===== AR — Accounts Receivable ===== */
+    {
+      id:'AR-1.1', module:'AR',
+      titleTH:'บันทึกความคืบหน้าโครงการ / ออกใบแจ้งหนี้ สำหรับงานรับเหมาก่อสร้าง',
+      titleEN:'Project progress billing (construction)',
+      lanes:[
+        {key:'acct', name:'แผนกบัญชี', sub:'Module AR', module:'AR'},
+        {key:'fin',  name:'แผนกการเงิน', sub:'', module:''}
+      ],
+      nodes:[
+        {id:'start', lane:'acct', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'acct', rank:1, type:'process', label:'1. บันทึกความคืบหน้าโครงการ'},
+        {id:'n2',    lane:'acct', rank:2, type:'process', label:'2. ยืนยันการเบิกผลงาน'},
+        {id:'n3',    lane:'acct', rank:3, type:'process', label:'3. เปิดใบแจ้งหนี้'},
+        {id:'n4',    lane:'acct', rank:4, type:'process', label:'4. ตั้งหนี้ลูกหนี้ รายได้'},
+        {id:'n5',    lane:'fin',  rank:4, type:'process', label:'5. บันทึกใบเสร็จรับเงิน / ใบกำกับภาษี'},
+        {id:'n6',    lane:'fin',  rank:5, type:'process', label:'6. บันทึกรับเงินตามใบเสร็จ'},
+        {id:'n7',    lane:'acct', rank:5, type:'process', label:'7. ตัดลูกหนี้'},
+        {id:'end',   lane:'acct', rank:6, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'n6'},
+        {from:'n6', to:'n7'},
+        {from:'n7', to:'end'}
+      ],
+      narrative:[
+        '1. บันทึกความคืบหน้าโครงการ (Project Progress) ใน Module OF',
+        '» เลือก/ระบุ Payment Type: Down (เงินล่วงหน้า) / Progress (เงินงวดงาน) / Retention (เงินประกันผลงาน)',
+        '» Save เพื่อบันทึก',
+        '2. ยืนยันการเบิกผลงาน / Submit Certificate',
+        '3. แผนกบัญชีเปิดใบแจ้งหนี้ โดยระบุประเภทการเบิก 3 ประเภท: Down / Progress / Retention',
+        '4. บันทึกตั้งลูกหนี้ รายได้',
+        '5. ออกใบเสร็จรับเงิน',
+        '6. บันทึกรับชำระเงินตามใบเสร็จรับเงิน',
+        '7. บันทึกตัดลูกหนี้'
+      ]
+    },
+    {
+      id:'AR-1.1b', module:'AR',
+      titleTH:'การออกใบแจ้งหนี้ประเภทอื่น ๆ (Invoice Other)',
+      titleEN:'Other invoices (Invoice Other)',
+      lanes:[
+        {key:'acct', name:'ฝ่ายบัญชี', sub:'Module AR', module:'AR'},
+        {key:'fin',  name:'ฝ่ายการเงิน', sub:'', module:''}
+      ],
+      nodes:[
+        {id:'start', lane:'acct', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'acct', rank:1, type:'process', label:'1. กำหนดข้อมูลรายได้อื่น ๆ'},
+        {id:'n2',    lane:'acct', rank:2, type:'process', label:'2. บันทึกใบแจ้งหนี้ (Invoice Other)'},
+        {id:'n3',    lane:'acct', rank:3, type:'process', label:'3. ตั้งหนี้ลูกหนี้ รายได้'},
+        {id:'n4',    lane:'fin',  rank:3, type:'process', label:'4. บันทึกใบเสร็จรับเงิน / ใบกำกับภาษี'},
+        {id:'n5',    lane:'fin',  rank:4, type:'process', label:'5. บันทึกรับเงินตามใบเสร็จ'},
+        {id:'n6',    lane:'acct', rank:4, type:'process', label:'6. ตัดลูกหนี้'},
+        {id:'end',   lane:'acct', rank:5, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'n5'},
+        {from:'n5', to:'n6'},
+        {from:'n6', to:'end'}
+      ],
+      narrative:[
+        'การบันทึก AR - Invoice Other',
+        '1. กำหนดข้อมูลประเภทรายได้อื่น ๆ ซึ่งเชื่อมโยงกับรหัสบัญชีที่ต้องการบันทึกรายได้อื่น ๆ (Master Type Of Income >> Revenue Other)',
+        '2. ฝ่ายบัญชีบันทึกใบแจ้งหนี้ประเภทอื่น ๆ',
+        '» เลือก Type : Trading หรือ Service',
+        '» ระบุรายการของใบแจ้งหนี้อื่น ๆ',
+        '» ระบุจำนวนหน่วย / ราคาต่อหน่วย / จำนวนเงินรวม',
+        '3. ฝ่ายบัญชีบันทึกตั้งลูกหนี้ รายได้',
+        '4. ฝ่ายการเงินออกใบเสร็จรับเงิน',
+        '5. ฝ่ายการเงินบันทึกรับชำระเงินตามใบเสร็จรับเงิน',
+        '6. ฝ่ายบัญชีบันทึกตัดลูกหนี้'
+      ]
+    },
+    {
+      id:'AR-1.2', module:'AR',
+      titleTH:'การทำบันทึกรับเงินลูกหนี้อื่น ๆ แบบไม่ออกใบแจ้งหนี้',
+      titleEN:'Receive from other debtors (no invoice)',
+      lanes:[
+        {key:'acct', name:'ฝ่ายบัญชี / ฝ่ายการเงิน', sub:'Module AR', module:'AR'}
+      ],
+      nodes:[
+        {id:'start', lane:'acct', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'acct', rank:1, type:'process', label:'1. ทำรายการบันทึกรายละเอียด และจำนวนเงิน Dr. Cr.'},
+        {id:'n2',    lane:'acct', rank:2, type:'process', label:'2. กด Save เพื่อบันทึก (RV)'},
+        {id:'end',   lane:'acct', rank:3, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'end'}
+      ],
+      narrative:[
+        'การบันทึกรับเงินลูกหนี้อื่น ๆ แบบไม่ออกใบแจ้งหนี้ — กรณีรับชำระเงินจากลูกหนี้โดยไม่ผ่านการบันทึกใบแจ้งหนี้ (Invoice)',
+        '1. ฝ่ายบัญชี/การเงิน บันทึกเอกสารโดยระบุข้อมูล',
+        '» เลือกโครงการ หรือแผนก',
+        '» ระบุ Option Type เลือกประเภทรายได้',
+        '» ระบุจำนวนเงิน / ระบุว่าเงินเข้าธนาคาร / ระบุเงื่อนไข / ระบุหมายเหตุ (Remark)',
+        '» เลือกรหัสบัญชี Dr. / Cr. ตามที่เกิดขึ้นจริง เช่น Dr. ธนาคาร / Cr. รายได้',
+        '2. ตรวจสอบความถูกต้องของการบันทึก จากนั้นบันทึกเอกสาร (RV)'
+      ]
+    },
+
+    /* ===== FA — Fixed Assets ===== */
+    {
+      id:'FA-1.1', module:'FA',
+      titleTH:'การบันทึกทรัพย์สิน (FA)',
+      titleEN:'Record fixed asset',
+      lanes:[
+        {key:'fa', name:'หน่วยงานผู้ดูแลทรัพย์สิน', sub:'Module FA', module:'FA'},
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'GL Module', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'fa', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'fa', rank:1, type:'process', label:'1. บันทึกทรัพย์สิน (Fix Asset)'},
+        {id:'n2',    lane:'fa', rank:2, type:'process', label:'2. ตรวจนับทรัพย์สิน'},
+        {id:'n3',    lane:'fa', rank:3, type:'process', label:'3. คำนวณค่าเสื่อมราคา ณ สิ้นเดือน'},
+        {id:'gl',    lane:'gl', rank:3, type:'process', label:'บันทึกบัญชีสมุดรายวันทั่วไป'},
+        {id:'end',   lane:'gl', rank:4, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'n3'},
+        {from:'n3', to:'gl'},
+        {from:'gl', to:'end'}
+      ],
+      narrative:[
+        'หน่วยงานผู้ดูแลทรัพย์สิน:',
+        '1. บันทึกทรัพย์สินในระบบ (Fix Asset)',
+        '2. ทุกสิ้นเดือน บันทึกตรวจนับทรัพย์สินที่อยู่แต่ละหน่วยงาน / โครงการ หรือแผนกต่าง ๆ',
+        '3. เมื่อถึงสิ้นเดือน บันทึกคำนวณค่าเสื่อมราคาที่ FA Depreciation',
+        'ฝ่ายบัญชี: บันทึกปรับปรุงค่าเสื่อมราคาทรัพย์สินที่ Module GL',
+        '! การบันทึกบัญชี: Dr. ค่าเสื่อมราคา - ทรัพย์สิน / Cr. ค่าเสื่อมราคาสะสม - ทรัพย์สิน'
+      ]
+    },
+    {
+      id:'FA-1.2', module:'FA',
+      titleTH:'การบันทึกทรัพย์สิน กรณีโอนย้ายทรัพย์สิน (FA Transfer)',
+      titleEN:'Asset transfer',
+      lanes:[
+        {key:'fa', name:'หน่วยงานผู้ดูแลทรัพย์สิน', sub:'Module FA', module:'FA'},
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'Module GL', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'fa', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'fa', rank:1, type:'process', label:'1. บันทึกโอนย้ายทรัพย์สิน'},
+        {id:'n2',    lane:'fa', rank:2, type:'process', label:'2. คำนวณค่าเสื่อมราคา ณ สิ้นเดือน'},
+        {id:'gl',    lane:'gl', rank:2, type:'process', label:'บันทึกบัญชีสมุดรายวันทั่วไป'},
+        {id:'end',   lane:'gl', rank:3, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'n2'},
+        {from:'n2', to:'gl'},
+        {from:'gl', to:'end'}
+      ],
+      narrative:[
+        'หน่วยงานผู้ดูแลทรัพย์สิน:',
+        '1. บันทึกโอนย้ายทรัพย์สิน — ค่าเสื่อมราคาประจำเดือนจะถูกบันทึกที่หน่วยงานปลายทาง (กรณีโอนย้ายประเภท Transfer)',
+        '2. เมื่อถึงสิ้นเดือน บันทึกคำนวณค่าเสื่อมราคาที่ FA Depreciation',
+        'ฝ่ายบัญชี: บันทึกปรับปรุงค่าเสื่อมราคาทรัพย์สินที่ Module GL',
+        '! Dr. ค่าเสื่อมราคา - ทรัพย์สิน / Cr. ค่าเสื่อมราคาสะสม - ทรัพย์สิน'
+      ]
+    },
+    {
+      id:'FA-1.3', module:'FA',
+      titleTH:'การบันทึกทรัพย์สิน กรณีตัดจ่ายทรัพย์สิน (FA Write Off)',
+      titleEN:'Asset write-off',
+      lanes:[
+        {key:'fa', name:'หน่วยงานผู้ดูแลทรัพย์สิน', sub:'Module FA', module:'FA'},
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'Module GL', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'fa', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'fa', rank:1, type:'process', label:'1. บันทึกตัดจ่ายทรัพย์สิน'},
+        {id:'gl1',   lane:'gl', rank:1, type:'process', label:'2. บันทึกบัญชีสมุดรายวันทั่วไป'},
+        {id:'n3',    lane:'fa', rank:2, type:'process', label:'3. คำนวณค่าเสื่อมราคา ณ สิ้นเดือน'},
+        {id:'gl2',   lane:'gl', rank:2, type:'process', label:'บันทึกบัญชีสมุดรายวันทั่วไป'},
+        {id:'end',   lane:'gl', rank:3, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'gl1'},
+        {from:'n1', to:'n3'},
+        {from:'gl1', to:'gl2'},
+        {from:'n3', to:'gl2'},
+        {from:'gl2', to:'end'}
+      ],
+      narrative:[
+        '1. ระบุทรัพย์สินที่จะตัดจ่าย ทรัพย์สินมี 3 ประเภท: 1.1 ขาย (Sale) / 1.2 หมดอายุ (Expired) / 1.3 สูญหาย (Loss)',
+        '2. บันทึกตัดจ่ายทรัพย์สินที่ Module FA',
+        '3. ณ สิ้นเดือน คำนวณค่าเสื่อมราคา และบันทึกบัญชีที่ Module GL',
+        '! 1.1 ขาย: Dr. ธนาคาร/เงินสด, ค่าเสื่อมราคาสะสม, ค่าเสื่อมราคา (ถึงวันขาย), กำไร(ขาดทุน)จากการขาย / Cr. ทรัพย์สิน, กำไร(ขาดทุน)จากการขาย — Book value = ราคาทรัพย์สิน หัก ค่าเสื่อมราคาสะสม',
+        '! 1.2 หมดอายุ: Dr. ค่าเสื่อมราคาสะสม / Cr. ทรัพย์สิน',
+        '! 1.3 สูญหาย: Dr. ค่าเสื่อมราคาสะสม, ขาดทุนจากทรัพย์สินสูญหาย / Cr. ทรัพย์สิน'
+      ]
+    },
+
+    /* ===== GL — General Ledger ===== */
+    {
+      id:'GL-1.1', module:'GL',
+      titleTH:'การบันทึกบัญชี',
+      titleEN:'Journal entries',
+      lanes:[
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'GL Module', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'gl', rank:0, type:'start',   label:'Start'},
+        {id:'n1',    lane:'gl', rank:1, type:'process', label:'1. บันทึกปรับปรุงรายการ (JV)'},
+        {id:'jv1',   lane:'gl', rank:2, type:'process', label:'JV.'},
+        {id:'src',   lane:'gl', rank:3, type:'process', label:'ข้อมูลจาก Module ต่าง ๆ'},
+        {id:'adj',   lane:'gl', rank:4, type:'process', label:'บันทึกปรับปรุงรายการ'},
+        {id:'jv2',   lane:'gl', rank:5, type:'process', label:'JV.'},
+        {id:'end',   lane:'gl', rank:6, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n1'},
+        {from:'n1', to:'jv1'},
+        {from:'jv1', to:'src'},
+        {from:'src', to:'adj'},
+        {from:'adj', to:'jv2'},
+        {from:'jv2', to:'end'}
+      ],
+      narrative:[
+        '1. การบันทึกปรับปรุงรายการ (JV) เช่น สมุดรายวันซื้อ / ทั่วไป / จ่าย / รับ',
+        '» GL Module > บันทึกรายการ > บันทึกสมุดรายวัน > สร้างใบสำคัญ',
+        '2. การบันทึกบัญชีแบบอัตโนมัติ — ข้อมูลส่งมาจาก Module อื่น ๆ ดังนี้',
+        '» FA Depreciation (ค่าเสื่อมราคา) / FA Write off (ตัดจำหน่ายทรัพย์สิน) / IC (ตัดและโอนย้ายต้นทุนวัสดุ)',
+        '» Copy Voucher / Reverse Voucher (กลับรายการ) / Rental (ค่าเช่าทรัพย์สิน)',
+        '» Unbill progress submit / Retention Write off / PO Write off',
+        '» Cost Sheet (ต้นทุนอสังหาฯ) / Report GL (ปรับปรุงรายได้-ต้นทุน) / MA to GL (ค่าซ่อม) / RE WIP Out (ต้นทุนบ้านสร้างเสร็จ)'
+      ]
+    },
+    {
+      id:'GL-1.2', module:'GL',
+      titleTH:'การพิมพ์รายงาน',
+      titleEN:'Print reports',
+      lanes:[
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'GL Module', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'gl', rank:0, type:'start',   label:'Start'},
+        {id:'p1',    lane:'gl', rank:1, type:'process', label:'1. พิมพ์รายงานบัญชีแยกประเภท'},
+        {id:'r1',    lane:'gl', rank:2, type:'process', label:'Report (1-8)'},
+        {id:'p2',    lane:'gl', rank:3, type:'process', label:'2. พิมพ์รายงานงบทดลอง'},
+        {id:'r2',    lane:'gl', rank:4, type:'process', label:'Report (1-2)'},
+        {id:'end',   lane:'gl', rank:5, type:'end',     label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'p1'},
+        {from:'p1', to:'r1'},
+        {from:'r1', to:'p2'},
+        {from:'p2', to:'r2'},
+        {from:'r2', to:'end'}
+      ],
+      narrative:[
+        '1. การพิมพ์รายงานบัญชีแยกประเภท',
+        '» GL > Report > รายงานบัญชีแยกประเภท (General ledger)',
+        '» รายงานต่าง ๆ: 1) รายละเอียด (Detail) 2) Detail ตามโครงการ/แผนก 3) รายงานงบทดลอง 4) งบทดลองตามโครงการ/แผนก',
+        '» 5) บัญชีแยกประเภท (ก่อน/หลัง) 6) งบทดลอง 7) สถานะรายรับรายจ่ายแต่ละโครงการ 8) ทุก Module แต่ไม่มีรายละเอียดโครงการ',
+        '2. การพิมพ์รายงานงบทดลอง',
+        '» GL > Report > งบทดลอง',
+        '» เรียกรายงานตามประเภท: 1) Period 2) Year'
+      ]
+    },
+
+    /* ===== Period-end close (AP → AR → GL) ===== */
+    {
+      id:'AP-Close', module:'AP',
+      titleTH:'การปิดงบการเงิน — โอนข้อมูล AP ไปบัญชีแยกประเภท',
+      titleEN:'Period close — AP to GL',
+      lanes:[
+        {key:'a', name:'ฝ่ายบัญชี', sub:'', module:'AP'},
+        {key:'b', name:'ฝ่ายบัญชี', sub:'', module:'AP'}
+      ],
+      nodes:[
+        {id:'start', lane:'a', rank:0, type:'start',    label:'เริ่มต้น'},
+        {id:'n11',   lane:'a', rank:1, type:'process',  label:'1.1 กระทบยอด AP ↔ GL'},
+        {id:'n12',   lane:'b', rank:1, type:'process',  label:'1.2 กระทบการบันทึก Cost Code'},
+        {id:'dec',   lane:'a', rank:2, type:'decision', label:'ตรวจสอบ?'},
+        {id:'fix',   lane:'b', rank:3, type:'process',  label:'แก้ไข transaction'},
+        {id:'post',  lane:'a', rank:3, type:'process',  label:'1.3 โอนข้อมูลไปบัญชีแยกประเภท'},
+        {id:'end',   lane:'a', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n11'},
+        {from:'n11', to:'n12'},
+        {from:'n12', to:'dec'},
+        {from:'dec', to:'post', label:'ถูกต้อง', kind:'yes'},
+        {from:'dec', to:'fix', label:'ไม่ถูกต้อง', kind:'reject'},
+        {from:'fix', to:'dec'},
+        {from:'post', to:'end'}
+      ],
+      narrative:[
+        'การปิดงบการเงิน — โอนข้อมูลจาก AP ไปยังบัญชีแยกประเภท (ข้อมูลการตั้งหนี้/จ่ายชำระอยู่ในระบบ AP เท่านั้น ต้องโอนไป GL ก่อนจึงดูรายงานทางการเงินได้)',
+        '1.1 กระทบยอดให้ถูกต้อง ครบถ้วน และตรงกันระหว่างรายงานใน Module AP กับ Module GL เช่น',
+        '» รายงานภาษีหัก ณ ที่จ่าย ↔ บัญชีภาษีหัก ณ ที่จ่าย',
+        '» รายงานภาษีซื้อ ↔ บัญชีภาษีซื้อ',
+        '» รายงานเจ้าหนี้คงเหลือ ↔ บัญชีเจ้าหนี้',
+        '1.2 กระทบยอดการบันทึก Cost Code ให้ครบถ้วน (เทียบ Project status : GL = Project Cost control Report > Summary by Project : GL)',
+        '1.3 ส่งข้อมูลไประบบบัญชีแยกประเภท — ระบุ ปี/งวดบัญชี โอนทีละกลุ่มเอกสาร: APV (PO) / APS (Subcontractor) / APO (Other) / PL (ยกเลิกการโอนเพื่อแก้ไขได้)',
+        '1.4 แก้ไข Transaction — ตรวจสอบว่าบัญชี/รายงานใดผิดพลาด แล้วกลับไปแก้ที่ AP Module โดยถอยขั้นตอนทีละ Step จากขั้นตอนสุดท้ายไปถึงจุดที่ผิด'
+      ]
+    },
+    {
+      id:'AR-Close', module:'AR',
+      titleTH:'การปิดงบการเงิน (2) — โอนข้อมูล AR ไปบัญชีแยกประเภท',
+      titleEN:'Period close — AR to GL',
+      lanes:[
+        {key:'a', name:'ฝ่ายบัญชี', sub:'', module:'AR'},
+        {key:'b', name:'ฝ่ายบัญชี', sub:'', module:'AR'}
+      ],
+      nodes:[
+        {id:'start', lane:'a', rank:0, type:'start',    label:'เริ่มต้น'},
+        {id:'n21',   lane:'a', rank:1, type:'process',  label:'2.1 กระทบยอด AR ↔ GL'},
+        {id:'dec',   lane:'a', rank:2, type:'decision', label:'ตรวจสอบ?'},
+        {id:'fix',   lane:'b', rank:2, type:'process',  label:'แก้ไข transaction'},
+        {id:'post',  lane:'a', rank:3, type:'process',  label:'2.2 โอนข้อมูลไปบัญชีแยกประเภท'},
+        {id:'end',   lane:'a', rank:4, type:'end',      label:'End'}
+      ],
+      edges:[
+        {from:'start', to:'n21'},
+        {from:'n21', to:'dec'},
+        {from:'dec', to:'post', label:'ถูกต้อง', kind:'yes'},
+        {from:'dec', to:'fix', label:'ไม่ถูกต้อง', kind:'reject'},
+        {from:'fix', to:'dec'},
+        {from:'post', to:'end'}
+      ],
+      narrative:[
+        'โอนข้อมูลจาก AR ไปยังบัญชีแยกประเภท (การรับรู้รายได้/รายได้รับล่วงหน้าอยู่ในระบบ AR เท่านั้น ต้องโอนไป GL ก่อน)',
+        '2.1 กระทบยอดให้ถูกต้อง ครบถ้วน และตรงกันระหว่างรายงานใน Module AR กับ Module GL เช่น',
+        '» รายงานภาษีถูกหัก ณ ที่จ่าย ↔ บัญชีภาษีถูกหัก ณ ที่จ่าย',
+        '» รายงานภาษีขาย ↔ บัญชีภาษีขาย',
+        '» รายงานลูกหนี้คงเหลือ ↔ บัญชีลูกหนี้',
+        '2.2 ส่งข้อมูลไประบบบัญชีแยกประเภท — ระบุ ปี/งวดบัญชี/Data Type/กลุ่มเอกสาร โอนทีละกลุ่ม: AR (Construction) / AR (Trading) / AR (Other) / AR (Real Estate) / RL-RV'
+      ]
+    },
+    {
+      id:'GL-Close', module:'GL',
+      titleTH:'การปิดงบการเงิน (3) — Posting และปิดบัญชี',
+      titleEN:'Period close — posting & close year',
+      lanes:[
+        {key:'gl', name:'ฝ่ายบัญชี', sub:'GL Module', module:'GL'}
+      ],
+      nodes:[
+        {id:'start', lane:'gl', rank:0, type:'start',   label:'เริ่มต้น'},
+        {id:'n3',    lane:'gl', rank:1, type:'process', label:'3. ผ่านรายการบัญชีแยกประเภท (Posting)'},
+        {id:'n4',    lane:'gl', rank:2, type:'process', label:'4. สร้างรายงานทางการเงิน'},
+        {id:'fmt',   lane:'gl', rank:3, type:'process', label:'รูปแบบของรายงาน'},
+        {id:'n41',   lane:'gl', rank:4, type:'process', label:'4.1 พิมพ์รายงานทางการเงินต่าง ๆ'},
+        {id:'n5',    lane:'gl', rank:5, type:'process', label:'5. ทำการปิดบัญชี – Close Year'},
+        {id:'end',   lane:'gl', rank:6, type:'end',     label:'สิ้นสุดงานปิดบัญชี'}
+      ],
+      edges:[
+        {from:'start', to:'n3'},
+        {from:'n3', to:'n4'},
+        {from:'n4', to:'fmt'},
+        {from:'fmt', to:'n41'},
+        {from:'n41', to:'n5'},
+        {from:'n5', to:'end'}
+      ],
+      narrative:[
+        '3. ผ่านรายการไปยังบัญชีแยกประเภท (Posting) — หลังโอนข้อมูลจาก AP และ AR มาที่ GL ข้อมูลในสมุดรายวันจะมีสถานะ Not post (N) ต้องทำ Posting โดยระบุ GL Year และ GL Period (เลือก Post บางรายการได้ ระบุเลขที่/วันที่ Voucher; ยกเลิก Post เพื่อแก้ไขได้)',
+        '4. สร้างรายงานทางการเงิน (Custom Financial Report) — เช่น งบแสดงฐานะการเงิน / งบกำไรขาดทุน / งบกระแสเงินสด ผ่านข้อมูลที่ Posting แล้ว กำหนดช่วงเวลาได้ (รูปแบบรายงานสร้างครั้งเดียวใช้ได้ตลอด)',
+        '4.1 การพิมพ์รายงานทางการเงิน — พิมพ์ได้เมื่อทำขั้นตอนที่ 3 เรียบร้อยแล้ว',
+        '5. การปิดบัญชี (Close Year) — หลังสิ้นงวดและตรวจสอบโดยผู้สอบบัญชีแล้ว ปิดรายได้และค่าใช้จ่ายเพื่อเริ่มรอบใหม่ ระบุปีบัญชี และรหัสบัญชีกำไรขาดทุนสุทธิ/กำไรสะสมที่ยังไม่ได้จัดสรร'
+      ]
+    }
+  ];
+function diagramHtml(f){
+    var lanes = f.lanes;
+    var laneIndex = {}; lanes.forEach(function(l,i){ laneIndex[l.key]=i; });
+    var maxRank = 0; f.nodes.forEach(function(n){ if(n.rank>maxRank) maxRank=n.rank; });
+    var cols = 'repeat('+lanes.length+',var(--flow-col))';
+    var heads = lanes.map(function(l){
+      return '<div class="flow-lane-h m-'+(l.module||'')+'"><b>'+esc(l.name)+'</b>'+
+             (l.sub?'<small>'+esc(l.sub)+'</small>':'')+'</div>';
+    }).join('');
+    var nodes = f.nodes.map(function(n){
+      var col = (laneIndex[n.lane]||0)+1;
+      return '<div class="flow-node fn-'+(n.type||'process')+'" id="fn-'+f.id+'-'+n.id+'" '+
+             'style="grid-column:'+col+';grid-row:'+(n.rank+1)+'">'+esc(n.label)+'</div>';
+    }).join('');
+    return '<div class="flow-wrap"><div class="flow-scroll"><div class="flow-canvas">'+
+      '<div class="flow-lanes" style="grid-template-columns:'+cols+'">'+heads+'</div>'+
+      '<div class="flow-body" id="fb-'+f.id+'">'+
+        '<svg class="flow-edges" id="fe-'+f.id+'" xmlns="http://www.w3.org/2000/svg"></svg>'+
+        '<div class="flow-grid" style="grid-template-columns:'+cols+';grid-template-rows:repeat('+(maxRank+1)+',auto)">'+
+          nodes+
+        '</div>'+
+      '</div>'+
+    '</div></div></div>';
+  }
+
+function narrativeHtml(f){
+    if(!f.narrative || !f.narrative.length) return '';
+    var items = f.narrative.map(function(line){
+      if(line.indexOf('» ')===0) return '<li class="fn-sub">'+esc(line.slice(2))+'</li>';
+      if(line.indexOf('! ')===0)  return '<li class="fn-note">'+esc(line.slice(2))+'</li>';
+      return '<li class="fn-main">'+esc(line)+'</li>';
+    }).join('');
+    return '<div class="d-sec" style="margin-top:20px"><p class="lbl">'+t('flowStepsLbl')+'</p>'+
+      '<ul class="flow-narr">'+items+'</ul></div>';
+  }
+
+function flowLegendHtml(){
+    return '<div class="flow-legend">'+
+      '<span><i style="border-top-color:#8693a3"></i>'+esc(t('flowLegNormal'))+'</span>'+
+      '<span><i style="border-top-color:#2E75B6"></i>'+esc(t('flowLegApprove'))+'</span>'+
+      '<span><i style="border-top-color:#2e9e5b"></i>'+esc(t('flowLegYes'))+'</span>'+
+      '<span><i style="border-top-color:#d9822b;border-top-style:dashed"></i>'+esc(t('flowLegReject'))+'</span>'+
+    '</div>';
+  }
+
+function layoutFlowEdges(f){
+    var svg  = document.getElementById('fe-'+f.id);
+    var body = document.getElementById('fb-'+f.id);
+    if(!svg || !body) return;
+    var br = body.getBoundingClientRect();
+    var W = body.scrollWidth || body.clientWidth, H = body.scrollHeight || body.clientHeight;
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', '0 0 '+W+' '+H);
+
+    var dark = document.documentElement.classList.contains('dark');
+    var KIND = { normal: dark?'#62707f':'#8693a3', approve:'#2E75B6', yes:'#2e9e5b', reject:'#d9822b' };
+    var chipFill = dark?'#161b22':'#ffffff', chipStroke = dark?'#283039':'#e7ecf1', chipText = dark?'#9ba6b2':'#5b6672';
+
+    function R(nid){
+      var el = document.getElementById('fn-'+f.id+'-'+nid);
+      if(!el) return null;
+      var r = el.getBoundingClientRect();
+      var x = r.left-br.left, y = r.top-br.top;
+      return {w:r.width,h:r.height,cx:x+r.width/2,cy:y+r.height/2,
+              top:y,bottom:y+r.height,left:x,right:x+r.width};
+    }
+
+    var defs = '<defs>';
+    ['normal','approve','yes','reject'].forEach(function(k){
+      defs += '<marker id="ar-'+f.id+'-'+k+'" markerWidth="9" markerHeight="9" refX="7.5" refY="4" '+
+              'orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L8,4 L0,8 Z" fill="'+KIND[k]+'"/></marker>';
+    });
+    defs += '</defs>';
+
+    var paths = '', labels = '';
+    f.edges.forEach(function(e){
+      var a = R(e.from), b = R(e.to);
+      if(!a || !b) return;
+      var kind = e.kind || 'normal', col = KIND[kind] || KIND.normal;
+      var d, lx, ly;
+      var sameCol = Math.abs(a.cx-b.cx) < 6;
+      var sameRow = Math.abs(a.cy-b.cy) < 6;
+      if(kind==='reject'){
+        // Loop under both boxes so it never overlaps the forward arrow above.
+        var chY = Math.max(a.bottom,b.bottom) + 17;
+        d = 'M '+a.cx+' '+a.bottom+' L '+a.cx+' '+chY+' L '+b.cx+' '+chY+' L '+b.cx+' '+b.bottom;
+        lx = (a.cx+b.cx)/2; ly = chY+9;
+      } else if(sameCol && b.top>=a.bottom){
+        d = 'M '+a.cx+' '+a.bottom+' L '+b.cx+' '+b.top; lx = a.cx; ly = (a.bottom+b.top)/2;
+      } else if(sameRow){
+        if(b.left>=a.right){ d = 'M '+a.right+' '+a.cy+' L '+b.left+' '+b.cy; lx = (a.right+b.left)/2; }
+        else { d = 'M '+a.left+' '+a.cy+' L '+b.right+' '+b.cy; lx = (a.left+b.right)/2; }
+        ly = a.cy-9;
+      } else if(b.top>=a.bottom){
+        var midY = (a.bottom+b.top)/2;
+        d = 'M '+a.cx+' '+a.bottom+' L '+a.cx+' '+midY+' L '+b.cx+' '+midY+' L '+b.cx+' '+b.top;
+        lx = (a.cx+b.cx)/2; ly = midY-9;
+      } else {
+        var chY2 = b.top-17;
+        d = 'M '+a.cx+' '+a.top+' L '+a.cx+' '+chY2+' L '+b.cx+' '+chY2+' L '+b.cx+' '+b.top;
+        lx = (a.cx+b.cx)/2; ly = chY2-9;
+      }
+      paths += '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.7"'+
+               (kind==='reject'?' stroke-dasharray="5 4"':'')+
+               ' marker-end="url(#ar-'+f.id+'-'+kind+')"/>';
+      if(e.label){
+        var wl = e.label.length*6.4 + 12;
+        labels += '<g><rect x="'+(lx-wl/2)+'" y="'+(ly-8)+'" width="'+wl+'" height="16" rx="5" '+
+                  'fill="'+chipFill+'" stroke="'+chipStroke+'"/>'+
+                  '<text x="'+lx+'" y="'+(ly+3.6)+'" text-anchor="middle" font-size="10.5" '+
+                  'font-family="Sarabun,sans-serif" fill="'+chipText+'">'+esc(e.label)+'</text></g>';
+      }
+    });
+    svg.innerHTML = defs + paths + labels;
+  }
+
+function flowById(id){ return SOP_FLOWS.filter(function(f){ return f.id===id; })[0]; }
+function render(){
+  document.getElementById("root").innerHTML=SOP_FLOWS.map(function(f){
+    return '<div class="d-wrap m-'+f.module+'" style="max-width:none;border:1px solid var(--line);border-radius:12px;margin-bottom:24px;background:var(--panel)">'+
+      '<div class="d-head"><span class="flow-id-badge">'+esc(f.id)+'</span><div class="d-titles"><div class="d-th">'+esc(f.titleTH)+'</div><div class="d-en">'+esc(f.titleEN)+'</div></div><span class="d-badge">'+f.module+'</span></div>'+
+      diagramHtml(f)+flowLegendHtml()+narrativeHtml(f)+'</div>';
+  }).join("");
+  requestAnimationFrame(function(){ SOP_FLOWS.forEach(layoutFlowEdges); });
+}
+function redraw(){ SOP_FLOWS.forEach(layoutFlowEdges); }
+document.getElementById("dk").addEventListener("click",function(){document.documentElement.classList.toggle("dark");redraw();});
+render();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(redraw);
+window.addEventListener("resize",redraw,{passive:true});
+</script>
+</body></html>

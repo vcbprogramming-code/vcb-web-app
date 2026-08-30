@@ -1,7 +1,7 @@
 # PORT_NOTES — GAS → React mirror
 
 This folder lives **inside** the Google Apps Script (GAS) project root
-(`Meeting Minute Web App/meeting-minutes-react`) and is a **live mirror** of it. The
+(`VCB Connect/meeting-minutes/FOR DEPLOYMENT TEAM`) and is a **live mirror** of it. The
 GAS project is **canonical**: build/demo there first, then re-sync here. After ANY
 change to the GAS source, diff it against this folder and update only what changed
 (components, logic, and the verbatim CSS).
@@ -657,7 +657,7 @@ change to the GAS source, diff it against this folder and update only what chang
 re-extract on every sync:
 
 ```bash
-# run from this folder (Meeting Minute Web App/meeting-minutes-react)
+# run from this folder (VCB Connect/meeting-minutes/FOR DEPLOYMENT TEAM)
 sed '1d;$d' "../Stylesheet.html" > src/styles.css
 ```
 

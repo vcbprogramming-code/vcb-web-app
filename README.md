@@ -3,9 +3,12 @@
 One company portal for VCB Group (vcb-con.com), made of modules that are
 developed separately but ship as one website.
 
+See **[ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md)** for the app
+inventory, database ids, and the rules everyone follows.
+
 ## Structure
 
-Every module has the same two folders:
+Every module has the same two folders, and nothing else:
 
 | Folder | What it is | Status |
 |---|---|---|
@@ -22,56 +25,53 @@ these folders are flat rather than split into `frontend/` + `backend/`.
 
 ## Modules
 
-| Module | Folder |
-|---|---|
-| Portal (the launcher/shell) | `portal/` |
-| Credit Facility | `credit-facility/` |
-| System Map | `system-map/` |
-| SOP | `sop/` |
-| HR Work Log | `hr-worklog/` |
-| Meeting Minutes | `meeting-minutes/` |
-| Onboarding | `onboarding/` |
-| E-Memo | `ememo/` |
+| Module | Folder | Live data store |
+|---|---|---|
+| Portal (the launcher) | `portal/` | none |
+| Credit Facility | `credit-facility/` | Google Sheet |
+| System Map | `system-map/` | none |
+| SOP | `sop/` | Google Doc + ScriptProperties |
+| HR Work Log | `hr-worklog/` | Google Sheet |
+| Meeting Minutes | `meeting-minutes/` | Google Sheet + Drive attachments |
+| Onboarding | `onboarding/` | Google Sheet |
+| E-Memo | `ememo/` | handed to an external developer |
 
-## Shared
+## Editing an app
 
-| Folder | What it is |
-|---|---|
-| `platform/` | Node/Express API + React SPA + 23 Supabase migrations. Shared infrastructure with real auth/roles — **not a module**. |
-| `shared/` | Cross-module design tokens and theme controller (see Known issues). |
-| `docs/` | Architecture standards and setup notes. |
+Work in `ORIGINAL CODE/`, then from that same folder:
 
-## A note on `frontend/` and `backend/`
+```sh
+clasp pull    # ALWAYS first — someone may have edited in the browser
+# make changes
+clasp push    # overwrites the live code with your local files
+```
 
-No module has its own `frontend/` or `backend/` folder, and that is deliberate —
-in Apps Script the backend is the `api_*` functions and the frontend is the HTML
-served from the same file, so the split cannot exist.
+`clasp push` updates code only — the live `/exec` URL keeps serving its current
+version until you create a new deployment, so pushing mid-day is safe.
 
-Copies of the platform app previously sat inside `portal/`, `meeting-minutes/`
-and `ememo/`. They were migration debris, not module code, and have been removed.
-The one real backend lives in `platform/`. The copy found under `ememo/` turned
-out to be **newer** than the one installed as `platform/` (23 migrations vs 17,
-plus an action-level permissions system, PDF merging, and a reorganised admin
-UI); it was promoted, and the older tree is archived in the backup folder.
+Portal has no `.clasp.json` on purpose, so it cannot be pushed to by accident.
 
-## Known issues
+## ⚠ Never copy, move or delete a `.gscript` or `.gsheet` file
 
-**Theme fragmentation.** All modules ship light *and* dark, but each implements
-it differently — four different CSS selectors (`html[data-theme]`, `body.dark`,
-`html.theme-dark`, `html.dark`), five different `localStorage` keys, and only
-HR Work Log supports `auto` (follow-OS). Under one domain they share an origin,
-so a user's choice will not follow them between modules. `hr-worklog` has the
-most complete implementation — use it as the model when converging into
-`shared/`.
+They are not shortcuts — each **is** the live Apps Script project or Spreadsheet.
+Copying one makes Drive create a new empty project; deleting one trashes the real
+thing. Both happened on 2026-08-30. Relocate them only by moving them in File
+Explorer within the synced folder.
 
-**Design tokens differ.** Token names and palettes are unrelated between modules
-(`--brand` vs `--accent` vs `--blue`; navy `#1F3864` vs `#0b3d62`). They will not
-look like one website until this is unified.
-
-## Local setup
+## Running the React side
 
 `node_modules/` is not kept in this tree. In any `FOR DEPLOYMENT TEAM/` folder:
 
 ```sh
 npm install && npm run dev
 ```
+
+All seven build clean (`npm run build`, TypeScript included).
+
+## Known gap
+
+**Theme fragmentation.** All modules ship light *and* dark, but each implements it
+differently — four different CSS selectors, five `localStorage` keys, and only
+HR Work Log follows the OS setting. Under one domain they share an origin, so a
+user's choice will not follow them between modules. Token names and palettes
+differ too. `hr-worklog` is the model to converge on.

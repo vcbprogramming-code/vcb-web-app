@@ -1230,14 +1230,8 @@
     .sidebar.is-open ~ .sidebar-scrim { display: block; }
     .menu-btn { display: grid; }
     .topbar-search { display: none; }
-    .globe-card { display: none; }
-    /* Birthdays panel stays visible on phones too, but the 2-column
-       side-by-side layout with Leave is too tight at this width — stack
-       them instead. */
-    .side-row { grid-template-columns: 1fr; }
-    .side-row > div,
-    .side-row > div:last-child { padding: 0; border-left: none; }
-    .side-row > div:first-child { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--card-border); }
+    .dash-grid { grid-template-columns: 1fr; }
+    .side-col { display: none; }
     .content { max-width: 100%; }
     .apps-grid { grid-template-columns: 1fr; }
   }

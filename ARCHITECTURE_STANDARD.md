@@ -1,81 +1,132 @@
-# VCB Web Apps — shared architecture standard
+# VCB Connect — architecture standard
 
-One place that answers: *how many databases exist, where do they live, and how does
-each app behave.* Audited + verified against Google Drive 2026-07-04. Each app folder
-also has its own **`DATABASES.md`** manifest — open that when you click into a folder.
+The single place that answers: *what apps exist, where does each keep its data,
+and what are the rules everyone follows.* Verified against live Google Drive and
+the live Apps Script deployments on **2026-08-30**.
 
-## Database inventory (the answer to "how many?")
+## Folder layout
 
-Four apps own **one** live database each. Two own none. One is empty.
+```
+VCB Connect/
+├── portal/            ├── credit-facility/   ├── system-map/
+├── sop/               ├── hr-worklog/        ├── meeting-minutes/
+├── onboarding/        ├── ememo/
+│
+│     each module contains exactly two folders:
+│       ORIGINAL CODE/         Google Apps Script (plain JS) — 🟢 LIVE
+│       FOR DEPLOYMENT TEAM/   React 18 + TypeScript (Vite)  — ⚪ not deployed
+│
+├── README.md
+└── ARCHITECTURE_STANDARD.md   ← this file
+```
 
-| App | Live DB | Doc id (live) | Discovery | Where it lives |
-|-----|---------|---------------|-----------|----------------|
-| Credit Facility | 1 Google Sheet | `1AP5bJBw…YnE8` | ScriptProp `MASTER_SHEET_ID` | its own app Drive folder ✓ |
-| Meeting Minute | 1 Google Sheet | `1ouYa11i…CCfs` | ScriptProp `MINUTES_DB_SPREADSHEET_ID` | its own app Drive folder ✓ |
-| E-Memo | 1 Sheet **+** 1 backup | `1PYXXfMs…Pa1s` | ScriptProp `MASTER_SHEET_ID` | its own app Drive folder ✓ |
-| HR Work Log | 1 Google Sheet | `1MYHU0ic…5ZIQ` | hardcoded `DB_ID` constant | `_data` subfolder ✓ |
-| SOP | none (JSON file) | — | env var / local file | `data\sop.json` (Node/Express) |
-| VCB Connect | none | — | ScriptProperties only | — |
-| Expense Planner | — | *(empty folder)* | — | — |
+**`ORIGINAL CODE/` is canonical.** It is what employees actually use.
+`FOR DEPLOYMENT TEAM/` is a downstream React mirror kept in sync afterwards —
+read its `PORT_NOTES.md` before assuming a feature exists there.
 
-A healthy Drive contains **exactly 4 live master spreadsheets**, one per app above,
-**each already inside its own app folder**. E-Memo additionally keeps 1 manual backup
-sheet and generates a Doc + PDF per memo (filed into project subfolders, not root).
+There is no `frontend/` + `backend/` split inside these folders, deliberately: in
+Apps Script the backend is the `api_*` functions and the frontend is the HTML
+served from the same file, so the split cannot exist.
 
-## Why a database looked like "litter" at E:\ root
+## App inventory
 
-`SpreadsheetApp.create()` **always** drops a new sheet at My Drive root (the API has
-no folder argument), and Google Drive-for-Desktop mirrors My Drive onto `E:\`. The
-loose file previously at `E:\` root was **not** a live database — it was a blank
-**orphan** created by the 2026-07-01 reseed incident. It has been archived (see below).
-Every *live* DB was already correctly filed in its app folder.
+| App | Script id | Data store |
+|---|---|---|
+| Portal | `1nHl05hM…0b0j5` | none — static link list |
+| Credit Facility | `183uDd0f…AVIqW` | Sheet via ScriptProp `MASTER_SHEET_ID` |
+| System Map | `1fHG0p18…G1EUO` | none — static renderer |
+| SOP | `1oiWdc-1…8PVeY` | Google **Doc** `1emolyEx…HheJxo` + ScriptProperties (chunked) |
+| HR Work Log | `13GL834Y…0gxVzu` | Sheet `1lyn78vJ…CAgEn-A` (`DB_ID` + `DB_ID_OVERRIDE_`) |
+| Meeting Minutes | `1Ozxm34T…7KE6vf` | Sheet via ScriptProp; attachments in Drive folder `1EPGohkA…j5zuJR` |
+| Onboarding | `15EUqN1-…9EmLHa` | Sheet `1H5d-BwY…uhmfW0k` (ScriptProp `PROGRESS_SS_ID`) |
+| E-Memo | `1TVYyTD7…GY92Op` | handed to an external developer — not maintained here |
 
-## The standard (all Apps Script apps)
+Portal and System Map hold no data, so they cannot have a "missing database".
 
-1. **A DB lives in its own app's Drive folder — never at My Drive root.** All live DBs
-   already satisfy this. As a safety net, `setupMaster_`/`getDb_` now `moveTo()` any
-   *freshly created* DB into a shared `VCB App Data` folder so a disaster re-create can
-   never litter root again.
-2. **Never silently reseed.** If a DB id is stored but `openById()` fails, **throw
-   loudly** — never create a blank replacement. Auto-create only on genuine first run.
-   This is the guard that prevents the 2026-07-01 reseed incident from recurring.
-3. **Discovery via a stable id** (ScriptProperties key, or a hardcoded `DB_ID`). Keys
-   are **not** renamed on live apps — a rename would orphan the live DB.
-4. **Temp/export files:** create → `setTrashed(true)` immediately. Never leave at root.
-5. **One authoritative source dir per project.** No stale duplicate script copies.
-6. **Each folder carries a `DATABASES.md`** listing its live DB (id + link), any
-   backups/orphans, and the transient files it creates — so the count is obvious.
+## The rules
 
-## Per-app conformance (2026-07-04, verified)
+1. **A `.gscript` / `.gsheet` file IS the live cloud object, not a shortcut.**
+   Never copy, move or delete one from the filesystem. Copying makes Google Drive
+   create a **new empty project**; deleting **trashes the real one**. Both happened
+   on 2026-08-30. To relocate one, move it in File Explorer within the synced tree.
 
-| App | DB in app folder | No silent reseed | Temp files cleaned | DATABASES.md |
-|-----|:---:|:---:|:---:|:---:|
-| Credit Facility | ✅ | ✅ (already hardened) | ✅ | ✅ |
-| Meeting Minute | ✅ | ✅ **(fixed 07-04)** | n/a | ✅ |
-| E-Memo | ✅ | ✅ (hot path fails loudly) | ✅ | ✅ |
-| HR Work Log | ✅ | ✅ (opens by id, throws) | ✅ | ✅ |
-| VCB Connect / SOP | n/a (no Google DB) | n/a | n/a | ✅ |
+2. **Never silently reseed.** If a stored database id will not open, throw loudly.
+   Never stand up a blank replacement — the app then writes to an empty sheet and
+   the real data looks lost. Auto-create only on a genuine first run with no id
+   stored at all.
 
-## What was done 2026-07-04
+3. **Recover before failing.** Where a known-good id exists, try it before
+   throwing, and write the correction back to the script property so the app
+   self-heals. A guard that turns a working app into a hard failure is as bad as a
+   silent reseed. (HR Work Log and Onboarding both do this.)
 
-- **Deleted the two orphan sheets** → Google Drive Trash (recoverable 30 days):
-  Credit Facility blank reseed orphan (`1dugu…`) and HR stale twin (`1HCI…`). Verified
-  first — neither held real user work; the live DBs (`1AP5…`, `1MYHU…`) were untouched.
-  `E:\` root now has zero loose sheets and each DB name maps to exactly one sheet.
-- **Hardened** Meeting Minute `getDb_()` against silent reseed — **deployed live @42**.
-- **Removed** stale duplicate code: E-Memo `_appsscript_new\`; HR `Code.js`/`History.js`
-  shadow copies (git-removed, recoverable).
-- **Added** a `DATABASES.md` manifest to every app folder; removed the temporary
-  `_ARCHIVE` folder once empty.
+4. **Discovery via a stable id** — a ScriptProperties key or a hardcoded constant.
+   Never rename a key on a live app; that orphans the database.
 
-Kept on purpose: E-Memo's dated backup sheet `1tWQE…` (a deliberate restore point).
+5. **Temp/export files:** create → `setTrashed(true)` immediately.
 
-## Still your call
+6. **One authoritative source per app.** No duplicate script copies.
 
-- **Credit Facility deploy was intentionally skipped.** Its reseed guard is already
-  live, and its only new code (`moveMasterToFolder`) is dormant unless a fresh DB is
-  ever created — so it needs no deploy. Its working tree also holds unrelated
-  in-progress edits (`Seed.js`, `index.html`, `README.md`); since `deploy.ps1` pushes
-  the whole working tree, deploy it yourself only when those edits are ready to go live.
-- The two deleted sheets sit in **Drive Trash** for 30 days — empty it whenever you're
-  sure, or restore from there if anything ever looks off.
+## Reseed-guard conformance (2026-08-30)
+
+| App | Can it invent a blank database? | Note |
+|---|---|---|
+| Credit Facility | no | guarded July 2026 |
+| Meeting Minutes | no | guarded July 2026 |
+| HR Work Log | no | **fixed 08-30** — see below |
+| Onboarding | no | **fixed 08-30** — both sheet accessors |
+| SOP / System Map / Portal | n/a | no spreadsheet at all |
+| E-Memo | no | throws if id unset; setup is manual only |
+
+## What changed on 2026-08-30
+
+- **HR Work Log** — its hardcoded `DB_ID` was `1MYHU0ic…5ZIQ`, which **returned 404
+  in Drive**; the app survived only via `DB_ID_OVERRIDE_`. Corrected to the real
+  sheet, the `createFreshDb_()` fallback replaced with a loud error, and a
+  recovery path added that falls back to `DB_ID` and clears a stale override.
+- **Onboarding** — `getProgressSheet_()` and `getChecklistContentSheet_()` both
+  silently created blank sheets on open failure (this produced two junk
+  spreadsheets). Both now route through `openProgressSs_()`, which prefers the
+  stored id, recovers onto the known-good one, and refuses to create anything.
+- **Meeting Minutes** — `APP_FOLDER_ID` pointed at a **trashed** Drive folder, so
+  every attachment upload would have thrown. Repointed at the live folder.
+- All three fixes are deployed and verified by pulling the deployed code back.
+
+## Working on these apps
+
+Edit in `ORIGINAL CODE/`, then from that same folder:
+
+```sh
+clasp pull    # ALWAYS first — someone may have edited in the browser
+# make changes
+clasp push    # overwrites live code with your local files
+```
+
+`clasp push` updates code only. The live `/exec` URL keeps serving its current
+version until a new deployment is created, so pushing mid-day is safe. It never
+touches triggers, Script Properties, or webhook registrations.
+
+Portal has no `.clasp.json` on purpose — it was removed so nobody pushes to
+production by accident.
+
+## Integrations (Meeting Minutes)
+
+Fathom and Transkriptor feed transcripts in automatically:
+
+- `doPost` webhook — Fathom POSTs finished recordings
+- `processFathomQueue_` — every 1 minute
+- `pollFathomMeetings_` / `pollTranskriptorMeetings_` — hourly
+
+Transcripts are written as **rows in the database** (`FATHOM_INBOX` /
+`TRANSKRIPTOR_INBOX`), not into any Drive folder. API keys live in Script
+Properties (`FATHOM_API_KEY`, `TRANSKRIPTOR_API_KEY`).
+
+## Known gap
+
+**Theme fragmentation across the React mirrors.** All modules ship light *and*
+dark, but each implements it differently — four CSS selectors
+(`html[data-theme]`, `body.dark`, `html.theme-dark`, `html.dark`), five
+`localStorage` keys, and only HR Work Log supports follow-OS. Under one domain
+they share an origin, so a user's choice will not follow them between modules.
+Token names and palettes differ too. `hr-worklog` has the most complete
+implementation — use it as the model when converging.

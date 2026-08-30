@@ -985,7 +985,13 @@ function getDb_() {
 // recreate) an unrelated same-named folder anywhere in Drive, which is how
 // attachments previously ended up in a stray root-level "VCB App Data" folder
 // instead of here.
-var APP_FOLDER_ID = '1Ag1RrEBL1n3wlQNYS79ugyJ5gNdnnGvh'; // "Meeting Minute Web App"
+// The app's own Drive folder — holds the database, the script source and the
+// "Meeting Attachments" subfolder. Corrected 2026-08-30: the previous id
+// (1Ag1RrEB…nnGvh, created 2026-05-22) had been TRASHED, so every call below
+// threw and attachment upload was broken. This id is the live folder
+// (My Drive / WORK / 08 CLAUDE CODE / Meeting Minute Web App) that actually
+// contains "VCB Meeting Minutes — Database".
+var APP_FOLDER_ID = '1EPGohkAPdUnw4pVhcoTYAEx5dNj5zuJR'; // "Meeting Minute Web App"
 function moveDbToFolder_(id) {
   try {
     var file = DriveApp.getFileById(id);

@@ -31,20 +31,44 @@ function include(filename) {
 
 var PROGRESS_SHEET_NAME = 'Onboarding Progress';
 
+// The real progress database, confirmed in Drive on 2026-08-30 (created
+// 2026-07-27, owner c.chavananand@vcb-con.com). Used as a recovery fallback if
+// the PROGRESS_SS_ID script property is missing or points at a sheet that no
+// longer opens — see getProgressSheet_(). It is never used to create anything.
+var PROGRESS_SS_FALLBACK_ID = '1H5d-BwYADdUMix_BjzzWgSo5tFNrgPCYr9nhuhmfW0k';
+
+/** Open the progress database, preferring the stored id and falling back to the
+ *  known-good one above. Returns null if neither opens — the caller decides. */
+function openProgressSs_(props) {
+  var ssId = props.getProperty('PROGRESS_SS_ID');
+  if (ssId) {
+    try { return SpreadsheetApp.openById(ssId); } catch (e) { /* try fallback */ }
+  }
+  // Stored id missing or dead. Recover onto the real database rather than
+  // failing the request or standing up a blank sheet.
+  try {
+    var ss = SpreadsheetApp.openById(PROGRESS_SS_FALLBACK_ID);
+    props.setProperty('PROGRESS_SS_ID', PROGRESS_SS_FALLBACK_ID); // self-heal
+    return ss;
+  } catch (e2) { return null; }
+}
+
 function getProgressSheet_() {
   var props = PropertiesService.getScriptProperties();
-  var ssId = props.getProperty('PROGRESS_SS_ID');
-  var ss;
-  if (ssId) {
-    try {
-      ss = SpreadsheetApp.openById(ssId);
-    } catch (e) {
-      ss = null;
-    }
-  }
+  var ss = openProgressSs_(props);
   if (!ss) {
-    ss = SpreadsheetApp.create('VCB Onboarding Portal — Progress Data');
-    props.setProperty('PROGRESS_SS_ID', ss.getId());
+    // Neither the stored id nor the known-good fallback opened. Fail LOUDLY —
+    // never quietly stand up a blank replacement, because the app would then
+    // write to an empty sheet and the real progress data would look lost.
+    // (On 2026-08-30 an unguarded reseed here created two empty sheets after
+    // the live database was trashed.)
+    throw new Error(
+      'Onboarding progress database could not be opened (tried PROGRESS_SS_ID ' +
+      'and the known-good id ' + PROGRESS_SS_FALLBACK_ID + '). It may be in ' +
+      'Drive Trash or its sharing may have changed. Restore it, or set ' +
+      'PROGRESS_SS_ID to the correct spreadsheet id. Refusing to create a blank ' +
+      'replacement.'
+    );
   }
   var sheet = ss.getSheetByName(PROGRESS_SHEET_NAME);
   if (!sheet) {
@@ -363,14 +387,16 @@ var CHECKLIST_CONTENT_HEADERS = ['ItemId', 'PageKey', 'BlockIndex', 'Text', 'Lev
 
 function getChecklistContentSheet_() {
   var props = PropertiesService.getScriptProperties();
-  var ssId = props.getProperty('PROGRESS_SS_ID');
-  var ss;
-  if (ssId) {
-    try { ss = SpreadsheetApp.openById(ssId); } catch (e) { ss = null; }
-  }
+  // Same path as getProgressSheet_(): prefer the stored id, recover onto the
+  // known-good one, and refuse to invent a blank replacement.
+  var ss = openProgressSs_(props);
   if (!ss) {
-    ss = SpreadsheetApp.create('VCB Onboarding Portal — Progress Data');
-    props.setProperty('PROGRESS_SS_ID', ss.getId());
+    throw new Error(
+      'Onboarding progress database could not be opened (tried PROGRESS_SS_ID ' +
+      'and the known-good id ' + PROGRESS_SS_FALLBACK_ID + '). Restore it, or ' +
+      'set PROGRESS_SS_ID to the correct spreadsheet id. Refusing to create a ' +
+      'blank replacement.'
+    );
   }
   var sheet = ss.getSheetByName(CHECKLIST_CONTENT_SHEET_NAME);
   if (!sheet) {

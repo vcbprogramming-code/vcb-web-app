@@ -5513,7 +5513,12 @@ function SEED_ENTRIES(){ var s=loadSeed_(); return { support:s.support||[], oper
 // web app and the editor's SETUP always act on the exact same spreadsheet.
 // The web app is deployed "Execute as: Me", so opening DB_ID always succeeds
 // regardless of whether the visiting user has direct access to the Sheet.
-var DB_ID = "1MYHU0ictzuOYPTWHolWKjB2zNND7gKUakbXhim_5ZIQ";
+// The live HR Work Log database. Confirmed 2026-08-30 (created 2026-08-15,
+// 145 KB, owner c.chavananand@vcb-con.com). The previous value here
+// (1MYHU0ic…5ZIQ) no longer exists in Drive — it returned 404 — so the app was
+// running only via the DB_ID_OVERRIDE_ script property. Keeping a dead id here
+// is what made the auto-create fallback below reachable in the first place.
+var DB_ID = "1lyn78vJ2xKBhMJUs7LxTXI9kB49or6uxVRH_CAgEn-A";
 var SS_CACHE_ = null;
 // Self-healing: if DB_ID can't be opened (e.g. the file was deleted), the app
 // auto-creates a replacement spreadsheet on first use and remembers its id in
@@ -5587,9 +5592,30 @@ function ss_(){
   var id = activeDbId_();
   try { SS_CACHE_ = SpreadsheetApp.openById(id); }
   catch(e){
-    // DB missing/inaccessible — provision a brand-new one automatically.
-    try { SS_CACHE_ = createFreshDb_(); SETUP(); }
-    catch(e2){ throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ' + (e && e.message) + ' | สร้างใหม่ไม่สำเร็จ: ' + (e2 && e2.message)); }
+    // The active id would not open. Before failing, fall back to the known-good
+    // DB_ID constant — a STALE OVERRIDE is the likely cause (activeDbId_ prefers
+    // DB_ID_OVERRIDE_, so an old override silently shadows a corrected DB_ID).
+    // This recovers to a real, existing database; it never creates one.
+    if (id !== DB_ID) {
+      try {
+        SS_CACHE_ = SpreadsheetApp.openById(DB_ID);
+        // The override is wrong and DB_ID works — clear it so the app stops
+        // being routed at a dead sheet on every future call.
+        try { PropertiesService.getScriptProperties().deleteProperty('DB_ID_OVERRIDE_'); } catch(e3){}
+      } catch(e2){ SS_CACHE_ = null; }
+    }
+    if (!SS_CACHE_) {
+      // NEVER auto-create a replacement here. A database that will not open has
+      // been moved, trashed, or had its sharing changed — provisioning a blank
+      // one silently strands every existing record and the app looks empty.
+      // Fail loudly instead so the real cause gets fixed. (Matches the guard in
+      // Meeting Minutes and Credit Facility; see ARCHITECTURE_STANDARD.md rule 2.)
+      throw new Error(
+        'เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ' + (e && e.message) +
+        ' | ระบบจะไม่สร้างฐานข้อมูลใหม่ให้อัตโนมัติ เพื่อป้องกันข้อมูลสูญหาย ' +
+        'โปรดกู้คืนไฟล์เดิมจาก Drive Trash หรือแก้ค่า DB_ID_OVERRIDE_ ให้ถูกต้อง'
+      );
+    }
   }
   if (!SS_CACHE_) throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ตรวจสิทธิ์/รหัสไฟล์');
   return SS_CACHE_;

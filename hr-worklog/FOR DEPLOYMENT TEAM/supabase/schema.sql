@@ -14,7 +14,7 @@
 -- forces awkward things: a fixed 31-day ceiling, columns whose meaning depends
 -- on position, and a migration whenever a new per-day field is needed.
 --
--- Here it is normalised to ONE ROW PER (employee, date, period) in
+-- Here it is normalised to ONE ROW PER (employee, date, task slot) in
 -- work_entries. Everything the wide tab could express is still expressible, the
 -- 31-day limit disappears, and per-day queries stop being column arithmetic.
 -- The import step in MIGRATION.md does that pivot; it is the only place where
@@ -183,12 +183,11 @@ create index if not exists hr_audit_at_idx on public.audit_log(at desc);
 -- ------------------------------------------------------- the daily entries --
 
 -- Replaces the wide per-(site, month) tabs. One row per employee per day per
--- period. `period` is 'am' or 'pm' — the sheet's AM block and appended PM block.
--- NOTE ON SHAPE: the sheet has one `Note N` column per DAY, shared by the AM and
--- PM values (writeWideCells_ writes 'AM', 'PM' and 'note' as three separate
--- fields of one day). So the note belongs to the day, not to a period — keeping
--- it on work_entries would let AM and PM disagree about the same note. It lives
--- in work_days below.
+-- task slot. NOTE ON SHAPE: the sheet has one `Note N` column per DAY, shared
+-- by both task slots (writeWideCells_ writes the two values and the note as
+-- three separate fields of one day). So the note belongs to the day, not to a
+-- slot — keeping it on work_entries would let the two slots disagree about the
+-- same note. It lives in work_days below.
 create table if not exists public.work_days (
   eid        text not null references public.employees(eid) on delete cascade,
   entry_date date not null,
@@ -199,18 +198,44 @@ create table if not exists public.work_days (
   primary key (eid, entry_date)
 );
 
+-- IMPORTANT — `slot` is NOT a time of day.
+--
+-- The sheet's columns are named "AM N" and "PM N", and the code still uses
+-- those names, but they are historical. The app today shows งานหลัก (main task)
+-- and "+ งานที่ 2 (ถ้ามี)" (optional second task) — see mkRow() in Code.gs.
+-- The AM→PM auto-mirror was deliberately disabled with this comment:
+--
+--   "the second slot is now optional งานเสริม (extra work), not a duplicate
+--    afternoon shift — copying งานหลัก into it would turn every single-task day
+--    into a 2-task day and break the 1-manday-per-day math"
+--
+-- So slot 1 = main task, slot 2 = optional extra. A day with both is still ONE
+-- manday, not two. Naming this column `period` with 'am'/'pm' (as an earlier
+-- draft of this schema did) invites exactly the miscalculation that comment
+-- warns about.
 create table if not exists public.work_entries (
   id         bigint generated always as identity primary key,
   eid        text not null references public.employees(eid) on delete cascade,
   site_key   text not null references public.sites(key),
   entry_date date not null,
-  period     text not null check (period in ('am','pm')),
+  -- 1 = งานหลัก (main task), 2 = งานเสริม (optional extra work).
+  -- Imports from the sheet: "AM N" → slot 1, "PM N" → slot 2.
+  slot       smallint not null check (slot in (1, 2)),
   -- The activity code written in the cell (e.g. 'A-1'), matching MasterIndex.
   value      text,
   updated_at timestamptz not null default now(),
   updated_by text,
-  unique (eid, entry_date, period)
+  unique (eid, entry_date, slot)
 );
+
+-- One manday per employee per day, regardless of how many task slots are
+-- filled. Use this for any workload or cost total — counting work_entries rows
+-- would double-count every day that has an extra task.
+create or replace view public.mandays as
+  select eid, site_key, entry_date, 1::int as mandays
+    from public.work_entries
+   where coalesce(value, '') <> ''
+   group by eid, site_key, entry_date;
 
 create index if not exists work_entries_site_date_idx on public.work_entries(site_key, entry_date);
 create index if not exists work_entries_eid_date_idx  on public.work_entries(eid, entry_date);
@@ -346,7 +371,7 @@ begin
     extract(month from new.entry_date)::int,
     new.eid, emp_name,
     extract(day   from new.entry_date)::int,
-    upper(new.period),
+    'slot' || new.slot,
     case when tg_op = 'UPDATE' then old.value else null end,
     new.value
   );

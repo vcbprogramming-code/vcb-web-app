@@ -30,20 +30,33 @@ position, and a schema migration every time a per-day field is added — the PM
 block had to be appended at the end precisely to avoid shifting existing
 columns.
 
-`work_entries` replaces it with **one row per (eid, entry_date, period)**, where
-period is `'am'` or `'pm'`. The import therefore has to *pivot*: for each wide
-tab, for each employee row, for each day 1–31, emit up to two rows.
+`work_entries` replaces it with **one row per (eid, entry_date, slot)**. The
+import therefore has to *pivot*: for each wide tab, for each employee row, for
+each day 1–31, emit up to two rows.
+
+**`slot` is not a time of day.** The sheet's columns are still called "AM N" and
+"PM N", but the app does not work that way: it shows งานหลัก (main task) and
+"+ งานที่ 2 (ถ้ามี)" (optional second task). The AM→PM auto-mirror was
+deliberately switched off, with this comment in `Code.gs`:
+
+> "the second slot is now optional งานเสริม (extra work), not a duplicate
+> afternoon shift — copying งานหลัก into it would turn every single-task day
+> into a 2-task day and break the 1-manday-per-day math"
+
+So "AM N" → slot 1, "PM N" → slot 2, and a day with both slots filled is still
+**one manday**. Use the `mandays` view for any total; counting `work_entries`
+rows double-counts every two-task day.
 
 ```
 tab "สำนักงานใหญ่ · 2569-08", employee E123, day 5
   AM 5 = 'A-1', Note 5 = 'ตรวจงาน', PM 5 = 'B-2'
-    → work_entries (E123, 2026-08-05, 'am', 'A-1')
-    → work_entries (E123, 2026-08-05, 'pm', 'B-2')
+    → work_entries (E123, 2026-08-05, slot 1, 'A-1')   -- งานหลัก
+    → work_entries (E123, 2026-08-05, slot 2, 'B-2')   -- งานเสริม
     → work_days    (E123, 2026-08-05, note = 'ตรวจงาน')
 ```
 
-Note the split: `Note N` is ONE column per day in the sheet, shared by AM and
-PM, so it goes to `work_days` — one row per employee per day. Putting it on
+Note the split: `Note N` is ONE column per day in the sheet, shared by both
+slots, so it goes to `work_days` — one row per employee per day. Putting it on
 `work_entries` would create two copies that could disagree.
 
 Notes for whoever writes the import script:

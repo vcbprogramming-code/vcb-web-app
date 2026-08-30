@@ -121,6 +121,37 @@ Transcripts are written as **rows in the database** (`FATHOM_INBOX` /
 `TRANSKRIPTOR_INBOX`), not into any Drive folder. API keys live in Script
 Properties (`FATHOM_API_KEY`, `TRANSKRIPTOR_API_KEY`).
 
+## Migration off Apps Script — status
+
+Each module's `FOR DEPLOYMENT TEAM/supabase/` now holds the Postgres schema that
+would replace its Google Sheet, derived from the live app's own table
+definitions. **Nothing is connected**: no Supabase project exists, no data has
+been imported, and every React app still runs on its mock layer. The Apps Script
+apps remain the live system.
+
+| Module | Schema | Note |
+|---|---|---|
+| credit-facility | ✅ + `MIGRATION.md` | the pilot — 9 tables |
+| meeting-minutes | ✅ | 3-tier access (public / locked / guest) reproduced in RLS |
+| hr-worklog | ✅ | wide monthly tabs normalised to one row per entry |
+| sop | ✅ | one jsonb document + versions; no spreadsheet today |
+| portal | ✅ | app tiles become editable rows, not hardcoded |
+| system-map | n/a — see its `supabase/README.md` | stores nothing; a static build |
+| onboarding | ✅ (pre-existing) | already scaffolded this way |
+
+**The security model changes on migration, and this is the part to get right.**
+Apps Script gets identity free: `Session.getActiveUser().getEmail()` is supplied
+by Google and cannot be spoofed, so a server-side allowlist is enough. A SPA
+ships its anon key in the browser bundle, so any check written in the UI can be
+skipped by calling the API directly. Every schema therefore enforces access in
+the database via row level security, and each app's `supabaseClient.ts` exposes
+its role helper for hiding controls only — never for protecting data.
+
+**Still to do per app, and it is the bulk of the work:** create the project, turn
+on Google auth restricted to the workspace domain, seed the role tables, import
+the data, then replace `src/mock/` with real queries. Do one end-to-end before
+starting the next.
+
 ## Known gap
 
 **Theme fragmentation across the React mirrors.** All modules ship light *and*

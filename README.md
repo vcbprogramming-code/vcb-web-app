@@ -3,7 +3,11 @@
 One company portal for VCB Group (vcb-con.com), made of modules that are
 developed separately but ship as one website.
 
-See **[ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md)** for the app
+> **New here? Read [START-HERE.md](START-HERE.md) first.** It explains what this
+> is, the two-folder layout, which apps are live, and the traps that are not
+> obvious from the code.
+
+Then **[ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md)** for the app
 inventory, database ids, and the rules everyone follows.
 
 ## Structure

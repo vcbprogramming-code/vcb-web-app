@@ -5,6 +5,7 @@ import { useToast } from '../../components/Toast.jsx';
 import { BusyLabel } from '../../components/Spinner.jsx';
 import { useT } from '../../lib/i18n.jsx';
 import ImportEmployees from './ImportEmployees.jsx';
+import OrgRegistry from './OrgRegistry.jsx';
 
 /**
  * Module settings. Server-side: per-site back-date lock window (lock-days).
@@ -34,8 +35,12 @@ export default function SettingsView({ sites, onSitesChange }) {
   };
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5">
+      {/* the two registries need room for two columns; the settings below stay
+          narrow because they are single fields */}
+      <OrgRegistry sites={sites} />
       <ImportEmployees />
+      <div className="max-w-2xl space-y-5">
 
       {/* display */}
       <section className="card space-y-3">
@@ -98,6 +103,7 @@ export default function SettingsView({ sites, onSitesChange }) {
       </section>
       <div className="mt-6 border-t border-slate-200 pt-6">
         <LeaveApprovers />
+      </div>
       </div>
     </div>
   );

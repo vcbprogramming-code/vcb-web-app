@@ -53,6 +53,52 @@ suite('§2 ข้อมูลหลัก (Master Data)');
     (await call('/performance/cost-categories', { user: A })).status === 200, '');
 }
 
+// ── §2 ทะเบียนแผนกและตำแหน่ง ──────────────────────────────────────────────
+suite('§2 ทะเบียนแผนกและตำแหน่ง');
+let deptId = null; let posId = null;
+{
+  const d = await call('/performance/departments', { method: 'POST', user: A, body: { site: site.code, name: `${MARK} ฝ่ายทดสอบ` } });
+  happy('เพิ่มแผนกได้', [200, 201].includes(d.status), `${d.status} ${d.error || ''}`);
+  deptId = d.data?.id;
+  bad('แผนกชื่อซ้ำในไซต์เดียวกันไม่ได้',
+    (await call('/performance/departments', { method: 'POST', user: A, body: { site: site.code, name: `${MARK} ฝ่ายทดสอบ` } })).status === 409, '');
+
+  const p2 = await call('/performance/positions', { method: 'POST', user: A, body: { departmentId: deptId, name: `${MARK} หัวหน้าชุด` } });
+  happy('เพิ่มตำแหน่งในแผนกได้', [200, 201].includes(p2.status), `${p2.status} ${p2.error || ''}`);
+  posId = p2.data?.id;
+  bad('ตำแหน่งชื่อซ้ำในแผนกเดียวกันไม่ได้',
+    (await call('/performance/positions', { method: 'POST', user: A, body: { departmentId: deptId, name: `${MARK} หัวหน้าชุด` } })).status === 409, '');
+
+  const list = await call(`/performance/departments?site=${site.code}`, { user: A });
+  const mine = (list.data || []).find((x) => x.id === deptId);
+  happy('อ่านทะเบียนแผนกกลับมาได้', Boolean(mine), '');
+  happy('บอกจำนวนตำแหน่งในแผนก', mine?.positions === 1, String(mine?.positions));
+
+  // §2 การเปลี่ยนแปลงมีผลกับข้อมูลในอนาคต ไม่ลบของเดิม
+  await call(`/performance/employees/${emp.id}`, { method: 'PATCH', user: A, body: { departmentId: deptId, positionId: posId } });
+  const bound = await query('select department_id, position_id from employees where id = $1', [emp.id]);
+  happy('ผูกแผนกและตำแหน่งให้พนักงานได้', bound.rows[0].department_id === deptId && bound.rows[0].position_id === posId, '');
+  bad('แผนกที่มีพนักงานผูกอยู่ ลบไม่ได้',
+    (await call(`/performance/departments/${deptId}`, { method: 'DELETE', user: A })).status === 409, '');
+  bad('ตำแหน่งที่มีพนักงานผูกอยู่ ลบไม่ได้',
+    (await call(`/performance/positions/${posId}`, { method: 'DELETE', user: A })).status === 409, '');
+
+  const off = await call(`/performance/departments/${deptId}`, { method: 'PATCH', user: A, body: { isActive: false } });
+  happy('ปิดใช้งานแผนกได้', off.status === 200, `${off.status}`);
+  const still = await query('select department_id from employees where id = $1', [emp.id]);
+  happy('ปิดใช้งานแล้วข้อมูลพนักงานเดิมไม่เปลี่ยน', still.rows[0].department_id === deptId, '');
+  const active = await call(`/performance/departments?site=${site.code}`, { user: A });
+  bad('แผนกที่ปิดแล้วไม่ขึ้นในรายการปกติ', !(active.data || []).some((x) => x.id === deptId), '');
+  const all = await call(`/performance/departments?site=${site.code}&all=1`, { user: A });
+  happy('ยังเรียกดูรายการที่ปิดแล้วได้', (all.data || []).some((x) => x.id === deptId), '');
+  const posOff = await query('select is_active from positions where id = $1', [posId]);
+  happy('ปิดแผนกแล้วตำแหน่งใต้แผนกปิดตาม', posOff.rows[0].is_active === false, '');
+  await call(`/performance/departments/${deptId}`, { method: 'PATCH', user: A, body: { isActive: true } });
+
+  bad('ผู้ที่ไม่ใช่ผู้ดูแลระบบเพิ่มแผนกไม่ได้',
+    (await call('/performance/departments', { method: 'POST', user: H, body: { site: site.code, name: 'x' } })).status === 403, '');
+}
+
 // ── §3 บันทึกรายวัน ───────────────────────────────────────────────────────
 suite('§3 การบันทึกการปฏิบัติงานประจำวัน');
 {
@@ -247,6 +293,9 @@ suite('ไม่ทิ้งข้อมูลทดสอบไว้');
   await query('delete from work_log_audit where unit_id = $1', [site.id]);
   await query('delete from period_closes where unit_id = $1', [site.id]);
   await query('delete from employee_away where employee_id = any($1)', [[emp.id, gone.id, mate.id]]);
+  await query('update employees set department_id = null, position_id = null where unit_id = $1', [site.id]);
+  await query('delete from positions where department_id in (select id from departments where unit_id = $1)', [site.id]);
+  await query('delete from departments where unit_id = $1', [site.id]);
   await query('delete from teams where unit_id = $1', [site.id]);
   await query('delete from employees where unit_id = $1', [site.id]);
   await query('delete from units where id = $1', [site.id]);

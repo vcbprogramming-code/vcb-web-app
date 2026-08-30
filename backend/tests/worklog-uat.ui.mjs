@@ -271,6 +271,71 @@ suite('§2 นำเข้าพนักงานจาก Excel และเ�
   await shot('09-นำเข้าจริง');
 }
 
+// ── §2 จัดการแผนกและตำแหน่งจากหน้าจอ ──────────────────────────────────────
+suite('§2 เพิ่ม แก้ไข และปิดใช้งานแผนก/ตำแหน่งจากหน้าจอ');
+{
+  await as(A);
+  await clickText('ตั้งค่า'); await settle(2600);
+  happy('หน้าตั้งค่ามีทะเบียนแผนกและตำแหน่ง', (await body()).includes('ทะเบียนแผนกและตำแหน่ง'), '');
+  // the registry has its own site picker, separate from the header one
+  const pickedSite = await page.evaluate((name) => {
+    const card = [...document.querySelectorAll('div')].find((d) => d.innerText?.startsWith('ทะเบียนแผนกและตำแหน่ง'));
+    const sel = [...(card || document).querySelectorAll('select')].find((s) => [...s.options].some((o) => o.text.includes(name)));
+    if (!sel) return false;
+    const opt = [...sel.options].find((o) => o.text.includes(name));
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, opt.value);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }, `${MARK} ไซต์ทดสอบ`);
+  happy('เลือกไซต์งานในทะเบียนได้', pickedSite, '');
+  await settle(2200);
+
+  const typeAdd = async (placeholderPart, value) => page.evaluate((ph, v) => {
+    const inp = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes(ph));
+    if (!inp) return false;
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, v);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    const btn = inp.parentElement.querySelector('button');
+    if (btn) btn.click();
+    return true;
+  }, placeholderPart, value);
+
+  happy('พิมพ์ชื่อแผนกแล้วกดเพิ่มได้', await typeAdd('ชื่อแผนกใหม่', `${MARK} ฝ่ายวิศวกรรม`), '');
+  await waitForText(`${MARK} ฝ่ายวิศวกรรม`);
+  const dept = await query('select d.id, d.name from departments d join units u on u.id = d.unit_id where u.code = $1 and d.name = $2',
+    [site.code, `${MARK} ฝ่ายวิศวกรรม`]);
+  happy('แผนกถูกบันทึกลงระบบ', dept.rows.length === 1, `${dept.rows.length}`);
+  await shot('13-เพิ่มแผนก');
+
+  // click the department so the position list belongs to it
+  happy('เลือกแผนกเพื่อดูตำแหน่งได้', await clickText(`${MARK} ฝ่ายวิศวกรรม`), '');
+  await settle(1800);
+  happy('พิมพ์ชื่อตำแหน่งแล้วกดเพิ่มได้', await typeAdd('ชื่อตำแหน่งใหม่', `${MARK} วิศวกรสนาม`), '');
+  await waitForText(`${MARK} วิศวกรสนาม`);
+  const pos = await query('select id from positions where department_id = $1 and name = $2', [dept.rows[0]?.id, `${MARK} วิศวกรสนาม`]);
+  happy('ตำแหน่งถูกบันทึกใต้แผนกที่เลือก', pos.rows.length === 1, `${pos.rows.length}`);
+  await shot('14-เพิ่มตำแหน่ง');
+
+  // retire it from the screen, and check it stops being offered
+  const off = await page.evaluate((name) => {
+    const row = [...document.querySelectorAll('div')].find((d) => d.children.length && d.innerText.startsWith(name) && [...d.querySelectorAll('button')].some((b) => b.innerText.trim() === 'ปิดใช้งาน'));
+    const btn = row && [...row.querySelectorAll('button')].find((b) => b.innerText.trim() === 'ปิดใช้งาน');
+    if (btn) { btn.click(); return true; }
+    return false;
+  }, `${MARK} ฝ่ายวิศวกรรม`);
+  happy('กดปิดใช้งานแผนกจากหน้าจอได้', off, '');
+  await settle(2800);
+  const state = await query('select is_active from departments where id = $1', [dept.rows[0]?.id]);
+  happy('ระบบบันทึกว่าปิดใช้งานแล้ว', state.rows[0]?.is_active === false, String(state.rows[0]?.is_active));
+  const gone = !(await body()).includes(`${MARK} ฝ่ายวิศวกรรม`);
+  happy('แผนกที่ปิดแล้วหายจากรายการปกติ', gone, '');
+  await shot('15-ปิดใช้งานแผนก');
+
+  await query('update employees set department_id = null, position_id = null where unit_id = $1', [site.id]);
+  await query('delete from positions where department_id = $1', [dept.rows[0]?.id]);
+  await query('delete from departments where unit_id = $1', [site.id]);
+}
+
 // ── §1 บทบาทใหม่เห็นและทำได้ต่างกันจริง ───────────────────────────────────
 suite('§1 บทบาทผู้บันทึกและผู้ตรวจสอบแยกหน้าที่กันจริง');
 {
@@ -388,6 +453,9 @@ suite('ไม่ทิ้งข้อมูลทดสอบไว้');
   await query('delete from period_closes where unit_id = $1', [site.id]);
   await query('delete from employee_away where employee_id in (select id from employees where unit_id = $1)', [site.id]);
   await query('delete from leave_requests where unit_id = $1', [site.id]);
+  await query('update employees set department_id = null, position_id = null where unit_id = $1', [site.id]);
+  await query('delete from positions where department_id in (select id from departments where unit_id = $1)', [site.id]);
+  await query('delete from departments where unit_id = $1', [site.id]);
   await query('delete from teams where unit_id = $1', [site.id]);
   await query('delete from employees where unit_id = $1', [site.id]);
   await query('delete from profile_units where unit_id = $1', [site.id]);

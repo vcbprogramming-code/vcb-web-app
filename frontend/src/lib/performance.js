@@ -45,6 +45,16 @@ export const perfApi = {
   importTemplateUrl: () => apiBlobUrl('/performance/import/employees/template.xlsx'),
   importEmployees: (file, dryRun) =>
     apiUpload(`/performance/import/employees${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  // ทะเบียนแผนกและตำแหน่ง
+  departments: (params) => api(`/performance/departments${qs(params)}`),
+  createDepartment: (body) => api('/performance/departments', { method: 'POST', body }),
+  updateDepartment: (id, body) => api(`/performance/departments/${id}`, { method: 'PATCH', body }),
+  deleteDepartment: (id) => api(`/performance/departments/${id}`, { method: 'DELETE' }),
+  positions: (params) => api(`/performance/positions${qs(params)}`),
+  createPosition: (body) => api('/performance/positions', { method: 'POST', body }),
+  updatePosition: (id, body) => api(`/performance/positions/${id}`, { method: 'PATCH', body }),
+  deletePosition: (id) => api(`/performance/positions/${id}`, { method: 'DELETE' }),
+
   attachments: (params) => api(`/performance/attachments${qs(params)}`),
   uploadAttachment: (site, employeeId, date, file) =>
     apiUpload('/performance/attachments', file, { extra: { site, employeeId, date } }),

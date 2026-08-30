@@ -268,6 +268,10 @@ router.get('/employees', asyncHandler(async (req, res) => {
 const employeeSchema = z.object({
   site: z.string().min(1), fullName: z.string().min(1),
   employeeCode: z.string().optional().nullable(), kind: z.enum(['operation', 'support']),
+  // §2 the register carries a department and a position, so both have to be
+  // settable where a person is created, not only through the Excel import
+  departmentId: z.string().uuid().optional().nullable(),
+  positionId: z.string().uuid().optional().nullable(),
 });
 router.post('/employees', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = employeeSchema.safeParse(req.body);
@@ -276,8 +280,10 @@ router.post('/employees', requirePermission('performance', 'edit'), asyncHandler
   if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
   assertUnitInScope(scopedUnitIds(req.profile), unit.id);
   const row = await queryOne(
-    `insert into employees (unit_id, full_name, employee_code, kind, is_active) values ($1,$2,$3,$4,true) returning id`,
-    [unit.id, p.data.fullName, p.data.employeeCode || null, p.data.kind]
+    `insert into employees (unit_id, full_name, employee_code, kind, is_active, department_id, position_id)
+     values ($1,$2,$3,$4,true,$5,$6) returning id`,
+    [unit.id, p.data.fullName, p.data.employeeCode || null, p.data.kind,
+     p.data.departmentId || null, p.data.positionId || null]
   );
   res.status(201).json({ data: { eid: row.id } });
 }));
@@ -289,10 +295,16 @@ async function assertEmployeeScoped(profile, employeeId) {
   return emp;
 }
 router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
-  const p = z.object({ fullName: z.string().optional(), employeeCode: z.string().optional().nullable(), kind: z.enum(['operation', 'support']).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
+  const p = z.object({
+    fullName: z.string().optional(), employeeCode: z.string().optional().nullable(),
+    kind: z.enum(['operation', 'support']).optional(), isActive: z.boolean().optional(),
+    departmentId: z.string().uuid().optional().nullable(),
+    positionId: z.string().uuid().optional().nullable(),
+  }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   await assertEmployeeScoped(req.profile, req.params.id); // #B: no cross-unit writes
-  const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', isActive: 'is_active' };
+  const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', isActive: 'is_active',
+    departmentId: 'department_id', positionId: 'position_id' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
@@ -1532,6 +1544,146 @@ router.delete('/attachments/:id', requirePermission('performance', 'edit'), asyn
   await query('delete from work_log_attachments where id = $1', [req.params.id]);
   await logWork({ actor: req.profile, unitId: row.unit_id, employeeId: row.employee_id, ymd: row.ymd,
     action: 'detach', before: { file: row.file_name } });
+  res.json({ data: { deleted: true } });
+}));
+
+// ── §2 ทะเบียนแผนกและตำแหน่ง ──────────────────────────────────────────────
+// A department belongs to a site; a position belongs to a department. Neither
+// is ever deleted once used — §2 wants a change to apply going forward without
+// rewriting what is already filed, so retiring is a switch, not a removal.
+
+router.get('/departments', asyncHandler(async (req, res) => {
+  const scoped = scopedUnitIds(req.profile);
+  const params = []; const where = [];
+  if (req.query.site) {
+    const unit = await loadUnitByKey(req.query.site);
+    if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+    assertUnitInScope(scoped, unit.id);
+    params.push(unit.id); where.push(`d.unit_id = $${params.length}`);
+  } else if (scoped) {
+    params.push(scoped); where.push(`d.unit_id = any($${params.length}::uuid[])`);
+  }
+  if (!req.query.all) where.push('d.is_active');
+  const { rows } = await query(
+    `select d.*, u.code site, u.name site_name,
+            (select count(*)::int from positions p where p.department_id = d.id and p.is_active) positions,
+            (select count(*)::int from employees e where e.department_id = d.id and e.is_active) people
+       from departments d join units u on u.id = d.unit_id
+       ${where.length ? 'where ' + where.join(' and ') : ''}
+      order by u.name, d.name`, params);
+  res.json({ data: rows });
+}));
+
+const deptSchema = z.object({ site: z.string().min(1), name: z.string().trim().min(1).max(120) });
+router.post('/departments', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = deptSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const unit = await loadUnitByKey(p.data.site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  const dup = await queryOne('select id, is_active from departments where unit_id = $1 and name = $2', [unit.id, p.data.name]);
+  if (dup?.is_active) throw new ApiError(409, 'ไซต์งานนี้มีแผนกชื่อนี้อยู่แล้ว');
+  const row = dup
+    ? await queryOne('update departments set is_active = true, updated_at = now() where id = $1 returning *', [dup.id])
+    : await queryOne('insert into departments (unit_id, name) values ($1,$2) returning *', [unit.id, p.data.name]);
+  await logWork({ actor: req.profile, unitId: unit.id, action: 'department-create', after: { name: row.name } });
+  res.status(201).json({ data: row });
+}));
+
+router.patch('/departments/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ name: z.string().trim().min(1).max(120).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const before = await queryOne('select * from departments where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'ไม่พบแผนกนี้');
+  if (p.data.name && p.data.name !== before.name) {
+    const clash = await queryOne('select id from departments where unit_id = $1 and name = $2 and id <> $3',
+      [before.unit_id, p.data.name, before.id]);
+    if (clash) throw new ApiError(409, 'ไซต์งานนี้มีแผนกชื่อนี้อยู่แล้ว');
+  }
+  const sets = []; const vals = [];
+  if (p.data.name !== undefined) { vals.push(p.data.name); sets.push(`name = $${vals.length}`); }
+  if (p.data.isActive !== undefined) { vals.push(p.data.isActive); sets.push(`is_active = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'ไม่มีข้อมูลที่เปลี่ยนแปลง');
+  vals.push(req.params.id);
+  const after = await queryOne(`update departments set ${sets.join(', ')}, updated_at = now() where id = $${vals.length} returning *`, vals);
+  // retiring a department retires what hangs off it, or the position picker
+  // would keep offering roles in a department that no longer exists
+  if (p.data.isActive === false) await query('update positions set is_active = false, updated_at = now() where department_id = $1', [after.id]);
+  await logWork({ actor: req.profile, unitId: after.unit_id, action: 'department-update',
+    before: { name: before.name, isActive: before.is_active }, after: { name: after.name, isActive: after.is_active } });
+  res.json({ data: after });
+}));
+
+router.delete('/departments/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from departments where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบแผนกนี้');
+  const used = await queryOne('select count(*)::int n from employees where department_id = $1', [row.id]);
+  // §2 a change must not rewrite what is already filed — once people are
+  // recorded under a department, it can only be retired
+  if (used.n > 0) throw new ApiError(409, `แผนกนี้มีพนักงานผูกอยู่ ${used.n} คน — ปิดใช้งานได้ แต่ลบไม่ได้`);
+  await query('delete from positions where department_id = $1', [row.id]);
+  await query('delete from departments where id = $1', [row.id]);
+  await logWork({ actor: req.profile, unitId: row.unit_id, action: 'department-delete', before: { name: row.name } });
+  res.json({ data: { deleted: true } });
+}));
+
+router.get('/positions', asyncHandler(async (req, res) => {
+  const params = []; const where = [];
+  if (req.query.departmentId) { params.push(req.query.departmentId); where.push(`p.department_id = $${params.length}`); }
+  const scoped = scopedUnitIds(req.profile);
+  if (scoped) { params.push(scoped); where.push(`d.unit_id = any($${params.length}::uuid[])`); }
+  if (!req.query.all) where.push('p.is_active');
+  const { rows } = await query(
+    `select p.*, d.name department_name, d.unit_id,
+            (select count(*)::int from employees e where e.position_id = p.id and e.is_active) people
+       from positions p join departments d on d.id = p.department_id
+       ${where.length ? 'where ' + where.join(' and ') : ''}
+      order by d.name, p.name`, params);
+  res.json({ data: rows });
+}));
+
+const posSchema = z.object({ departmentId: z.string().uuid(), name: z.string().trim().min(1).max(120) });
+router.post('/positions', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = posSchema.safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const dept = await queryOne('select * from departments where id = $1', [p.data.departmentId]);
+  if (!dept) throw new ApiError(404, 'ไม่พบแผนกนี้');
+  const dup = await queryOne('select id, is_active from positions where department_id = $1 and name = $2', [dept.id, p.data.name]);
+  if (dup?.is_active) throw new ApiError(409, 'แผนกนี้มีตำแหน่งชื่อนี้อยู่แล้ว');
+  const row = dup
+    ? await queryOne('update positions set is_active = true, updated_at = now() where id = $1 returning *', [dup.id])
+    : await queryOne('insert into positions (department_id, name) values ($1,$2) returning *', [dept.id, p.data.name]);
+  await logWork({ actor: req.profile, unitId: dept.unit_id, action: 'position-create', after: { name: row.name, department: dept.name } });
+  res.status(201).json({ data: row });
+}));
+
+router.patch('/positions/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ name: z.string().trim().min(1).max(120).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const before = await queryOne('select * from positions where id = $1', [req.params.id]);
+  if (!before) throw new ApiError(404, 'ไม่พบตำแหน่งนี้');
+  if (p.data.name && p.data.name !== before.name) {
+    const clash = await queryOne('select id from positions where department_id = $1 and name = $2 and id <> $3',
+      [before.department_id, p.data.name, before.id]);
+    if (clash) throw new ApiError(409, 'แผนกนี้มีตำแหน่งชื่อนี้อยู่แล้ว');
+  }
+  const sets = []; const vals = [];
+  if (p.data.name !== undefined) { vals.push(p.data.name); sets.push(`name = $${vals.length}`); }
+  if (p.data.isActive !== undefined) { vals.push(p.data.isActive); sets.push(`is_active = $${vals.length}`); }
+  if (!sets.length) throw new ApiError(400, 'ไม่มีข้อมูลที่เปลี่ยนแปลง');
+  vals.push(req.params.id);
+  const after = await queryOne(`update positions set ${sets.join(', ')}, updated_at = now() where id = $${vals.length} returning *`, vals);
+  await logWork({ actor: req.profile, action: 'position-update',
+    before: { name: before.name, isActive: before.is_active }, after: { name: after.name, isActive: after.is_active } });
+  res.json({ data: after });
+}));
+
+router.delete('/positions/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from positions where id = $1', [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบตำแหน่งนี้');
+  const used = await queryOne('select count(*)::int n from employees where position_id = $1', [row.id]);
+  if (used.n > 0) throw new ApiError(409, `ตำแหน่งนี้มีพนักงานผูกอยู่ ${used.n} คน — ปิดใช้งานได้ แต่ลบไม่ได้`);
+  await query('delete from positions where id = $1', [row.id]);
+  await logWork({ actor: req.profile, action: 'position-delete', before: { name: row.name } });
   res.json({ data: { deleted: true } });
 }));
 

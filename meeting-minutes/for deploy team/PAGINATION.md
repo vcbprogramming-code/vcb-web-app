@@ -1,14 +1,6 @@
 # Page-accurate rendering — architecture
 
-*Written 2026-08-19, live @200. Synced from the GAS source 2026-08-29.*
-
-> **Note for this React mirror.** This file is a verbatim copy of the GAS
-> app's, kept here so the rules travel with the port. The mirror does **not**
-> render a Paged.js iframe, so the runtime parts — the scroll-container rule,
-> the two document modes, the post-pagination height, the scalers — describe
-> the GAS app only. What *does* apply here is the page geometry and the
-> responsive column bands; see `PORT_NOTES.md` for exactly what is and is not
-> ported.
+*Written 2026-08-19, live @200.*
 
 **Read this before changing anything about how meetings are displayed, printed,
 or edited.** Getting the reading view to break pages exactly where the PDF

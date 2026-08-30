@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <script>
+    // Mobile detection runs before body parses so the right styles win on first paint.
+    // UA is the strong signal; width is only a fallback for in-app browsers / iframe
+    // wrappers that misreport size. Threshold is intentionally phone-only (<= 500) so
+    // narrow desktop windows and iPads stay on the desktop layout.
+    (function () {
+      function detect() {
+        var ua = navigator.userAgent || '';
+        var uaMobile = /iPhone|iPod|Android.*Mobile/i.test(ua);
+        var sw = (typeof screen !== 'undefined' && screen.width) ? screen.width : 9999;
+        var iw = window.innerWidth || 9999;
+        var isMobile = uaMobile || sw <= 500 || iw <= 500;
+        document.documentElement.classList.toggle('is-mobile', isMobile);
+        if (isMobile && !document.documentElement.className.match(/mobile-pane-/)) {
+          document.documentElement.classList.add('mobile-pane-projects');
+        }
+      }
+      detect();
+      window.addEventListener('resize', detect);
+      window.addEventListener('orientationchange', detect);
+
+      // Apply saved theme + language immediately so first paint matches the user's
+      // preference (avoids a flash of light/EN before the main JS hydrates).
+      try {
+        var t = localStorage.getItem('vcb_mm_theme');
+        document.documentElement.classList.add('theme-' + (t === 'dark' ? 'dark' : 'light'));
+      } catch (e) { document.documentElement.classList.add('theme-light'); }
+      try {
+        var l = localStorage.getItem('vcb_mm_lang');
+        document.documentElement.classList.add('lang-' + (l === 'th' ? 'th' : 'en'));
+      } catch (e) { document.documentElement.classList.add('lang-en'); }
+    })();
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+  <div class="app">
+    <div id="bootLoader" class="boot-loader"><span class="spin"></span></div>
+    <header class="topbar">
+      <div class="brandwrap">
+        <div class="brand-txt">
+          <h1 class="brand-h1"><a class="brand-link" id="brandLink" href="https://script.google.com/a/macros/vcb-con.com/s/AKfycbxqIk8Qql3XWXIWn_p0f0FSd04i-FcWZjoXgRErlU5bTXUkpujbQ4ZN4mWco6HEQFUB/exec" target="_top" title="กลับไปหน้าหลัก VCB Connect">VCB Group</a></h1>
+          <span class="brand-div"></span>
+          <div class="brand-stack">
+            <span class="brand-sub" id="appTitle">Meeting Minutes</span>
+            <span class="brand-th" id="appSub"></span>
+          </div>
+        </div>
+        <button class="settings-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+      <div class="hdr-right">
+        <div class="search">
+          <span>🔎</span>
+          <input id="search" type="text" placeholder="Search meetings, decisions, people…" autocomplete="off">
+        </div>
+        <button class="tbtn settings-btn-d" id="settingsBtnD" type="button" title="Settings" aria-label="Settings">⚙</button>
+        <span class="who" id="who"></span>
+      </div>
+    </header>
+
+    <div class="body" id="body">
+      <aside class="sidebar">
+        <div class="mobile-latest" id="mobileLatest"></div>
+        <button type="button" class="newbtn secondary" id="timelineBtn" style="margin:0 0 12px;">📅 Timeline</button>
+        <div class="side-label" id="sideLabel">Projects</div>
+        <div id="projects"></div>
+        <button class="newbtn" id="newBtn" style="display:none;">＋ New meeting</button>
+        <button class="newbtn secondary" id="newProjectBtn" style="display:none;">＋ New project</button>
+      </aside>
+
+      <section class="list">
+        <div class="mobile-backbar">
+          <button type="button" class="mobile-back-btn" data-back-to="projects">← Projects</button>
+        </div>
+        <div class="list-head" id="listHead">All meetings</div>
+        <div class="range" id="rangeFilter"></div>
+        <div id="cards"></div>
+      </section>
+
+      <main class="detail">
+        <div class="mobile-backbar">
+          <button type="button" class="mobile-back-btn" data-back-to="list">← Meetings</button>
+          <span class="backbar-actions" id="detailBackActions"></span>
+        </div>
+        <!-- Tablet portrait only (CSS-gated): the meeting list gives up its
+             column there so the document can be read, and this is how it is
+             called back. Hidden at every other width, where the list is
+             simply visible. -->
+        <button type="button" class="list-peek" id="listPeek" aria-label="Show meeting list">
+          <span class="list-peek-ic">☰</span><span class="list-peek-lbl">Meetings</span>
+        </button>
+        <div id="detailContent" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+          <div class="placeholder">
+            <div class="big">📄</div>
+            <div>Select a meeting on the left to read the full minutes.</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- New / Edit modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h3 id="modalTitle">New meeting</h3>
+      <div class="form">
+        <input type="hidden" id="m_id">
+        <div>
+          <label>Project</label>
+          <select id="m_project"></select>
+        </div>
+        <div>
+          <label>Title</label>
+          <input id="m_ttl" placeholder="e.g. Monthly review — financials">
+        </div>
+        <div class="row2">
+          <div>
+            <label>Date (e.g. 21/05/2569 or 21 May 2569)</label>
+            <div class="date-field">
+              <input id="m_date" placeholder="21/05/2569">
+              <button type="button" class="date-pick-btn" id="m_date_pick" title="Pick from calendar" aria-label="Pick date from calendar">📅</button>
+              <div class="cal-pop" id="calPop">
+                <div class="cal-head">
+                  <button type="button" class="cal-nav" id="cal_prev" aria-label="Previous month">‹</button>
+                  <span class="cal-title" id="cal_title"></span>
+                  <button type="button" class="cal-nav" id="cal_next" aria-label="Next month">›</button>
+                </div>
+                <div class="cal-dow" id="cal_dow"></div>
+                <div class="cal-grid" id="cal_grid"></div>
+              </div>
+            </div>
+          </div>
+          <div><label>Time</label><input id="m_time" placeholder="10:00AM"></div>
+        </div>
+        <div>
+          <label>Content (plain text or HTML — headings, bullets, links all welcome)</label>
+          <textarea id="m_html" placeholder="Paste or type the minutes here…"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="dbtn danger" id="m_delete" style="margin-right:auto; display:none;">Delete</button>
+        <button class="dbtn" id="m_cancel">Cancel</button>
+        <button class="dbtn primary" id="m_save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fathom "tag into project" picker -->
+  <div class="modal-bg" id="tagBg">
+    <div class="modal" style="max-width:420px;">
+      <h3>Also show this recording in…</h3>
+      <p class="subhead">It stays in Fathom Inbox too — this just adds it to a project's list as well.</p>
+      <div class="form" id="tagProjectList"></div>
+      <div class="actions">
+        <button class="dbtn" id="tagCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New project -->
+  <div class="modal-bg" id="npBg">
+    <div class="modal" style="max-width:460px;">
+      <h3>New project</h3>
+      <p class="subhead">Adds a new tile to the sidebar so you can file Fathom recordings (or new meetings) into it. No Google Doc is created.</p>
+      <div class="form">
+        <div>
+          <label>Project name (Thai or however you'll title it)</label>
+          <input id="np_name" placeholder="e.g. โครงการหลวงพระบาง">
+        </div>
+        <div>
+          <label>English name (used for sidebar subtitle + internal reference)</label>
+          <input id="np_nameEn" placeholder="e.g. Luang Prabang Project">
+        </div>
+        <div>
+          <label>Cadence</label>
+          <select id="np_cadence">
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>As needed</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="dbtn" id="np_cancel">Cancel</button>
+        <button class="dbtn primary" id="np_save">Create project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename project -->
+  <div class="modal-bg" id="rpBg">
+    <div class="modal" style="max-width:460px;">
+      <h3>Rename project</h3>
+      <div class="form">
+        <div>
+          <label>Project name</label>
+          <input id="rp_name" placeholder="e.g. โครงการหลวงพระบาง">
+        </div>
+        <div>
+          <label>English name</label>
+          <input id="rp_nameEn" placeholder="e.g. Luang Prabang Project">
+        </div>
+        <div>
+          <label>Cadence</label>
+          <select id="rp_cadence">
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>As needed</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="dbtn" id="rp_cancel">Cancel</button>
+        <button class="dbtn primary" id="rp_save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-app content editor -->
+  <div class="modal-bg" id="edBg">
+    <div class="editor">
+      <h3>Edit meeting</h3>
+      <div class="ed-meta">
+        <div>
+          <label>Title</label>
+          <input id="ed_ttl" placeholder="Meeting title">
+        </div>
+        <div>
+          <label>Date</label>
+          <div class="date-field">
+            <input id="ed_date" placeholder="e.g. 21 May 2569 or 21-05-2569">
+            <button type="button" class="date-pick-btn" id="ed_date_pick" title="Pick from calendar" aria-label="Pick date from calendar">📅</button>
+            <div class="cal-pop" id="edCalPop">
+              <div class="cal-head">
+                <button type="button" class="cal-nav" id="ed_cal_prev" aria-label="Previous month">‹</button>
+                <span class="cal-title" id="ed_cal_title"></span>
+                <button type="button" class="cal-nav" id="ed_cal_next" aria-label="Next month">›</button>
+              </div>
+              <div class="cal-dow" id="ed_cal_dow"></div>
+              <div class="cal-grid" id="ed_cal_grid"></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Time</label>
+          <input id="ed_time" placeholder="e.g. 10:00">
+        </div>
+      </div>
+      <div class="ed-toolbar">
+        <span class="ed-group">
+          <button type="button" id="edUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+          <button type="button" id="edRedo" title="Redo (Ctrl+Y)">↷ Redo</button>
+        </span>
+        <span class="ed-sep"></span>
+        <span class="ed-group">
+          <select id="edStyle" title="Paragraph style">
+            <option value="p">Normal text</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+          </select>
+        </span>
+        <span class="ed-sep"></span>
+        <span class="ed-group">
+          <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+        </span>
+        <span class="ed-sep"></span>
+        <span class="ed-group">
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+          <button type="button" id="edTickList" title="Checklist (green tick)">✓ List</button>
+        </span>
+        <span class="ed-sep"></span>
+        <span class="ed-group">
+          <button type="button" id="edLink" title="Add a hyperlink">🔗 Link</button>
+          <button type="button" id="edUnlink" title="Remove hyperlink">Unlink</button>
+        </span>
+      </div>
+      <!-- One continuous sheet at the exact print column width; paginate_()
+           inserts real page-break elements where the printed page ends. -->
+      <div class="ed-scroll">
+        <div class="ed-area" id="edArea" contenteditable="true"></div>
+      </div>
+      <div class="actions">
+        <button class="dbtn" id="edHistory" style="margin-right:auto;" title="See who edited this and when">🕘 Edit history</button>
+        <button class="dbtn danger" id="edDelete">🗑 Delete meeting</button>
+        <button class="dbtn" id="edCancel">Cancel</button>
+        <button class="dbtn primary" id="edSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit history -->
+  <!-- Activity is a side strip rather than a centred dialog: it is reference
+       material you read ALONGSIDE the minutes, so it docks to the right and
+       leaves the document visible instead of covering it. -->
+  <div class="eh-scrim" id="ehBg">
+    <aside class="eh-drawer" role="dialog" aria-label="Activity">
+      <div class="eh-drawer-head">
+        <h3>Activity</h3>
+        <button class="ibtn" id="ehClose" title="Close">✕</button>
+      </div>
+      <div id="ehList" class="eh-drawer-body"></div>
+    </aside>
+  </div>
+
+  <!-- Generic confirm dialog (replaces native confirm()) -->
+  <div class="modal-bg" id="cfBg">
+    <div class="modal" style="max-width:400px;">
+      <h3 id="cfTitle">Are you sure?</h3>
+      <p class="subhead" id="cfMsg" style="padding-bottom:16px;"></p>
+      <div class="actions">
+        <button class="dbtn" id="cfCancel">Cancel</button>
+        <button class="dbtn danger-solid" id="cfOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic single-input prompt dialog (replaces native prompt()) -->
+  <div class="modal-bg" id="ipBg">
+    <div class="modal" style="max-width:420px;">
+      <h3 id="ipTitle">Add a link</h3>
+      <div class="form">
+        <div>
+          <label id="ipLabel">Link URL</label>
+          <input id="ipInput" placeholder="https://">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="dbtn" id="ipCancel">Cancel</button>
+        <button class="dbtn primary" id="ipOk">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor sign-in. The app needs its own login because the deployment is
+       ANYONE_ANONYMOUS: Google never tells the script who a visitor is, so an
+       employee on the editor list is otherwise indistinguishable from a
+       stranger. Two fields, so promptDialog (single input) can't serve. -->
+  <div class="modal-bg" id="lgBg">
+    <div class="modal" style="max-width:420px;">
+      <h3 id="lgTitle">Sign in to edit</h3>
+      <div class="form">
+        <!-- Google Sign-In: the preferred route. Google verifies the person,
+             so the app never handles a password. Hidden until GOOGLE_CLIENT_ID
+             is configured, at which point this becomes the primary control and
+             the email/password fields below collapse into a fallback. -->
+        <div id="lgGoogleWrap" style="display:none;">
+          <div id="lgGoogleBtn" style="display:flex;justify-content:center;min-height:44px;"></div>
+          <div id="lgOr" style="display:flex;align-items:center;gap:10px;margin:14px 0 2px;color:#8b949e;font-size:12px;">
+            <span style="flex:1;height:1px;background:var(--line);"></span>
+            <span>or use a password</span>
+            <span style="flex:1;height:1px;background:var(--line);"></span>
+          </div>
+        </div>
+        <div>
+          <label>Work email</label>
+          <input id="lgEmail" type="email" autocomplete="username" placeholder="you@vcb-con.com">
+        </div>
+        <div>
+          <label id="lgPwLabel">Password</label>
+          <input id="lgPw" type="password" autocomplete="current-password" placeholder="Your password">
+        </div>
+        <div id="lgPw2Row" style="display:none;">
+          <label>Confirm new password</label>
+          <input id="lgPw2" type="password" autocomplete="new-password" placeholder="Re-type it">
+        </div>
+        <div id="lgMsg" style="display:none;font-size:13px;color:#cf222e;line-height:1.45;"></div>
+        <div id="lgHint" style="font-size:12.5px;color:#57606a;line-height:1.45;">
+          No password yet? Ask an admin to set one for you.
+        </div>
+      </div>
+      <div class="actions">
+        <button class="dbtn" id="lgCancel">Cancel</button>
+        <button class="dbtn primary" id="lgOk">Sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Version content preview (read-only) -->
+  <div class="modal-bg" id="vpBg">
+    <div class="modal" style="max-width:900px;width:92vw;height:85vh;display:flex;flex-direction:column;">
+      <h3>Version preview <span style="font-weight:400;color:var(--ink-faint);font-size:12.5px;">(read-only)</span></h3>
+      <div id="vpBody" style="flex:1;overflow:hidden;padding:16px 20px;display:flex;min-height:0;"></div>
+      <div class="actions">
+        <button class="dbtn" id="vpPrint" style="margin-right:auto;">🖨 Print / PDF</button>
+        <button class="dbtn" id="vpClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings sheet (mobile + desktop gear icon) -->
+  <div class="modal-bg" id="setBg">
+    <div class="modal">
+      <h3 id="setHeading">Settings</h3>
+      <div class="form">
+        <div class="set-group">
+          <div class="set-mini-label" id="setWhoLabel">Signed in as</div>
+          <div id="setWho" class="set-who">—</div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title" id="setDisplayTitle">การแสดงผล / DISPLAY</div>
+          <div class="set-row-label" id="setThemeLabel">โหมดสี / Theme</div>
+          <div class="set-segment" id="themeSeg">
+            <button type="button" class="set-seg-opt" data-theme="light">☀ สว่าง Light</button>
+            <button type="button" class="set-seg-opt" data-theme="dark">🌙 มืด Dark</button>
+          </div>
+          <div class="set-row-label" id="setLangLabel" style="margin-top:6px;">ภาษา / Language</div>
+          <div class="set-segment" id="langSeg">
+            <button type="button" class="set-seg-opt" data-lang="th">ไทย / TH</button>
+            <button type="button" class="set-seg-opt" data-lang="en">English / EN</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <button type="button" class="set-row-btn" id="setAdminLogin"><span class="set-row-btn-ic">🔑</span><span class="set-row-btn-label">Admin login</span><span class="set-row-btn-chev">›</span></button>
+          <button type="button" class="set-row-btn" id="setAccess"><span class="set-row-btn-ic">🔐</span><span class="set-row-btn-label">Project access</span><span class="set-row-btn-chev">›</span></button>
+        </div>
+
+        <div class="set-group set-about">
+          <div class="set-group-title" id="setAboutTitle">เกี่ยวกับ / ABOUT</div>
+          <div class="set-about-row"><span class="set-about-k">App</span><span class="set-about-v">VCB Meeting Minutes</span></div>
+          <div class="set-about-row"><span class="set-about-k" id="setBuildK">Build</span><span class="set-about-v" id="setBuildV">—</span></div>
+          <div class="set-about-row"><span class="set-about-k" id="setAdminK">Admin</span><a class="set-about-v" id="setAdminV" href="mailto:c.chavananand@vcb-con.com">c.chavananand@vcb-con.com</a></div>
+        </div>
+
+        <button type="button" class="set-logout-link" id="setAdminLogout">Log out of admin</button>
+      </div>
+      <div class="actions"><button class="dbtn" id="setClose">Close</button></div>
+    </div>
+  </div>
+
+  <!-- Per-project access (admin) — a full-page workspace, not a dialog.
+       Naming the people who may see each project means many rows of many
+       addresses; a centred modal gave that a ~500px-tall scroll box, which is
+       the wrong shape for the job. This takes the whole viewport, so the
+       project list can breathe and each project's guest list is editable in
+       place. -->
+  <div class="ac-page" id="acPage" aria-hidden="true">
+    <header class="ac-page-top">
+      <div class="ac-page-titles">
+        <h2>Project access</h2>
+        <p id="acPageSub">Who may open each project, and who may edit.</p>
+      </div>
+      <div class="ac-page-tools">
+        <div class="ac-search">
+          <span>🔎</span>
+          <input type="text" id="acSearch" placeholder="Filter projects or emails…" autocomplete="off">
+        </div>
+        <button class="dbtn" id="acPageClose">Close</button>
+      </div>
+    </header>
+
+    <nav class="ac-tabs" id="acTabs">
+      <button type="button" class="ac-tab is-on" data-actab="projects">Projects</button>
+      <button type="button" class="ac-tab" data-actab="editors">Editors &amp; PIN</button>
+    </nav>
+
+    <div class="ac-page-body">
+      <!-- ---------------- Projects tab ---------------- -->
+      <section class="ac-pane is-on" data-acpane="projects">
+        <div class="ac-legend">
+          <p><b>🔓 Public</b> — readable by anyone who opens the app link, no sign-in, any email domain.</p>
+          <p><b>🔒 Locked</b> — readable only by admins, editors, and the people you name below it. Everyone else, including other <span class="ac-mono">@vcb-con.com</span> staff, sees nothing of it.</p>
+          <p class="ac-legend-tip">Add several at once by pasting a list — commas, semicolons, spaces or new lines all work.</p>
+        </div>
+        <div id="acBare" class="ac-bare" style="display:none;"></div>
+        <div id="acProjects" class="ac-projects-grid"></div>
+        <div id="acProjectsEmpty" class="empty" style="display:none;padding:26px 2px;">No project matches that filter.</div>
+      </section>
+
+      <!-- ---------------- Editors tab ---------------- -->
+      <section class="ac-pane" data-acpane="editors">
+        <div class="ac-cols">
+          <section class="ac-section">
+            <div class="ac-section-title">Editors</div>
+            <div class="ac-note">Editors can edit meeting content, add/remove attachments, create/delete meetings, and file Fathom/Transkriptor recordings into projects. They can read every project, including locked ones. They cannot manage access, projects, or hidden/pinned status.</div>
+            <div id="acEditors" class="ac-list"></div>
+            <div class="ac-add"><input type="email" id="acEditorAdd" name="acEditorAdd" autocomplete="off" placeholder="add editor email"><button class="dbtn primary" id="acEditorAddBtn">Add</button></div>
+          </section>
+
+          <!-- Shared team PIN: one number several trusted people can use, so
+               the admin doesn't have to create an account each. The email must
+               STILL be on the editor list above, so this is a convenience, not
+               a skeleton key. -->
+          <section class="ac-section">
+            <div class="ac-section-title">Shared team PIN <span style="font-weight:400;color:var(--ink-faint);font-size:12px;text-transform:none;letter-spacing:0;">— optional</span></div>
+            <div class="ac-note">One PIN any editor may use, instead of giving each person their own. Handy for a small group of trusted people. The email must still be on the list, so this alone grants nothing — but everyone using it looks the same in the edit history, and changing it changes it for all of them.</div>
+            <div class="ac-shared-row">
+              <span id="acSharedState" class="ac-shared-state">Not set</span>
+              <span id="acSharedValue" class="ac-shared-value" style="display:none;"></span>
+              <span style="flex:1;"></span>
+              <button class="dbtn" id="acSharedReveal" style="display:none;">Show</button>
+              <button class="dbtn" id="acSharedSet">Set PIN</button>
+              <button class="dbtn" id="acSharedClear" style="display:none;">Turn off</button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="busy" id="busy"><div class="busybox"><span class="spin"></span><span id="busyMsg">Working…</span></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var BOOTSTRAP = <?!= bootstrap ?>;
+    var SERVER_PENDING_MEETING_ID = <?!= pendingMeetingId ?>;
+    var SERVER_PENDING_PROJECT_ID = <?!= pendingProjectId ?>;
+  </script>
+  <?!= include('QrCode'); ?>
+  <?!= include('JavaScript'); ?>
+</body>
+</html>

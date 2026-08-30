@@ -1,79 +1,74 @@
-# VCB Meeting Minutes — React replica
+# VCB Meeting Minutes
 
-A pixel-matched **React + TypeScript (strict)** replica of the VCB Meeting Minutes
-Google Apps Script web app. Self-contained and deployable to **Vercel** on its own.
+ระบบบันทึกการประชุมของกลุ่มวิจิตรภัณฑ์ก่อสร้าง — เก็บรายงานการประชุมไว้ในที่เดียว
+ค้นหาได้ และควบคุมสิทธิ์การเข้าถึงรายโครงการ
 
-The Google Apps Script project at the repository root is the **source of truth**;
-this folder mirrors it. See [`PORT_NOTES.md`](./PORT_NOTES.md) for the GAS↔React
-mapping, the data-layer rationale, and sync instructions.
+**🔗 เปิดใช้งาน:**
+https://script.google.com/macros/s/AKfycbxJN7olKBYqGHlaWXiVOI41fh8oZJ9lRstXZAj1DFVeiynyvfBf48xaKX5p4D19rUnr/exec
 
-## Quick start
+*(ใช้ลิงก์รูปแบบนี้เท่านั้น อย่าใช้แบบ `/a/vcb-con.com/` เพราะ Google จะ redirect
+แล้วทำให้ query string เช่น `?meeting=` หรือ `?project=` หายไป)*
 
-```bash
-npm install
-npm run dev        # http://localhost:5200
-```
+---
 
-Other scripts:
+## โครงสร้างโฟลเดอร์
 
-```bash
-npm run typecheck  # tsc strict, no emit
-npm run build      # tsc -b && vite build  → dist/
-npm run preview    # serve the production build
-```
+แยกเป็น **2 โฟลเดอร์หลัก** แบบเดียวกับ HR Work Log ในโปรเจกต์นี้
 
-## Views / URL flags
+| โฟลเดอร์ | คืออะไร | สถานะ |
+|---|---|---|
+| [`for deploy team/`](for%20deploy%20team/) | **Google Apps Script ที่ deploy จริง** — 8 ไฟล์ที่ `clasp push` ส่งขึ้นไป | 🟢 **รันอยู่จริง** `@220` |
+| [`original script/`](original%20script/) | **โค้ดต้นฉบับ React + TypeScript** สำหรับนักพัฒนาอ่าน/ต่อยอด | 🟡 preview, mock data |
 
-| URL | What you see |
+### ⚠️ อ่านก่อนแก้ไข
+
+**ระบบที่พนักงานใช้อยู่คือ [`for deploy team/`](for%20deploy%20team/)** ไม่ใช่ React
+ถ้าจะแก้ให้มีผลกับผู้ใช้จริง ต้องแก้ที่โฟลเดอร์นั้น
+
+`original script/` เป็น React port ที่ใช้ mock data (`src/api/mock.ts`)
+แก้แล้ว **ไม่มีผล** กับระบบที่ใช้งานอยู่ และข้อมูลจะหายเมื่อ refresh
+
+**ทิศทางการ sync:** `for deploy team/` คือแหล่งความจริงเสมอ — แก้ที่นั่นก่อน
+แล้วค่อย sync มาที่ `original script/` ไม่ใช่ทางกลับกัน
+
+---
+
+## สิทธิ์การเข้าถึง
+
+**การอ่าน** ไม่ต้องล็อกอิน แต่เห็นได้แค่ไหนขึ้นกับโครงการ:
+
+- **🔓 Public** — ใครก็ตามที่เปิดลิงก์อ่านได้ทุกการประชุมในโครงการนั้น
+  ไม่ต้องล็อกอิน ไม่จำกัดโดเมนอีเมล
+- **🔒 Locked** — อ่านได้เฉพาะ admin, editor และ **อีเมลที่ระบุไว้เฉพาะเจาะจง**
+  โครงการที่ล็อกไว้ **ไม่ได้**เปิดให้พนักงาน `@vcb-con.com` ทุกคน
+  แต่เป็นรายชื่อที่กำหนดเอง
+
+**การแก้ไข** ต้องล็อกอินเสมอ — Google Sign-In หรืออีเมล + PIN 4 หลัก
+Editor แก้เนื้อหาได้ทุกโครงการ ส่วน admin จัดการสิทธิ์/โครงการ/สถานะซ่อน-ปักหมุดได้
+
+จัดการทั้งหมดที่ **ตั้งค่า → 🔐 Project access** (เฉพาะ admin)
+
+---
+
+## ข้อมูลระบบ
+
+| | |
 |---|---|
-| `/` | Public reader view (no sign-in) — what live users get |
-| `/?admin=1` | Admin view — New meeting, pin, hide/show, edit-here, project access, refresh |
-| `/?meeting=<id>` | Deep-link straight into a meeting (e.g. `?meeting=fin-2569-06`) |
+| **Script ID** | `1Ozxm34TQ4tIdwyr4dPPImwIeuGJpj9B53Zb0hl30MnR8tdeawb7KE6vf` |
+| **Deployment ID** | `AKfycbxJN7olKBYqGHlaWXiVOI41fh8oZJ9lRstXZAj1DFVeiynyvfBf48xaKX5p4D19rUnr` |
+| **เวอร์ชันล่าสุด** | `@220` |
+| **ฐานข้อมูล** | Google Sheet ส่วนตัว (สคริปต์เข้าถึงแทนเจ้าของ) |
 
-Try `?admin=1` to exercise every dialog and flow.
+---
 
-## Data layer
+## เอกสาร
 
-Ships with a **typed mock** (`src/api/`) that mirrors the GAS server contracts
-(`src/types.ts → ServerApi`) and is stateful in memory, so pin/hide/save/delete/edit
-and project-access changes all work during a session. The GAS functions have no
-public HTTP/JSON endpoint, so a standalone SPA must use a mock or a new backend —
-see PORT_NOTES.
+| เอกสาร | เนื้อหา |
+|---|---|
+| [`for deploy team/README.md`](for%20deploy%20team/README.md) | วิธี deploy, ไฟล์แต่ละตัวทำอะไร, จุดที่พลาดบ่อย |
+| [`for deploy team/PAGINATION.md`](for%20deploy%20team/PAGINATION.md) | **อ่านก่อนแก้เรื่องการแสดงผล/พิมพ์/ตัวแก้ไขเอกสาร** |
+| [`original script/README.md`](original%20script/README.md) | วิธีรัน React, โครงสร้างไฟล์ |
+| [`original script/PORT_NOTES.md`](original%20script/PORT_NOTES.md) | ตารางเทียบ GAS↔React + สิ่งที่ยังไม่ port |
 
-## Project structure
-
-Three layers, separated by responsibility:
-
-```
-src/
-  main.tsx            App entry (mounts React)
-  App.tsx             Root component: state, routing, layout
-  types.ts            Domain + API models (mirror the GAS shapes)
-  styles.css          GAS Stylesheet.html, verbatim
-  vite-env.d.ts       Vite ambient types
-  api/                Data layer
-    client.ts           typed facade (latency-wrapped) over the server API
-    mock.ts             stateful mock implementing every GAS function
-    seed.ts             sample projects + meetings
-    contentCache.ts     full-record cache + prefetch
-  lib/                Framework-agnostic helpers
-    i18n.ts             strings + date/time formatters
-    docRender.ts        rendered-meeting CSS, letterhead, summary extraction
-    ui.ts               mobile panes, range filter, theme/lang, iframe scaling
-  components/         UI (one file per screen/dialog)
-    Topbar, Sidebar, MobileLatest, MeetingList, Dashboard,
-    ProjectDashboard, MeetingDetail, MeetingModal, EditorModal,
-    AccessModal, SettingsModal, Overlays
-```
-
-`dist/` is build output (git-ignored, regenerated by `npm run build`).
-
-## Stack
-
-Vite + React 18 + TypeScript (strict). No UI library (the original uses none). CSS is
-the original GAS `Stylesheet.html` reused verbatim as `src/styles.css`.
-
-## Deploy to Vercel
-
-Framework preset **Vite**; build `npm run build`; output `dist/`. No env vars needed
-for the mock build. (`vercel.json` pins these.)
+เอกสารสถาปัตยกรรมและ CHANGELOG ฉบับเต็มอยู่ในโฟลเดอร์ต้นทางของ Apps Script
+(`PROJECT_SUMMARY.md`, `CHANGELOG.md`) ซึ่งไม่ได้ mirror มาที่นี่

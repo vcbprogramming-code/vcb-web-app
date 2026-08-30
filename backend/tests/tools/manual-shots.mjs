@@ -62,12 +62,16 @@ const clearMark = () => page.evaluate((id) => { document.querySelectorAll(`.${id
 async function mark(find, label, { pad = 6, center = true } = {}) {
   await clearMark();
   const ok = await page.evaluate(({ id, src, label: cap, pad: p, center: c }) => {
+    // The finders are written as thunks so they survive being stringified;
+    // unwrap until something that is not a function comes back.
     // eslint-disable-next-line no-new-func
-    const el = new Function(`return (${src})`)()();
+    let el = new Function(`return (${src})`)();
+    for (let i = 0; i < 3 && typeof el === 'function'; i += 1) el = el();
     if (!el) return false;
     if (c) el.scrollIntoView({ block: 'center', inline: 'center' });
     return new Promise((resolve) => setTimeout(() => {
       const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) { resolve('zero'); return; }
       const box = document.createElement('div');
       box.className = id;
       Object.assign(box.style, {
@@ -94,14 +98,17 @@ async function mark(find, label, { pad = 6, center = true } = {}) {
       resolve(true);
     }, c ? 350 : 0));
   }, { id: HL, src: find.toString(), label, pad, center });
-  if (!ok) console.log(`  ⚠ ไม่พบเป้าหมาย: ${label}`);
+  if (ok === 'zero') console.log(`  ⚠ เป้าหมายไม่มีขนาด (อาจเป็นเลย์เอาต์ที่ซ่อนอยู่): ${label}`);
+  else if (!ok) console.log(`  ⚠ ไม่พบเป้าหมาย: ${label}`);
   return ok;
 }
 
 const taken = [];
 async function shoot(key, find, label, opts) {
   if (only.length && !only.some((o) => key.startsWith(o))) return;
-  if (find) await mark(find, label, opts);
+  // One picture that cannot find its target must not cost the other forty-five
+  try { if (find) await mark(find, label, opts); }
+  catch (e) { console.log(`  ⚠ ${key} วาดกรอบไม่ได้: ${e.message}`); }
   await settle(420);
   await page.screenshot({ path: `${OUT}/${key}.png` });
   await clearMark();
@@ -116,11 +123,14 @@ const A = U.admin;
 
 // ── 01 บทบาทผู้ใช้ ────────────────────────────────────────────────────────
 await as(A, '/settings?s=users');
+// ผู้ดูแลระบบมีสิทธิ์ทุกอย่างอยู่แล้ว แท็บสิทธิ์จึงว่าง — เลือกผู้ใช้ที่ไม่ใช่ผู้ดูแล
 await shoot('c01-a', () => () => [...document.querySelectorAll('tr')]
+  .filter((r) => !r.innerText.includes('ผู้ดูแลระบบ'))
   .map((r) => [...r.querySelectorAll('button')].find((b) => b.innerText.trim() === 'แก้ไข'))
   .find(Boolean), 'กด แก้ไข ที่ผู้ใช้รายที่ต้องการ');
 await page.evaluate(() => {
   const b = [...document.querySelectorAll('tr')]
+    .filter((r) => !r.innerText.includes('ผู้ดูแลระบบ'))
     .map((r) => [...r.querySelectorAll('button')].find((x) => x.innerText.trim() === 'แก้ไข')).find(Boolean);
   if (b) b.click();
 });
@@ -129,9 +139,12 @@ await shoot('c01-b', () => () => [...document.querySelectorAll('select')]
   .find((s) => [...s.options].some((o) => o.value === 'recorder')), 'ช่องบทบาท — มีให้เลือกครบ 5 ระดับ');
 await clickText('สิทธิ์การใช้งาน');
 await settle(1500);
-await shoot('c01-c', () => () => [...document.querySelectorAll('div')]
-  .find((d) => d.innerText.includes('ตรวจสอบและยืนยันข้อมูล') && d.children.length < 6),
-'แท็บสิทธิ์การใช้งาน มีสวิตช์รายโมดูล');
+await shoot('c01-c', () => () => {
+  const el = [...document.querySelectorAll('div,section,label')]
+    .filter((d) => d.innerText.includes('ตรวจสอบและยืนยันข้อมูล'))
+    .sort((a, b) => a.innerText.length - b.innerText.length)[0];
+  return el || null;
+}, 'แท็บสิทธิ์การใช้งาน มีสวิตช์รายโมดูล');
 
 // ── 02 ทะเบียนแผนก/ตำแหน่ง ────────────────────────────────────────────────
 await as(A);
@@ -140,12 +153,31 @@ await shoot('c02-a', () => () => {
   const card = [...document.querySelectorAll('section, div')].find((d) => d.innerText.startsWith('ทะเบียนแผนกและตำแหน่ง'));
   return card && card.querySelector('select');
 }, 'เลือกไซต์งานของทะเบียนก่อน');
+// ทะเบียนตั้งต้นที่ไซต์แรกซึ่งอาจยังไม่มีแผนก — ย้ายไปโครงการสาธิตให้มีของจริงให้ดู
+await page.evaluate(() => {
+  const card = [...document.querySelectorAll('section, div')].find((d) => d.innerText.startsWith('ทะเบียนแผนกและตำแหน่ง'));
+  const sel = card && card.querySelector('select');
+  const opt = sel && [...sel.options].find((o) => o.text.includes('โครงการสาธิต'));
+  if (!opt) return;
+  Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, opt.value);
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await settle(2200);
 await shoot('c02-b', () => () => [...document.querySelectorAll('input')]
   .find((i) => (i.placeholder || '').includes('ชื่อแผนกใหม่')), 'พิมพ์ชื่อแผนก แล้วกด + เพิ่ม');
+// ช่องตำแหน่งจะเปิดใช้งานก็ต่อเมื่อเลือกแผนกทางซ้ายแล้ว
+await page.evaluate(() => {
+  // ชื่อแผนกเป็นปุ่มที่มี span บอกจำนวนตำแหน่ง/คนอยู่ข้างใน
+  const b = [...document.querySelectorAll('button')].find((x) => /ตำแหน่ง · \d+ คน/.test(x.innerText));
+  if (b) b.click();
+});
+await settle(1600);
 await shoot('c02-c', () => () => [...document.querySelectorAll('input')]
   .find((i) => (i.placeholder || '').includes('ชื่อตำแหน่งใหม่')), 'คลิกแผนกทางซ้ายก่อน จึงเพิ่มตำแหน่งได้');
-await shoot('c02-d', () => () => [...document.querySelectorAll('button')]
-  .find((b) => b.innerText.trim() === 'ปิดใช้งาน'), 'ปิดใช้งานแทนการลบ เมื่อมีคนผูกอยู่');
+await shoot('c02-d', () => () => {
+  const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'ปิดใช้งาน');
+  return b ? b.parentElement : null;
+}, 'ปิดใช้งานแทนการลบ เมื่อมีคนผูกอยู่');
 
 // ── 03 นำเข้าพนักงาน ──────────────────────────────────────────────────────
 await shoot('c03-a', () => () => [...document.querySelectorAll('button')]
@@ -209,18 +241,42 @@ await shoot('c05-d', () => () => document.querySelector('table tbody'),
 await shoot('c07-a', () => () => [...document.querySelectorAll('th')]
   .find((h) => h.innerText.includes('ไฟล์ประกอบ')), 'คอลัมน์ไฟล์ประกอบ อยู่ท้ายแถว');
 await shoot('c07-b', () => () => [...document.querySelectorAll('table tbody label')]
-  .find((l) => ['แนบ', '+'].includes(l.innerText.trim())), 'กด แนบ เพื่อเลือกไฟล์');
+  .find((l) => ['แนบ', '+'].includes(l.innerText.trim()) && l.getBoundingClientRect().width),
+'กด แนบ เพื่อเลือกไฟล์');
+// แนบไฟล์ตัวอย่างจริงก่อน ไม่งั้นไม่มีตัวเลขให้ชี้ (ลบทิ้งหลังถ่ายเสร็จ)
+{
+  const sample = `${OUT}/รูปหน้างาน.txt`;
+  fs.writeFileSync(sample, 'ตัวอย่างหลักฐานประกอบการบันทึก');
+  const inp = await page.$('table tbody input[type=file]');
+  if (inp) { await inp.uploadFile(sample); await settle(3200); }
+}
 await shoot('c07-c', () => () => [...document.querySelectorAll('table tbody button')]
-  .find((b) => /^\d+$/.test(b.innerText.trim())), 'กดที่ตัวเลข เพื่อเปิดรายการไฟล์ที่แนบไว้');
+  .find((b) => /^\d+$/.test(b.innerText.trim()) && b.getBoundingClientRect().width),
+'กดที่ตัวเลข เพื่อเปิดรายการไฟล์ที่แนบไว้');
 await page.evaluate(() => {
-  const b = [...document.querySelectorAll('table tbody button')].find((x) => /^\d+$/.test(x.innerText.trim()));
+  const b = [...document.querySelectorAll('table tbody button')]
+    .find((x) => /^\d+$/.test(x.innerText.trim()) && x.getBoundingClientRect().width);
   if (b) b.click();
 });
 await settle(900);
 await shoot('c07-d', () => () => {
-  const dl = [...document.querySelectorAll('button')].find((b) => b.title === 'ดาวน์โหลด');
-  return dl && dl.parentElement.parentElement;
-}, 'ชื่อไฟล์ = เปิดดู · ลูกศร = ดาวน์โหลด · ลบ = เอาออก');
+  const dl = [...document.querySelectorAll('button')]
+    .find((b) => b.title === 'ดาวน์โหลด' && b.getBoundingClientRect().width);
+  return dl ? dl.parentElement : null;
+}, 'ชื่อไฟล์ = เปิดดู · ลูกศร = ดาวน์โหลด · ลบ = เอาออก', { pad: 8, center: false });
+
+// เก็บไฟล์ตัวอย่างออกด้วยปุ่มลบจริง ไม่ทิ้งไว้ในข้อมูลของลูกค้า
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll('button')]
+    .find((x) => x.innerText.trim() === 'ลบ' && x.getBoundingClientRect().width);
+  if (b) b.click();
+});
+await settle(1200);
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll('button')].reverse().find((x) => x.innerText.trim() === 'ลบ');
+  if (b) b.click();
+});
+await settle(2000);
 
 // ── 08 ตรวจสอบและยืนยันข้อมูล ─────────────────────────────────────────────
 await page.keyboard.press('Escape');

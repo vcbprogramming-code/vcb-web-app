@@ -90,7 +90,16 @@ function snapshotVersion(meetingId: string, html: string, meta: { title: string;
 }
 
 const EMPLOYEE_VISIBLE_DEFAULT: Record<ProjectId, boolean> = { FIN: true, BD: true, BT12: true, BV: true, PN34: true }
-function docVisibleDefault(projectId: ProjectId): boolean { return !!EMPLOYEE_VISIBLE_DEFAULT[projectId] }
+// Runtime lock/unlock overrides, mirroring PROJECT_PUBLIC in Config.js: a
+// project with no entry here falls back to the static default above.
+const publicOverrides: Record<string, boolean> = {}
+function docVisibleDefault(projectId: ProjectId): boolean {
+  if (Object.prototype.hasOwnProperty.call(publicOverrides, projectId)) return !!publicOverrides[projectId]
+  return !!EMPLOYEE_VISIBLE_DEFAULT[projectId]
+}
+function setProjectPublicOverride(projectId: ProjectId, isPublic: boolean): void {
+  publicOverrides[projectId] = !!isPublic
+}
 
 function isVisible(r: SeedRow): boolean { return r.visible }
 
@@ -207,8 +216,13 @@ function toListItems(r: SeedRow): MeetingListItem[] {
 
 function accessList(): ProjectAccess[] {
   return allProjects().slice().sort((a, b) => a.order - b.order).map(d => {
-    const r = accessMap[d.id] || { domain: docVisibleDefault(d.id), emails: [] }
-    return { id: d.id, name: d.name, nameEn: d.nameEn, color: d.color, domain: !!r.domain, emails: r.emails.slice() }
+    // No fallback to docVisibleDefault for `domain`: a project being public
+    // says nothing about whether all staff are allow-listed on it.
+    const r = accessMap[d.id] || { domain: false, emails: [] }
+    return {
+      id: d.id, name: d.name, nameEn: d.nameEn, color: d.color,
+      domain: !!r.domain, emails: r.emails.slice(), isPublic: docVisibleDefault(d.id),
+    }
   })
 }
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
@@ -342,8 +356,17 @@ export const mockApi: ServerApi = {
 
   async setProjectDomain(projectId, allowDomain): Promise<ProjectAccess[]> {
     requireAdmin()
-    const r = accessMap[projectId] || { domain: docVisibleDefault(projectId), emails: [] }
+    const r = accessMap[projectId] || { domain: false, emails: [] }
     r.domain = !!allowDomain; accessMap[projectId] = r; return accessList()
+  },
+
+  // Lock/unlock. Unlocking publishes every meeting already in the project;
+  // locking only stops the future default, matching setProjectPublic in Auth.js.
+  async setProjectPublic(projectId, isPublic): Promise<ProjectAccess[]> {
+    requireAdmin()
+    setProjectPublicOverride(projectId, isPublic)
+    if (isPublic) rows.forEach(r => { if (r.projectId === projectId) r.visible = true })
+    return accessList()
   },
 
   async addProjectViewer(projectId, email): Promise<ProjectAccess[]> {
@@ -355,11 +378,43 @@ export const mockApi: ServerApi = {
     accessMap[projectId] = r; return accessList()
   },
 
+  // Add several at once from a pasted list. The whole batch is rejected if
+  // any entry is malformed, so a typo is reported rather than half-saved.
+  async addProjectViewers(projectId, emailsText): Promise<ProjectAccess[]> {
+    requireAdmin()
+    const parts = String(emailsText || '').split(/[\s,;]+/).filter(Boolean)
+    if (!parts.length) throw new Error('Enter at least one email address.')
+    const bad = parts.filter(e => !EMAIL_RE.test(e))
+    if (bad.length) throw new Error('Not a valid email address: ' + bad.join(', '))
+    const r = accessMap[projectId] || { domain: false, emails: [] }
+    parts.forEach(e => {
+      if (!r.emails.some(x => x.toLowerCase() === e.toLowerCase())) r.emails.push(e)
+    })
+    accessMap[projectId] = r; return accessList()
+  },
+
   async removeProjectViewer(projectId, email): Promise<ProjectAccess[]> {
     requireAdmin()
     const r = accessMap[projectId]; if (!r) return accessList()
     r.emails = r.emails.filter(x => x.toLowerCase() !== String(email).toLowerCase())
     accessMap[projectId] = r; return accessList()
+  },
+
+  // Copy one guest list onto other locked projects. A public target is
+  // skipped: a guest list on it would control nothing.
+  async copyProjectViewers(fromProjectId, toProjectIds): Promise<ProjectAccess[]> {
+    requireAdmin()
+    const src = accessMap[fromProjectId]?.emails || []
+    if (!src.length) throw new Error('That project has no named people to copy.')
+    ;(toProjectIds || []).forEach(pid => {
+      if (pid === fromProjectId || docVisibleDefault(pid)) return
+      const r = accessMap[pid] || { domain: false, emails: [] }
+      src.forEach(e => {
+        if (!r.emails.some(x => x.toLowerCase() === e.toLowerCase())) r.emails.push(e)
+      })
+      accessMap[pid] = r
+    })
+    return accessList()
   },
 
   // Mirrors getEditors/addEditor/removeEditor in Auth.js.

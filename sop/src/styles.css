@@ -14,6 +14,9 @@
     --sans:'Sarabun',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
     --banner-font:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
     --ico:18px;
+    /* Related Files rail — a soft blue wash that reads as its own zone next to
+       the white SOP body without competing with the brand accents. */
+    --att-bg:#f2f6fc; --att-line:#dbe6f5;
   }
   /* Base icon: sized by --ico (or local font-size via em fallbacks below) */
   .ico{width:var(--ico);height:var(--ico);flex:0 0 auto;display:inline-block;vertical-align:middle;stroke-width:1.7}
@@ -28,6 +31,7 @@
     --brand-soft:#1c2d4a; --accent:#d2a24a; --accent-soft:#2a2415;
     --ink:#e6edf3; --muted:#9aa4b1; --faint:#7d8590;
     --line:#2a313b; --line-soft:#20262e;
+    --att-bg:#141b26; --att-line:#26303e;
     --shadow-xs:0 1px 2px rgba(0,0,0,.4);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.5);
@@ -182,6 +186,11 @@
   body{font-family:var(--sans);color:var(--ink);background:var(--bg);font-size:15px}
   button{font-family:inherit;cursor:pointer}
   a{color:var(--brand-2)}
+  /* --brand-2 (#2E75B6) is a mid-blue tuned for white; on the dark panel it
+     lands at 3.57:1, under the 4.5 needed for body-sized text. Same lift the
+     other brand-coloured text gets in night mode. */
+  html.dark a{color:#7fa8d6}
+  html.dark .sm-contact{color:#7fa8d6}
 
   .app{display:flex;flex-direction:column;height:100vh}
 
@@ -208,9 +217,15 @@
 
   /* ===== Three-pane body ===== */
   .body{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:324px 418px 1fr}
+  /* Two steps, not one. The single 1100px breakpoint meant a 1280px window
+     still spent 742px on the two left columns, leaving the detail pane
+     narrower than it gets at 1024px — the wider viewport read worse than the
+     smaller one. 1440px trims them, 1100px trims again. */
+  @media (max-width:1440px){.body{grid-template-columns:300px 390px 1fr}}
   @media (max-width:1100px){.body{grid-template-columns:278px 368px 1fr}}
   body.reports-mode .list{display:none}
   body.reports-mode .body{grid-template-columns:324px 1fr}
+  @media (max-width:1440px){body.reports-mode .body{grid-template-columns:300px 1fr}}
   @media (max-width:1100px){body.reports-mode .body{grid-template-columns:278px 1fr}}
 
   /* ----- Sidebar ----- */
@@ -319,7 +334,10 @@
   .w-notes ul li{position:relative;padding-left:14px;margin-bottom:3px}
   .w-notes ul li::before{content:'–';position:absolute;left:0;color:#a16f12}
 
-  .d-wrap{padding:22px 26px;max-width:900px}
+  /* width (not max-width) so the body column is the same on every case — with
+     max-width alone a short case shrank and a long one filled out, which read
+     as the panel resizing when moving between cases. */
+  .d-wrap{padding:22px 26px;width:100%;max-width:900px}
   .d-head{display:flex;align-items:flex-start;gap:13px;padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--line)}
   .d-num{flex:0 0 auto;min-width:36px;height:36px;padding:0 11px;border-radius:9px;background:var(--mc,var(--brand));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:1rem;white-space:nowrap;margin-top:1px}
   .d-titles{flex:1 1 auto;min-width:0}
@@ -357,6 +375,76 @@
   .note b{color:#b5302a}
   .d-ref{margin-top:6px;font-size:.82rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;display:flex;align-items:center;gap:6px}
   .d-ref svg{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+  /* Attachments rail — sits in the empty space to the right of the 900px-capped
+     .d-wrap. Only rendered for cases that actually have files, so every other
+     case keeps its existing single-column layout untouched. */
+  /* Fixed two-column split inside the detail pane. The rail is a hard 238px and
+     the body takes the rest — neither reflows with content, so every case
+     renders at exactly the same widths. stretch (not flex-start) lets the
+     rail's tint run the full column height. */
+  .d-cols{display:flex;align-items:stretch;gap:0;min-height:100%}
+  .d-cols-main{flex:1 1 auto;min-width:0;width:100%}
+  /* The rail itself stretches to paint the full-height tint; the inner wrapper
+     is what sticks on scroll (a stretched flex item can't itself be sticky). */
+  .d-att-rail{flex:0 0 238px;width:238px;padding:22px 18px;background:var(--att-bg);border-left:1px solid var(--att-line)}
+  .d-att-inner{position:sticky;top:22px}
+  /* Matches .lbl in the main body so both columns share one heading level. */
+  .d-att-h{margin:0 0 9px;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--brand)}
+  /* Stacked vertically — one card under the next when a case has several. */
+  .d-att-card{display:block;margin-bottom:16px;text-decoration:none;color:var(--ink)}
+  .d-att-card:last-child{margin-bottom:0}
+  /* No fixed aspect-ratio and no cropping: the box height follows the image so
+     a wide diagram stays a wide diagram, just scaled down. min-height only
+     applies to the fallback (no image) state. */
+  .d-att-thumb{position:relative;border:1px solid var(--att-line);border-radius:var(--r-sm);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-xs);transition:border-color .12s,box-shadow .12s;line-height:0}
+  .d-att-card:hover .d-att-thumb{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+  .d-att-img{width:100%;height:auto;display:block}
+  .d-att-thumb.no-thumb{min-height:96px;line-height:normal}
+  .d-att-thumb.no-thumb .d-att-img{display:none}
+  .d-att-ico{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;stroke:var(--faint);fill:none;stroke-width:1.5;opacity:0;pointer-events:none}
+  .d-att-thumb.no-thumb .d-att-ico{opacity:1}
+  .d-att-name{margin-top:6px;font-size:.78rem;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .d-att-card:hover .d-att-name{color:var(--brand-2)}
+  .d-att-empty{font-size:.78rem;color:var(--faint);line-height:1.4}
+  /* The side rail only earns its keep when there is genuinely spare width.
+     The three-column shell already spends 742px on the sidebar + list, so the
+     detail pane gets `viewport - 742`; take another 238px for the rail and
+     52px of padding and the real reading column is `viewport - 1032`. At
+     1366px (iPad Pro landscape) that left **334px** — narrow enough that the
+     case title wrapped one word per line — and 1280px was worse at 248px.
+     The old 1180px breakpoint dated from a two-column era and was never
+     revisited. 1600px is where the reading column clears ~560px with the rail
+     still attached; below that it stacks. */
+  @media (max-width:1600px){
+    .d-cols{flex-direction:column}
+    /* Stacked, the rail becomes a compact strip of links rather than a wall of
+       thumbnails: the files stay one tap away without spending the vertical
+       space a preview grid would. */
+    .d-att-rail{flex:none;width:auto;padding:14px 26px 16px;background:var(--att-bg);
+      border-left:0;border-top:1px solid var(--att-line)}
+    .d-att-inner{position:static;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;width:100%}
+    .d-att-rail .d-att-h{width:100%;margin:0 0 2px}
+    /* Thumbnail off, filename on — a chip, not a card. */
+    .d-att-card{display:inline-flex;align-items:center;gap:7px;width:auto;margin:0;
+      max-width:100%;padding:7px 12px;border:1px solid var(--att-line);border-radius:999px;
+      background:var(--panel);box-shadow:var(--shadow-xs);transition:border-color .12s,box-shadow .12s}
+    .d-att-card:hover{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+    /* The thumb box collapses to just its file glyph — the affordance that
+       says "this opens a document". */
+    .d-att-thumb{flex:0 0 auto;width:16px;height:16px;min-height:0;border:0;border-radius:0;
+      background:none;box-shadow:none;overflow:visible}
+    .d-att-card:hover .d-att-thumb{border-color:transparent;box-shadow:none}
+    .d-att-img{display:none}
+    .d-att-ico{position:static;width:16px;height:16px;margin:0;opacity:1;stroke:var(--brand-2)}
+    .d-att-thumb.no-thumb{min-height:0}
+    /* One line, ellipsised — never the 2-line clamp the card layout uses. */
+    .d-att-name{margin:0;font-size:.8rem;line-height:1.3;white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis;display:block;-webkit-line-clamp:none;max-width:32ch}
+    /* Stacked under the content there is no empty space to fill, so an empty
+       rail would just be noise — show it only when it has files. */
+    .d-att-rail.is-empty{display:none}
+  }
+  html.is-mobile .d-att-rail{padding:0 16px 18px}
   .pathbox{font-family:'Consolas','Courier New',monospace;font-size:.95rem;color:var(--brand-dark);
     background:var(--brand-soft);border:1px solid #cdddef;border-radius:9px;padding:13px 16px;line-height:1.6}
 
@@ -412,6 +500,7 @@
     margin-left:auto;
     z-index:10
   }
+
   /* Bottom row inside topbar: Admin badge + Search spread across full width */
   html.is-mobile .hdr-right{order:3;flex:1 1 100%;width:100%;
     display:flex;gap:8px;margin-left:0;margin-top:0;align-items:center;
@@ -458,8 +547,7 @@
   html.is-mobile .mback svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.5;flex:0 0 auto}
   /* Detail pane: back button + Share/Edit share one sticky row, so the
      buttons stay pinned alongside "List" instead of drifting off as the
-     case content scrolls underneath — see the DetailActions portal in
-     DetailPane.tsx (mirrors moveDetailActionsMobile() in the canonical app). */
+     case content scrolls underneath — see moveDetailActionsMobile(). */
   html.is-mobile body.m-detail .detail .mback-row{
     display:flex;align-items:center;justify-content:space-between;gap:8px;
     background:var(--panel);border-bottom:1px solid var(--line);
@@ -543,6 +631,31 @@
   html.is-mobile .modal input[type=password],
   html.is-mobile .modal textarea{font-size:16px}
 
+  /* The full-screen editor is already a full-height sheet on mobile; it keeps
+     its sticky header/footer but drops to one column and tighter padding. */
+  html.is-mobile .modal-full{max-height:none;height:100%;border-radius:0;padding:0;overflow:hidden}
+  html.is-mobile .modal-full > h3{padding:13px 15px}
+  html.is-mobile .modal-full .actions{padding:10px 15px max(10px,env(safe-area-inset-bottom))}
+  html.is-mobile .mf-grid{grid-template-columns:minmax(0,1fr);gap:0;height:auto;min-height:0}
+  /* One narrow column can't fit everything at once, so on a phone the body
+     scrolls as a normal document and the fields revert to fixed heights —
+     the desktop flex-fill (which sizes ขั้นตอน from leftover space) would
+     collapse it to its min-height here. */
+  html.is-mobile .mf-body{padding:14px 15px;overflow-y:auto}
+  html.is-mobile .mf-col,html.is-mobile .mf-col.mf-meta{display:block;overflow:visible}
+  /* The desktop row/wrapper grids hand ขั้นตอน a 1fr track of whatever the
+     column has spare. In a normally-scrolling mobile document that spare is
+     zero, so both grids are reverted to block and the field gets a fixed
+     height again. */
+  html.is-mobile .modal-full .row.ta-fill,
+  html.is-mobile .modal-full .row.ta-fill > div{display:block;grid-template-rows:none}
+  html.is-mobile .modal-full #ed_steps{height:auto;min-height:230px}
+  html.is-mobile .modal-full #ed_when{height:auto;min-height:120px}
+  html.is-mobile .modal-full #ed_note{height:auto;min-height:60px}
+  /* Name over URL over delete — three columns is unusable at phone width. */
+  html.is-mobile .att-row{grid-template-columns:minmax(0,1fr) auto;gap:5px}
+  html.is-mobile .att-row .att-name{grid-column:1 / -1}
+
   /* iOS tap feedback on interactive elements */
   html.is-mobile .mod,html.is-mobile .lcard,html.is-mobile .tbtn,
   html.is-mobile .btn,html.is-mobile .d-edit{-webkit-tap-highlight-color:rgba(46,117,182,.18)}
@@ -554,7 +667,11 @@
   .modal{background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);
     width:100%;max-width:680px;padding:22px 26px;font-family:var(--sans)}
   .modal h3{margin:0 0 14px;font-size:1.15rem;color:var(--brand-dark)}
-  .modal .row{display:grid;grid-template-columns:120px 1fr;gap:10px 14px;margin-bottom:11px;align-items:start}
+  /* minmax(0,1fr) not 1fr — a grid track sized 1fr still floors at its content's
+     min-content width, so a wide child (e.g. a <select> with long options) can
+     push the field column past the modal edge. */
+  .modal .row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px 14px;margin-bottom:11px;align-items:start}
+  .modal .row > div{min-width:0}
   .modal label{font-size:.82rem;font-weight:700;color:var(--muted);padding-top:8px}
   .modal input[type=text],.modal input[type=password],.modal textarea{
     width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:8px;
@@ -567,6 +684,72 @@
   .chk-grid label{display:inline-flex;align-items:center;gap:5px;font-size:.86rem;font-weight:500;color:var(--ink);cursor:pointer;width:auto}
   .chk-grid input[type=checkbox]{margin:0;cursor:pointer}
   .modal .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid var(--line-soft);padding-top:14px}
+
+  /* ===== Full-screen edit modal =====
+     The scenario editor holds several long free-text fields (ปัญหา, ขั้นตอน,
+     ไฟล์แนบ). In the old 780px box every one of them was a 3-10 row textarea
+     with its own tiny scrollbar. .modal-full fills the viewport instead: a
+     sticky header/footer with one scrolling body between them, and a two-column
+     grid so the long fields get real height. */
+  .modal-bg.full{padding:0;align-items:stretch;overflow:hidden}
+  .modal-full{max-width:none;width:100%;height:100%;border-radius:0;padding:0;
+    display:flex;flex-direction:column;min-height:0}
+  .modal-full > h3{flex:0 0 auto;margin:0;padding:16px 26px;
+    border-bottom:1px solid var(--line-soft);background:inherit}
+  /* The body fills exactly the space between header and footer and does NOT
+     scroll — the whole point is that everything fits on one screen. Only the
+     two textareas that can hold unbounded text scroll, internally. */
+  .mf-body{flex:1 1 auto;overflow:hidden;padding:16px 26px;min-height:0}
+  .modal-full .actions{flex:0 0 auto;margin:0;padding:12px 26px;background:inherit}
+  /* Two columns: the short metadata fields on the left, the long free-text
+     fields on the right. Both are full-height flex columns so the tall fields
+     size themselves from what's left over rather than from a vh guess — a
+     fixed vh can't know how tall the header, footer, or the fields above it
+     are, which is what pushed หมายเหตุ off the bottom. */
+  .mf-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);
+    gap:0 30px;align-items:stretch;height:100%;min-height:0}
+  .mf-col{min-width:0;display:flex;flex-direction:column;min-height:0}
+  .mf-col.mf-meta{overflow-y:auto}
+  /* Inside the full-screen editor the label sits above its field (stacked)
+     rather than in a 120px gutter — the columns are narrower than the old
+     single-column modal, so a side gutter would squeeze the inputs. */
+  /* Everything is meant to fit on one screen, so the full-screen editor runs
+     tighter than the small modals: less row spacing, and hints that sit closer
+     to their field. The savings are what keep the left column from scrolling
+     on a case with several attachments. */
+  .modal-full .row{grid-template-columns:minmax(0,1fr);gap:2px;margin-bottom:9px;flex:0 0 auto}
+  .modal-full label{padding-top:0;padding-bottom:0}
+  .modal-full .hint{margin-top:2px;line-height:1.4}
+  .modal-full input[type=text],.modal-full textarea{padding:6px 10px}
+  .modal-full .chk-grid{gap:4px 12px}
+  /* ปัญหา and หมายเหตุ are fixed to their content; ขั้นตอน absorbs whatever is
+     left so the column fills the page exactly — no dead space, no page scroll.
+     This is done on the GRID row, not by turning the row into a flex column.
+     That distinction is the whole bug history of this modal: a flex row
+     inherits `align-items:start` from `.modal .row` and packs the field to its
+     content width, which made ขั้นตอน narrower than its neighbours. A grid row
+     stretches its track by default, so the field keeps full width for free.
+     `grid-template-rows:auto 1fr` gives the label its height and hands the
+     rest to the field wrapper; min-height:0 lets it actually shrink. */
+  .modal-full .row.ta-fill{flex:1 1 auto;min-height:0;grid-template-rows:auto minmax(0,1fr);align-items:stretch}
+  .modal-full .row.ta-fill > div{min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto}
+  .modal-full #ed_steps{height:auto;min-height:0;resize:none}
+  .modal-full #ed_when{height:6.5em;min-height:3em;resize:vertical}
+  .modal-full #ed_note{height:3.2em;min-height:2.4em;resize:vertical}
+
+  /* ===== Attachment rows =====
+     Replaces the "Label | URL" textarea. One row per file so the name is a
+     first-class field and never has to be remembered as pipe syntax. */
+  .att-list{display:flex;flex-direction:column;gap:7px}
+  .att-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) auto;gap:7px;align-items:center}
+  .att-row input[type=text]{margin:0}
+  .att-del{flex:0 0 auto;width:30px;height:30px;padding:0;display:inline-flex;
+    align-items:center;justify-content:center;border:1px solid var(--line);
+    background:#fff;color:#B5302A;border-radius:8px;cursor:pointer;font-size:1.1rem;line-height:1}
+  .att-del:hover{background:#fdecec;border-color:#e3a9a5}
+  html.dark .att-del{background:#1a2230;border-color:var(--line);color:#ff8a82}
+  html.dark .att-del:hover{background:#2a1a1c;border-color:#5a2f2f}
+  .att-add{margin-top:8px;padding:6px 13px;font-size:.85rem}
   .btn{padding:8px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);
     border-radius:8px;font-family:var(--sans);font-size:.92rem;font-weight:600;cursor:pointer}
   .btn:hover{background:var(--line-soft)}
@@ -616,6 +799,14 @@
   .fn-decision{border-color:var(--accent);background:#fff8ec;color:#7a5a16;font-weight:700}
   html.dark .flow-lane-h{background:#10161f}
   html.dark .fn-decision{background:#2a2415;color:#e4cd8f}
+  /* Start/End pills and the rail heading both paint a dark-navy brand colour as
+     TEXT. `--brand-dark` / `--brand` are deliberately not redefined for night
+     mode (they are surface colours elsewhere), so without these the pill drew
+     #16284a on #1c2d4a — a contrast ratio of 1.06, i.e. invisible — and the
+     heading drew #1F3864 on #141b26 at 1.49. Lifted to the same light blue the
+     other brand-coloured text uses in dark mode (.lbl, .mback). */
+  html.dark .fn-start,html.dark .fn-end{color:#cdddef}
+  html.dark .d-att-h{color:#7fa8d6}
   html.dark .flow-id-badge{background:#1a2230;color:#cdddef}
   /* Narrative (left-column process text) shown under the diagram — readable on
      mobile where the wide swimlane has to scroll horizontally. */

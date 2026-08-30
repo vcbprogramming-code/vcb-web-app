@@ -66,11 +66,87 @@
   .tbtn:hover { background: rgba(255,255,255,.24); }
   .who { font-size: 13.5px; color: #fff; font-weight: 500; margin-left: 4px; white-space: nowrap; }
 
+  /* --- Base layout (unconditional; responsive overrides follow) ---
+     Order matters: .body.timeline-mode is (0,2,0) and outranks .body (0,1,0)
+     whatever the media query, so the unconditional rules must come FIRST or
+     they win at tablet widths and reinstate the three-column grid. */
   .body { display: grid; grid-template-columns: 294px 360px 1fr; min-height: 0; }
-  @media (max-width: 1100px) { .body { grid-template-columns: 258px 320px 1fr; } }
   .body.timeline-mode { grid-template-columns: 294px 0 1fr; }
-  @media (max-width: 1100px) { .body.timeline-mode { grid-template-columns: 258px 0 1fr; } }
   .body.timeline-mode .list { border-right: none; overflow: hidden; }
+
+  /* --- Responsive: narrow the fixed columns as width runs out ---
+     1200, not 1100: an iPad Air / Pro 11 in landscape is 1180px and fell
+     into the widest band, leaving the reading pane narrower than the same
+     tablet gets in portrait. */
+  @media (max-width: 1200px) {
+    .body { grid-template-columns: 258px 320px 1fr; }
+    .body.timeline-mode { grid-template-columns: 258px 0 1fr; }
+  }
+  /* iPad Pro portrait (1024) and similar. */
+  @media (max-width: 1040px) {
+    .body { grid-template-columns: 214px 268px 1fr; }
+    .body.timeline-mode { grid-template-columns: 214px 0 1fr; }
+  }
+  /* Tablet PORTRAIT: two columns, not three. At 820px three columns leave the
+     document ~390px — a 43% scale, present but not readable. The meeting list
+     gives up its column and slides over the document when wanted.
+
+     Every rule is scoped html:not(.is-mobile). Phones ALSO match this query,
+     but they swap whole panes via .mobile-pane-* and never override
+     position/transform, so an unscoped rule here slides the phone meeting
+     list off-screen with nothing able to bring it back. */
+  @media (max-width: 900px) {
+    html:not(.is-mobile) .body { position: relative; grid-template-columns: 188px 1fr; }
+    html:not(.is-mobile) .body.timeline-mode { grid-template-columns: 188px 1fr; }
+    html:not(.is-mobile) .list {
+      position: absolute; top: 0; bottom: 0; left: 188px; width: min(300px, 52vw);
+      z-index: 24; border-right: 1px solid var(--line); background: var(--panel);
+      box-shadow: 6px 0 18px rgba(15,20,28,.13);
+      transform: translateX(-102%); transition: transform .18s ease;
+    }
+    html:not(.is-mobile) .body.list-open .list { transform: translateX(0); }
+    /* The timeline view uses the whole pane, so the list stays away while it
+       is on screen. Scoped to .timeline-only (set when no meeting is open):
+       opening a meeting from a timeline dot keeps activeProject === TIMELINE,
+       and hiding the list unconditionally left that screen with no way back
+       to it. */
+    html:not(.is-mobile) .body.timeline-only .list { display: none; }
+    html:not(.is-mobile) .detail { position: relative; }
+    /* Tapping the document dismisses the list, so it needs no close button.
+       NOT in timeline mode: nothing there can dismiss it (both the list and
+       the toggle are hidden), so the scrim would sit over the whole timeline
+       and eat the first click. */
+    html:not(.is-mobile) .body.list-open:not(.timeline-only) .detail::before {
+      content: ''; position: absolute; inset: 0; z-index: 23;
+      background: rgba(15,20,28,.18);
+    }
+  }
+
+  /* The list toggle. Hidden everywhere except tablet portrait, where the list
+     is an overlay rather than a column. */
+  .list-peek { display: none; }
+  @media (max-width: 900px) {
+    html:not(.is-mobile) .list-peek {
+      display: inline-flex; align-items: center; gap: 7px;
+      position: absolute; top: 10px; left: 12px; z-index: 22;
+      border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
+      border-radius: 999px; padding: 6px 14px 6px 11px; font: inherit; font-size: 13px;
+      font-weight: 600; box-shadow: 0 1px 3px rgba(15,20,28,.12); cursor: pointer;
+    }
+    html:not(.is-mobile) .list-peek:hover { color: var(--ink); border-color: var(--brand-2); }
+    html:not(.is-mobile) .list-peek-ic { font-size: 14px; line-height: 1; }
+    /* Once the list is open the toggle sits under it — and tapping the
+       document already dismisses it, so it is redundant. */
+    html:not(.is-mobile) .body.list-open .list-peek { display: none; }
+    /* The timeline view itself has no list to peek at; a meeting opened from
+       it does (see .timeline-only above). */
+    html:not(.is-mobile) .body.timeline-only .list-peek { display: none; }
+    /* Clear the toggle so it never covers the meeting title or a heading —
+       but only while the toggle is actually shown, or the indent is a 128px
+       hole that wraps the detail-bar buttons onto an extra row. Same
+       condition as .list-peek above. */
+    html:not(.is-mobile) .body:not(.list-open):not(.timeline-only) .detail-bar { padding-left: 128px; }
+  }
 
   /* ----- Sidebar ----- */
   .sidebar { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
@@ -366,15 +442,67 @@
   .editor .actions { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: none; }
   .ac-status { font-size: 13px; padding: 9px 12px; border-radius: 8px; background: #eef6ff; color: #0b3d62; font-weight: 600; }
   .ac-status.restricted { background: #fff4d6; color: #9a6700; }
-  .ac-proj { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-  .ac-proj-name { font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 7px; }
+  /* ------------- Project access: a full-page workspace -------------
+     Mirrors Stylesheet.html. This was a centred modal; managing a
+     per-project guest list means many projects x many addresses, which a
+     dialog could only give a cramped scroll box. */
+  .ac-page { position: fixed; inset: 0; z-index: 65; background: var(--bg); display: none; flex-direction: column; }
+  .ac-page.show { display: flex; }
+  .ac-page-top { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 28px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .ac-page-titles h2 { margin: 0; font-size: 20px; color: var(--brand); }
+  .ac-page-titles p { margin: 4px 0 0; font-size: 13px; color: var(--ink-faint); }
+  .ac-page-tools { display: flex; align-items: center; gap: 10px; flex: none; }
+  .ac-search { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 11px; }
+  .ac-search span { font-size: 13px; opacity: .65; }
+  .ac-search input { border: 0; background: transparent; outline: none; font: inherit; font-size: 13px; color: var(--ink); width: 240px; max-width: 40vw; padding: 0; }
+
+  .ac-tabs { flex: none; display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .ac-tab { border: 0; background: transparent; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink-faint); padding: 11px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+  .ac-tab:hover { color: var(--ink); }
+  .ac-tab.is-on { color: var(--brand); border-bottom-color: var(--brand); }
+
+  .ac-page-body { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px 40px; }
+  .ac-pane { display: none; }
+  .ac-pane.is-on { display: block; }
+  .ac-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start; }
+
+  .ac-bare { font-size: 12.5px; line-height: 1.6; color: #9a6700; background: #fff8c5; border: 1px solid #eac54f; border-radius: 10px; padding: 11px 14px; margin: 0 0 16px; }
+  .ac-legend { font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; margin: 0 0 18px; max-width: 900px; }
+  .ac-legend p { margin: 0 0 3px; }
+  .ac-legend-tip { margin-top: 7px !important; font-style: italic; }
+  .ac-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .ac-section { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--panel); }
+  .ac-section-title { font-size: 13px; font-weight: 700; color: var(--brand); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
+
+  .ac-projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+  .ac-proj { border: 1px solid var(--line); border-radius: 12px; padding: 15px 17px; background: var(--panel); display: flex; flex-direction: column; }
+  .ac-proj.is-public { opacity: .82; }
+  .ac-proj-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ac-proj-name { font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ac-proj-name .ac-proj-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ac-proj-name .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .ac-dom { display: flex; align-items: center; gap: 8px; margin: 7px 0; font-weight: 500; font-size: 13px; }
+  .ac-lock-btn { flex: none; border: 1px solid var(--line); background: #f6f8fa; color: var(--ink-soft); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .ac-lock-btn.unlocked { background: #dafbe1; border-color: #7ee2a8; color: #116329; }
+
+  .ac-proj-people { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .ac-proj-people-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .ac-proj-people-t { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-soft); }
+  .ac-proj-copy { border: 0; background: transparent; font: inherit; font-size: 11.5px; color: var(--brand); cursor: pointer; text-decoration: underline; padding: 0; }
+  .ac-public-note { font-size: 12px; color: var(--ink-faint); line-height: 1.55; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .ac-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+  .ac-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px 6px 3px 11px; font-size: 12.5px; }
+  .ac-chip-mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-chip button { border: 0; background: transparent; color: var(--ink-faint); font-size: 14px; line-height: 1; padding: 0 4px; cursor: pointer; border-radius: 50%; }
+  .ac-chip button:hover { color: var(--danger); background: #fdeef0; }
+  .ac-chips-empty { font-size: 12.5px; color: var(--ink-faint); margin-bottom: 9px; }
+  .ac-proj-add { display: flex; gap: 7px; }
+  .ac-proj-add input { flex: 1; min-width: 0; font-size: 12.5px; padding: 6px 10px; }
+  .ac-proj-add button { flex: none; font-size: 12.5px; padding: 6px 13px; }
   .ac-add { display: flex; gap: 8px; margin-top: 7px; }
   .ac-add input { flex: 1; min-width: 0; }
   /* Was 160px — about three rows before scrolling INSIDE an already-scrolling
      panel, i.e. a scrollbar within a scrollbar. Grows with the window now. */
-  .ac-list { display: flex; flex-direction: column; gap: 6px; max-height: min(320px, 34vh); overflow: auto; margin-top: 7px; }
+  .ac-list { display: flex; flex-direction: column; gap: 6px; max-height: min(460px, 52vh); overflow: auto; margin-top: 7px; }
   .ac-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
   /* Whether an editor can actually sign in yet — being allow-listed is only
      half of it, and hiding that is what once stranded employees. */
@@ -390,11 +518,26 @@
   .ac-item.admin { background: #f6f8fa; color: var(--ink-soft); }
   .ac-item button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; color: var(--danger); }
   .ac-item button:hover { background: #fdeef0; border-color: #f3c2c8; }
-  .ac-note { font-size: 11.5px; color: var(--ink-faint); line-height: 1.5; }
-  #acBg .ac-note { padding: 2px 20px 6px; }
+  .ac-note { font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; margin-bottom: 12px; }
+  html.theme-dark .ac-lock-btn { background: var(--bg); border-color: var(--line); }
+  html.theme-dark .ac-lock-btn.unlocked { background: #0d3321; border-color: #2ea043; color: #7ee2a8; }
+  html.theme-dark .ac-chip button:hover { background: #3d1418; }
+  html.theme-dark .ac-bare { color: #e3b341; background: #2d2410; border-color: #6b5117; }
+
+  /* Phone: header stacks, search goes full width, one card per row. */
+  html.is-mobile .ac-page-top { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px 16px 12px; }
+  html.is-mobile .ac-page-tools { justify-content: space-between; }
+  html.is-mobile .ac-search { flex: 1; }
+  html.is-mobile .ac-search input { width: 100%; max-width: none; }
+  html.is-mobile .ac-tabs { padding: 0 16px; }
+  html.is-mobile .ac-page-body { padding: 16px 16px 40px; }
+  html.is-mobile .ac-projects-grid { grid-template-columns: 1fr; }
+
   .denied { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 12px; text-align: center; padding: 40px; color: var(--ink-soft); }
   .denied .big { font-size: 46px; }
-  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 60; }
+  /* Above .ac-page (65): a toast confirming an access change must not be
+     painted behind the full-screen panel that raised it. */
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; padding: 10px 18px; border-radius: 24px; font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 95; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
   .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: sp .7s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
@@ -549,6 +692,13 @@
   html.theme-dark.is-mobile .ml-item:active { background: var(--line-soft); }
   html.theme-dark .dash-card { background: var(--panel); border-color: var(--line); }
   html.theme-dark .card { background: var(--panel); border-color: var(--line); }
+  /* Room for the floating ☰ toggle in every view the detail pane can show,
+     not just a meeting. Must come after .dash-wrap/.placeholder above —
+     equal specificity means source order decides. */
+  @media (max-width: 900px) {
+    html:not(.is-mobile) .body:not(.list-open):not(.timeline-only) .dash-wrap { padding-top: 46px; }
+    html:not(.is-mobile) .body:not(.list-open):not(.timeline-only) .placeholder { padding-top: 66px; }
+  }
   html.theme-dark .dash-head h2 { color: var(--brand-2); }
   html.theme-dark .card .date, html.theme-dark .dash-date { color: var(--brand-2); }
   html.theme-dark .list-head, html.theme-dark .range { background: var(--bg); }

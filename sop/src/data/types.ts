@@ -56,6 +56,16 @@ export interface Scenario {
    * (which still drives displayNo/color/chapter ref). Purely additive — the
    * case shows up whenever the sidebar filters to any of these too. */
   extraModules?: string[];
+  /** Reference files for this case (flow-diagram PDFs and the like). Stored as
+   * links only — the app never holds the file itself; see the "ไฟล์แนบ:"
+   * metadata lines in apps-script/Code.js. */
+  attachments?: Attachment[];
+}
+
+/** One reference file attached to a case: a display label plus its URL. */
+export interface Attachment {
+  label: string;
+  url: string;
 }
 
 /** A row in the "which report do I run" table. */
@@ -95,6 +105,10 @@ export interface ScenarioEdit {
   /** Replaces the case's extra-module tags wholesale, including clearing them
    * with an empty array. Omit to leave existing tags untouched. */
   extraModules?: string[];
+  /** Full replacement set. Omit to leave the case's existing attachments
+   * alone — mirrors editScenario() in Code.js, which only rewrites the
+   * "ไฟล์แนบ:" lines when the key is present. */
+  attachments?: Attachment[];
 }
 
 /** Payload accepted by createScenario() / POST /api/scenario/new. Server/mock
@@ -108,6 +122,7 @@ export interface ScenarioCreate {
   note?: string;
   ref?: string;
   extraModules?: string[];
+  attachments?: Attachment[];
 }
 
 /** Payload accepted by swapScenarioPositions() / POST /api/scenario/swap.

@@ -3,7 +3,12 @@ import type { Lang, MeetingListItem, MeetingFull } from '../types'
 
 type Dict = Record<string, string>
 
-export const I18N: Record<Lang, Dict> = {
+// `satisfies`, NOT `: Record<Lang, Dict>`. The annotation widened every key
+// to `string`, which made `keyof typeof I18N.en` collapse to `string` and
+// left TrKey catching nothing. This way the shape is still checked — both
+// languages present, all values strings — while the literal key union
+// survives for TrKey below.
+export const I18N = {
   en: {
     latestMeetings: 'Latest meetings', projects: 'Projects',
     allMeetings: 'All meetings', allMeetingsSub: 'ทุกการประชุม',
@@ -12,6 +17,7 @@ export const I18N: Record<Lang, Dict> = {
     settings: 'Settings', signIn: '🔓 Sign in', signOut: 'Sign out',
     projectAccess: '🔐 Project access', readMinutes: 'Read minutes →',
     backProjects: '← Projects', backMeetings: '← Meetings',
+    meetingsLabel: 'Meetings',
     signedInAs: 'Signed in as', display: 'การแสดงผล / DISPLAY',
     theme: 'โหมดสี / Theme', language: 'ภาษา / Language',
     readingSize: 'ขนาดตัวอักษร / Reading size',
@@ -28,6 +34,7 @@ export const I18N: Record<Lang, Dict> = {
     settings: 'ตั้งค่า', signIn: '🔓 เข้าสู่ระบบ', signOut: 'ออกจากระบบ',
     projectAccess: '🔐 สิทธิ์โครงการ', readMinutes: 'อ่านบันทึก →',
     backProjects: '← โครงการ', backMeetings: '← การประชุม',
+    meetingsLabel: 'การประชุม',
     signedInAs: 'เข้าสู่ระบบโดย', display: 'การแสดงผล / DISPLAY',
     theme: 'โหมดสี / Theme', language: 'ภาษา / Language',
     readingSize: 'ขนาดตัวอักษร / Reading size',
@@ -36,10 +43,19 @@ export const I18N: Record<Lang, Dict> = {
     build: 'เวอร์ชั่น', adminLabel: 'ผู้ดูแล', close: 'ปิด',
     records: 'รายการ', recordsPlural: 'รายการ', backToPortal: 'กลับไปหน้าหลัก VCB Connect'
   }
-}
+} satisfies Record<Lang, Dict>
 
-export type Tr = (key: string) => string
+// Every key the app may ask for, derived from the English dictionary rather
+// than hand-maintained — adding a string to I18N.en is all it takes. English
+// is the source of truth because it is the fallback in makeTr: a key missing
+// there cannot resolve for any language.
+export type TrKey = keyof typeof I18N.en
+
+export type Tr = (key: TrKey) => string
 export function makeTr(lang: Lang): Tr {
+  // The `|| key` fallback stays as a runtime safety net, but TrKey means a
+  // typo is now a compile error rather than a button labelled with its own
+  // key name.
   return (key) => (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key
 }
 

@@ -16,6 +16,33 @@ export function isMobile(): boolean {
   return document.documentElement.classList.contains('is-mobile')
 }
 
+// Below this width the meeting list stops being a grid column and becomes a
+// slide-over, so the A4 document has room to be read: at 820px three columns
+// leave it about 390px, which is present but not readable.
+//
+// Must stay in step with the `@media (max-width: 900px)` block in styles.css.
+// Opening the overlay at a width where the CSS does not define it leaves a
+// class nothing on screen can clear, which then springs the panel open the
+// moment the window is narrowed.
+export const LIST_OVERLAY_MAX = 900
+
+// Phones are excluded on purpose: they swap whole panes via .mobile-pane-*
+// and never override position/transform, so the overlay does not apply to
+// them even though they also match the media query.
+//
+// matchMedia, not window.innerWidth: innerWidth includes the scrollbar
+// gutter and a media query does not, so on a desktop browser with classic
+// scrollbars the two disagree by ~15px. In that band the CSS overlay was
+// live while the JS believed it was not, and tapping a project did nothing.
+export function listIsOverlay(): boolean {
+  if (isMobile()) return false
+  try {
+    return window.matchMedia(`(max-width: ${LIST_OVERLAY_MAX}px)`).matches
+  } catch {
+    return window.innerWidth <= LIST_OVERLAY_MAX   // very old browsers
+  }
+}
+
 export function setMobilePane(pane: MobilePane): void {
   const h = document.documentElement
   h.classList.remove('mobile-pane-projects', 'mobile-pane-list', 'mobile-pane-detail')

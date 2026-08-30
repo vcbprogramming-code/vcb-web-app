@@ -111,6 +111,8 @@ export function editScenario(payload: ScenarioEdit): Promise<{ ok: true; no: num
     // Undefined = leave existing tags untouched; an array (even []) replaces
     // them wholesale, mirroring editScenario()'s extraModules handling in Code.js.
     extraModules: payload.extraModules !== undefined ? payload.extraModules : target.extraModules,
+    // Same contract: undefined leaves them alone, an empty array clears them.
+    attachments: payload.attachments !== undefined ? payload.attachments : target.attachments,
   };
   // Replace with a NEW array (not mutate in place) — React's useMemo in
   // Sidebar.tsx keys off array identity to recompute per-module counts, so an
@@ -164,6 +166,7 @@ export function createScenario(payload: ScenarioCreate): Promise<{ ok: true; no:
     note: (payload.note || '').trim(),
     dateAdded: formatThaiDate(new Date()),
     extraModules: (payload.extraModules || []).filter((m) => m && m !== payload.module),
+    attachments: payload.attachments || [],
   };
   store.scenarios = [...store.scenarios, scenario];
   assignDisplayNo(store.scenarios);
@@ -259,4 +262,41 @@ export function createReport(payload: ReportCreate): Promise<{ ok: true; reports
 /** The bootstrap payload the page boots with (mirrors doGet's BOOTSTRAP). */
 export function bootstrap(): SopData {
   return withSession();
+}
+
+/* ----- Drive filename lookup -----
+ * Mirrors getDriveFileName(url) in Code.js, which opens the file with
+ * DriveApp and returns getName() minus its extension so the editor can
+ * pre-fill an attachment's name when a link is pasted.
+ *
+ * THIS MOCK CANNOT ACTUALLY RESOLVE A NAME. Reading Drive metadata needs an
+ * authenticated server call; this port has no server, and the browser cannot
+ * fetch it directly (Drive sends no permissive CORS headers for file
+ * metadata). Returning '' is the honest answer and is also the exact shape the
+ * real function returns for an unresolvable file — the caller already treats
+ * that as "leave the field alone", so the editor degrades to manual typing
+ * with no error path of its own.
+ *
+ * To make this real against the Express backend, add an endpoint that proxies
+ * the Drive API with a service credential and swap the body for a fetch. */
+export function getDriveFileName(url: string): Promise<{ name: string }> {
+  if (!session.isAdmin) {
+    return Promise.reject(new Error('Unauthorized — open the admin sign-in URL.'));
+  }
+  // Both branches return the same thing here; the id check is kept so this
+  // mock rejects a non-Drive URL for the same *reason* the real one does,
+  // rather than by accident.
+  if (!driveFileId(String(url || ''))) return defer({ name: '' });
+  return defer({ name: '' });
+}
+
+/** Server-side twin of driveFileId() in DetailPane.tsx / the canonical
+ * index.html. Kept here so the mock can reject a non-Drive URL the same way
+ * the real function does. */
+function driveFileId(u: string): string {
+  const m =
+    u.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/) ||
+    u.match(/[?&]id=([a-zA-Z0-9_-]{10,})/) ||
+    u.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : '';
 }

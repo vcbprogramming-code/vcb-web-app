@@ -11,7 +11,7 @@ type Dict = Record<string, string | Fmt>;
 
 export const DEV_NAME  = 'Chavananand';
 export const DEV_EMAIL = 'c.chavananand@vcb-con.com';
-export const APP_VERSION = 'build 26 · 2026-06-03';
+export const APP_VERSION = 'build 34 · 2026-08-29';
 export const CHANGELOG = [
     { th:'แชร์ลิงก์ไปยังกรณีศึกษาแต่ละเรื่องได้โดยตรง (ปุ่ม "แชร์" ในหน้ารายละเอียด)', en:'Share a direct link to any single case study (the "Share" button on its detail page)' },
     { th:'ปรับดีไซน์ใหม่ให้ดูมืออาชีพ ใช้ไอคอนเส้น (SVG) แทนอีโมจิทั้งหมด', en:'Refined-corporate redesign — inline SVG line icons replace all emoji' },
@@ -95,6 +95,10 @@ export const I18N: Record<Lang, Dict> = {
       newReportTitle:'เพิ่มรายการ Report ใหม่',
       reportRequiredMsg:'กรุณากรอกข้อมูลให้ครบ / Please fill in all fields',
       dateAddedLbl:'วันที่เพิ่ม:',
+      attachmentsLbl:'เอกสารที่เกี่ยวข้อง',
+      attachmentsNone:'ไม่มีเอกสารแนบ',
+      attachmentsFile:'เอกสารแนบ',
+      swapPick:'เลือกกรณี',
       backList:'รายการ · List', backModules:'หมวด · Modules',
       menuLang:'ภาษา · Language', menuNight:'โหมดกลางคืน · Night mode',
       langName:'ไทย', nightOn:'เปิด', nightOff:'ปิด',
@@ -156,6 +160,10 @@ export const I18N: Record<Lang, Dict> = {
       newReportTitle:'Add new report row',
       reportRequiredMsg:'Please fill in all fields',
       dateAddedLbl:'Added:',
+      attachmentsLbl:'Related Files',
+      attachmentsNone:'No files attached',
+      attachmentsFile:'Document',
+      swapPick:'Select a case',
       backList:'List', backModules:'Modules',
       menuLang:'Language · ภาษา', menuNight:'Night mode',
       langName:'English', nightOn:'On', nightOff:'Off',

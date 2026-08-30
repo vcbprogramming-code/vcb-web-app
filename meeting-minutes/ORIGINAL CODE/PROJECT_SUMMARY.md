@@ -169,11 +169,11 @@ recordings pending admin filing.
 - `PAGINATION.md` — **how the reading view, PDF and editor stay page-identical. Read before changing any display/print/editor layout.**
 - `tools/layout-checks/` — three dependency-free Node scripts guarding the responsive reading pane (device widths, CSS scoping/cascade, the document scaler). Run from the project root after touching the `.body` grid, `.list`/`.detail`/`.paper`/`.frame-wrap`, the `.list-peek` toggle, or the scalers. Excluded from `clasp push`; see its own `README.md`.
 - `Diagnose.js` — one-off read-only survey of how much heading structure the meeting docs actually carry, to decide whether an "action plan" view would have enough to show. Run `diagnoseActionItems()` by hand from the Apps Script editor. Excluded from `clasp push`; delete once the question is settled.
-- `meeting-minutes-react/` — React 18 + TypeScript reference implementation, kept in parity with this app (see its `PORT_NOTES.md`). Synced 2026-08-19 with the page-accurate rendering work.
+- `../FOR DEPLOYMENT TEAM/` — React 18 + TypeScript reference implementation, kept in parity with this app (see its `PORT_NOTES.md`). Synced 2026-08-19 with the page-accurate rendering work.
 - `.clasp.json` — clasp config (Script ID)
 
 **React mirror (reference implementation, not deployed from here — see its own `STATUS.md`/`PORT_NOTES.md`):**
-- `meeting-minutes-react/` — kept in sync with the GAS source above; excluded from `clasp push` via `.claspignore`. Also mirrored out to the `vcb-web-app` GitHub monorepo (`VCB-dev` branch, `meeting-minutes/` folder) for the eventual real backend build.
+- `../FOR DEPLOYMENT TEAM/` — kept in sync with the GAS source above; excluded from `clasp push` via `.claspignore`. Also mirrored out to the `vcb-web-app` GitHub monorepo (`VCB-dev` branch, `meeting-minutes/` folder) for the eventual real backend build.
 
 **Docs:**
 - `README.md` — quick overview

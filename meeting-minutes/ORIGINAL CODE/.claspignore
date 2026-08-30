@@ -3,9 +3,11 @@
 # so it deliberately lists ONLY non-source paths — every Apps Script .js/.html/.json
 # at the project root stays pushable.
 
-# The nested React replica is a standalone web app, not Apps Script source.
+# The React replica now lives in the sibling 'FOR DEPLOYMENT TEAM/' folder, which
+# is outside this clasp root, so these rules are belt-and-braces only.
 meeting-minutes-react/**
 **/meeting-minutes-react/**
+**/FOR DEPLOYMENT TEAM/**
 
 # One-off diagnostic, run by hand from the Apps Script editor when needed.
 # Not part of the app; kept out of the live deployment.

@@ -2,7 +2,7 @@
 // nodes, so the arithmetic and the clear-on-widen path are actually executed
 // rather than eyeballed.
 const fs = require('fs');
-const src = fs.readFileSync('JavaScript.html', 'utf8');
+const src = fs.readFileSync('ORIGINAL CODE/JavaScript.html', 'utf8');
 
 const start = src.indexOf('  function fitScaleToPane(frame) {');
 const end = src.indexOf('  function applyMobileScale(frame) {');

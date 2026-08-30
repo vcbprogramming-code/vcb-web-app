@@ -6,7 +6,7 @@ GAS project is **canonical**: build/demo there first, then re-sync here. After A
 change to the GAS source, diff it against this folder and update only what changed
 (components, logic, and the verbatim CSS).
 
-> **Deploy safety:** the GAS root's `.claspignore` excludes `meeting-minutes-react/**`,
+> **Deploy safety:** the GAS root's `.claspignore` excludes this folder,
 > `node_modules`, and `dist`, so `clasp push` never sends this app to the live Apps
 > Script deployment. Verify anytime with `clasp status` (run in the GAS root) — only
 > the 7 `.gs`/`.html`/`.json` source files should appear under *Tracked files*.

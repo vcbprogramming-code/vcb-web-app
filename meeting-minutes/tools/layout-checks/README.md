@@ -52,7 +52,7 @@ than the same device in portrait, which moved the 1100px band to 1200px.
   would pass happily while the app set none of them.
 
 `css-audit-react.js` runs the same checks against
-`meeting-minutes-react/src/styles.css`, minus the document-scaler rules the
+`FOR DEPLOYMENT TEAM/src/styles.css`, minus the document-scaler rules the
 mirror has no use for (it renders no Paged.js iframe).
 
 **`scaler.test.js`** — extracts `fitScaleToPane` from `JavaScript.html` and runs

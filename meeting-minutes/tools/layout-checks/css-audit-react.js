@@ -5,7 +5,7 @@
 //
 // Run from the project root:  node tools/layout-checks/css-audit-react.js
 const fs = require('fs');
-const css = fs.readFileSync('meeting-minutes-react/src/styles.css', 'utf8');
+const css = fs.readFileSync('FOR DEPLOYMENT TEAM/src/styles.css', 'utf8');
 
 function ok(label, cond, detail) {
   console.log((cond ? '  PASS  ' : '  FAIL  ') + label + (detail ? '  — ' + detail : ''));
@@ -90,7 +90,7 @@ check('list(' + zList + ') > scrim(' + zScrim + ') > peek(' + zPeek + ')',
 // The CSS above is inert unless App.tsx actually emits these classes. Checking
 // only the stylesheet would pass happily while the app rendered none of them.
 console.log('\n--- App.tsx emits the classes the CSS keys off ---');
-const app = fs.readFileSync('meeting-minutes-react/src/App.tsx', 'utf8');
+const app = fs.readFileSync('FOR DEPLOYMENT TEAM/src/App.tsx', 'utf8');
 check("emits ' list-open'", app.includes("' list-open'"));
 check("emits ' timeline-only'", app.includes("' timeline-only'"));
 check('timeline-only requires no open meeting',

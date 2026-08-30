@@ -50,10 +50,10 @@ npm run preview    # serve the production build
 ## Deploy to Vercel
 
 This folder is self-contained. From the Vercel dashboard import the repo and set the
-**Root Directory** to `vcb-connect-react`, or from the CLI:
+**Root Directory** to `portal/FOR DEPLOYMENT TEAM`, or from the CLI:
 
 ```bash
-cd vcb-connect-react
+cd 'portal/FOR DEPLOYMENT TEAM'
 vercel            # framework + build are pre-set in vercel.json
 ```
 
@@ -64,7 +64,7 @@ for demo without any server. To wire a real backend, replace the implementations
 ## Layout
 
 ```
-vcb-connect-react/
+portal/FOR DEPLOYMENT TEAM/
 ├── index.html            Vite entry (loads src/main.tsx; <html class="js"> gates reveal)
 ├── src/
 │   ├── main.tsx          React root

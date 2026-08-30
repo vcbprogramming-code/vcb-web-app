@@ -2,7 +2,7 @@
 // peek-button rules exist, are scoped away from phones, and win the cascade
 // against the base rules they are meant to override.
 const fs = require('fs');
-const css = fs.readFileSync('Stylesheet.html', 'utf8');
+const css = fs.readFileSync('ORIGINAL CODE/Stylesheet.html', 'utf8');
 
 function ok(label, cond, detail) {
   console.log((cond ? '  PASS  ' : '  FAIL  ') + label + (detail ? '  — ' + detail : ''));
@@ -93,7 +93,7 @@ check('list(' + zList + ') > scrim(' + zScrim + ') > peek(' + zPeek + ')',
 // Checking only the stylesheet would pass happily while the app set none of
 // them — and .timeline-only in particular is new, so nothing else guards it.
 console.log('\n--- JavaScript.html toggles the classes the CSS keys off ---');
-const js = fs.readFileSync('JavaScript.html', 'utf8');
+const js = fs.readFileSync('ORIGINAL CODE/JavaScript.html', 'utf8');
 check('adds timeline-only only when no meeting is open',
   /classList\.toggle\('timeline-only', !S\.activeId\)/.test(js));
 check('clears both timeline classes',

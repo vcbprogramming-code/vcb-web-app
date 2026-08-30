@@ -271,6 +271,57 @@ suite('§2 นำเข้าพนักงานจาก Excel และเ�
   await shot('09-นำเข้าจริง');
 }
 
+// ── §6 ขอลาครึ่งวันพร้อมใบรับรองแพทย์ จากหน้าจอ ──────────────────────────
+suite('§6 ยื่นลาครึ่งวันและแนบใบรับรองแพทย์จากหน้าจอ');
+{
+  await as(A);
+  await pickSite(); await settle(1500);
+  happy('เปิดแท็บการลาได้', await clickText('การลา'), '');
+  await waitForText('ขอลาใหม่');
+  const t = await body();
+  happy('ฟอร์มมีช่องเลือกช่วงเวลาที่ลา', t.includes('ช่วงเวลาที่ลา'), '');
+  happy('ฟอร์มมีช่องแนบไฟล์', t.includes('ใบรับรองแพทย์'), '');
+
+  const ahead = new Date(d); ahead.setDate(ahead.getDate() + 6);
+  const day = `${ahead.getFullYear()}-${String(ahead.getMonth()+1).padStart(2,'0')}-${String(ahead.getDate()).padStart(2,'0')}`;
+  const filled = await page.evaluate((eid, d) => {
+    const set = (el, v) => {
+      const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement : window.HTMLInputElement;
+      Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, v);
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const emp = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === eid));
+    if (!emp) return 'ไม่พบช่องเลือกพนักงาน';
+    set(emp, eid);
+    const part = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'first_half'));
+    if (!part) return 'ไม่พบช่องครึ่งวัน';
+    set(part, 'first_half');
+    const dates = [...document.querySelectorAll('input[type=date]')];
+    if (dates.length < 2) return 'ไม่พบช่องวันที่';
+    set(dates[0], d); set(dates[1], d);
+    return 'ok';
+  }, emps[0].id, day);
+  happy('กรอกฟอร์มและเลือกครึ่งวันเช้าได้', filled === 'ok', String(filled));
+
+  const png = Buffer.from('89504e470d0a1a0a0000000d494844520000000100000001080600000001f15c4890000000a49444154789c6360000002000100ffff03000006000557bfabd40000000049454e44ae426082', 'hex');
+  const cert = `${SHOTS}/ใบรับรองแพทย์.png`;
+  fs.writeFileSync(cert, png);
+  const fileInput = await page.$('input[type=file]');
+  if (fileInput) await fileInput.uploadFile(cert);
+  await settle(900);
+
+  await clickText('ส่งคำขอลา');
+  await settle(3500);
+  const row = await query(
+    'select day_part, days, attachment_name from leave_requests where employee_id = $1 and from_date = $2',
+    [emps[0].id, day]);
+  happy('คำขอถูกบันทึกเป็นครึ่งวัน', row.rows[0]?.day_part === 'first_half', String(row.rows[0]?.day_part));
+  happy('นับเป็น 0.5 วัน ไม่ใช่ 1', Number(row.rows[0]?.days) === 0.5, String(row.rows[0]?.days));
+  happy('ใบรับรองแพทย์ถูกแนบมาด้วย', (row.rows[0]?.attachment_name || '').includes('ใบรับรองแพทย์'), row.rows[0]?.attachment_name || '');
+  await shot('16-ลาครึ่งวัน');
+}
+
 // ── §2 จัดการแผนกและตำแหน่งจากหน้าจอ ──────────────────────────────────────
 suite('§2 เพิ่ม แก้ไข และปิดใช้งานแผนก/ตำแหน่งจากหน้าจอ');
 {

@@ -68,7 +68,7 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
   const [canDecide, setCanDecide] = useState(false);
   const [tab, setTab] = useState('mine');
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ employeeId: '', leaveType: 'sick', from: '', to: '', reason: '' });
+  const [form, setForm] = useState({ employeeId: '', leaveType: 'sick', from: '', to: '', reason: '', dayPart: 'full', file: null });
   const [error, setError] = useState(null);
 
   const load = useCallback(() => Promise.all([
@@ -94,11 +94,15 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
     if (!form.employeeId) { setError(t('กรุณาเลือกชื่อพนักงาน')); return; }
     if (!form.from || !form.to) { setError(t('กรุณาระบุช่วงวันที่ลา')); return; }
     if (form.to < form.from) { setError(t('วันสิ้นสุดต้องไม่ก่อนวันเริ่มลา')); return; }
+    if (form.dayPart !== 'full' && form.from !== form.to) { setError(t('ลาครึ่งวันเลือกได้เฉพาะวันเดียว')); return; }
     setBusy(true);
     try {
-      await perfApi.requestLeave(form);
+      const r = await perfApi.requestLeave(form);
       toast.success(t('ส่งคำขอลาแล้ว รอการอนุมัติ'));
-      setForm({ employeeId: '', leaveType: 'sick', from: '', to: '', reason: '' });
+      // §6 เตือนเมื่อวันที่ขอลาชนกับวันที่บันทึกงานไว้แล้ว
+      const clash = r.warnWorkedDays || r.data?.warnWorkedDays || [];
+      if (clash.length) toast.info(t('วันที่ขอลามีบันทึกงานอยู่แล้ว {n} วัน — ตรวจสอบอีกครั้ง', { n: clash.length }));
+      setForm({ employeeId: '', leaveType: 'sick', from: '', to: '', reason: '', dayPart: 'full', file: null });
       await load();
       setTab('mine');
     } catch (err) { setError(err.message); }
@@ -178,6 +182,25 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันที่สิ้นสุด')} <span className="text-red-500">*</span></label>
               <input type="date" value={form.to} onChange={(e) => setForm((f) => ({ ...f, to: e.target.value }))} className="field" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              {/* §6 ครึ่งวันนับเป็น 0.5 — ถ้านับเป็น 1 ยอดแรงงาน-วันจะเพี้ยน */}
+              <label className="mb-1 block text-sm font-medium text-slate-600">{t('ช่วงเวลาที่ลา')}</label>
+              <select value={form.dayPart} onChange={(e) => setForm((f) => ({ ...f, dayPart: e.target.value }))} className="field">
+                <option value="full">{t('ลาเต็มวัน')}</option>
+                <option value="first_half">{t('ลาครึ่งวันเช้า')}</option>
+                <option value="second_half">{t('ลาครึ่งวันบ่าย')}</option>
+              </select>
+              {form.dayPart !== 'full' && (
+                <p className="mt-1 text-xs text-slate-400">{t('ลาครึ่งวันเลือกได้เฉพาะวันเดียว นับเป็น 0.5 วัน')}</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-600">{t('ไฟล์แนบ เช่น ใบรับรองแพทย์')}</label>
+              <input type="file" onChange={(e) => setForm((f) => ({ ...f, file: e.target.files?.[0] || null }))}
+                className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-1.5 file:text-sm" />
             </div>
           </div>
           <div>

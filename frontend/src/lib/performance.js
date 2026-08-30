@@ -66,7 +66,10 @@ export const perfApi = {
   myLeave: () => api('/performance/leave/mine'),
   pendingLeave: () => api('/performance/leave/pending'),
   decidedLeave: () => api('/performance/leave/decided'),
-  requestLeave: (body) => api('/performance/leave', { method: 'POST', body }),
+  requestLeave: ({ file, ...body }) => (file
+    ? apiUpload('/performance/leave', file, { extra: body })
+    : api('/performance/leave', { method: 'POST', body })),
+  leaveAttachmentUrl: (id) => apiBlobUrl(`/performance/leave/${id}/attachment`),
   decideLeave: (id, approve, note) => api(`/performance/leave/${id}/decide`, { method: 'POST', body: { approve, note } }),
   cancelLeave: (id) => api(`/performance/leave/${id}/cancel`, { method: 'POST' }),
   leaveSlipUrl: (id) => apiBlobUrl(`/performance/leave/${id}/slip`),

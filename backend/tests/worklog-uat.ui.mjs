@@ -208,6 +208,41 @@ suite('§5 ผู้ตรวจสอบกดยืนยันข้อมู
   await shot('06-ยืนยันแล้ว');
 }
 
+// ── §4 ปิดงวดและเปิดงวดคืน จากหน้าจอ ──────────────────────────────────────
+suite('§4 ปิดงวดและเปิดงวดจากหน้าจอ');
+{
+  await as(A);
+  await clickText('แรงงาน-วัน'); await settle(1500);
+  await pickSite(); await waitForText('วันที่ปฏิบัติงาน'); await settle(1500);
+
+  const ym = TODAY.slice(0, 7);
+  happy('เห็นป้ายสถานะของวันที่เลือก', /แก้ไขได้|ใกล้ครบกำหนด|ล็อกแล้ว/.test(await body()), '');
+  happy(`กดปุ่มปิดงวด ${ym} ได้`, await clickText('ปิดงวด'), '');
+  await settle(1400);
+  // ยืนยันในกล่องยืนยันของแอป ไม่ใช่ของเบราว์เซอร์
+  const confirmed = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll('button')].filter((b) => b.innerText.trim() === 'ปิดงวด');
+    const inDialog = btns[btns.length - 1];
+    if (inDialog) { inDialog.click(); return true; }
+    return false;
+  });
+  happy('กดยืนยันในกล่องยืนยันได้', confirmed, '');
+  await settle(3000);
+  const closed = await query('select ym from period_closes p join units u on u.id = p.unit_id where u.code = $1', [site.code]);
+  happy('งวดถูกปิดจริงในระบบ', closed.rows.some((r) => r.ym === ym), JSON.stringify(closed.rows));
+  happy('หน้าจอเปลี่ยนเป็นปุ่มเปิดงวด', (await body()).includes('เปิดงวด'), '');
+  await shot('17-ปิดงวด');
+
+  // §4 การเปิดงวดคืนต้องระบุเหตุผล — แอปถามผ่านกล่อง prompt ของเบราว์เซอร์
+  page.once('dialog', (d) => d.accept('ทดสอบตามเกณฑ์ตรวจรับ'));
+  happy('กดเปิดงวดได้', await clickText('เปิดงวด'), '');
+  await settle(3200);
+  const after = await query('select count(*)::int n from period_closes p join units u on u.id = p.unit_id where u.code = $1 and p.ym = $2', [site.code, ym]);
+  happy('เปิดงวดคืนแล้วเมื่อระบุเหตุผล', after.rows[0].n === 0, `${after.rows[0].n}`);
+  const why = await query("select reason from work_log_audit where action = 'period-open' order by created_at desc limit 1");
+  happy('เหตุผลการเปิดงวดถูกบันทึกไว้', Boolean(why.rows[0]?.reason), why.rows[0]?.reason || '');
+}
+
 // ── §8 รายงาน PDF และ Excel จากหน้าจอ ─────────────────────────────────────
 suite('§8 ดาวน์โหลดรายงานจากหน้าจอได้ทั้ง PDF และ Excel');
 {
@@ -217,11 +252,62 @@ suite('§8 ดาวน์โหลดรายงานจากหน้าจ
   await settle(3200);
   const t = await body();
   happy('เห็นยอดรวมแรงงาน-วัน', /รวมแรงงาน-วัน/.test(t), '');
+  // §7 เปลี่ยนช่วงวันที่แล้วตัวเลขต้องเปลี่ยนตาม
+  const before = await page.evaluate(() => document.body.innerText.match(/รวมแรงงาน-วัน\s*([\d.,]+)/)?.[1] || '');
+  await page.evaluate((d) => {
+    const inp = document.querySelector('input[type=date]');
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, d);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+  }, TODAY);
+  await settle(3200);
+  const afterRange = await page.evaluate(() => document.body.innerText.match(/รวมแรงงาน-วัน\s*([\d.,]+)/)?.[1] || '');
+  happy('เปลี่ยนช่วงวันที่แล้วยอดรวมคำนวณใหม่', afterRange !== '' && afterRange !== before, `${before} → ${afterRange}`);
+  happy('มีกล่องรายการที่ต้องดำเนินการพร้อมข้อความจริง',
+    /ยังไม่บันทึก|บันทึกแล้ว \d+ จาก|จะถูกล็อก/.test(t), '');
+  const auditRows = await page.evaluate(() => {
+    const h = [...document.querySelectorAll('h3')].find((x) => x.innerText.includes('ประวัติการแก้ไข'));
+    const table = h?.parentElement?.querySelector('tbody');
+    return table ? [...table.querySelectorAll('tr')].map((r) => r.innerText.replace(/\t+/g, ' | ')).slice(0, 3) : [];
+  });
+  happy('ตารางประวัติมีแถวข้อมูลจริง', auditRows.length > 0, `${auditRows.length} แถว`);
+  happy('แถวประวัติบอกผู้ทำและการกระทำ',
+    auditRows.some((r) => /สร้าง|แก้ไข|ยืนยัน|ปิดงวด|เปิดงวด|ลบ/.test(r)), auditRows[0] || '');
   happy('มีปุ่มรายงาน PDF', t.includes('รายงานนี้เป็น PDF'), '');
   happy('มีปุ่มรายงานเดือน ทุกโครงการ', t.includes('ทุกโครงการ'), '');
   happy('เห็นประวัติการแก้ไข', t.includes('ประวัติการแก้ไข'), '');
   happy('เห็นรายการที่ต้องดำเนินการ', t.includes('รายการที่ต้องดำเนินการ') || t.includes('ยังไม่บันทึก'), '');
   await shot('07-รายงาน');
+
+  // §8 กดปุ่มดาวน์โหลดจริง แล้วดูว่าไฟล์ลงเครื่อง
+  const dlDir = `${SHOTS}/downloads`;
+  fs.rmSync(dlDir, { recursive: true, force: true });
+  fs.mkdirSync(dlDir, { recursive: true });
+  const cdp = await page.createCDPSession();
+  await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: dlDir, eventsEnabled: true });
+  const waitForFile = async (match, tries = 24) => {
+    for (let i = 0; i < tries; i += 1) {
+      const f = fs.readdirSync(dlDir).find((x) => match.test(x) && !x.endsWith('.crdownload'));
+      if (f) return f;
+      await settle(500);
+    }
+    return null;
+  };
+
+  happy('กดปุ่มรายงานเดือน (Excel) ได้', await clickText('ทุกโครงการ (Excel)'), '');
+  const xlsxFile = await waitForFile(/\.xlsx$/);
+  happy('ไฟล์ Excel ดาวน์โหลดลงเครื่องจริง', Boolean(xlsxFile), xlsxFile || '(ไม่พบไฟล์)');
+  if (xlsxFile) {
+    const size = fs.statSync(`${dlDir}/${xlsxFile}`).size;
+    happy('ไฟล์ Excel มีเนื้อหา ไม่ใช่ไฟล์เปล่า', size > 3000, `${size} ไบต์`);
+  }
+
+  const newTab = new Promise((res) => browser.once('targetcreated', (t) => res(t)));
+  happy('กดปุ่มรายงาน PDF ได้', await clickText('รายงานนี้เป็น PDF'), '');
+  const opened = await Promise.race([newTab, settle(6000).then(() => null)]);
+  const pdfFile = await waitForFile(/\.pdf$/, 6);
+  happy('รายงาน PDF เปิดหรือดาวน์โหลดจริง', Boolean(opened || pdfFile), opened ? 'เปิดแท็บใหม่' : (pdfFile || '(ไม่เกิดอะไร)'));
+  if (opened) { const pg = await opened.page().catch(() => null); if (pg) await pg.close().catch(() => {}); }
 
   const pdf = await call(`/performance/report/manday.pdf?from=${TODAY}&to=${TODAY}&groupBy=project`, { user: A, raw: true });
   happy('ไฟล์ PDF สร้างได้จริง', pdf.status === 200, `${pdf.status}`);
@@ -385,6 +471,35 @@ suite('§2 เพิ่ม แก้ไข และปิดใช้งาน�
   await query('update employees set department_id = null, position_id = null where unit_id = $1', [site.id]);
   await query('delete from positions where department_id = $1', [dept.rows[0]?.id]);
   await query('delete from departments where unit_id = $1', [site.id]);
+}
+
+// ── §4 ตั้งค่าระยะเวลาล็อกจากหน้าจอ ───────────────────────────────────────
+suite('§4 ตั้งจำนวนวันล็อกรายไซต์จากหน้าจอ');
+{
+  await as(A);
+  happy('เปิดแท็บตั้งค่าได้', await clickText('ตั้งค่า'), '');
+  await waitForText('ล็อกการแก้ไขย้อนหลัง');
+  await settle(1500);
+  // แถวนี้แสดงชื่อไซต์ ไม่ใช่รหัส และต้องกดบันทึกเอง ไม่ใช่บันทึกอัตโนมัติ
+  const changed = await page.evaluate((name) => {
+    const row = [...document.querySelectorAll('div')]
+      .filter((e) => e.innerText?.includes(name) && e.querySelector('input[type=number]') && e.querySelector('button'))
+      .sort((a, b) => a.innerText.length - b.innerText.length)[0];
+    const inp = row?.querySelector('input[type=number]');
+    if (!inp) return 'ไม่พบช่องจำนวนวัน';
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, '5');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    const save = [...row.querySelectorAll('button')].find((b) => b.innerText.includes('บันทึก'));
+    if (!save) return 'ไม่พบปุ่มบันทึก';
+    save.click();
+    return 'ok';
+  }, `${MARK} ไซต์ทดสอบ`);
+  happy('พบช่องจำนวนวันของไซต์ แก้ค่าและกดบันทึกได้', changed === 'ok', String(changed));
+  await settle(3200);
+  const saved = await query('select lock_days from units where code = $1', [site.code]);
+  happy('จำนวนวันล็อกถูกบันทึกลงระบบ', Number(saved.rows[0]?.lock_days) === 5, String(saved.rows[0]?.lock_days));
+  await shot('18-ตั้งค่าล็อก');
+  await query('update units set lock_days = 3 where code = $1', [site.code]);
 }
 
 // ── §1 บทบาทใหม่เห็นและทำได้ต่างกันจริง ───────────────────────────────────

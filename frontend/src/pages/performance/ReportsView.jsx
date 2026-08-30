@@ -19,6 +19,22 @@ const GROUPS = [
 const iso = (d) => d.toISOString().slice(0, 10);
 
 /**
+ * The audit table stores what happened as a code. Rendering the code was
+ * showing a Thai reader the word "verify" — the dictionary is keyed by Thai, so
+ * an English key passes straight through in Thai. Name them in Thai here and
+ * let the translation layer turn them round for English.
+ */
+const ACTION_TH = {
+  create: 'สร้างรายการ', edit: 'แก้ไข', delete: 'ลบรายการ',
+  verify: 'ยืนยันข้อมูล', unverify: 'ยกเลิกการยืนยัน',
+  'period-close': 'ปิดงวด', 'period-open': 'เปิดงวด',
+  attach: 'แนบไฟล์', detach: 'ลบไฟล์แนบ',
+  'import-employees': 'นำเข้าพนักงาน',
+  'department-create': 'เพิ่มแผนก', 'department-update': 'แก้ไขแผนก', 'department-delete': 'ลบแผนก',
+  'position-create': 'เพิ่มตำแหน่ง', 'position-update': 'แก้ไขตำแหน่ง', 'position-delete': 'ลบตำแหน่ง',
+};
+
+/**
  * §7/§8 read across every project the viewer is allowed to see, not just the
  * one selected above — "manpower by project" with a single project in it is not
  * a comparison, and the monthly report is explicitly required to cover them all.
@@ -233,7 +249,7 @@ export default function ReportsView({ site }) {
                         {new Date(a.created_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
                       </td>
                       <td className="tbl-td text-slate-700">{a.actor_label || '—'}</td>
-                      <td className="tbl-td"><span className="chip bg-slate-100 text-slate-600">{t(a.action)}</span></td>
+                      <td className="tbl-td"><span className="chip bg-slate-100 text-slate-600">{t(ACTION_TH[a.action] || a.action)}</span></td>
                       <td className="tbl-td whitespace-nowrap text-slate-500">{a.ymd ? String(a.ymd).slice(0, 10) : '—'}</td>
                       <td className="tbl-td max-w-[280px] text-xs text-slate-500">
                         <span className="line-through opacity-60">{a.before_val ? JSON.stringify(a.before_val) : '—'}</span>

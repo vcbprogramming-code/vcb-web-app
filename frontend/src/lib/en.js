@@ -1429,4 +1429,13 @@ export const EN = {
     '{n} people are filed under this department — retire it instead of deleting',
   'ตำแหน่งนี้มีพนักงานผูกอยู่ {n} คน — ปิดใช้งานแทนการลบ':
     '{n} people hold this position — retire it instead of deleting',
+  'ช่วงเวลาที่ลา': 'Part of day',
+  'ลาเต็มวัน': 'Full day',
+  'ลาครึ่งวันเช้า': 'Morning half',
+  'ลาครึ่งวันบ่าย': 'Afternoon half',
+  'ลาครึ่งวันเลือกได้เฉพาะวันเดียว นับเป็น 0.5 วัน': 'A half day applies to a single date and counts as 0.5',
+  'ลาครึ่งวันเลือกได้เฉพาะวันเดียว': 'A half day applies to a single date only',
+  'ไฟล์แนบ เช่น ใบรับรองแพทย์': 'Attachment, e.g. a medical certificate',
+  'วันที่ขอลามีบันทึกงานอยู่แล้ว {n} วัน — ตรวจสอบอีกครั้ง':
+    '{n} of those days already have work recorded — please check',
 };

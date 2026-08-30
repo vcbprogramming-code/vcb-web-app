@@ -22,6 +22,10 @@ import { env } from '../config/env.js';
 const router = Router();
 router.use(requireAuth);
 
+// อัปโหลดไฟล์ในโมดูลนี้ใช้ตัวเดียวกันทั้งหมด
+const fileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
+
+
 // ── helpers ──────────────────────────────────────────────────────────────
 /** Units this user may see. admin/executive = null (all); hr = their unit ids. */
 function scopedUnitIds(profile) {
@@ -662,12 +666,20 @@ const leaveSchema = z.object({
   reason: z.string().trim().max(1000).optional().default(''),
   // §6 a half day is a real case, and counting it as one distorts man-days
   dayPart: z.enum(['full', 'first_half', 'second_half']).optional().default('full'),
-  attachmentUrl: z.string().url().optional().nullable(),
+  attachmentUrl: z.string().max(300).optional().nullable(),
   attachmentName: z.string().max(300).optional().nullable(),
 });
 
 /** POST /api/performance/leave — ask for leave (HR files it for the employee). */
-router.post('/leave', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+router.post('/leave', requirePermission('performance', 'edit'), fileUpload.single('file'), asyncHandler(async (req, res) => {
+  // §6 ใบรับรองแพทย์มากับคำขอในครั้งเดียว — multer ปล่อยคำขอ JSON ผ่านไปตามเดิม
+  if (req.file) {
+    const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const key = `leave/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await putObject(key, req.file.buffer, req.file.mimetype || 'application/octet-stream');
+    req.body.attachmentUrl = key;
+    req.body.attachmentName = name;
+  }
   const p = leaveSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const { employeeId, leaveType, from, to, reason } = p.data;
@@ -714,6 +726,18 @@ router.post('/leave', requirePermission('performance', 'edit'), asyncHandler(asy
   );
   const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);
   res.status(201).json({ ok: true, row: leaveOut(full), warnWorkedDays: worked });
+}));
+
+/** GET /api/performance/leave/:id/attachment — the certificate that came with it. */
+router.get('/leave/:id/attachment', asyncHandler(async (req, res) => {
+  const row = await queryOne('select * from leave_requests where id = $1', [req.params.id]);
+  if (!row?.attachment_url) throw new ApiError(404, 'คำขอนี้ไม่มีไฟล์แนบ');
+  assertUnitInScope(scopedUnitIds(req.profile), row.unit_id);
+  const obj = await openDownloadStream(row.attachment_url);
+  if (!obj?.stream) throw new ApiError(404, 'ไม่พบไฟล์ในที่จัดเก็บ');
+  res.setHeader('Content-Type', obj.contentType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(row.attachment_name || 'file')}`);
+  obj.stream.pipe(res);
 }));
 
 /** POST /api/performance/leave/:id/decide — approve or refuse one request. */
@@ -1486,7 +1510,6 @@ router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
 }));
 
 // ── §11 ไฟล์ประกอบการบันทึก ───────────────────────────────────────────────
-const fileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: env.maxUploadBytes } });
 router.post('/attachments', requirePermission('performance', 'edit'), fileUpload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');

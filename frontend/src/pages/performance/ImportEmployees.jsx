@@ -12,7 +12,7 @@ import { useT } from '../../lib/i18n.jsx';
  * to show exactly which rows will not make it and why, and again to write only
  * after someone has read that list.
  */
-export default function ImportEmployees() {
+export default function ImportEmployees({ onOpenSite }) {
   const t = useT();
   const toast = useToast();
   const fileRef = useRef(null);
@@ -102,6 +102,35 @@ export default function ImportEmployees() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {/* "Where did they go?" — the import used to answer only "how many",
+              which left someone opening every site in turn to find them. */}
+          {preview.sites?.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="mb-2 text-sm font-medium text-slate-700">
+                {preview.dryRun ? t('รายชื่อเหล่านี้จะเข้าโครงการ') : t('รายชื่อที่นำเข้าอยู่ในโครงการเหล่านี้')}
+              </div>
+              <div className="space-y-1.5">
+                {preview.sites.map((st) => (
+                  <div key={st.key || st.name} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-medium text-slate-800">{st.name}</span>
+                    <span className="text-slate-500">
+                      {preview.dryRun
+                        ? `${st.imported} ${t('รายการ')}`
+                        : `${t('เพิ่มใหม่')} ${st.imported} · ${t('ปรับปรุง')} ${st.updated}`}
+                    </span>
+                    {st.names?.length > 0 && (
+                      <span className="truncate text-xs text-slate-400">{st.names.join(', ')}{st.imported > st.names.length ? ' …' : ''}</span>
+                    )}
+                    {!preview.dryRun && onOpenSite && st.key && (
+                      <button onClick={() => onOpenSite(st.key)} className="ml-auto text-sm font-medium text-brand hover:underline">
+                        {t('ไปดูรายชื่อพนักงาน')} →
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {preview.dryRun && preview.accepted > 0 && (

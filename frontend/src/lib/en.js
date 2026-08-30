@@ -1440,4 +1440,38 @@ export const EN = {
   'แก้ไขแผนก': 'Department edited',
   'เพิ่มตำแหน่ง': 'Position added',
   'แก้ไขตำแหน่ง': 'Position edited',
+  'บันทึกงานรายวันของไซต์ที่รับผิดชอบ — ยืนยันข้อมูลของตัวเองไม่ได้':
+    'Records the daily log for their own sites — cannot verify their own work',
+  'ตรวจสอบและยืนยันข้อมูลของโครงการ — ไม่บันทึกงานรายวัน':
+    'Checks and signs off a project\'s figures — does not key the daily log',
+  'ดูและบันทึกข้อมูลตามโครงการที่รับผิดชอบ': 'Views and records for the projects they look after',
+  'ดูได้ทุกโครงการรวมข้อมูลการเงิน และอนุมัติรายการได้':
+    'Sees every project including financial data, and can approve',
+  'เข้าถึงและตั้งค่าได้ทั้งหมด': 'Full access and every setting',
+
+  // ── UAT feedback round: attachments, the approver's name, the audit trail ──
+  'รายชื่อเหล่านี้จะเข้าโครงการ': 'These people will go to these projects',
+  'รายชื่อที่นำเข้าอยู่ในโครงการเหล่านี้': 'The imported people are in these projects',
+  'ไปดูรายชื่อพนักงาน': 'Go to the employee list',
+  'เปิดไฟล์แนบ': 'Open attachment',
+  'ดาวน์โหลดไฟล์แนบ': 'Download attachment',
+  'รอ': 'Waiting on',
+  'ชื่อผู้อนุมัติแสดงอยู่ในแต่ละรายการ': 'The approver is named on each request.',
+  'แนบไฟล์เพิ่ม': 'Attach another file',
+  'ลบไฟล์แล้ว': 'File deleted',
+  'เดือนนี้ปิดงวดแล้ว — แก้ไขข้อมูลไม่ได้ ต้องเปิดงวดคืนก่อน':
+    'This month is closed — records cannot be edited until the period is reopened.',
+  'วันที่นี้เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบปลดล็อกได้โดยระบุเหตุผล':
+    'This date is past the edit window — an administrator can unlock it with a reason.',
+  'ครึ่งวันเช้า': 'Morning half day',
+  'ครึ่งวันบ่าย': 'Afternoon half day',
+  // audit-trail field names
+  'ทีม': 'Team',
+  'รายละเอียดงาน': 'Work detail',
+  'งานที่สอง': 'Second task',
+  'จำนวนรายการงาน': 'Task lines',
+  'งวดเดือน': 'Period',
+  'ไฟล์': 'File',
+  'สถานะใช้งาน': 'Active status',
+  'ชุดที่บันทึก': 'Batch',
 };

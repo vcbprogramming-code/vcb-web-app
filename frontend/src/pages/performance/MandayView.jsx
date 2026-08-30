@@ -24,6 +24,56 @@ const STATE_CHIP = {
 };
 const STATE_TH = { editable: 'แก้ไขได้', 'due-soon': 'ใกล้ครบกำหนด', locked: 'ล็อกแล้ว', closed: 'ปิดงวดแล้ว' };
 
+/**
+ * The file column. A count with nothing behind it told a user a file existed and
+ * then gave them no way to look at it — the number opens the list, and each row
+ * in it opens or removes the file it names.
+ */
+function FileCell({ files, canEdit, open, onToggle, onAttach, onOpen, onDownload, onRemove, tall }) {
+  const t = useT();
+  return (
+    <div className="relative">
+      <div className={`flex items-center gap-1 ${tall ? 'h-11' : ''}`}>
+        {files.length > 0 && (
+          <button type="button" onClick={onToggle}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-sm text-brand hover:bg-slate-50">
+            <Icon name="paperclip" className="h-4 w-4" /> {files.length}
+          </button>
+        )}
+        {canEdit && (
+          <label className="cursor-pointer rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
+            title={t('แนบไฟล์เพิ่ม')}>
+            <input type="file" className="hidden" onChange={(ev) => onAttach(ev.target.files?.[0])} />
+            {files.length ? '+' : t('แนบ')}
+          </label>
+        )}
+        {!files.length && !canEdit && <span className="text-sm text-slate-300">—</span>}
+      </div>
+      {open && files.length > 0 && (
+        <div className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+          {files.map((f) => (
+            <div key={f.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
+              <button type="button" onClick={() => onOpen(f)}
+                className="min-w-0 flex-1 truncate text-left text-sm text-brand hover:underline" title={f.file_name}>
+                {f.file_name}
+              </button>
+              <button type="button" onClick={() => onDownload(f)} title={t('ดาวน์โหลด')}
+                className="shrink-0 text-slate-400 hover:text-brand">
+                <Icon name="download" className="h-4 w-4" />
+              </button>
+              {canEdit && (
+                <button type="button" onClick={() => onRemove(f)} className="text-sm text-red-500 hover:underline">
+                  {t('ลบ')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MandayView({ site, month, canEdit, isAdmin }) {
   const t = useT();
   const toast = useToast();
@@ -38,7 +88,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   const [queued, setQueued] = useState(() => pendingCount());
   const [online, setOnline] = useState(() => navigator.onLine);
   const [files, setFiles] = useState([]);
-  const [fileFor, setFileFor] = useState(null);
+  const [fileFor, setFileFor] = useState(null); // แถวที่กำลังเปิดรายการไฟล์อยู่
 
   const load = useCallback(() => {
     if (!site) return;
@@ -49,10 +99,11 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   useEffect(load, [load]);
 
   // §11 evidence for the day in view
-  useEffect(() => {
-    if (!site) return;
+  const loadFiles = useCallback(() => {
+    if (!site) { setFiles([]); return; }
     perfApi.attachments({ site, date }).then((r) => setFiles(r.data || [])).catch(() => setFiles([]));
-  }, [site, date, busy]);
+  }, [site, date]);
+  useEffect(loadFiles, [loadFiles]);
 
   // §3 whatever was keyed while the signal was gone goes up when it returns
   const drain = useCallback(async () => {
@@ -132,12 +183,35 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
     } finally { setBusy(''); }
   };
 
+  const openFile = async (f) => {
+    try {
+      const url = await perfApi.attachmentUrl(f.id);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+  const downloadFile = async (f) => {
+    try {
+      const url = await perfApi.attachmentUrl(f.id);
+      const a = document.createElement('a');
+      a.href = url; a.download = f.file_name || 'attachment';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+  const removeFile = async (f) => {
+    const ok = await confirm({ title: t('ลบไฟล์แนบ'), message: f.file_name, confirmLabel: t('ลบ'), danger: true });
+    if (!ok) return;
+    try { await perfApi.deleteAttachment(f.id); toast.success(t('ลบไฟล์แล้ว')); loadFiles(); }
+    catch (e) { toast.error(e.message); }
+  };
+
   const attach = async (eid, file) => {
     if (!file) return;
     setBusy(eid);
-    try { await perfApi.uploadAttachment(site, eid, date, file); toast.success(t('แนบไฟล์แล้ว')); }
+    try { await perfApi.uploadAttachment(site, eid, date, file); toast.success(t('แนบไฟล์แล้ว')); loadFiles(); }
     catch (e) { toast.error(e.message); }
-    finally { setBusy(''); setFileFor(null); }
+    finally { setBusy(''); }
   };
 
   const verify = async (undo) => {
@@ -156,7 +230,10 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
     const ok = await confirm({
       title: t('ปิดงวด {ym}', { ym }),
       message: t('เมื่อปิดงวดแล้ว ข้อมูลของเดือนนี้จะแก้ไขไม่ได้อีก'),
-      confirmLabel: t('ปิดงวด'),
+      // Closing a period is not destructive — an admin can reopen it with a
+      // reason — so this one gets the green "go ahead", not the red one the
+      // provider hands out by default.
+      confirmLabel: t('ปิดงวด'), danger: false,
     });
     if (!ok) return;
     try { await perfApi.closePeriod(site, ym); toast.success(t('ปิดงวดแล้ว')); load(); }
@@ -201,6 +278,14 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
         </div>
       )}
 
+      {locked && (
+        <div className="card-sm border-l-4 border-rose-400 text-sm text-slate-700">
+          {dayState === 'closed'
+            ? t('เดือนนี้ปิดงวดแล้ว — แก้ไขข้อมูลไม่ได้ ต้องเปิดงวดคืนก่อน')
+            : t('วันที่นี้เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบปลดล็อกได้โดยระบุเหตุผล')}
+        </div>
+      )}
+
       {canEdit && (
         <div className="card-sm flex flex-wrap items-end gap-3">
           <div className="text-sm font-medium text-slate-600">
@@ -217,7 +302,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
               {STATUSES.map((s2) => <option key={s2} value={s2}>{t(s2)}</option>)}
             </select>
           </div>
-          <button onClick={saveBulk} disabled={!picked.size || busy === 'bulk'} className="btn-primary disabled:opacity-40">
+          <button onClick={saveBulk} disabled={!picked.size || locked || busy === 'bulk'} className="btn-primary disabled:opacity-40">
             <Icon name="check" className="h-4 w-4" /> {t('บันทึกให้ทุกคนที่เลือก')}
           </button>
           <button onClick={() => setPicked(new Set(rows.map(idOf)))} className="btn-outline">{t('เลือกทั้งหมด')}</button>
@@ -261,7 +346,8 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                 <div>
                   <label className="mb-1 block text-xs text-slate-500">{t('แรงงาน-วัน')}</label>
                   <input type="number" step="0.25" min="0" max="1" inputMode="decimal"
-                    defaultValue={cur.manDay ?? ''} disabled={!canEdit || busy === eid}
+                    key={`${eid}-${date}-${cur.manDay ?? ''}`}
+                    defaultValue={cur.manDay ?? ''} disabled={!canEdit || locked || busy === eid}
                     onBlur={(ev) => {
                       const v = ev.target.value === '' ? null : Number(ev.target.value);
                       if (v !== (cur.manDay ?? null)) save(eid, { manDay: v });
@@ -270,19 +356,16 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <label className="mb-1 block text-xs text-slate-500">{t('สถานะการทำงาน')}</label>
-                  <select value={cur.workStatus || ''} disabled={!canEdit || busy === eid}
+                  <select value={cur.workStatus || ''} disabled={!canEdit || locked || busy === eid}
                     onChange={(ev) => save(eid, { workStatus: ev.target.value || null })}
-                    className="field !h-11 w-full">
+                    className="field !h-11 w-full disabled:bg-slate-50">
                     <option value="">{t('— ไม่ระบุ —')}</option>
                     {STATUSES.map((st) => <option key={st} value={st}>{t(st)}</option>)}
                   </select>
                 </div>
-                <label className="flex h-11 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm text-brand">
-                  <input type="file" className="hidden" disabled={!canEdit}
-                    onChange={(ev) => attach(eid, ev.target.files?.[0])} />
-                  <Icon name="paperclip" className="h-4 w-4" />
-                  {files.filter((f) => f.employee_id === eid).length || t('แนบ')}
-                </label>
+                <FileCell eid={eid} files={files.filter((f) => f.employee_id === eid)}
+                  canEdit={canEdit && !locked} open={fileFor === eid} onToggle={() => setFileFor(fileFor === eid ? null : eid)}
+                  onAttach={(file) => attach(eid, file)} onOpen={openFile} onDownload={downloadFile} onRemove={removeFile} tall />
               </div>
               {cur.entryAt && (
                 <p className="text-[11px] text-slate-400">
@@ -333,8 +416,10 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                   <td className="tbl-td font-medium text-slate-800">{e.name || e.full_name}</td>
                   <td className="tbl-td">
                     <input
-                      type="number" step="0.25" min="0" max="1" defaultValue={cur.manDay ?? ''}
-                      disabled={!canEdit || busy === eid}
+                      type="number" step="0.25" min="0" max="1"
+                      key={`${eid}-${date}-${cur.manDay ?? ''}`}
+                      defaultValue={cur.manDay ?? ''}
+                      disabled={!canEdit || locked || busy === eid}
                       onBlur={(ev) => {
                         const v = ev.target.value === '' ? null : Number(ev.target.value);
                         if (v !== (cur.manDay ?? null)) save(eid, { manDay: v });
@@ -342,8 +427,8 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                       className="field !w-28 tabular-nums" />
                   </td>
                   <td className="tbl-td">
-                    <select value={cur.workStatus || ''} disabled={!canEdit || busy === eid}
-                      onChange={(ev) => save(eid, { workStatus: ev.target.value || null })} className="field !w-40">
+                    <select value={cur.workStatus || ''} disabled={!canEdit || locked || busy === eid}
+                      onChange={(ev) => save(eid, { workStatus: ev.target.value || null })} className="field !w-40 disabled:bg-slate-50">
                       <option value="">{t('— ไม่ระบุ —')}</option>
                       {STATUSES.map((s) => <option key={s} value={s}>{t(s)}</option>)}
                     </select>
@@ -357,12 +442,9 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
                       : <span className="chip bg-slate-100 text-slate-500">{t('บันทึกแล้ว')}</span>}
                   </td>
                   <td className="tbl-td">
-                    <label className="cursor-pointer text-sm text-brand hover:underline">
-                      <input type="file" className="hidden" disabled={!canEdit}
-                        onChange={(ev) => attach(eid, ev.target.files?.[0])} />
-                      <Icon name="paperclip" className="mr-1 inline h-4 w-4" />
-                      {files.filter((f) => f.employee_id === eid).length || t('แนบ')}
-                    </label>
+                    <FileCell eid={eid} files={files.filter((f) => f.employee_id === eid)}
+                      canEdit={canEdit && !locked} open={fileFor === eid} onToggle={() => setFileFor(fileFor === eid ? null : eid)}
+                      onAttach={(file) => attach(eid, file)} onOpen={openFile} onDownload={downloadFile} onRemove={removeFile} />
                   </td>
                 </tr>
               );

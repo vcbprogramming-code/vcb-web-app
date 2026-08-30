@@ -13,6 +13,25 @@ const ROLE_CHIP = {
   admin: 'bg-purple-50 text-purple-700',
   executive: 'bg-blue-50 text-blue-700',
   hr: 'bg-slate-100 text-slate-600',
+  recorder: 'bg-emerald-50 text-emerald-700',
+  verifier: 'bg-amber-50 text-amber-700',
+};
+
+/**
+ * The five levels the work-log acceptance criteria name, in the order an
+ * administrator thinks about them: who keys the day, who signs it off, then the
+ * office roles. This list is the one place the choice is defined — the labels
+ * come from nav.js so the menu, the chips and this picker can never drift apart.
+ */
+const ROLE_OPTIONS = ['recorder', 'verifier', 'hr', 'executive', 'admin'];
+
+/** One line on what each level may do, so the choice is not a guess. */
+const ROLE_HINT = {
+  recorder: 'บันทึกงานรายวันของไซต์ที่รับผิดชอบ — ยืนยันข้อมูลของตัวเองไม่ได้',
+  verifier: 'ตรวจสอบและยืนยันข้อมูลของโครงการ — ไม่บันทึกงานรายวัน',
+  hr: 'ดูและบันทึกข้อมูลตามโครงการที่รับผิดชอบ',
+  executive: 'ดูได้ทุกโครงการรวมข้อมูลการเงิน และอนุมัติรายการได้',
+  admin: 'เข้าถึงและตั้งค่าได้ทั้งหมด',
 };
 
 
@@ -226,10 +245,9 @@ function UserModal({ user, onClose, onSaved }) {
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">{t('บทบาท')} <span className="text-red-500">*</span></label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className={field}>
-              <option value="hr">{t('เจ้าหน้าที่ HR')}</option>
-              <option value="executive">{t('ผู้บริหาร')}</option>
-              <option value="admin">{t('ผู้ดูแลระบบ')}</option>
+              {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{t(ROLE_LABELS[r] || r)}</option>)}
             </select>
+            <p className="mt-1 text-xs text-slate-400">{t(ROLE_HINT[role] || '')}</p>
           </div>
 
           {/* Signature — admins can put one on file for someone else, which the
@@ -326,7 +344,7 @@ export default function UsersTab() {
                   </span>
                 </td>
                 <td className="tbl-td">
-                  <span className={`chip ${ROLE_CHIP[u.role]}`}>{ROLE_LABELS[u.role]}</span>
+                  <span className={`chip ${ROLE_CHIP[u.role]}`}>{t(ROLE_LABELS[u.role] || u.role)}</span>
                 </td>
                 <td className="tbl-td">
                   <span className={`chip ${u.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>

@@ -12,7 +12,7 @@ import OrgRegistry from './OrgRegistry.jsx';
  * Client-side (localStorage): grid cell display (code vs name) + which sites are
  * hidden on the dashboard.
  */
-export default function SettingsView({ sites, onSitesChange }) {
+export default function SettingsView({ sites, onSitesChange, onOpenSite }) {
   const t = useT();
   const toast = useToast();
   const [prefs, setPrefs] = useState(perfPrefs.get());
@@ -39,7 +39,7 @@ export default function SettingsView({ sites, onSitesChange }) {
       {/* the two registries need room for two columns; the settings below stay
           narrow because they are single fields */}
       <OrgRegistry sites={sites} />
-      <ImportEmployees />
+      <ImportEmployees onOpenSite={onOpenSite} />
       <div className="max-w-2xl space-y-5">
 
       {/* display */}

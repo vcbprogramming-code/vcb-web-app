@@ -19,6 +19,52 @@ const GROUPS = [
 const iso = (d) => d.toISOString().slice(0, 10);
 
 /**
+ * The trail stored what changed as JSON, and the table printed the JSON. A row
+ * that reads {"to":"2026-08-30","rows":2} tells an auditor nothing it could not
+ * have told them in Thai — so the fields are named, and a change is shown as a
+ * value moving, not as two objects side by side.
+ */
+const FIELD_TH = {
+  manDay: 'แรงงาน-วัน', hours: 'ชั่วโมง', workStatus: 'สถานะการทำงาน',
+  team: 'ทีม', detail: 'รายละเอียดงาน', pm: 'งานที่สอง', lines: 'จำนวนรายการงาน',
+  from: 'ตั้งแต่', to: 'ถึง', rows: 'จำนวนรายการ', ym: 'งวดเดือน', file: 'ไฟล์',
+  name: 'ชื่อ', isActive: 'สถานะใช้งาน', department: 'แผนก',
+  imported: 'เพิ่มใหม่', updated: 'ปรับปรุง', failed: 'ไม่ผ่าน', batch: 'ชุดที่บันทึก',
+};
+/** Dates in this table are read by Thai staff — 2026-08-30 is not their year. */
+const thShort = (v) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+  if (!m) return null;
+  return `${Number(m[3])}/${Number(m[2])}/${Number(m[1]) + 543}`;
+};
+const show = (v) => {
+  if (v === null || v === undefined || v === '') return '—';
+  if (v === true) return 'ใช้งาน';
+  if (v === false) return 'ปิดใช้งาน';
+  return thShort(v) || String(v);
+};
+/** Describe one audit row the way a person would say it out loud. */
+function describe(before, after) {
+  const b = before || {}; const a = after || {};
+  const present = new Set([...Object.keys(b), ...Object.keys(a)]);
+  // FIELD_TH declares a reading order — "ตั้งแต่" then "ถึง". Object key order
+  // is whatever the JSON happened to store, which printed the range backwards.
+  const keys = Object.keys(FIELD_TH).filter((k) => present.has(k));
+  const parts = [];
+  for (const k of keys) {
+    const from = b[k]; const to = a[k];
+    if (before && after && String(from ?? '') !== String(to ?? '')) {
+      parts.push({ k, label: FIELD_TH[k], from: show(from), to: show(to), changed: true });
+    } else if (!before && to !== undefined) {
+      parts.push({ k, label: FIELD_TH[k], to: show(to), changed: false });
+    } else if (!after && from !== undefined) {
+      parts.push({ k, label: FIELD_TH[k], to: show(from), changed: false });
+    }
+  }
+  return parts;
+}
+
+/**
  * The audit table stores what happened as a code. Rendering the code was
  * showing a Thai reader the word "verify" — the dictionary is keyed by Thai, so
  * an English key passes straight through in Thai. Name them in Thai here and
@@ -250,11 +296,24 @@ export default function ReportsView({ site }) {
                       </td>
                       <td className="tbl-td text-slate-700">{a.actor_label || '—'}</td>
                       <td className="tbl-td"><span className="chip bg-slate-100 text-slate-600">{t(ACTION_TH[a.action] || a.action)}</span></td>
-                      <td className="tbl-td whitespace-nowrap text-slate-500">{a.ymd ? String(a.ymd).slice(0, 10) : '—'}</td>
-                      <td className="tbl-td max-w-[280px] text-xs text-slate-500">
-                        <span className="line-through opacity-60">{a.before_val ? JSON.stringify(a.before_val) : '—'}</span>
-                        {' → '}
-                        <span>{a.after_val ? JSON.stringify(a.after_val) : '—'}</span>
+                      <td className="tbl-td whitespace-nowrap text-slate-500">{a.ymd ? (thShort(a.ymd) || String(a.ymd).slice(0, 10)) : '—'}</td>
+                      <td className="tbl-td max-w-[320px] text-xs text-slate-600">
+                        {(() => {
+                          const parts = describe(a.before_val, a.after_val);
+                          if (!parts.length) return <span className="text-slate-400">—</span>;
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              {parts.map((p2) => (
+                                <span key={p2.k} className={p2.changed ? 'font-medium text-slate-800' : ''}>
+                                  <span className="text-slate-400">{t(p2.label)}</span>{' '}
+                                  {p2.changed
+                                    ? <>{t(p2.from)} <span className="text-slate-400">→</span> {t(p2.to)}</>
+                                    : t(p2.to)}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="tbl-td text-xs text-slate-600">{a.reason || '—'}</td>
                     </tr>

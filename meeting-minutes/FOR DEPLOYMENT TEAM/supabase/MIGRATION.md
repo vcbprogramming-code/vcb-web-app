@@ -26,9 +26,19 @@ insert into public.editors (email) values ('another@vcb-con.com');   -- EDITOR_E
 ```
 
 The app's editor PINs (`EDITOR_CREDS`, salted+hashed in Script Properties) do
-**not** migrate. They existed because Apps Script had no way to authenticate a
-non-Google user; Supabase auth replaces that mechanism entirely. Tell editors
-they now sign in with their Google account instead of a PIN.
+**not** migrate. These are live and current — 4-digit PINs, added 2026-08-20 at
+the owner's request — so this is a real change for the people using them, not
+the removal of something already dead.
+
+They exist because of a specific Apps Script constraint: under
+`ANYONE_ANONYMOUS` deployment Google hides the visitor's email from the script,
+so `googleEmail_()` returns `''` for everyone but the owner. The app could not
+tell who an editor was, hence its own PIN-based session. Supabase auth removes
+that constraint entirely — identity comes from the signed-in user.
+
+Tell editors before the switch: they sign in with their Google account, and the
+PIN goes away. (The older magic-link sign-in was already retired; only the
+`token` argument survives, for call-site compatibility.)
 
 ### 3. Seed the projects
 

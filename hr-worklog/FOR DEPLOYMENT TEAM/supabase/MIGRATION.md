@@ -69,6 +69,13 @@ Notes for whoever writes the import script:
 - **Days 29–31 do not exist in every month.** Ignore those columns for shorter
   months rather than creating impossible dates.
 - **`site_key` comes from the tab name**, via the reverse of `siteSheetMap_()`.
+- **Check for `_legacy_<siteName>` tabs before you start.** The app was migrated
+  from a LONG format (one row per entry, in `SupportEntries` / `OperationEntries`)
+  to the current wide format by `migrateToWideFormat_()`. That function renamed
+  the old tabs to `_legacy_…` rather than deleting them, so a rollback stayed
+  possible. If any still exist, decide deliberately whether their rows were
+  fully carried into the wide tabs — anything left behind is history that the
+  pivot above will not see.
 
 This is the step most likely to lose or misplace data. Verify it before anything
 else.

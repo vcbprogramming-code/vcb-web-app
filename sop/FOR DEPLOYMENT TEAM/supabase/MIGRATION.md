@@ -73,19 +73,26 @@ npm run dev
 - Sign in as a non-editor and confirm an edit is refused.
 - Make one edit, then confirm a row appeared in `sop_versions` automatically.
 
-## Decide deliberately: the Google Doc
+## The Google Doc is a backup, not the source
 
-`SOP_DOC_ID` stays upstream of the live app — the Doc is where content is
-authored, and the app re-parses it. After migration you have two choices:
+Worth being precise, because it is easy to assume the opposite: **the Doc is not
+upstream of the app.** `Code.js` says so directly —
 
-1. **Keep the Doc as the source.** Someone still edits in Google Docs, and an
-   import step refreshes `sop_document`. Familiar for authors; two places to
-   look.
-2. **Cut the link.** The database becomes the only source, edited through the
-   app. Cleaner, but authors lose Google Docs.
+> "The Doc is NOT read back into the app automatically or on a schedule —
+> editing the Doc directly no longer has any effect on what the app shows.
+> There is no sync-from-Doc entry point anymore (removed along with the old
+> auto-sync trigger)."
 
-The schema supports either. Choose before switching anyone over, because doing
-it accidentally means edits in one place silently do not appear in the other.
+Content is authored **in the app**. Every mutation writes into the Doc as a
+one-way mirror, and also drops a timestamped JSON snapshot into Drive as an
+independent recovery point. `refreshFromDoc_()` is only a
+write-then-re-read-your-own-write helper for the admin mutation functions, not a
+sync path.
+
+So there is no "cut the cord" decision to make. After migration, Postgres holds
+the content and the app writes to it; if you want the Doc mirror to continue you
+would have to rebuild that write path deliberately. Most likely you do not —
+`sop_versions` already gives you the recovery points the Drive snapshots did.
 
 ## Also unique to SOP
 

@@ -65,7 +65,13 @@ create table if not exists public.projects (
   cadence    text,
   color      text,
   sort_order int,
-  doc_id     text,                      -- source Google Doc, if imported
+  -- HISTORICAL ONLY. Google Docs stopped being the source of truth on
+  -- 2026-07-19; every meeting is now created and edited in the app, and the
+  -- import path is permanently disabled with an explicit "do not resurrect"
+  -- note in Code.js (see ensureSeeded_ / importAllDocs). Kept so old rows keep
+  -- their provenance — never use it to re-import, which would overwrite real
+  -- in-app edits with stale Doc content.
+  doc_id     text,
   builtin    boolean not null default false,
   -- 'public'  = readable by anyone, no sign-in (the app's 🔓 Public)
   -- 'locked'  = admins, editors and the guest list only (🔒 Locked)
@@ -111,7 +117,11 @@ create table if not exists public.minutes (
   excerpt      text,
   fathom_url   text,
   attendees    jsonb not null default '[]'::jsonb,
+  -- Historical: the source Google Docs tab a row was imported from. Dead since
+  -- 2026-07-19 along with doc_id above; kept only so old rows stay traceable.
   tab_id       text,
+  -- 'doc-import' is a HISTORICAL value only — that path is disabled and must
+  -- not come back. New rows are 'manual', 'fathom' or 'transkriptor'.
   source       text check (source in ('doc-import','manual','fathom','transkriptor')),
   visible      boolean not null default false,
   pinned       boolean not null default false,

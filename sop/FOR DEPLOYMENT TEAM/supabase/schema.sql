@@ -1,9 +1,10 @@
 -- VCB-MANGO ERP SOP — Supabase schema
 --
--- The SOP app has no spreadsheet. Its content lives as ONE JSON document,
--- parsed from a Google Doc (SOP_DOC_ID in ../../ORIGINAL CODE/apps-script/Code.js)
--- and cached into ScriptProperties in chunks because a single property has a
--- size limit. Every mutation also drops a timestamped JSON snapshot into Drive.
+-- The SOP app has no spreadsheet. Its content lives as ONE JSON document, held
+-- in ScriptProperties in chunks because a single property has a size limit.
+-- Content is authored IN THE APP; the Google Doc (SOP_DOC_ID) and the
+-- timestamped Drive JSON snapshots are one-way backups, not inputs — see the
+-- note at the foot of this file.
 --
 -- So the migration here is small: the chunking disappears (Postgres has no such
 -- limit), and the Drive snapshots become rows in sop_versions.
@@ -103,7 +104,9 @@ create policy "sop versions readable by editors" on public.sop_versions
 --        insert into public.sop_document (id, data) values (1, '<json>'::jsonb);
 --   3. Enable Supabase Auth → Google, restricted to your workspace domain.
 --
--- The Google Doc (SOP_DOC_ID) stays as the upstream source of truth until the
--- React app fully replaces the Apps Script one. Decide deliberately when to cut
--- that link — see MIGRATION.md in the credit-facility folder for the general
--- argument about what is gained and lost by leaving Apps Script.
+-- NOTE: the Google Doc (SOP_DOC_ID) is a ONE-WAY MIRROR, not the source.
+-- Code.js is explicit: "editing the Doc directly no longer has any effect on
+-- what the app shows... There is no sync-from-Doc entry point anymore."
+-- Content is authored in the app; the Doc and the Drive JSON snapshots are
+-- backups. After migration, sop_document holds the content and sop_versions
+-- replaces those snapshots. See MIGRATION.md.

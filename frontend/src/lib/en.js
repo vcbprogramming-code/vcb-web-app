@@ -1396,4 +1396,37 @@ export const EN = {
   'แนบ': 'Attach',
   'แนบไฟล์แล้ว': 'File attached',
   'รายงานนี้เป็น PDF': 'This report as PDF',
+
+  // ── ทะเบียนแผนกและตำแหน่ง ───────────────────────────────────────────────
+  'ทะเบียนแผนกและตำแหน่ง': 'Departments and positions',
+  'แผนกสังกัดไซต์งาน · ตำแหน่งสังกัดแผนก — ที่เคยมีพนักงานผูกอยู่จะปิดใช้งานได้ แต่ลบไม่ได้ เพื่อไม่ให้ข้อมูลเดิมเปลี่ยนไป':
+    'A department belongs to a site, a position to a department — once people are filed under one it can be retired but not deleted, so what is already recorded stays as it was',
+  'ไซต์งาน': 'Site',
+  'แสดงที่ปิดใช้งานแล้ว': 'Show retired',
+  'ชื่อแผนกใหม่ เช่น ฝ่ายบุคคล': 'New department, e.g. HR',
+  'ชื่อตำแหน่งใหม่ เช่น หัวหน้าชุด': 'New position, e.g. Team leader',
+  'เลือกแผนกทางซ้ายก่อน': 'Choose a department on the left first',
+  'เลือกแผนกทางซ้ายเพื่อดูตำแหน่ง': 'Choose a department on the left to see its positions',
+  'ยังไม่มีแผนกในไซต์นี้': 'No departments at this site yet',
+  'ยังไม่มีตำแหน่งในแผนกนี้': 'No positions in this department yet',
+  'กรุณากรอกชื่อแผนก': 'Please enter a department name',
+  'กรุณากรอกชื่อตำแหน่ง': 'Please enter a position name',
+  'เพิ่มแผนกแล้ว': 'Department added',
+  'เพิ่มตำแหน่งแล้ว': 'Position added',
+  'ลบแผนก': 'Delete department',
+  'ลบตำแหน่ง': 'Delete position',
+  'ลบแผนกแล้ว': 'Department deleted',
+  'ลบตำแหน่งแล้ว': 'Position deleted',
+  'ชื่อแผนกใหม่': 'New department name',
+  'ชื่อตำแหน่งใหม่': 'New position name',
+  'เปลี่ยนชื่อแล้ว': 'Renamed',
+  'ปิดใช้งานแล้ว': 'Retired',
+  'เปิดใช้งานแล้ว': 'Back in use',
+  'admin::เปิดใช้งาน': 'Reactivate',
+  '{p} ตำแหน่ง · {n} คน': '{p} positions · {n} people',
+  '{n} คน': '{n} people',
+  'แผนกนี้มีพนักงานผูกอยู่ {n} คน — ปิดใช้งานแทนการลบ':
+    '{n} people are filed under this department — retire it instead of deleting',
+  'ตำแหน่งนี้มีพนักงานผูกอยู่ {n} คน — ปิดใช้งานแทนการลบ':
+    '{n} people hold this position — retire it instead of deleting',
 };

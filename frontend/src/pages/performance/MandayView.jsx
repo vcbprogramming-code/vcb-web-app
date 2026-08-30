@@ -77,10 +77,10 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   }, [data, date]);
   const locked = dayState === 'locked' || dayState === 'closed';
   const rows = data?.employees || [];
-  // site-month returns rows shaped {eid, name, emp_id} — not the employees table's
-// own column names — so read them as they arrive rather than renaming server-side
-const entriesFor = (eid) => data?.entries?.[eid]?.[date] || {};
-const idOf = (e) => e.eid || e.id;
+  // site-month returns rows shaped {eid, name, emp_id} — not the employees
+  // table's own column names — so read them as they arrive
+  const entriesFor = (eid) => data?.entries?.[eid]?.[date] || {};
+  const idOf = (e) => e.eid || e.id;
 
   const save = async (eid, patch) => {
     const cur = entriesFor(eid);

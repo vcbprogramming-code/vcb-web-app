@@ -19,13 +19,14 @@ const STATUS = {
   rejected:  { label: 'ไม่อนุมัติ',  chip: 'bg-rose-50 text-rose-700' },
   cancelled: { label: 'ยกเลิกแล้ว',  chip: 'bg-slate-100 text-slate-500' },
 };
+const DAY_PART_TH = { first_half: 'ครึ่งวันเช้า', second_half: 'ครึ่งวันบ่าย' };
 const thDate = (v) => {
   if (!v) return '—';
   const d = new Date(v);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear() + 543}`;
 };
 
-function Row({ r, children }) {
+function Row({ r, children, onOpenFile, onDownloadFile }) {
   const t = useT();
   const st = STATUS[r.status] || STATUS.pending;
   return (
@@ -36,18 +37,39 @@ function Row({ r, children }) {
       </div>
       <div className="min-w-[150px]">
         <div className="text-sm text-slate-800">{thDate(r.from_date)} – {thDate(r.to_date)}</div>
-        <div className="text-xs text-slate-500">{r.days} {t('วัน ·')} {r.leave_type_th}</div>
+        <div className="text-xs text-slate-500">
+          {r.days} {t('วัน ·')} {r.leave_type_th}
+          {DAY_PART_TH[r.day_part] ? ` · ${t(DAY_PART_TH[r.day_part])}` : ''}
+        </div>
+        {/* A certificate that can be attached and never opened again is a filing
+            cabinet with no handle — the name is the button. */}
+        {r.has_attachment && (
+          <div className="mt-1 flex items-center gap-1">
+            <button onClick={() => onOpenFile?.(r)} title={t('เปิดไฟล์แนบ')}
+              className="inline-flex min-w-0 items-center gap-1 text-xs text-brand hover:underline">
+              <Icon name="paperclip" className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-w-[130px] truncate">{r.attachment_name || t('ไฟล์แนบ')}</span>
+            </button>
+            <button onClick={() => onDownloadFile?.(r)} title={t('ดาวน์โหลดไฟล์แนบ')}
+              className="text-slate-400 hover:text-brand">
+              <Icon name="download" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
       <div className="min-w-[160px] flex-1">
         {r.reason
           ? <div className="text-sm text-slate-600">{r.reason}</div>
           : <div className="text-sm text-slate-400">{t('— ไม่ได้ระบุเหตุผล')}</div>}
-        {r.decided_by_name && (
+        {r.decided_by_name ? (
           <div className="mt-0.5 text-xs text-slate-500">
             {t(st.label, null, 'status')}{t('โดย')} {r.decided_by_name} · {thDate(r.decided_at)}
             {r.decide_note ? ` — ${r.decide_note}` : ''}
           </div>
-        )}
+        ) : r.status === 'pending' && r.approver_names ? (
+          // Waiting is easier to accept when you know who you are waiting for.
+          <div className="mt-0.5 text-xs text-slate-500">{t('รอ')} {r.approver_names} {t('อนุมัติ')}</div>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className={`chip ${st.chip}`}>{t(st.label, null, 'status')}</span>
@@ -139,6 +161,23 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
   // A site office still keeps a paper file, and the person approving often wants
   // something to hold. Open it in a tab rather than downloading: people read it
   // and print from there, and a forced download makes that two steps.
+  const openAttachment = async (r) => {
+    try {
+      const url = await perfApi.leaveAttachmentUrl(r.id);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+  const downloadAttachment = async (r) => {
+    try {
+      const url = await perfApi.leaveAttachmentUrl(r.id);
+      const a = document.createElement('a');
+      a.href = url; a.download = r.attachment_name || 'leave-attachment';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { toast.error(e.message); }
+  };
+
   const openSlip = async (r) => {
     try {
       const url = await perfApi.leaveSlipUrl(r.id);
@@ -234,7 +273,7 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
               : tab === 'pending' ? t('ไม่มีคำขอรออนุมัติ') : t('ยังไม่มีประวัติการพิจารณา')}
           </p>
         ) : list.map((r) => (
-          <Row key={r.id} r={r}>
+          <Row key={r.id} r={r} onOpenFile={openAttachment} onDownloadFile={downloadAttachment}>
             {tab === 'pending' && (
               <>
                 <button onClick={() => decide(r, true)} disabled={busy}
@@ -259,6 +298,7 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
         <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
           <Icon name="clock" className="h-3.5 w-3.5" />
           {t('คำขอของท่านจะถูกส่งไปยังหัวหน้าที่ผู้ดูแลระบบกำหนดไว้')}
+          {' '}{t('ชื่อผู้อนุมัติแสดงอยู่ในแต่ละรายการ')}
         </p>
       )}
     </div>

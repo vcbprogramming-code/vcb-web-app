@@ -162,6 +162,7 @@ export default function Performance() {
       {view === 'settings' && (
         <SettingsView
           sites={boot.sites}
+          onOpenSite={(key) => { setSiteKey(key); setRosterKey((k) => k + 1); setView('entry'); }}
           onSitesChange={(key, lockDays) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, lockDays } : s)) }))}
         />
       )}

@@ -42,12 +42,25 @@ export function ConfirmProvider({ children }) {
           size="md"
           footer={
             <>
-              <button onClick={() => close(false)} className="btn-outline">{state.cancelLabel}</button>
+              {/* The two buttons sat side by side in the same neutral outline, so
+                  which one went ahead was a reading exercise. Colour carries it
+                  now: green goes ahead, red backs out. One exception — when the
+                  action itself is destructive the red belongs on it, and two red
+                  buttons would put us right back where we started, so there the
+                  way out goes quiet slate instead. */}
+              <button
+                onClick={() => close(false)}
+                className={state.danger
+                  ? 'inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50'
+                  : 'inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50'}
+              >
+                {state.cancelLabel}
+              </button>
               <button
                 onClick={() => close(true)}
                 className={state.danger
                   ? 'inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700'
-                  : 'btn-primary'}
+                  : 'inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700'}
               >
                 {state.confirmLabel}
               </button>

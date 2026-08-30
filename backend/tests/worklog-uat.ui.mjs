@@ -208,6 +208,55 @@ suite('§5 ผู้ตรวจสอบกดยืนยันข้อมู
   await shot('06-ยืนยันแล้ว');
 }
 
+// ── §1 ช่องเลือกบทบาทต้องมีครบ 5 ระดับ ────────────────────────────────────
+suite('§1 หน้าจอผู้ใช้ให้เลือกบทบาทได้ครบ 5 ระดับ');
+{
+  // เปิดของบัญชีทดสอบที่สร้างเอง ไม่แตะบัญชีจริง — รอบก่อนเคยเผลอเปลี่ยนบทบาท
+  // ของบัญชีผู้ดูแลจริงจนชุดทดสอบอื่นล้ม
+  // เก็บกวาดของรอบก่อนที่อาจค้างไว้ ไม่งั้นชุดทดสอบล้มตั้งแต่บรรทัดแรก
+  const probeEmail = `${MARK.toLowerCase()}-role@vcb.local`;
+  await query('delete from profiles where lower(email) = lower($1)', [probeEmail]);
+  const probe = (await query(
+    `insert into profiles (email, full_name, role, is_active) values ($1,$2,'hr',true) returning *`,
+    [probeEmail, `${MARK} บัญชีทดสอบบทบาท`])).rows[0];
+  await as(A, '/settings?s=users');
+  const opened = await page.evaluate((email) => {
+    const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes(email));
+    const e = row && [...row.querySelectorAll('button')].find((x) => x.innerText.trim() === 'แก้ไข');
+    if (e) { e.click(); return true; } return false;
+  }, probe.email);
+  happy('เปิดหน้าต่างแก้ไขผู้ใช้ได้', opened, '');
+  await waitForText('บทบาท');
+  await settle(1200);
+
+  const roles = await page.evaluate(() => {
+    const sel = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'admin'));
+    return sel ? [...sel.options].map((o) => ({ v: o.value, t: o.text.trim() })) : [];
+  });
+  happy(`ช่องบทบาทมีให้เลือก 5 ระดับ (พบ ${roles.length})`, roles.length === 5, roles.map((r) => r.t).join(' · '));
+  for (const [v, th] of [['recorder', 'ผู้บันทึกข้อมูลหน้างาน'], ['verifier', 'ผู้ตรวจสอบโครงการ'],
+    ['hr', 'เจ้าหน้าที่ HR'], ['executive', 'ผู้บริหาร'], ['admin', 'ผู้ดูแลระบบ']]) {
+    happy(`มีบทบาท "${th}"`, roles.some((r) => r.v === v && r.t.includes(th)), '');
+  }
+  // เลือกบทบาทใหม่แล้วต้องมีคำอธิบายกำกับ ไม่ให้เดา
+  const hint = await page.evaluate(() => {
+    const sel = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'recorder'));
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, 'recorder');
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  });
+  await settle(900);
+  happy('เลือกบทบาทแล้วมีคำอธิบายว่าทำอะไรได้',
+    hint && (await body()).includes('ยืนยันข้อมูลของตัวเองไม่ได้'), '');
+  await shot('19-เลือกบทบาท');
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'ยกเลิก');
+    if (btn) btn.click();
+  });
+  await settle(1200);
+  await query('delete from profiles where id = $1', [probe.id]);
+}
+
 // ── §4 ปิดงวดและเปิดงวดคืน จากหน้าจอ ──────────────────────────────────────
 suite('§4 ปิดงวดและเปิดงวดจากหน้าจอ');
 {

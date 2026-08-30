@@ -597,7 +597,21 @@ const leaveSelect = `
          pos.name as position, dept.name as department,
          u.code as site_key, u.name as site_name,
          rp.full_name as requested_by_name, dp.full_name as decided_by_name,
-         (r.to_date - r.from_date + 1) as days
+         r.day_part, r.attachment_name, (r.attachment_url is not null) as has_attachment,
+         -- Half a day is stored as 0.5 in r.days; recomputing from the dates
+         -- silently rounded it back up to a whole day on every screen.
+         -- ::float8 or pg hands numeric back as the string '3.0', which the
+         -- screen then prints as "3.0 วัน" and every caller compares wrongly
+         coalesce(r.days, (r.to_date - r.from_date + 1))::float8 as days,
+         -- "Who decides this?" is the first question the person waiting asks.
+         -- Nobody assigned means it falls to the admins, so say that instead of
+         -- leaving the answer blank.
+         coalesce((select string_agg(ap.full_name, ', ' order by ap.full_name)
+                     from leave_approvers la join profiles ap on ap.id = la.approver_id
+                    where la.employee_id = r.employee_id and ap.is_active = true),
+                  (select string_agg(ap.full_name, ', ' order by ap.full_name)
+                     from profiles ap where ap.role = 'admin' and ap.is_active = true)
+                 ) as approver_names
     from leave_requests r
     join employees e on e.id = r.employee_id
     left join positions pos on pos.id = e.position_id
@@ -1357,6 +1371,16 @@ router.post('/import/employees', requirePermission('performance', 'edit'), impor
     }
 
     let imported = 0; let updated = 0;
+    // Where the people landed. An import that only answers "how many" leaves
+    // the person who ran it hunting through every site for the ones they added.
+    const perSite = new Map();
+    const bump = (unitId, field) => {
+      const u = units.find((x) => x.id === unitId);
+      const cur = perSite.get(unitId) || { key: u?.code || '', name: u?.name || '—', imported: 0, updated: 0, names: [] };
+      cur[field] += 1;
+      perSite.set(unitId, cur);
+      return cur;
+    };
     if (!dryRun) {
       for (const e of ok) {
         const existing = e.code ? await queryOne('select id from employees where employee_code = $1', [e.code]) : null;
@@ -1367,18 +1391,23 @@ router.post('/import/employees', requirePermission('performance', 'edit'), impor
               where id = $1`,
             [existing.id, e.name, e.unitId, e.kind, e.isActive, e.departmentId, e.positionId]);
           updated += 1;
+          bump(e.unitId, 'updated');
         } else {
           await query(
             `insert into employees (unit_id, full_name, employee_code, kind, is_active, department_id, position_id)
              values ($1,$2,$3,$4,$5,$6,$7)`,
             [e.unitId, e.name, e.code, e.kind, e.isActive, e.departmentId, e.positionId]);
           imported += 1;
+          const c = bump(e.unitId, 'imported');
+          if (c.names.length < 5) c.names.push(e.name);
         }
       }
       await logWork({ actor: req.profile, action: 'import-employees',
         after: { imported, updated, failed: failed.length, file: req.file.originalname } });
     }
-    res.json({ data: { dryRun, total: rows.length, imported, updated, failedCount: failed.length, failed, accepted: ok.length } });
+    if (dryRun) for (const e of ok) bump(e.unitId, 'imported');
+    res.json({ data: { dryRun, total: rows.length, imported, updated, failedCount: failed.length, failed,
+      accepted: ok.length, sites: [...perSite.values()].sort((a, b) => b.imported + b.updated - a.imported - a.updated) } });
   }));
 
 /** §2 the template, so nobody has to guess the column names. */

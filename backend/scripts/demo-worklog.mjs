@@ -26,6 +26,21 @@ async function load() {
      on conflict (code) do update set name = excluded.name, lock_days = 3 returning *`,
     [SITE_NAME, SITE_CODE])).rows[0];
 
+  // §2 the registers the walkthrough shows: departments with positions under them
+  for (const [dept, roles] of [
+    ['ฝ่ายวิศวกรรม', ['วิศวกรสนาม', 'โฟร์แมน']],
+    ['ฝ่ายจัดซื้อ', ['เจ้าหน้าที่จัดซื้อ']],
+    ['ฝ่ายความปลอดภัย', ['จป. วิชาชีพ']],
+  ]) {
+    const d = (await query(
+      `insert into departments (unit_id, name) values ($1,$2)
+       on conflict (unit_id, name) do update set is_active = true returning id`, [unit.id, dept])).rows[0];
+    for (const role of roles) {
+      await query(`insert into positions (department_id, name) values ($1,$2)
+                   on conflict (department_id, name) do update set is_active = true`, [d.id, role]);
+    }
+  }
+
   for (const name of ['ทีม ก', 'ทีม ข', 'ทีม ค']) {
     await query(`insert into teams (unit_id, name) values ($1,$2) on conflict (unit_id, name) do nothing`, [unit.id, name]);
   }
@@ -115,6 +130,9 @@ async function remove() {
   await query('delete from employee_away where employee_id in (select id from employees where unit_id = $1)', [unit.id]);
   await query('delete from leave_requests where unit_id = $1', [unit.id]);
   await query('delete from leave_approvers where employee_id in (select id from employees where unit_id = $1)', [unit.id]);
+  await query('update employees set department_id = null, position_id = null where unit_id = $1', [unit.id]);
+  await query('delete from positions where department_id in (select id from departments where unit_id = $1)', [unit.id]);
+  await query('delete from departments where unit_id = $1', [unit.id]);
   await query('delete from teams where unit_id = $1', [unit.id]);
   await query('delete from employees where unit_id = $1', [unit.id]);
   await query('delete from profile_units where unit_id = $1', [unit.id]);

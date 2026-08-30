@@ -1,5 +1,11 @@
 # PORT_NOTES — GAS → React mirror
 
+> **อ่านอยู่บน GitHub?** path ที่อ้างถึงข้างล่างเป็นของ**เครื่องที่พัฒนา** ซึ่ง
+> โฟลเดอร์นี้อยู่ข้างในโปรเจกต์ Apps Script ส่วนใน repo นี้ ของสองอย่างเดียวกันคือ
+> `for deploy team/` (โค้ด GAS ที่ deploy จริง เป็นแหล่งความจริง) กับ
+> `original script/` (React mirror ตัวนี้) ความสัมพันธ์เหมือนกันทุกอย่าง
+> ต่างแค่ชื่อโฟลเดอร์
+
 This folder lives **inside** the Google Apps Script (GAS) project root
 (`Meeting Minute Web App/meeting-minutes-react`) and is a **live mirror** of it. The
 GAS project is **canonical**: build/demo there first, then re-sync here. After ANY
@@ -133,7 +139,7 @@ change to the GAS source, diff it against this folder and update only what chang
 
 - **2026-08-19 — page-accurate rendering (the big one).** The reading view, the
   PDF and the editor now break pages in identical places. **Read
-  [PAGINATION.md](PAGINATION.md) before touching display, print or editor
+  [PAGINATION.md](../for%20deploy%20team/PAGINATION.md) before touching display, print or editor
   layout** — it records the design, the rules that must hold, and six approaches
   already tried and found not to work.
 

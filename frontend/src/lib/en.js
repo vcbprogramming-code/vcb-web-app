@@ -1351,13 +1351,6 @@ export const EN = {
   'ปกติ': 'Normal',
   'ล่วงเวลา': 'Overtime',
   'ขาดงาน': 'Absent',
-  'create': 'Created',
-  'edit': 'Edited',
-  'delete': 'Deleted',
-  'verify': 'Verified',
-  'unverify': 'Verification undone',
-  'period-close': 'Period closed',
-  'period-open': 'Period reopened',
   'รหัสพนักงาน': 'Employee code',
   'ชื่อ-สกุล': 'Name',
   'สถานะการทำงาน': 'Working status',
@@ -1438,4 +1431,13 @@ export const EN = {
   'ไฟล์แนบ เช่น ใบรับรองแพทย์': 'Attachment, e.g. a medical certificate',
   'วันที่ขอลามีบันทึกงานอยู่แล้ว {n} วัน — ตรวจสอบอีกครั้ง':
     '{n} of those days already have work recorded — please check',
+  // ── ชื่อการกระทำในประวัติการแก้ไข ───────────────────────────────────────
+  'สร้างรายการ': 'Created',
+  'ยืนยันข้อมูล': 'Verified',
+  'ลบไฟล์แนบ': 'File removed',
+  'นำเข้าพนักงาน': 'Employees imported',
+  'เพิ่มแผนก': 'Department added',
+  'แก้ไขแผนก': 'Department edited',
+  'เพิ่มตำแหน่ง': 'Position added',
+  'แก้ไขตำแหน่ง': 'Position edited',
 };

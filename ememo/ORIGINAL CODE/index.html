@@ -1,0 +1,3836 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>VCB E-MEMO</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+/* Reserve the scrollbar gutter so the layout never shifts horizontally
+   when a filter shortens the table and the vertical scrollbar vanishes. */
+html{overflow-y:scroll;scrollbar-gutter:stable}
+/* Safety net independent of the html.is-mobile JS detector below: some
+   in-app browsers (share-sheet webviews, embedded readers) report a UA
+   string that doesn't match our /iPhone|Android/ sniff AND misreport
+   viewport width, so is-mobile never gets added and the wide desktop
+   toolbar rows (.bar/.datebar) overflow past the screen edge instead of
+   wrapping. This guarantees the page itself never scrolls sideways no
+   matter which layout is active. */
+html,body{max-width:100vw;overflow-x:hidden}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:13px}
+
+header{background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);color:white;padding:16px 28px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;font-weight:600;letter-spacing:.3px}
+header span{font-size:11px;opacity:.55}
+
+.bar{background:white;padding:12px 28px 10px;border-bottom:1px solid #e8e8e8;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+#srch{padding:7px 12px;border:1px solid #d0d0d0;border-radius:6px;font-size:13px;width:240px;outline:none}
+#srch:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+
+.divider{width:1px;height:28px;background:#e0e0e0;margin:0 2px}
+
+/* Document-type / status / project dropdowns */
+.dtsel{padding:6px 9px;border:1.5px solid #d0d0d0;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-weight:600;color:#555;outline:none;max-width:240px}
+.dtsel:focus{border-color:#1a73e8}
+.dtsel.on{border-color:#1a73e8;color:#1a73e8}
+/* Project picker: SINGLE-select, but a custom button+popover rather than a
+   native <select>, because an <option> can't render a styled badge chip.
+   Each row = plain full name on the left + the same .pb chip the table
+   rows use on the right. Selecting a row closes the panel immediately —
+   one click to switch projects, same as the old <select>. */
+.pfms{position:relative}
+.pfmsBtn{display:flex;align-items:center;gap:6px;text-align:left}
+.pfmsCaret{font-size:10px;color:#8a90a2;transition:transform .15s;margin-left:auto}
+.pfms.openMenu .pfmsCaret{transform:rotate(180deg)}
+.pfmsPanel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:40;
+  min-width:270px;max-height:340px;overflow-y:auto;background:white;
+  border:1.5px solid #d0d0d0;border-radius:8px;box-shadow:0 6px 20px rgba(20,25,55,.14);padding:6px}
+.pfms.openMenu .pfmsPanel{display:block}
+/* Name left, chip right — gap:14px keeps them from ever touching. */
+.pfmsRow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:7px 9px;border-radius:6px;font-size:12.5px;font-weight:600;color:#333;
+  cursor:pointer;white-space:nowrap}
+.pfmsRow:hover{background:#f2f5fb}
+.pfmsRow.sel{background:#e8f0fe}
+.pfmsRow .pb{flex-shrink:0}
+.pfmsDiv{height:1px;background:#eceff5;margin:4px 2px}
+
+/* Date range row */
+.datebar{background:#fafafa;padding:8px 28px;border-bottom:1px solid #ececec;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.datebar input[type=date],.datebar .dfld{padding:5px 8px;border:1px solid #d0d0d0;border-radius:5px;font-size:12px;color:#333;outline:none;background:white}
+.datebar .dfld{width:104px;text-align:center}
+.datebar input[type=date]:focus,.datebar .dfld:focus{border-color:#1a73e8}
+.qbtn{padding:5px 11px;border:1.5px solid #d0d0d0;border-radius:16px;background:white;cursor:pointer;font-size:11px;font-weight:500;color:#555;transition:all .15s;white-space:nowrap}
+.qbtn:hover{border-color:#34a853;color:#34a853}
+.qbtn.on{background:#34a853;border-color:#34a853;color:white}
+.clrbtn{padding:4px 10px;border:1.5px solid #e57373;border-radius:16px;background:white;cursor:pointer;font-size:11px;font-weight:500;color:#e57373;transition:all .15s}
+.clrbtn:hover{background:#e57373;color:white}
+
+.stat{padding:5px 28px 0;font-size:11px;color:#888}
+
+.tw{padding:14px 28px 40px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+thead tr{background:#1a1a2e;color:white}
+th{padding:10px 12px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:#2a2a4e}
+th.asc::after{content:" ▲";font-size:9px;opacity:.7}
+th.desc::after{content:" ▼";font-size:9px;opacity:.7}
+tbody tr{border-bottom:1px solid #f0f0f0;transition:background .1s}
+tbody tr:hover{background:#f5f9ff}
+tbody tr.h{display:none}
+tbody tr.pg{display:none}
+#pager{display:none;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;padding:16px 0}
+#pager .qbtn.on{background:#1a1f38;color:#fff;border-color:#1a1f38}
+#pager .qbtn:disabled{opacity:.4;cursor:not-allowed}
+td{padding:9px 12px;vertical-align:top}
+td.n{width:34px;color:#bbb;font-size:11px;text-align:right}
+td.dt{width:88px;white-space:nowraw;color:#666;font-size:12px}
+td.pj{width:56px}
+td.cd{width:120px;font-size:11px;word-break:break-all;color:#555}
+td.sb{max-width:320px}
+.ti{font-weight:500;color:#1a1a2e;line-height:1.4}
+.de{font-size:11px;color:#777;margin-top:2px;line-height:1.4}
+td.lk{width:72px;text-align:center}
+
+.pb{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.BT1{background:#e3f2fd;color:#1565c0}.VK2{background:#f3e5f5;color:#6a1b9a}
+.CVE{background:#e8f5e9;color:#2e7d32}.LPB{background:#fff3e0;color:#e65100}
+.BV{background:#fce4ec;color:#880e4f}.PN4{background:#e0f7fa;color:#006064}
+.EP{background:#f9fbe7;color:#558b2f}.VK{background:#fff8e1;color:#f57f17}
+.VC{background:#ede7f6;color:#4527a0}.VnK{background:#e8eaf6;color:#283593}
+.UNCLASSIFIED{background:#f5f5f5;color:#757575}
+
+.ol{display:inline-block;padding:4px 9px;background:#1a73e8;color:white;border-radius:5px;text-decoration:none;font-size:11px;font-weight:500;white-space:nowrap}
+.ol:hover{background:#1557b0}
+.nl{color:#ccc;font-size:11px}
+.empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
+
+/* Review status */
+.stc{width:92px}.rvc{width:74px}
+.stb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap}
+.st-pending{background:#fff4e5;color:#8a5a00}
+.st-commented{background:#e8f0fe;color:#1a56c4}
+.st-approved{background:#e6f4ea;color:#137333}
+.st-rejected{background:#fce8e6;color:#c5221f}
+.rvb.dl{background:#fff;color:#c5221f;border:1.5px solid #c5221f}
+.rvb.dl:hover{background:#c5221f;color:#fff}
+.rvbtn{padding:4px 10px;background:#1a73e8;border:1.5px solid #1a73e8;color:#fff;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer}
+.rvbtn:hover{background:#1557b0;border-color:#1557b0}
+
+/* Review modal — a clean full-page view, not a floating card: no dark
+   backdrop margins, no card shadow/rounding, no "window inside a
+   window" look. The document sits directly on a plain light page. */
+#rvWrap{display:none;position:fixed;inset:0;z-index:200;background:#f0f2f5}
+.rvbox{position:static;width:100%;height:100vh;background:#f0f2f5;display:flex;flex-direction:column;overflow:hidden;box-shadow:none}
+.rvhd{background:#1a1a2e;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rvhd h3{font-size:14px;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+.rvbody{flex:1;overflow:auto;padding:24px 18px 40px;background:#f0f2f5;touch-action:pan-x pan-y;scrollbar-gutter:stable}
+/* ── Sidebar design tokens ──────────────────────────────────────
+   A small, deliberate palette: a blue-biased neutral ramp (not pure
+   gray) so borders/backgrounds read as chosen rather than default,
+   one accent for actions, and semantic colors kept distinct from it
+   for approve/reject/reopen states. One type scale, reused everywhere
+   instead of ad-hoc sizes per element. */
+.rvside{
+  --rv-ink:#0f1424; --rv-ink-soft:#5b6172; --rv-ink-faint:#8a90a2;
+  --rv-line:#e4e7f0; --rv-line-soft:#edeff5;
+  --rv-surface:#fff; --rv-surface-sunken:#f7f8fb;
+  --rv-accent:#2f5fd6; --rv-accent-soft:#eef2fd; --rv-accent-ink:#fff;
+  --rv-good:#1a7a43; --rv-good-bg:#2a9d5c; --rv-good-soft:#eaf7ee;
+  --rv-bad:#b3341f; --rv-bad-bg:#cf4a35; --rv-bad-soft:#fbeeec;
+  --rv-warn:#92400e; --rv-warn-bg:#c07a2e;
+  --rv-eyebrow-size:10.5px; --rv-label-size:11.5px; --rv-body-size:13px; --rv-heading-size:14.5px;
+}
+/* Document on the left, comments/audit trail on the right — two
+   independent columns, each scrolling within .rvbody, instead of one
+   long stacked page. Side-by-side only where there's room for it. */
+.rvsplit{display:flex;gap:22px;align-items:flex-start;max-width:1520px;margin:0 auto}
+.rvstack{flex:1 1 620px;min-width:0;display:flex;flex-direction:column;gap:16px;transform-origin:top center}
+.rvside{
+  flex:0 0 460px;min-width:0;
+  background:var(--rv-surface);border:1px solid var(--rv-line);border-radius:10px;
+  box-shadow:0 1px 2px rgba(15,20,36,.04),0 8px 24px rgba(15,20,36,.05);
+  padding:22px 24px 24px;position:sticky;top:0;
+  font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+  /* Cap the whole card to the viewport and let only the comment thread
+     scroll inside it — with many comments the card used to just keep
+     growing taller than the page (nothing to scroll it independently),
+     squeezing everything into an ever-longer narrow column instead of
+     a fixed-height panel with its own scrollbar. */
+  max-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;
+}
+@media (max-width:1100px){
+  .rvsplit{flex-direction:column}
+  .rvside{flex:1 1 auto;width:100%;position:static;max-height:none}
+}
+/* A Drive-hosted PDF preview paginates internally and needs to own its
+   scroll — nesting it inside another scrolling column makes the two
+   scrollbars fight (the page appears to jump instead of scrolling
+   smoothly). Give it the full visible height and let it scroll itself;
+   the letterhead HTML case (rvFitDoc) still grows a taller box that the
+   outer .rvbody scrolls, since that content has no scroll of its own. */
+.rvdoc{width:100%;height:calc(100vh - 130px);border:1px solid #dcdfe6;border-radius:2px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);display:block}
+.rvpage{background:#fff;border:1px solid #dcdfe6;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.15);padding:40px 48px;color:#000;min-height:600px}
+.rvpage h4{margin:0 0 4px;font-size:18px}
+.rvpage .sub{font-size:12px;color:#666;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px}
+/* Status block — its own tinted header strip at the top of the card,
+   so "what state is this document in" reads as the sidebar's headline
+   rather than one more line of text. */
+.rvst{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap;
+  margin:-22px -24px 14px;padding:10px 24px;
+  background:var(--rv-surface-sunken);border-bottom:1px solid var(--rv-line);
+  border-radius:10px 10px 0 0;
+}
+.rvst::before{
+  content:'STATUS';font-size:var(--rv-eyebrow-size);font-weight:700;color:var(--rv-ink-faint);
+  letter-spacing:.6px;flex:0 0 auto;
+}
+.rvst #rvStatus{font-size:var(--rv-heading-size);font-weight:700;color:var(--rv-ink);flex:0 0 auto;white-space:nowrap}
+/* "Signed in as ..." moved up onto the status row, right-aligned, in a
+   light weight — was its own line below the action buttons, wasting a
+   full row for what's really just ambient context, not something that
+   needs equal visual weight to Status. flex:1 1 auto + min-width:0 is
+   what actually makes text-overflow:ellipsis take effect inside a flex
+   row — without min-width:0 a flex item won't shrink below its content's
+   natural width, so it was forcing the whole row to wrap instead. */
+.rvst #rvWho{margin-left:auto;flex:1 1 auto;min-width:0;font-size:11px;font-weight:400;color:var(--rv-ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* ── Action area (#rvFoot): Comment / Approve / Reject → composer.
+   Muted, tinted button surfaces (not saturated blocks of color) with a
+   colored left rule — reads as a labeled control, not a warning light. */
+#rvStep1 .rvacts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:0}
+#rvStep1 #rvReopen,#rvStep1 #rvMango{grid-column:1/-1}
+#rvStep1 .rvb{
+  padding:7px 8px;font-size:var(--rv-label-size);font-weight:600;letter-spacing:.1px;
+  border-radius:7px;border:1px solid transparent;cursor:pointer;
+  transition:background .14s ease,border-color .14s ease,transform .08s ease;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#rvStep1 .rvb:active{transform:scale(.98)}
+#rvStep1 .rvb:focus-visible{outline:2px solid var(--rv-accent);outline-offset:2px}
+#rvPickComment{background:var(--rv-accent-soft);color:var(--rv-accent);border-color:#dbe4fb}
+#rvPickComment:hover{background:#e3eafc;border-color:#c7d6f8}
+#rvPickApprove{background:var(--rv-good-soft);color:var(--rv-good);border-color:#d5eedd}
+#rvPickApprove:hover{background:#ddf3e4;border-color:#c2e6cc}
+#rvPickReject{background:var(--rv-bad-soft);color:var(--rv-bad);border-color:#f3ddd8}
+#rvPickReject:hover{background:#f8e4df;border-color:#eecdc5}
+#rvReopen{background:#faf1e3;color:var(--rv-warn);border-color:#f0ddbe}
+#rvReopen:hover{background:#f6e9d1;border-color:#e9cf9d}
+#rvMango{background:var(--rv-accent-soft);color:var(--rv-accent);border-color:#dbe4fb}
+#rvMango:hover{background:#e3eafc;border-color:#c7d6f8}
+
+/* Always-open textarea — type a comment, then press Comment / Approve /
+   Reject directly. No separate "pick an action, then confirm" step. */
+#rvText{
+  width:100%;box-sizing:border-box;padding:8px 11px;margin-bottom:8px;
+  border:1px solid var(--rv-line);border-radius:8px;
+  font:400 var(--rv-body-size)/1.5 'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+  color:var(--rv-ink);background:var(--rv-surface);resize:vertical;min-height:44px;
+  transition:border-color .14s ease,box-shadow .14s ease;
+}
+#rvText:focus{outline:none;border-color:var(--rv-accent);box-shadow:0 0 0 3px rgba(47,95,214,.13)}
+#rvText::placeholder{color:var(--rv-ink-faint);font-style:normal}
+
+/* "Also notify" — collapsed by default so the simplified comment box
+   stays uncluttered; one click reveals the department chips + email
+   field. Feeds ccDepts/ccEmails into rvDo(), which server-side triggers
+   notifyCc_() to email the recipients a link to this document. */
+#rvCcToggle{
+  display:block;margin:0 0 6px;padding:2px 0;border:none;background:none;
+  font-size:11px;font-weight:600;color:var(--rv-accent);cursor:pointer;text-align:left;
+}
+#rvCcToggle:hover{text-decoration:underline}
+/* Compact: chips size to their own text and wrap in a flowing row
+   instead of a rigid 2-column grid that forced every chip (and the
+   whole picker) to full width — that was eating roughly half the
+   sidebar's height and pushing the audit trail below the fold. */
+#rvCcWrap{margin-bottom:10px;padding:8px 10px;background:var(--rv-surface-sunken);border:1px solid var(--rv-line-soft);border-radius:7px}
+#rvCcDepts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.ccchip{
+  width:auto;padding:4px 9px;border:1px solid var(--rv-line);border-radius:12px;
+  background:var(--rv-surface);color:var(--rv-ink-soft);font-size:10.5px;font-weight:600;cursor:pointer;
+  transition:all .14s ease;white-space:nowrap;
+}
+.ccchip:hover{border-color:var(--rv-accent)}
+.ccchip.on{background:var(--rv-accent-soft);border-color:var(--rv-accent);color:var(--rv-accent)}
+#rvCcEmail{
+  width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid var(--rv-line);border-radius:6px;
+  font-size:11.5px;font-family:inherit;color:var(--rv-ink);background:var(--rv-surface);
+}
+#rvCcEmail:focus{outline:none;border-color:var(--rv-accent)}
+.rvmsg{font-size:12px;font-weight:600;display:block;margin-top:8px}
+.rvlock{
+  font-size:12.5px;color:var(--rv-ink-soft);background:var(--rv-surface-sunken);
+  border:1px solid var(--rv-line);border-radius:8px;padding:12px 14px;text-align:center;line-height:1.5;
+}
+
+/* Sign-in prompt — an intentional call-to-action card, not a stray
+   floating button. */
+#rvSignIn{background:var(--rv-surface-sunken);border:1px solid var(--rv-line);border-radius:8px;padding:16px 14px}
+#rvSignIn .rvb{
+  width:100%;padding:11px 14px;font-size:var(--rv-label-size);font-weight:700;border-radius:8px;
+  background:var(--rv-accent);color:var(--rv-accent-ink);border:none;cursor:pointer;
+  box-shadow:0 1px 2px rgba(47,95,214,.3);transition:box-shadow .14s ease,transform .08s ease;
+}
+#rvSignIn .rvb:hover{box-shadow:0 4px 12px rgba(47,95,214,.32);transform:translateY(-1px)}
+
+/* Comments/audit-trail, styled as an actual timeline/history: a
+   connecting rail down the left edge with a colored dot per entry (by
+   action type), generous spacing between records instead of a cramped
+   card stack. #rvThread (the direct flex child inside .rvside) is the
+   one part of the sidebar that scrolls internally (see .rvside's
+   max-height/flex above) — Status and the action buttons stay in view
+   no matter how long the history gets; .rvcmtbox is the content
+   #rvThread wraps. */
+#rvThread{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  padding-right:6px;margin-right:-6px;   /* room for the scrollbar without shifting content */
+  /* Reserve the scrollbar's width whether or not it's actually showing.
+     Without this, expanding "Also notify" shrinks #rvThread enough to
+     newly need a scrollbar, which appears/disappears and changes this
+     column's content width by ~15px each time — reflowing the whole
+     .rvsplit row and visibly shifting the document a couple pixels
+     left/right depending on scroll state. */
+  scrollbar-gutter:stable;
+}
+.rvcmtbox{color:var(--rv-ink);margin-top:14px}
+.rvcmtbox h4{margin:0 0 2px;font-size:13px;font-weight:700;color:var(--rv-ink)}
+.rvcmtbox .sub{font-size:11px;color:var(--rv-ink-faint);margin-bottom:12px}
+/* Single rail spanning .rvol itself, from the first dot's center to the
+   last dot's center — NOT per-item segments guessed at a fixed pixel
+   offset (that broke as soon as comment bodies had different heights,
+   and still overshot past the final dot). Dots are 14px wide, so each
+   one's vertical center sits 7px below its <li>'s top edge (top:2px +
+   half of 14px border-box-sized width). Anchoring the rail's `top` and
+   `bottom` to those same two points — the FIRST li's dot-center from
+   .rvol's top, and the LAST li's dot-center from .rvol's bottom — means
+   it can never run past the last dot, however tall any comment in
+   between happens to render. */
+.rvol{list-style:none;margin:0;padding:0;position:relative}
+.rvol::before{
+  content:'';position:absolute;left:8px;width:2px;background:var(--rv-line);
+  top:9px;bottom:9px;
+}
+.rvol li{position:relative;padding:0 0 10px 22px}
+.rvol li:last-child{padding-bottom:2px}
+.rvol li::before{
+  content:'';position:absolute;left:2px;top:2px;box-sizing:border-box;z-index:1;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--rv-ink-faint);border:2px solid var(--rv-surface);
+  box-shadow:0 0 0 1px var(--rv-line);
+}
+.rvol li:has(.rvc1.approve)::before{background:var(--rv-good)}
+.rvol li:has(.rvc1.reject)::before{background:var(--rv-bad)}
+.rvol li:has(.rvc1.reopen)::before{background:var(--rv-warn-bg)}
+/* A single entry has no "next" to connect to — no rail at all. */
+.rvol:has(li:only-child)::before{display:none}
+.rvc1{
+  padding:8px 10px;border:1px solid var(--rv-line-soft);border-radius:7px;
+  background:var(--rv-surface-sunken);
+}
+.rvc1 .meta{font-size:11px;color:var(--rv-ink-faint);margin-bottom:3px}
+.rvc1 .act{font-weight:700;color:var(--rv-ink-soft)}
+.rvc1.approve .act{color:var(--rv-good)}
+.rvc1.reject .act{color:var(--rv-bad)}
+.rvc1.reopen .act{color:var(--rv-warn)}
+.rvc1 .tx{font-size:12.5px;color:var(--rv-ink);white-space:pre-wrap;word-break:break-word;line-height:1.45}
+
+/* ── Submission panel ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;opacity:0;transition:opacity .25s}
+.overlay.show{display:block;opacity:1}
+.panel{position:fixed;top:0;right:0;height:100%;width:460px;max-width:100vw;background:#fff;z-index:101;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.18)}
+.panel.show{transform:translateX(0)}
+.ph{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ph h2{font-size:15px;font-weight:600;margin:0}
+.ph button{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:.7;padding:0 4px;line-height:1}
+.ph button:hover{opacity:1}
+.pbody{flex:1;overflow-y:auto;padding:20px 22px}
+.pf{padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.fr{margin-bottom:14px}
+.fr label{display:block;font-size:11px;font-weight:700;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.fr input,.fr select,.fr textarea{width:100%;padding:8px 10px;border:1.5px solid #d8d8d8;border-radius:6px;font-size:13px;color:#222;outline:none;font-family:inherit;box-sizing:border-box}
+.fr input:focus,.fr select:focus,.fr textarea:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+.fr textarea{resize:vertical;min-height:58px}
+.fr .hint{font-size:11px;color:#aaa;margin-top:3px}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.dz{border:2px dashed #d0d0d0;border-radius:8px;padding:22px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa}
+.dz:hover,.dz.ov{border-color:#1a73e8;background:#f0f6ff}
+.dz-i{font-size:26px;margin-bottom:5px}
+.dz-t{font-size:13px;color:#666}
+.dz-s{font-size:11px;color:#aaa;margin-top:2px}
+.fc{display:none;align-items:center;gap:8px;padding:8px 12px;background:#eef4ff;border-radius:6px;margin-top:8px}
+.fc-n{font-size:12px;color:#1a73e8;font-weight:500;flex:1;word-break:break-all}
+.fc-z{font-size:11px;color:#888;white-space:nowrap}
+.fc-x{cursor:pointer;color:#999;font-size:14px;padding:2px 5px;line-height:1}
+.fc-x:hover{color:#c00}
+.btp{padding:9px 20px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+.btp:hover{background:#1557b0}
+.btp:disabled{background:#b0b0b0;cursor:not-allowed}
+.btc{padding:9px 18px;background:#fff;color:#555;border:1.5px solid #d0d0d0;border-radius:6px;font-size:13px;cursor:pointer}
+.btc:hover{border-color:#888}
+.add-btn{padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.5);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.add-btn:hover{background:rgba(255,255,255,.25)}
+.al{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none;line-height:1.5}
+.al-e{background:#fce8e6;color:#c5221f;border:1px solid #f5c6c4}
+.al-s{background:#e6f4ea;color:#137333;border:1px solid #c3e6cb}
+.al-i{background:#eef3fe;color:#1a4fa3;border:1px solid #c5d6f5}
+</style>
+<style>
+/* ───────── Demo polish layer (visual only) ───────── */
+body{font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;background:#eef1f6;color:#1f2433;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* Header / brand */
+header{padding:16px 30px;background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);box-shadow:0 2px 12px rgba(31,56,100,.25)}
+.brandwrap{display:flex;align-items:center;gap:18px}
+.logo-badge{height:64px;display:flex;align-items:center;justify-content:center;background:transparent;padding:0;box-shadow:none;border-radius:0}
+.logo-badge img{height:100%;width:auto;object-fit:contain;display:block;image-rendering:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+.brand-txt{display:flex;align-items:center;gap:16px}
+.brand-stack{display:flex;flex-direction:column;gap:6px}
+.brand-txt h1{font-size:24px;font-weight:800;letter-spacing:.3px;line-height:1;color:#fff;margin:0}
+.brand-home{text-decoration:none;color:inherit;display:inline-flex;align-items:center;cursor:pointer}
+.brand-home:hover h1{opacity:.85}
+.brand-div{width:1px;height:40px;background:rgba(255,255,255,.45)}
+.brand-sub{display:inline;font-size:12.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#fff;opacity:1;margin:0}
+.brand-th{font-size:13px;font-weight:500;color:#fff;opacity:1;letter-spacing:.5px;line-height:1}
+.hdr-right{display:flex;align-items:center;gap:14px}
+/* All three header-right chips share the same 40px height + 9px radius so
+   their top/bottom edges sit on the same plane. Sizes copied from the HR
+   Work Log reference (.topbar nav a, .gear inline). */
+#hdr{display:inline-flex;align-items:center;height:40px;padding:0 16px;
+  font-size:13px;color:#fff;font-weight:600;white-space:nowrap;
+  background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.18);border-radius:9px}
+.add-btn{display:inline-flex;align-items:center;height:40px;padding:0 18px;
+  background:#fff;color:#1a1f38;border:1px solid #fff;border-radius:9px;
+  font-weight:700;font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,.26);
+  transition:transform .12s,box-shadow .12s}
+.add-btn:hover{background:#fff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.32)}
+
+/* Toolbars */
+.bar{background:#fff;padding:14px 30px;border-bottom:1px solid #ebedf3;gap:10px}
+.datebar{background:#f7f8fb;padding:11px 30px;border-bottom:1px solid #ebedf3;gap:9px}
+#srch{height:38px;width:280px;border:1.5px solid #e1e4ee;border-radius:9px;font-size:13px}
+#srch:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dtsel{height:38px;border:1.5px solid #e1e4ee;border-radius:9px;color:#4b5163}
+.dtsel:focus,.dtsel.on{border-color:#2563eb;color:#2563eb}
+.dfld{height:38px;border:1.5px solid #e1e4ee;border-radius:9px}
+.dfld:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dwrap{position:relative;display:inline-flex;align-items:center}
+.dwrap .dfld{padding-right:30px}
+.calbtn{position:absolute;right:1px;top:1px;bottom:1px;width:28px;border:0;background:transparent;cursor:pointer;font-size:14px;line-height:1;border-radius:0 8px 8px 0;color:#5b6172}
+.calbtn:hover{background:#eef2fb}
+.dpick{position:absolute;right:6px;bottom:0;width:1px;height:1px;padding:0;margin:0;border:0;opacity:0;pointer-events:none}
+.divider{height:24px;background:#e6e9f0}
+.qbtn{height:30px;border:1.5px solid #e1e4ee;border-radius:18px;font-weight:600;color:#5b6172;transition:all .15s}
+.qbtn:hover{border-color:#2563eb;color:#2563eb;background:#f4f7ff}
+.qbtn.on{background:#1a1f38;border-color:#1a1f38;color:#fff}
+.clrbtn{height:30px;border:1.5px solid #f0c9c9;border-radius:18px;color:#d24747;font-weight:600}
+.clrbtn:hover{background:#d24747;border-color:#d24747;color:#fff}
+
+/* Stat / loading line */
+.stat{padding:12px 30px 0;font-size:12px;color:#8a90a2;font-style:italic}
+
+/* Table */
+.tw{padding:16px 30px 48px}
+table{border-radius:13px;box-shadow:0 3px 16px rgba(20,25,55,.08);overflow:hidden}
+thead tr{background:#1a1f38}
+th{padding:13px 14px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#c9cde2;font-weight:700}
+th:hover{background:#262c4d;color:#fff}
+th.asc::after,th.desc::after{color:#e3c869;opacity:1}
+tbody tr{border-bottom:1px solid #f0f1f5;transition:background .12s}
+tbody tr:hover{background:#f5f8ff}
+td{padding:12px 14px;font-size:12.5px;color:#2b3045}
+td.n{color:#b9bdca}
+td.dt{color:#6b7280}
+.ti{font-weight:600;color:#1f2433;line-height:1.45}
+.de{color:#8a90a2;margin-top:3px}
+.pb{padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.4px}
+.stb{padding:4px 11px;border-radius:14px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.rvbtn{background:#2563eb;border:1.5px solid #2563eb;border-radius:8px;padding:6px 13px;font-weight:600;transition:transform .12s,background .14s}
+.rvbtn:hover{background:#1b4fd0;border-color:#1b4fd0;transform:translateY(-1px)}
+.empty{padding:64px 20px;color:#9aa0b2;font-size:14px}
+
+/* Modals & panel */
+.rvhd{background:linear-gradient(120deg,#171a30,#23284a);padding:13px 18px;flex-wrap:nowrap}
+.rvhd h3{font-weight:700;letter-spacing:.3px;flex:1 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rvhd>span:last-child{flex:0 0 auto;flex-shrink:0;white-space:nowrap;display:inline-flex;flex-wrap:nowrap;align-items:center;gap:8px}
+.rvhd>span:last-child > *{flex-shrink:0}
+.panel{box-shadow:-12px 0 44px rgba(20,25,55,.24)}
+.ph{background:linear-gradient(120deg,#171a30,#23284a)}
+.ph h2{font-weight:700;letter-spacing:.3px}
+.fr label{color:#6b7280;letter-spacing:.5px}
+.fr input,.fr select,.fr textarea{border:1.5px solid #e1e4ee;border-radius:8px}
+.fr input:focus,.fr select:focus,.fr textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dz{border-radius:10px}
+.btp{background:#2563eb;border-radius:8px;font-weight:700;transition:transform .12s,background .14s}
+.btp:hover{background:#1b4fd0;transform:translateY(-1px)}
+.btp:disabled{background:#aeb4c4}
+.btc{border:1.5px solid #d7dae4;border-radius:8px;font-weight:600;color:#5b6172}
+.btc:hover{border-color:#9aa0b2;background:#f7f8fb}
+.rvb{border-radius:8px;font-weight:700;transition:transform .12s,filter .12s}
+.rvb:hover{transform:translateY(-1px);filter:brightness(1.06)}
+.rvb.cm{background:#2563eb}.rvb.ap{background:#16a34a}.rvb.rj{background:#dc2626}
+.rvmsg{font-size:12.5px;margin-left:0;flex-basis:100%;order:9;padding-top:4px}
+.add-btn,.btp,.btc,.rvb,.rvbtn,.qbtn,.clrbtn{cursor:pointer}
+/* Label that sits above each iframe in a multi-attachment view. */
+.rvflbl{display:none;font-size:12px;color:#fff;background:rgba(0,0,0,.6);padding:7px 14px;border-radius:6px;text-align:center;font-weight:600;letter-spacing:.3px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.rvextra{display:flex;flex-direction:column;gap:8px}
+
+/* In-app confirmation modal (replaces browser's native confirm). */
+.ackWrap{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.55);align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.ackWrap.show{display:flex}
+.ackBox{background:#fff;border-radius:12px;padding:24px 26px;width:min(460px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.42);animation:ackIn .14s ease-out}
+@keyframes ackIn{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ackBox h3{margin:0 0 10px;font-size:16px;font-weight:700;color:#1a1f38;letter-spacing:.2px}
+.ackBox .msg{margin:0 0 20px;font-size:13.5px;color:#444;line-height:1.6}
+.ackActs{display:flex;gap:10px;justify-content:flex-end}
+.ackBtn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:0;font-family:inherit;transition:background .14s,border-color .14s,color .14s}
+.ackBtnPri{background:#1a73e8;color:#fff}
+.ackBtnPri:hover{background:#1557b0}
+.ackBtnPri.danger{background:#c5221f}
+.ackBtnPri.danger:hover{background:#a01816}
+.ackBtnSec{background:#fff;color:#555;border:1.5px solid #d0d0d0}
+.ackBtnSec:hover{border-color:#888;color:#222}
+html.dark .ackBox{background:#1a2030}
+html.dark .ackBox h3{color:#e4e7ef}
+html.dark .ackBox .msg{color:#a8aec1}
+html.dark .ackBtnSec{background:#1a2030;color:#cdd2e1;border-color:#2c3447}
+html.dark .ackBtnSec:hover{border-color:#5a6480;color:#fff}
+
+/* Delete-my-last-entry button on the thread (only on user's own last). */
+.rvCmtDel{background:none;border:0;color:#c5221f;font-size:11px;font-weight:600;cursor:pointer;padding:0 0 0 8px;text-decoration:underline}
+.rvCmtDel:hover{color:#a01816}
+html.dark .rvCmtDel{color:#ff8c84}
+
+/* ───────── Dark mode ─────────
+   Chrome inverts; A4 letter pages stay white (formal documents are
+   white paper). Toggled by `html.dark` so the class can be set in a
+   tiny inline script BEFORE <body> renders → no flash of light theme. */
+/* Signed-in-as: plain inline text on the header — "email · role". */
+.user-as{
+  display:inline-flex;align-items:center;
+  color:#dbe0f1;
+  font-size:13px;font-weight:500;
+  white-space:nowrap;cursor:pointer;
+  padding:6px 4px;line-height:1;
+  transition:color .14s;
+  max-width:260px;
+}
+.user-as:hover{color:#fff}
+.user-as .email{overflow:hidden;text-overflow:ellipsis;max-width:220px;display:inline-block;vertical-align:middle}
+.user-as .sep{opacity:.55;margin:0;flex-shrink:0}
+.user-as .role{opacity:.85;flex-shrink:0}
+
+/* Settings gear chip — same 40px height as the other header chips.
+   Glyph 18px so the gear fills the same proportion of its frame. */
+.dm-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:40px;padding:0 13px;
+  background:rgba(255,255,255,.10);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:9px;
+  font-size:18px;line-height:1;
+  cursor:pointer;white-space:nowrap;font-family:inherit;
+  transition:background .14s,border-color .14s;
+}
+.dm-btn:hover{background:rgba(255,255,255,.24)}
+html.dark .dm-btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+html.dark .dm-btn:hover{background:rgba(255,255,255,.24)}
+
+/* Settings modal — centered card with sections for account / theme /
+   language / sign-out, modelled on the sibling-app Settings panel. */
+.st-wrap{position:relative;display:inline-block}
+.st-modal{display:none;position:fixed;inset:0;z-index:250;
+  background:rgba(15,20,40,.55);align-items:center;justify-content:center}
+.st-modal.show{display:flex}
+.st-card{background:#fff;border-radius:16px;width:min(440px,92vw);max-height:90vh;
+  overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.42);
+  -webkit-overflow-scrolling:touch}
+.st-head{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px 14px;border-bottom:1px solid #ebedf3}
+.st-head h3{margin:0;font-size:16px;font-weight:700;color:#1a1f38;letter-spacing:.2px}
+.st-x{background:none;border:0;font-size:18px;color:#9aa0b2;cursor:pointer;
+  padding:4px 8px;line-height:1;font-family:inherit}
+.st-x:hover{color:#1a1f38}
+.st-body{padding:6px 0 14px}
+.st-section{padding:14px 22px}
+.st-divider{margin:0 22px;border:0;border-top:1px solid #ebedf3}
+.st-sect-label{font-size:11px;font-weight:700;color:#1f2937;letter-spacing:1.2px;
+  text-transform:uppercase;margin-bottom:6px}
+.st-sect-value{font-size:14px;font-weight:600;color:#111827;margin-bottom:4px;word-break:break-all}
+.st-sect-sub{font-size:13px;color:#374151;margin:8px 0}
+.st-seg{display:flex;background:#f1f3f7;border-radius:11px;padding:4px;gap:0}
+.st-seg-btn{flex:1;padding:10px 14px;background:transparent;border:0;border-radius:8px;
+  font-size:13.5px;font-weight:600;color:#1f2937;cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap}
+.st-seg-btn.active{background:#2563eb;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.st-signout{display:block;margin:14px 22px 4px;padding:12px 14px;
+  background:#fff;border:1px solid #e1e4ee;border-radius:10px;
+  font-size:13.5px;color:#1a1f38;font-weight:500;cursor:pointer;
+  font-family:inherit;text-align:left;width:calc(100% - 44px)}
+.st-signout:hover{background:#f4f7ff;border-color:#2563eb;color:#2563eb}
+html.dark .st-card{background:#1a2030;color:#e4e7ef}
+html.dark .st-head{border-bottom-color:#262d3e}
+html.dark .st-head h3{color:#e4e7ef}
+html.dark .st-x{color:#a8aec1}
+html.dark .st-x:hover{color:#fff}
+html.dark .st-divider{border-top-color:#262d3e}
+html.dark .st-sect-label{color:#7e8499}
+html.dark .st-sect-value{color:#e4e7ef}
+html.dark .st-sect-sub{color:#a8aec1}
+html.dark .st-seg{background:#0e1424}
+html.dark .st-seg-btn{color:#a8aec1}
+html.dark .st-seg-btn.active{background:#2E75B6;color:#fff}
+html.dark .st-signout{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .st-signout:hover{background:#222a3e;color:#fff;border-color:#5a6480}
+
+/* Access-control editor (admin only) inside the Settings modal. */
+.acc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  width:100%;background:#eef2fb;border:1px solid #d3dcef;border-radius:9px;
+  padding:11px 14px;cursor:pointer;font-family:inherit;text-align:left;
+  transition:background .15s,border-color .15s}
+.acc-head:hover{background:#e2e9f8;border-color:#b6c2e0}
+.acc-head.open{background:#e2e9f8;border-color:#b6c2e0;
+  border-bottom-left-radius:0;border-bottom-right-radius:0}
+.acc-caret{flex:0 0 auto;display:inline-block;color:#3b4254;font-size:12px;
+  transition:transform .18s;transform:rotate(-90deg)}
+.acc-head.open .acc-caret{transform:rotate(0)}
+.acc-panel{margin-top:0;border:1px solid #d3dcef;border-top:0;
+  border-radius:0 0 9px 9px;padding:12px 12px 4px}
+.acc-body{margin-top:6px}
+.acc-group{margin-bottom:12px}
+.acc-group-h{font-size:12px;font-weight:700;color:#374151;margin:10px 0 6px;
+  text-transform:uppercase;letter-spacing:.6px}
+.acc-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:5px;
+  padding:5px 8px;border:1px solid #ebedf3;border-radius:8px;background:#fbfcff}
+.acc-row.confidential{border-color:#f0b429;background:#fffaf0}
+.acc-key{flex:1 1 auto;min-width:80px;font-size:12.5px;font-weight:600;color:#1a1f38;word-break:break-word}
+.acc-toggle{flex:0 0 auto;display:inline-flex;border:1px solid #d3d8e4;border-radius:7px;overflow:hidden}
+.acc-tg{padding:6px 11px;background:#fff;border:0;font-size:12px;font-weight:700;
+  color:#3b4254;line-height:1.1;cursor:pointer;font-family:inherit;white-space:nowrap}
+.acc-tg+.acc-tg{border-left:1px solid #d3d8e4}
+.acc-tg:hover{background:#f1f4fa}
+.acc-tg.pub.active{background:#34a853;color:#fff}
+.acc-tg.conf.active{background:#e8a013;color:#fff}
+.acc-emails{flex:1 1 100%;display:none;margin-top:2px;padding:7px 9px;border:1px solid #e1e4ee;
+  border-radius:6px;font-size:12.5px;color:#1a1f38;font-family:inherit;background:#fff;
+  box-sizing:border-box;resize:vertical;min-height:38px;line-height:1.5}
+.acc-row.confidential .acc-emails{display:block}
+.acc-emails:focus{outline:none;border-color:#2563eb}
+.acc-emails::placeholder{color:#aab0c0}
+.acc-actions{display:flex;gap:8px;margin-top:12px}
+.acc-reload{flex:0 0 auto;padding:10px 14px;background:#f1f3f7;border:0;border-radius:9px;
+  font-size:13px;font-weight:600;color:#5b6172;cursor:pointer;font-family:inherit}
+.acc-reload:hover{background:#e6e9f0}
+.acc-save{flex:1;padding:10px 14px;background:#2563eb;border:0;border-radius:9px;
+  font-size:13.5px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit}
+.acc-save:hover{background:#1d4fd0}
+.acc-save:disabled{opacity:.6;cursor:default}
+.acc-msg{margin-top:8px;font-size:12.5px;min-height:16px}
+.acc-msg.ok{color:#137333}
+.acc-msg.err{color:#c5221f}
+html.dark .acc-group-h{color:#a8aec1}
+html.dark .acc-row{border-color:#2c3447;background:#141a29}
+html.dark .acc-row.confidential{border-color:#a87d18;background:#2a2410}
+html.dark .acc-key{color:#e4e7ef}
+html.dark .acc-head{background:#1a2030;border-color:#2c3447}
+html.dark .acc-head:hover{background:#222a3e;border-color:#3a455e}
+html.dark .acc-head.open{background:#222a3e;border-color:#3a455e}
+html.dark .acc-panel{border-color:#2c3447}
+html.dark .acc-caret{color:#a8aec1}
+html.dark .acc-toggle{border-color:#2c3447}
+html.dark .acc-tg{background:#1a2030;color:#c4cad8}
+html.dark .acc-tg+.acc-tg{border-left-color:#2c3447}
+html.dark .acc-tg:hover{background:#222a3e}
+html.dark .acc-tg.pub.active{background:#2e8b4f;color:#fff}
+html.dark .acc-tg.conf.active{background:#b9820f;color:#fff}
+html.dark .acc-emails{background:#1a2030;border-color:#2c3447;color:#e4e7ef}
+html.dark .acc-emails:focus{border-color:#4f9dff}
+html.dark .acc-reload{background:#222a3e;color:#cdd2e1}
+html.dark .acc-reload:hover{background:#2c3650}
+html.dark .acc-save{background:#2E75B6}
+html.dark .acc-save:hover{background:#3b86cb}
+html.dark .acc-msg.ok{color:#7ee2a8}
+html.dark .acc-msg.err{color:#ff9a94}
+
+/* Document-list loading state — centered spinner so a slow first load
+   never looks like a blank page. */
+.loadbox{display:flex;align-items:center;justify-content:center;gap:11px;
+  padding:60px 20px;color:#6b7280;font-size:14px;font-weight:500}
+.spinner{width:22px;height:22px;border:3px solid #d9deea;border-top-color:#2563eb;
+  border-radius:50%;animation:vcbspin .8s linear infinite;flex:0 0 auto}
+@keyframes vcbspin{to{transform:rotate(360deg)}}
+html.dark .loadbox{color:#a8aec1}
+html.dark .spinner{border-color:#2c3447;border-top-color:#4f9dff}
+
+/* Mobile: settings modal becomes a bottom sheet. */
+html.is-mobile .st-modal{align-items:flex-end}
+html.is-mobile .st-card{width:100%;max-width:100%;max-height:92vh;
+  border-radius:18px 18px 0 0;
+  padding-bottom:max(8px,env(safe-area-inset-bottom))}
+
+html.dark body{background:#0f1421;color:#e4e7ef}
+html.dark .bar{background:#1a2030;border-bottom-color:#262d3e}
+html.dark #srch{background:#11172a;border-color:#2c3447;color:#e4e7ef}
+html.dark #srch::placeholder{color:#6b7180}
+html.dark .divider{background:#2c3447}
+html.dark .dtsel{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .dtsel:focus{border-color:#4f9dff}
+html.dark .dtsel.on{border-color:#4f9dff;color:#9dc3e6}
+html.dark .pfmsPanel{background:#1a2030;border-color:#2c3447;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+html.dark .pfmsRow{color:#cdd2e1}
+html.dark .pfmsRow:hover{background:#232b40}
+html.dark .pfmsRow.sel{background:#243352}
+html.dark .pfmsDiv{background:#2c3447}
+html.dark .pfmsCaret{color:#7d8399}
+html.dark .datebar{background:#141a29;border-bottom-color:#262d3e}
+html.dark .datebar label{color:#9aa0b2}
+html.dark .datebar input[type=date],html.dark .datebar .dfld{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .qbtn{background:#1a2030;border-color:#2c3447;color:#a8aec1}
+html.dark .qbtn:hover{border-color:#4f9dff;color:#9dc3e6}
+html.dark .qbtn.on{background:#2E75B6;border-color:#2E75B6;color:#fff}
+html.dark .clrbtn{background:#1a2030}
+/* Native date picker icon is black by default → invisible on dark fields. */
+html.dark .datebar input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer}
+html.dark .stat{color:#9aa0b2}
+html.dark table{background:#1a2030;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+html.dark thead tr{background:#0b1020;color:#cdd2e1}
+html.dark th:hover{background:#141a2e}
+html.dark tbody tr{border-bottom-color:#262d3e}
+html.dark tbody tr:hover{background:#222a3e}
+html.dark .ti{color:#e4e7ef}
+html.dark .de{color:#9aa0b2}
+html.dark td.n{color:#5b6172}
+html.dark td.dt,html.dark td.cd{color:#a8aec1}
+html.dark .nl{color:#5b6172}
+html.dark .empty{color:#6b7180}
+html.dark #hdr{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+/* Submission panel */
+html.dark .overlay{background:rgba(0,0,0,.65)}
+html.dark .panel{background:#141a29;color:#e4e7ef}
+html.dark .pf{border-top-color:#262d3e}
+html.dark .fr label{color:#a8aec1}
+html.dark .fr input,html.dark .fr select,html.dark .fr textarea{background:#0e1424;border-color:#2c3447;color:#e4e7ef}
+html.dark .fr .hint{color:#6b7180}
+html.dark .dz{background:#0e1424;border-color:#2c3447}
+html.dark .dz:hover,html.dark .dz.ov{background:#162342}
+html.dark .dz-t{color:#a8aec1}
+html.dark .dz-s{color:#6b7180}
+html.dark .btc{background:#1a2030;color:#cdd2e1;border-color:#2c3447}
+html.dark .btc:hover{border-color:#5a6480}
+/* Review modal — keep the letter (rvpage/rvdoc) white; dark the chrome */
+html.dark .rvbox{background:#0e1424}
+html.dark .rvbody{background:#070a14}
+html.dark .rvft{background:#141a29;border-top-color:#262d3e}
+html.dark .rvft textarea{background:#0e1424;border-color:#2c3447;color:#e4e7ef}
+html.dark .rvft textarea::placeholder{color:#6b7180}
+html.dark .rvlock{background:#1a2030;color:#a8aec1}
+html.dark .al-e{background:#3a1414;color:#ffb4ad;border-color:#5a2020}
+html.dark .al-s{background:#0e2a18;color:#a7e0bd;border-color:#1a4a2c}
+html.dark .al-i{background:#13243f;color:#a9c6f5;border-color:#27406b}
+</style>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   MOBILE LAYOUT — single-pane stack-navigation pattern for phones.
+
+   Activated by html.is-mobile, set by the JS detector in <head>
+   (NOT by @media alone — in-app browsers like Gmail webview, Slack,
+   Twitter, and the Apps Script iframe wrapper often misreport the
+   viewport at 980px+ on a real iPhone, so @media never fires).
+   Desktop layout is untouched.
+   ────────────────────────────────────────────────────────────────── */
+
+/* iOS-wide tweaks: no bounce-through, brand-tinted tap highlight,
+   no auto text resizing in rotated webviews. */
+html.is-mobile, html.is-mobile body{
+  overscroll-behavior-y:contain;
+  -webkit-tap-highlight-color:rgba(46,117,182,.18);
+  -webkit-text-size-adjust:100%;
+}
+
+/* All form fields ≥16px so iOS Safari does NOT zoom on focus.
+   Buttons too — same height parity, no weird mid-tap zoom. */
+html.is-mobile input,
+html.is-mobile select,
+html.is-mobile textarea,
+html.is-mobile button{font-size:16px}
+html.is-mobile #srch,
+html.is-mobile .dtsel,
+html.is-mobile .dfld{font-size:16px}
+
+/* ── Header — tuned to the real iPhone viewport (after the viewport
+   meta-tag fix made CSS px = device px). */
+html.is-mobile header{
+  padding:9px 12px;
+  padding-top:max(9px,env(safe-area-inset-top));
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:nowrap;
+  gap:8px;
+  box-shadow:0 1px 6px rgba(31,56,100,.25);
+}
+html.is-mobile .brandwrap{min-width:0;flex:1 1 auto;overflow:hidden;gap:10px}
+html.is-mobile .logo-badge{height:38px !important;flex-shrink:0}
+html.is-mobile .brand-txt{gap:10px;flex-wrap:nowrap;align-items:center;min-width:0;flex:1 1 auto}
+html.is-mobile .brand-txt h1{font-size:18px !important;font-weight:800 !important;letter-spacing:.2px;flex-shrink:0;line-height:1 !important}
+html.is-mobile .brand-div{display:inline-block !important;height:28px !important;flex-shrink:0}
+html.is-mobile .brand-stack{flex-basis:auto;flex:1 1 auto;min-width:0;gap:2px;overflow:hidden;display:flex;flex-direction:column}
+html.is-mobile .brand-sub{font-size:10px !important;font-weight:700;letter-spacing:1.2px !important;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block !important}
+html.is-mobile .brand-th{display:block !important;font-size:10.5px !important;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.is-mobile .hdr-right{gap:6px;flex-shrink:0}
+html.is-mobile #hdr{display:none}                    /* counts move to .stat line */
+html.is-mobile .add-btn{display:none}                /* Add Document becomes the FAB on phones */
+html.is-mobile .dm-btn{height:36px;padding:0 10px;font-size:16px;flex-shrink:0;border-radius:8px}
+html.is-mobile .user-as{display:none}                /* email + role moved into Settings modal on mobile */
+
+/* Floating Add-Document button — phone-only. Bottom-right, above the
+   home indicator. Replicates Mail/Gmail/iOS-native FAB pattern. */
+.fab{display:none}
+html.is-mobile .fab{
+  display:flex;align-items:center;justify-content:center;
+  position:fixed;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  right:calc(14px + env(safe-area-inset-right));
+  width:48px;height:48px;border-radius:24px;
+  background:#2E75B6;color:#fff;border:0;
+  font-size:24px;font-weight:300;cursor:pointer;
+  box-shadow:0 5px 14px rgba(31,56,100,.4),0 2px 5px rgba(0,0,0,.2);
+  z-index:90;line-height:1;
+}
+html.is-mobile .fab:active{transform:translateY(1px);box-shadow:0 3px 10px rgba(31,56,100,.4)}
+
+/* ── Filter / search bar — search + dropdown share a row, project pills
+   become a tight horizontal scroller below them ── */
+html.is-mobile .bar{
+  padding:8px 12px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  gap:6px;
+  flex-direction:row;flex-wrap:wrap;
+  align-items:center;
+}
+html.is-mobile #srch{flex:1 1 100%;width:auto;min-width:0;height:36px;border-radius:8px;font-size:14px;padding:0 12px}
+html.is-mobile .bar .divider{display:none}
+html.is-mobile .dtsel{flex:1 1 calc(50% - 3px);width:auto;max-width:none;min-width:0;height:36px;border-radius:8px;font-size:13px;padding:0 8px}
+html.is-mobile .pfmsPanel{left:auto;right:0;min-width:min(300px,calc(100vw - 24px))}
+
+/* Date filter bar — 2 dense rows. Row 1: label + From + → + To.
+   Row 2: 3 quick buttons + Clear. Tight padding everywhere. */
+html.is-mobile .datebar{
+  padding:6px 12px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:5px;align-items:center;
+}
+html.is-mobile .datebar{flex-wrap:nowrap}
+/* One shared box spec, matching .dtsel (doc-type / status) exactly —
+   height:36px, radius:8px — so every filter control in the header looks
+   like one standardized set instead of some boxes taller than others. */
+html.is-mobile .datebar .dfld{
+  height:36px;border-radius:8px;padding:0 6px;font-size:12px;
+  min-width:0;box-sizing:border-box;
+}
+/* Native date inputs render their own (long, locale-formatted) text —
+   we can't shorten that directly, so the real input is shrunk/hidden and
+   a custom label is drawn on top instead: the short "d/m/yy" value once
+   picked, or a short "Date" placeholder when empty. Both boxes are the
+   same size and both draw their label inside the box, never beside it.
+   See .dwrap1/.dlbl below and refreshDateLabels() in the script. */
+html.is-mobile .datebar .dfld{flex:0 0 auto;width:70px;max-width:70px;text-align:center;color:transparent;-webkit-appearance:none;appearance:none;background:white}
+html.is-mobile .dwrap1{position:relative;display:inline-flex;flex:0 0 auto}
+html.is-mobile .dlbl{
+  position:absolute;inset:0;pointer-events:none;background:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:#333;white-space:nowrap;
+}
+html.is-mobile .dlbl.dph{background:none;font-size:11px;color:#888;font-weight:600}
+html.dark.is-mobile .dlbl{color:#cdd2e1}
+html.dark.is-mobile .dlbl.dph{color:#9aa0b2}
+html.is-mobile .datebar > span{color:#bbb;font-size:11px;flex-shrink:0;padding:0 1px}
+html.is-mobile .datebar .divider{display:none}
+/* Clutter — remove all the preset chips on mobile per user request. */
+html.is-mobile .qbtn,
+html.is-mobile .clrbtn{display:none !important}
+html.is-mobile .stat{padding:8px 12px 4px;font-size:11.5px;font-weight:500}
+
+/* ── Custom date picker modal (mobile-only). Replaces iOS native
+   picker so there's no auto-today on tap, no reset/tick chrome. ── */
+.dp-modal{display:none;position:fixed;inset:0;z-index:260;
+  background:rgba(15,20,40,.55);align-items:flex-end;justify-content:center}
+.dp-modal.show{display:flex}
+.dp-sheet{background:#fff;width:100%;max-width:100%;
+  border-radius:18px 18px 0 0;
+  padding:14px 14px max(18px,env(safe-area-inset-bottom));
+  box-shadow:0 -10px 40px rgba(0,0,0,.3)}
+.dp-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.dp-nav{background:#f1f3f7;border:0;border-radius:8px;
+  width:34px;height:34px;font-size:14px;color:#1a1f38;cursor:pointer;
+  font-family:inherit;display:inline-flex;align-items:center;justify-content:center}
+.dp-nav:active{background:#e1e4ee}
+.dp-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#1a1f38}
+.dp-close{background:none;border:0;font-size:18px;color:#9aa0b2;
+  cursor:pointer;padding:6px 10px;line-height:1;font-family:inherit}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-dow{text-align:center;font-size:11px;color:#9aa0b2;font-weight:700;
+  padding:6px 0;letter-spacing:.4px}
+.dp-empty{height:38px}
+.dp-day{background:transparent;border:0;border-radius:9px;
+  height:38px;font-size:13.5px;color:#1a1f38;cursor:pointer;
+  font-family:inherit;font-weight:500;
+  display:inline-flex;align-items:center;justify-content:center}
+.dp-day:active{background:#e8eef7}
+.dp-day.today{color:#2563eb;font-weight:700}
+.dp-day.selected{background:#2563eb;color:#fff;font-weight:700}
+.dp-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.dp-clear{background:transparent;border:0;color:#c5221f;
+  font-size:13px;font-weight:600;cursor:pointer;
+  padding:8px 14px;font-family:inherit}
+.dp-clear:active{opacity:.6}
+html.dark .dp-sheet{background:#1a2030;color:#e4e7ef}
+html.dark .dp-nav{background:#0e1424;color:#e4e7ef}
+html.dark .dp-title{color:#e4e7ef}
+html.dark .dp-day{color:#cdd2e1}
+html.dark .dp-day:active{background:#222a3e}
+
+/* ── Table → card stack on phones ──
+   Each <tr> becomes a flex container; tds become flex items whose
+   order/basis we control. No floats — keeps the bottom row clean. */
+html.is-mobile .tw{
+  padding:10px 12px 90px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  padding-bottom:max(90px,calc(env(safe-area-inset-bottom) + 60px));
+  overflow-x:visible;
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile table{box-shadow:none;background:transparent;border-radius:0;display:block;width:100%}
+html.is-mobile thead{display:none}
+html.is-mobile tbody{display:block}
+html.is-mobile tbody tr{
+  display:flex;flex-wrap:wrap;align-items:center;
+  background:#fff;border:0;
+  border-radius:11px;padding:11px 13px;
+  margin-bottom:8px;
+  box-shadow:0 1px 5px rgba(20,25,55,.08);
+  position:relative;
+  min-height:48px;
+}
+/* Filter-hidden rows must stay hidden even when the mobile flex rule
+   above re-declares `display`. Higher-specificity override. */
+html.is-mobile tbody tr.h{display:none}
+html.is-mobile tbody tr:hover{background:#fff}   /* no row hover on touch */
+html.is-mobile tbody td{
+  padding:0;white-space:normal;border:0;
+  width:auto !important;max-width:none !important;
+}
+/* # number → small superscript top-right */
+html.is-mobile td.n{
+  position:absolute;top:10px;right:14px;
+  font-size:10.5px;color:#c0c4d0;font-weight:600;
+  order:0;
+}
+/* Meta row: date + project pill + code, all inline */
+html.is-mobile td.dt{
+  order:1;flex:1 1 100%;
+  font-size:11px;color:#6b7280;font-weight:500;
+  margin:0 0 6px;padding-right:26px;
+}
+html.is-mobile td.pj{
+  order:2;flex:0 0 auto;
+  margin:0 6px 7px 0;
+}
+html.is-mobile td.cd{
+  order:3;flex:1 1 auto;
+  font-size:11px;color:#9aa0b2;font-weight:600;letter-spacing:.2px;
+  margin:0 0 7px;
+}
+/* Subject block: full-width, takes most of the card */
+html.is-mobile td.sb{
+  order:4;flex:1 1 100%;
+  margin:0 0 10px;
+}
+html.is-mobile td.sb .ti{
+  font-size:13.5px;line-height:1.38;font-weight:600;color:#1a1f38;
+}
+html.is-mobile td.sb .de{
+  font-size:11.5px;color:#9aa0b2;margin-top:4px;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+/* Bottom action row: status badge left, Open button pushed right */
+html.is-mobile td.stc{
+  order:5;flex:0 0 auto;
+  margin:0;
+}
+html.is-mobile td.rvc{
+  order:6;flex:0 0 auto;
+  margin-left:auto;
+}
+html.is-mobile .rvbtn{padding:7px 14px;font-size:11.5px;min-height:34px;border-radius:8px;font-weight:600;touch-action:manipulation;letter-spacing:.2px}
+html.is-mobile .add-btn,
+html.is-mobile .btp,
+html.is-mobile .btc,
+html.is-mobile .qbtn,
+html.is-mobile .clrbtn,
+html.is-mobile .rvb,
+html.is-mobile .ackBtn{touch-action:manipulation}
+html.is-mobile .pb{padding:4px 10px;font-size:11px}
+html.is-mobile .stb{padding:4px 11px;font-size:11px}
+
+html.dark.is-mobile tbody tr{background:#1a2030;box-shadow:0 1px 5px rgba(0,0,0,.4)}
+html.dark.is-mobile tbody tr:hover{background:#1a2030}
+
+/* ── Review modal: full-screen "detail pane" with ← Back bar ── */
+html.is-mobile #rvWrap{background:#fff;display:none}
+html.is-mobile .rvbox{
+  position:fixed;inset:0;top:0;left:0;
+  width:100vw;height:100vh;height:100dvh;
+  transform:none;border-radius:0;max-width:none;
+  box-shadow:none;
+}
+html.is-mobile .rvhd{
+  position:sticky;top:0;z-index:5;
+  padding:10px 12px;
+  padding-top:max(10px,env(safe-area-inset-top));
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:8px;
+  border-bottom:1px solid rgba(255,255,255,.1);
+}
+html.is-mobile .rvhd h3{font-size:13.5px;max-width:100%;flex:1 1 100%}
+/* Title takes its own row; the action buttons (Back, Delete) take the
+   next row and spread evenly across the full width. Zoom +/- and
+   "Open original" were dropped entirely (see desktop rules above) —
+   the doc preview's own expand-to-full-screen square covers that case. */
+html.is-mobile .rvhd > span:last-child{
+  flex-wrap:nowrap;gap:6px;flex:1 1 100%;
+  display:flex;justify-content:space-between;
+}
+html.is-mobile .rvhd .btc{
+  padding:8px 6px;font-size:11.5px;min-height:36px;
+  margin-right:0 !important;flex:1 1 0;min-width:0;
+  text-align:center;
+}
+/* Re-label the ✕ Close button as a ← Back chip and pin it first (left) */
+html.is-mobile .rvhd .btc[onclick*="closeReview"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border-color:rgba(255,255,255,.4);color:#fff;
+  min-height:36px;padding:8px 6px;order:1;
+}
+html.is-mobile .rvhd .btc[onclick*="closeReview"]::before{
+  content:"← Back";font-size:12px;font-weight:700;letter-spacing:.2px;
+}
+html.is-mobile #rvDel{order:2}
+html.is-mobile .rvbody{
+  padding:10px;
+  -webkit-overflow-scrolling:touch;
+  flex:1;min-height:0;
+}
+html.is-mobile .rvdoc{height:65vh;height:65dvh}
+html.is-mobile .rvft{
+  padding:10px 12px;
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+}
+html.is-mobile .rvft textarea{font-size:16px;min-height:54px}
+html.is-mobile .rvb{padding:10px 14px;font-size:14px;min-height:44px}
+/* Comment / Approve / Reject spread evenly across the full width instead
+   of bunching to the left — frees up more vertical room for the document
+   since the row no longer needs to wrap as easily. */
+html.is-mobile .rvacts{gap:6px;display:flex}
+html.is-mobile #rvStep1 .rvacts .rvb{flex:1 1 0;min-width:0;text-align:center}
+html.is-mobile .rvmsg{flex-basis:100%;order:9;text-align:center}
+
+/* ── Add Document panel: slides up from bottom on mobile ── */
+html.is-mobile .panel{
+  width:100vw;max-width:100vw;
+  top:0;right:0;bottom:0;left:0;height:100%;
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+html.is-mobile .panel.show{transform:translateY(0)}
+html.is-mobile .ph{
+  padding:12px 14px;
+  padding-top:max(12px,env(safe-area-inset-top));
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+  position:sticky;top:0;z-index:5;
+}
+html.is-mobile .ph h2{font-size:15px}
+/* Re-label the ✕ close button as ← Back on the Add Document panel */
+html.is-mobile .ph button[onclick*="closePanel"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.4);
+  border-radius:7px;min-height:36px;padding:6px 12px;
+}
+html.is-mobile .ph button[onclick*="closePanel"]::before{
+  content:"← Back";font-size:13px;font-weight:700;color:#fff;letter-spacing:.2px;
+}
+html.is-mobile .pbody{
+  padding:14px;
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+  padding-bottom:max(20px,env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile .panel .pf{
+  padding:10px 14px;
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+  position:sticky;bottom:0;background:#fff;
+}
+html.dark.is-mobile .panel .pf{background:#141a29}
+html.is-mobile .fr2{grid-template-columns:1fr 1fr;gap:10px}
+html.is-mobile .btp,html.is-mobile .btc{min-height:44px;padding:11px 16px;font-size:14px}
+
+/* ── A4 preview & body-editor modals: full-screen with ← Back ── */
+html.is-mobile #pvWrap,
+html.is-mobile #bxWrap{background:#fff}
+html.is-mobile #pvWrap > div:first-child,
+html.is-mobile #bxWrap > div:first-child{
+  height:auto;min-height:48px;
+  padding-top:max(8px,env(safe-area-inset-top));
+  padding-bottom:8px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:6px;
+}
+html.is-mobile #pvWrap .btc[onclick*="closePreview"],
+html.is-mobile #bxWrap .btc[onclick*="closeBodyEditor"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.4);color:#fff;
+  min-height:36px;padding:7px 12px;
+}
+html.is-mobile #pvWrap .btc[onclick*="closePreview"]::before,
+html.is-mobile #bxWrap .btc[onclick*="closeBodyEditor"]::before{
+  content:"← Back";font-size:13px;font-weight:700;letter-spacing:.2px;
+}
+html.is-mobile #pvFrame,
+html.is-mobile #bxFrame{
+  top:calc(56px + env(safe-area-inset-top));
+  height:calc(100% - 56px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+/* ── Confirmation dialog → bottom sheet on phones ── */
+html.is-mobile .ackWrap{align-items:flex-end}
+html.is-mobile .ackBox{
+  width:100%;max-width:100%;
+  max-height:92vh;overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:22px 22px 0;
+  padding-bottom:max(26px,calc(env(safe-area-inset-bottom) + 22px));
+  animation:none;
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile .ackBtn{min-height:44px;padding:11px 18px;font-size:14px}
+
+/* Drag-and-drop hint isn't useful on touch; keep tap-to-open instead. */
+html.is-mobile .dz{padding:18px 14px;min-height:84px}
+html.is-mobile .dz-i{font-size:24px}
+html.is-mobile .dz-t{font-size:13px}
+html.is-mobile .dz-s{font-size:11px}
+</style>
+<script>
+/* Apply dark mode BEFORE body renders so there's no flash of light theme. */
+try{ if(localStorage.getItem('vcb-dm')==='1') document.documentElement.classList.add('dark'); }catch(e){}
+/* App URL injected server-side so file viewers don't need to use blob:
+   URLs (Edge's Scareware blocker silently blocks blob-URL iframes). */
+var _APP_URL = '<?!= (typeof ScriptApp !== "undefined" ? ScriptApp.getService().getUrl() : "") ?>';
+/* Shared single-document link (?doc=<id>): set server-side from the
+   request's query param so a recipient lands straight on this one
+   document — see openReviewShared() and the bootstrap call near
+   loadDocuments(). Empty string in normal (dashboard) mode. */
+var _SHARE_DOC_ID = <?!= JSON.stringify(shareDocId || '') ?>;
+/* Mobile detection — toggles html.is-mobile. In-app browsers (Gmail
+   webview, Slack, Twitter, etc.) and the Apps Script iframe wrapper
+   often misreport the viewport at 980px+ on a real phone, so @media
+   never fires. We check userAgent + screen.width + window.innerWidth
+   — any one of them indicates a phone. Re-runs on resize / rotate. */
+(function(){
+  function isPhone(){
+    var ua = navigator.userAgent || '';
+    var uaMobile = /iPhone|iPod|Android.+Mobile/i.test(ua);
+    var sw = (typeof screen !== 'undefined' && screen.width) ? screen.width : 9999;
+    var iw = window.innerWidth || 9999;
+    return uaMobile || sw <= 480 || iw <= 480;
+  }
+  function apply(){
+    document.documentElement.classList.toggle('is-mobile', isPhone());
+  }
+  apply();
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', apply);
+})();
+</script>
+</head>
+<body>
+
+<header>
+  <div class="brandwrap">
+    <div class="brand-txt">
+      <a class="brand-home" href="https://script.google.com/a/macros/vcb-con.com/s/AKfycbxqIk8Qql3XWXIWn_p0f0FSd04i-FcWZjoXgRErlU5bTXUkpujbQ4ZN4mWco6HEQFUB/exec" target="_top" title="Back to VCB Connect Home"><h1>VCB Group</h1></a>
+      <span class="brand-div"></span>
+      <div class="brand-stack">
+        <span class="brand-sub">Document Control · e-Memo</span>
+        <span class="brand-th">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสารภายใน</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span id="hdr">95 documents &nbsp;·&nbsp; 48 linked</span>
+    <button class="add-btn" onclick="openPanel()" data-i18n-html="add_doc">&#xFF0B;&nbsp; Add Document</button>
+    <div class="st-wrap">
+      <button id="stTog" class="dm-btn" onclick="toggleSettings(event)" title="Settings" aria-label="Settings">⚙</button>
+    </div>
+    <div id="stModal" class="st-modal" role="dialog" aria-modal="true" onclick="if(event.target===this)toggleSettings()">
+      <div class="st-card">
+        <div class="st-head">
+          <h3>การตั้งค่า · Settings</h3>
+          <button class="st-x" onclick="toggleSettings()" aria-label="Close">✕</button>
+        </div>
+        <div class="st-body">
+          <div class="st-section">
+            <div class="st-sect-label">SIGNED IN AS</div>
+            <div class="st-sect-value" id="stUserText">Not signed in</div>
+          </div>
+          <hr class="st-divider">
+          <div class="st-section">
+            <div class="st-sect-label">การแสดงผล / DISPLAY</div>
+            <div class="st-sect-sub">โหมดสี / Theme</div>
+            <div class="st-seg" id="stThemeSeg">
+              <button class="st-seg-btn" data-mode="light" onclick="setTheme('light')">☀️ สว่าง Light</button>
+              <button class="st-seg-btn" data-mode="dark"  onclick="setTheme('dark')">🌙 มืด Dark</button>
+            </div>
+          </div>
+          <div class="st-section">
+            <div class="st-sect-sub">ภาษา / Language</div>
+            <div class="st-seg" id="stLangSeg">
+              <button class="st-seg-btn" data-lang="th" onclick="setLang('th')">ไทย / TH</button>
+              <button class="st-seg-btn" data-lang="en" onclick="setLang('en')">English / EN</button>
+            </div>
+          </div>
+          <div class="st-section">
+            <div class="st-sect-sub">รูปแบบวันที่ / Date format</div>
+            <div class="st-seg" id="stEraSeg">
+              <button class="st-seg-btn" data-era="be" onclick="setDateEra('be')">พ.ศ. (2569)</button>
+              <button class="st-seg-btn" data-era="ce" onclick="setDateEra('ce')">ค.ศ. (2026)</button>
+            </div>
+          </div>
+          <div class="st-section" id="stAccessSection" style="display:none">
+            <hr class="st-divider" style="margin:0 0 14px">
+            <button type="button" class="acc-head" id="stAccessHead" onclick="toggleAccessPanel()">
+              <span class="st-sect-label" style="margin:0">สิทธิ์การเข้าถึง / ACCESS CONTROL</span>
+              <span class="acc-caret" id="stAccessCaret" aria-hidden="true">▾</span>
+            </button>
+            <div id="stAccessPanel" class="acc-panel" style="display:none">
+              <div class="st-sect-sub">
+                Confidential items open only for the owner and the emails listed.
+              </div>
+              <div id="stAccessBody" class="acc-body">Sign in as an admin to manage access.</div>
+              <div class="acc-actions">
+                <button class="acc-reload" onclick="loadAccessConfig()">↻ Reload</button>
+                <button class="acc-save" id="stAccessSave" onclick="saveAccessConfig()">บันทึก · Save access</button>
+              </div>
+              <div id="stAccessMsg" class="acc-msg"></div>
+            </div>
+          </div>
+          <button class="st-signout" id="stSignOut" onclick="onSignOutClick()">Sign out</button>
+        </div>
+      </div>
+    </div>
+    <span id="userPill" class="user-as" onclick="onUserPillClick()" title="Sign in">
+      <span class="email" id="upEmail">Sign in</span><span class="sep" id="upSep" style="display:none"> · </span><span class="role" id="upRole" style="display:none"></span>
+    </span>
+  </div>
+</header>
+
+<!-- Search + project filters -->
+<div class="bar">
+  <input id="srch" type="text" data-i18n-placeholder="search_placeholder" placeholder="🔍  Search document" oninput="go()">
+  <div class="divider"></div>
+  <select id="dt" class="dtsel" onchange="onDtChange()" title="Filter by document type / code">
+    <option value="ALL" data-i18n="all_doc_types">All document types</option>
+  </select>
+  <div class="divider"></div>
+  <select id="st" class="dtsel stsel" onchange="onStChange()" title="Filter by status">
+    <option value="ALL"       data-i18n="all_statuses">All statuses</option>
+    <option value="pending"   data-i18n="flt_pending">Pending</option>
+    <option value="commented" data-i18n="flt_commented">Comments</option>
+    <option value="approved"  data-i18n="flt_approved">Approved</option>
+    <option value="rejected"  data-i18n="flt_rejected">Rejected</option>
+  </select>
+  <div class="divider"></div>
+  <!-- Project picker: still SINGLE-select (one click to switch, no deselect
+       step) — but a custom button+popover instead of a native <select>, so
+       each row can show the project's badge chip beside its full name. -->
+  <div class="pfms" id="pfms">
+    <button type="button" class="dtsel pfmsBtn" id="pfmsBtn" onclick="togglePfMenu(event)" title="Filter by project">
+      <span id="pfmsLabel" data-i18n="all_projects">All projects</span>
+      <span class="pfmsCaret">▾</span>
+    </button>
+    <div class="pfmsPanel" id="pfmsPanel"></div>
+  </div>
+</div>
+
+<!-- Date filters -->
+<div class="datebar">
+  <span class="dwrap1">
+    <input type="date" id="d1" class="dfld" onchange="onDateChange(this)" onfocus="onDateFocus(this,event)">
+    <span class="dlbl" id="d1lbl"></span>
+  </span>
+  <span style="color:#aaa;font-size:12px">→</span>
+  <span class="dwrap1">
+    <input type="date" id="d2" class="dfld" onchange="onDateChange(this)" onfocus="onDateFocus(this,event)">
+    <span class="dlbl" id="d2lbl"></span>
+  </span>
+  <div class="divider"></div>
+  <button class="qbtn" data-q="7"  onclick="setQuick(this,7)"  data-i18n="last_7">Last 7 days</button>
+  <button class="qbtn" data-q="30" onclick="setQuick(this,30)" data-i18n="last_30">Last 30 days</button>
+  <button class="qbtn" data-q="lm" onclick="setQuick(this,'lm')" data-i18n="last_month">Last month</button>
+  <button class="clrbtn" onclick="clearFilters()" data-i18n="clear_filters">✕ Clear all filters</button>
+</div>
+
+<div class="stat" id="stat"></div>
+
+<div id="loadingBox" class="loadbox">
+  <span class="spinner"></span>
+  <span>กำลังโหลดเอกสาร · Loading documents…</span>
+</div>
+
+<div class="tw" id="tw" style="display:none">
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th onclick="sort(0)" data-i18n="col_num">#</th>
+        <th onclick="sort(1)" data-i18n="col_date">Date</th>
+        <th onclick="sort(2)" data-i18n="col_project">Project</th>
+        <th onclick="sort(3)" data-i18n="col_code">Code</th>
+        <th onclick="sort(4)" data-i18n="col_document">Document</th>
+        <th data-i18n="col_status">Status</th>
+        <th data-i18n="col_open">Open</th>
+      </tr>
+    </thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div class="empty" id="em" style="display:none" data-i18n="empty">No documents match your filters.</div>
+  <div id="pager"></div>
+</div>
+
+<script>
+/* ── i18n ── Thai / English UI strings.
+   Project names, document subjects and Drive content stay as-is (they
+   are user data, not UI chrome). */
+var I18N = {
+  en: {
+    add_doc:'＋ Add Document',
+    search_placeholder:'🔍  Search document',
+    all_doc_types:'All document types',
+    all_statuses:'All statuses',
+    flt_pending:'Pending', flt_commented:'Comments', flt_approved:'Approved', flt_rejected:'Rejected',
+    all_projects:'All Projects',
+    date_received:'Date received:',
+    date_short:'Date',
+    last_7:'Last 7 days', last_30:'Last 30 days', last_month:'Last month',
+    clear_filters:'✕ Clear all filters',
+    showing:'Showing {n} of {m} documents',
+    empty:'No documents match your filters.',
+    loading:'Loading documents…',
+    col_num:'#', col_date:'Date', col_project:'Project', col_code:'Code',
+    col_document:'Document', col_status:'Status', col_open:'Open',
+    status_pending:'• Pending', status_approved:'✓ Approved',
+    status_rejected:'✕ Rejected', status_commented:'💬 Comment',
+    open_btn:'Open ↗',
+    dark_mode:'Dark mode', light_mode:'Light mode',
+    lang_menu:'Language · English'
+  },
+  th: {
+    add_doc:'＋ เพิ่มเอกสาร',
+    search_placeholder:'🔍  ค้นหาเอกสาร',
+    all_doc_types:'ประเภทเอกสารทั้งหมด',
+    all_statuses:'ทุกสถานะ',
+    flt_pending:'รอดำเนินการ', flt_commented:'ความเห็น', flt_approved:'อนุมัติแล้ว', flt_rejected:'ไม่อนุมัติ',
+    all_projects:'ทุกโครงการ',
+    date_received:'วันที่รับเอกสาร:',
+    date_short:'วันที่',
+    last_7:'7 วันล่าสุด', last_30:'30 วันล่าสุด', last_month:'เดือนที่แล้ว',
+    clear_filters:'✕ ล้างตัวกรองทั้งหมด',
+    showing:'แสดง {n} จาก {m} เอกสาร',
+    empty:'ไม่พบเอกสารตามตัวกรอง',
+    loading:'กำลังโหลดเอกสาร…',
+    col_num:'ลำดับ', col_date:'วันที่', col_project:'โครงการ', col_code:'รหัส',
+    col_document:'เอกสาร', col_status:'สถานะ', col_open:'เปิด',
+    status_pending:'• รอดำเนินการ', status_approved:'✓ อนุมัติแล้ว',
+    status_rejected:'✕ ไม่อนุมัติ', status_commented:'💬 ความเห็น',
+    open_btn:'เปิด ↗',
+    dark_mode:'โหมดมืด', light_mode:'โหมดสว่าง',
+    lang_menu:'ภาษา · ไทย'
+  }
+};
+var LANG = (function(){
+  try { return (localStorage.getItem('vcb-lang') === 'th') ? 'th' : 'en'; }
+  catch(e){ return 'en'; }
+})();
+// Date era: 'ce' = 2026, 'be' = พ.ศ. 2569 (CE + 543). Source data is CE.
+var DATE_ERA = (function(){
+  try { return (localStorage.getItem('vcb-era') === 'be') ? 'be' : 'ce'; }
+  catch(e){ return 'ce'; }
+})();
+function formatDateByEra(dateStr){
+  var m = String(dateStr||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m) return dateStr;
+  var d=m[1].padStart(2,'0'), mo=m[2].padStart(2,'0'), y=parseInt(m[3],10);
+  var displayY = (DATE_ERA==='be') ? (y+543) : y;
+  return d+'/'+mo+'/'+displayY;
+}
+function t(k){ return (I18N[LANG] && I18N[LANG][k] != null) ? I18N[LANG][k] : (I18N.en[k] != null ? I18N.en[k] : k); }
+function applyI18n(){
+  // text content
+  document.querySelectorAll('[data-i18n]').forEach(function(el){
+    var k = el.getAttribute('data-i18n');
+    if(k) el.textContent = t(k);
+  });
+  // innerHTML (for tags that need entities like &nbsp;)
+  document.querySelectorAll('[data-i18n-html]').forEach(function(el){
+    var k = el.getAttribute('data-i18n-html');
+    if(k){
+      var v = t(k).replace(/ /g,'&nbsp;');   // keep visual gap after ＋
+      el.innerHTML = v;
+    }
+  });
+  // placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
+    var k = el.getAttribute('data-i18n-placeholder');
+    if(k) el.setAttribute('placeholder', t(k));
+  });
+  // dynamic bits
+  var lbl = document.getElementById('stLangLabel');
+  if(lbl) lbl.textContent = t('lang_menu');
+  try { syncDarkUi(); } catch(e){}        // re-translate the Dark/Light label
+  // Refresh table rows + stat line so status badges + "Open" use the new lang
+  try { if (typeof buildIndex === 'function' && all && all.length) buildIndex(); } catch(e){}
+  // The project button carries data-i18n="all_projects", so the loop above
+  // just overwrote it with the generic label even when a project is picked.
+  // Restore the real label (no-op before the picker exists).
+  try { if (typeof updatePfmsLabel === 'function') updatePfmsLabel(); } catch(e){}
+}
+function toggleLanguage(){
+  LANG = (LANG === 'th') ? 'en' : 'th';
+  try { localStorage.setItem('vcb-lang', LANG); } catch(e){}
+  applyI18n();
+}
+
+let RAW = {};  // populated live from the staging sheet via getDocuments()
+
+// Full project names shown next to the "Showing …" line when filtered.
+const PROJ_NAMES = {
+  'BT1':'โครงการบางเตย ตอน 1',
+  'VC':'โครงการลาดหลุมแก้ว ตอน 3',
+  'VK2':'โครงการบางเตย ตอน 2',
+  'CVE':'ชวนา เอ็นจิเนียร์ริ่ง',
+  'LPB':'โครงการหลวงพระบาง',
+  'BV':'โครงการบางวัว ตอน 6',
+  'PN4':'โครงการพุทธมณฑล ตอน 4',
+  'EP':'โครงการบ้านแพ้ว ตอน 3',
+  'V&K':'โครงการพุทธมณฑล ตอน 3',
+  'UNCLASSIFIED':'Unclassified'
+};
+
+// NOTE: the project palette now lives in ONE place — the .BT1/.VK2/...
+// badge classes in the stylesheet above. Both the table badges and the
+// project-picker chips render a `.pb <class>` span, so there is no longer
+// a parallel JS colour map to keep in sync (an earlier PROJ_COLOR map was
+// needed only because a native <select>'s <option> can't carry a chip).
+
+// Table badge CSS class for a project key. Stripping non-alphanumerics
+// (the old approach) collapses "V&K" to "VK", colliding with the real
+// "VK" project (VK2's doc-code prefix) — two different sites would then
+// share one badge color. Give "V&K" its own distinct token instead of
+// dropping the "&".
+function projBadgeClass(proj) {
+  var p = String(proj);
+  if (p === 'V&K') return 'VnK';
+  return p.replace(/[^A-Za-z0-9]/g, '');
+}
+
+// State (data is populated live from the staging sheet)
+let all = [];
+let af = 'ALL';
+let dtf = 'ALL';   // active document-type (code) filter
+let stf = 'ALL';   // active status filter (pending / commented / approved / rejected)
+let sortCol = -1, sortDir = 1;
+const tb = document.getElementById('tb');
+
+function buildIndex() {
+  // Data has arrived — drop the spinner, reveal the table.
+  var _lb=document.getElementById('loadingBox'); if(_lb) _lb.style.display='none';
+  var _tw=document.getElementById('tw'); if(_tw) _tw.style.display='';
+  // Flatten & parse dates  (DD/MM/YYYY → sortable YYYY-MM-DD)
+  all = [];
+  for (const [proj, rows] of Object.entries(RAW)) {
+    rows.forEach(r => {
+      let iso = '', ts = 0;
+      const m = String(r.date || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) {
+        iso = `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+        ts = new Date(iso).getTime();
+      }
+      all.push({...r, proj, iso, ts});
+    });
+  }
+
+  // Default sort: documents with a comment awaiting attention float to
+  // the very top; everything else stays newest-first.
+  const rk = r => (r.status === 'commented' ? 0 : 1);
+  all.sort((a,b) => rk(a) - rk(b) || b.ts - a.ts || b.num - a.num);
+
+  // Renumber AFTER sorting so the # column is a clean 1..N sequence in
+  // display order (top row = 1). getDocuments() only hands us a per-tab
+  // row index, which looks jumbled once rows are merged + date-sorted.
+  all.forEach((r, i) => r.num = i + 1);
+
+  // Document-type dropdown — distinct codes present in the data, sorted.
+  // Label shows the code plus its department name (from TO_BY_CODE) when known.
+  const dtEl = document.getElementById('dt');
+  const prev = dtEl.value;
+  const codes = [...new Set(all.map(r => fmtCode(r.code)).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  dtEl.innerHTML = '<option value="ALL">' + esc(t('all_doc_types')) + '</option>' +
+    codes.map(c => {
+      const name = (typeof CODE_LABEL !== 'undefined' && CODE_LABEL[c]) ? ' — ' + CODE_LABEL[c] : '';
+      return `<option value="${esc(c)}">${esc(c + name)}</option>`;
+    }).join('');
+  // Keep the current selection if it still exists; otherwise reset to ALL.
+  dtf = codes.indexOf(prev) >= 0 ? prev : 'ALL';
+  dtEl.value = dtf;
+  dtEl.classList.toggle('on', dtf !== 'ALL');
+
+  // Project filter — single-select popover (#pfmsPanel), driven by `af`
+  // and kept in sync with selectProject(). Each row renders the project's
+  // full name plus the same .pb badge chip used in the table below.
+  const projList = ['ALL', ...Object.keys(RAW).filter(p => RAW[p].length > 0)];
+  if (projList.indexOf(af) < 0) af = 'ALL';   // project may have vanished after a reload
+  const panel = document.getElementById('pfmsPanel');
+  if (panel) {
+    panel.innerHTML = projList.map((p, i) => {
+      const sel = p === af ? ' sel' : '';
+      const name = esc(p === 'ALL' ? t('all_projects') : (PROJ_NAMES[p] || p));
+      const chip = p === 'ALL' ? ''
+        : `<span class="pb ${projBadgeClass(p)}">${esc(p)}</span>`;
+      return (i === 1 ? '<div class="pfmsDiv"></div>' : '') +
+        `<div class="pfmsRow${sel}" onclick="selectProject('${esc(p).replace(/'/g, "\\'")}')">` +
+        `<span>${name}</span>${chip}</div>`;
+    }).join('');
+  }
+  updatePfmsLabel();
+
+  // Build table rows
+  tb.innerHTML = '';
+  all.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.dataset.proj = r.proj;
+    tr.dataset.code = fmtCode(r.code);
+    tr.dataset.iso  = r.iso;
+    tr.dataset.id   = r.id || '';
+    tr.dataset.url  = r.url || '';
+    tr.dataset.subject = r.subject || '';
+    var _am = String(r.ref||'').match(/แนบเพิ่ม:\s*(\S+)/);
+    tr.dataset.att = _am ? _am[1] : '';
+    // Note: r.date is intentionally excluded — dates have dedicated From/To
+    // filters, and including them made "08" match any date with day/month 08.
+    tr.dataset.srch = [r.code, fmtCode(r.code), r.subject, r.desc, r.proj].join(' ').toLowerCase();
+    const stat = (r.status || 'pending');
+    tr.dataset.status = stat;
+    const stLabel = t('status_' + stat) || t('status_pending');
+    tr.innerHTML =
+      `<td class="n">${r.num}</td>` +
+      `<td class="dt">${formatDateByEra(r.date)}</td>` +
+      `<td class="pj"><span class="pb ${projBadgeClass(r.proj)}">${esc(r.proj)}</span></td>` +
+      `<td class="cd">${esc(fmtCode(r.code)) || '<span class="nl">—</span>'}</td>` +
+      `<td class="sb"><div class="ti">${esc(r.subject)}</div>` +
+        `${r.desc ? `<div class="de">${esc(r.desc)}</div>` : ''}</td>` +
+      `<td class="stc"><span class="stb st-${stat}">${stLabel}</span></td>` +
+      `<td class="rvc"><button class="rvbtn" onclick="openReview(this)">${t('open_btn')}</button></td>`;
+    tb.appendChild(tr);
+  });
+
+  // Header counts — computed from real data, never hardcoded
+  const linked = all.filter(r => r.url).length;
+  document.getElementById('hdr').innerHTML =
+    all.length + ' documents &nbsp;·&nbsp; ' + linked + ' linked';
+
+  go();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Codes stored as plain numbers in the sheet lose their leading zero
+// ("08" -> 8). Pad a leading 1-digit number back to 2 digits so the
+// code reads "08", "06", "09" — matching "02A"/"10" which keep theirs.
+function fmtCode(c) {
+  var s = String(c == null ? '' : c).trim();
+  var m = s.match(/^(\d+)(.*)$/);
+  if (m && m[1].length === 1) return '0' + m[1] + m[2];
+  return s;
+}
+
+// Date filter uses dd/mm/yyyy text; convert to sortable yyyy-mm-dd.
+function dmy2iso(s){
+  const m = String(s||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : '';
+}
+function iso2dmy(s){
+  const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+// Calendar picker for the date filters (still shows dd/mm/yyyy text).
+function pickDate(id){
+  const p=document.getElementById(id+'p');
+  const cur=dmy2iso(document.getElementById(id).value);
+  if(cur) p.value=cur;
+  try{ p.showPicker(); }
+  catch(e){ p.style.pointerEvents='auto'; p.focus(); try{p.click();}catch(_){}}
+}
+function onPick(id){
+  const p=document.getElementById(id+'p');
+  if(p.value){ document.getElementById(id).value=iso2dmy(p.value); go(); }
+}
+
+// Rows per page. Loading/rendering all ~400 rows' worth of DOM at once
+// was unnecessary work on every filter/sort; paging keeps each render
+// small regardless of how many documents exist.
+const PAGE_SIZE = 100;
+var curPage = 1;
+var _lastFilterSig = '';
+
+function go() {
+  const q  = document.getElementById('srch').value.toLowerCase().trim();
+  const d1 = document.getElementById('d1').value;   // native date → yyyy-mm-dd
+  const d2 = document.getElementById('d2').value;
+  // Any change to the actual filter inputs (as opposed to a plain page-nav
+  // re-render via gotoPage) means a new result set — start back at page 1.
+  const sig = [q, d1, d2, af, dtf, stf, sortCol, sortDir].join('|');
+  if (sig !== _lastFilterSig) { curPage = 1; _lastFilterSig = sig; }
+  let shown = 0;
+  document.querySelectorAll('#tb tr').forEach(tr => {
+    const projOk = af === 'ALL' || tr.dataset.proj === af;
+    const dtOk   = dtf === 'ALL' || tr.dataset.code === dtf;
+    const stOk   = stf === 'ALL' || (tr.dataset.status || 'pending') === stf;
+    const srchOk = !q || tr.dataset.srch.includes(q);
+    const iso    = tr.dataset.iso;
+    const d1Ok   = !d1  || iso >= d1;
+    const d2Ok   = !d2  || iso <= d2;
+    const hide   = !projOk || !dtOk || !stOk || !srchOk || !d1Ok || !d2Ok;
+    tr.classList.toggle('h', hide);
+    if (!hide) shown++;
+  });
+  document.getElementById('em').style.display  = shown ? 'none' : '';
+  document.getElementById('tbl').style.display = shown ? ''     : 'none';
+  const maxPage = Math.max(1, Math.ceil(shown / PAGE_SIZE));
+  if (curPage > maxPage) curPage = maxPage;
+  applyPage(shown, maxPage);
+}
+
+// Of the rows that passed the filters (not .h), only the current page's
+// slice of PAGE_SIZE stays visible — the rest get .pg (page-hidden).
+// Recomputed on every filter/sort/page change; cheap even at ~400 rows.
+function applyPage(shownTotal, maxPage){
+  var start = (curPage - 1) * PAGE_SIZE, i = 0, shown = 0;
+  document.querySelectorAll('#tb tr').forEach(function(tr){
+    if (tr.classList.contains('h')) { tr.classList.remove('pg'); return; }
+    var onPage = i >= start && i < start + PAGE_SIZE;
+    tr.classList.toggle('pg', !onPage);
+    if (onPage) shown++;
+    i++;
+  });
+  document.getElementById('stat').textContent =
+    t('showing').replace('{n}', shown).replace('{m}', shownTotal) +
+    (af !== 'ALL' ? `   ·   ${PROJ_NAMES[af] || af}` : '') +
+    (maxPage > 1 ? `   ·   page ${curPage}/${maxPage}` : '');
+  renderPager(maxPage);
+  renumberVisible();
+}
+
+function renderPager(maxPage){
+  var el = document.getElementById('pager');
+  if (!el) return;
+  if (maxPage <= 1) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  var btns = [];
+  btns.push(`<button class="qbtn" ${curPage<=1?'disabled':''} onclick="gotoPage(${curPage-1})">‹ Prev</button>`);
+  for (var p = 1; p <= maxPage; p++) {
+    if (maxPage > 9 && p !== 1 && p !== maxPage && Math.abs(p - curPage) > 2) {
+      if (p === 2 || p === maxPage - 1) btns.push('<span style="padding:0 4px;color:#9aa0b2">…</span>');
+      continue;
+    }
+    btns.push(`<button class="qbtn${p===curPage?' on':''}" onclick="gotoPage(${p})">${p}</button>`);
+  }
+  btns.push(`<button class="qbtn" ${curPage>=maxPage?'disabled':''} onclick="gotoPage(${curPage+1})">Next ›</button>`);
+  el.innerHTML = btns.join('');
+}
+
+function gotoPage(p){
+  curPage = p;
+  go();
+  var tw = document.getElementById('tw');
+  if (tw) tw.scrollIntoView({ block: 'start' });
+}
+
+// The # column is always a running 1..N of the rows CURRENTLY shown on
+// this page (top → bottom), recomputed after every filter/sort/page.
+function renumberVisible(){
+  var i = (curPage - 1) * PAGE_SIZE;
+  document.querySelectorAll('#tb tr').forEach(function(tr){
+    if (tr.classList.contains('h') || tr.classList.contains('pg')) return;
+    var c = tr.cells[0];
+    if (c) c.textContent = (++i);
+  });
+}
+
+function onDtChange() {
+  const el = document.getElementById('dt');
+  dtf = el.value;
+  el.classList.toggle('on', dtf !== 'ALL');
+  go();
+}
+
+function onStChange() {
+  const el = document.getElementById('st');
+  stf = el.value;
+  el.classList.toggle('on', stf !== 'ALL');
+  go();
+}
+
+// Set the active project (single-select) and close the popover — one
+// click to switch, no deselect step.
+function selectProject(p) {
+  af = p;
+  document.querySelectorAll('#pfmsPanel .pfmsRow').forEach(function(el){
+    el.classList.remove('sel');
+  });
+  var rows = document.querySelectorAll('#pfmsPanel .pfmsRow');
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].getAttribute('onclick').indexOf("'" + p + "'") >= 0) {
+      rows[i].classList.add('sel'); break;
+    }
+  }
+  var box = document.getElementById('pfms');
+  if (box) box.classList.remove('openMenu');
+  updatePfmsLabel();
+  go();
+}
+// Button label: the selected project's full name (or "All projects"),
+// with the filter-active outline when something specific is picked.
+function updatePfmsLabel() {
+  var lbl = document.getElementById('pfmsLabel');
+  var btn = document.getElementById('pfmsBtn');
+  if (!lbl || !btn) return;
+  lbl.textContent = af === 'ALL' ? t('all_projects') : (PROJ_NAMES[af] || af);
+  btn.classList.toggle('on', af !== 'ALL');
+}
+function togglePfMenu(e) {
+  e.stopPropagation();
+  document.getElementById('pfms').classList.toggle('openMenu');
+}
+document.addEventListener('click', function(e) {
+  var box = document.getElementById('pfms');
+  if (box && !box.contains(e.target)) box.classList.remove('openMenu');
+});
+
+function setQuick(btn, preset) {
+  document.querySelectorAll('.qbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  // Use LOCAL date parts (toISOString is UTC → off-by-one in Thailand).
+  const ymd = d => d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+  const now = new Date();
+  let d1, d2;
+  if (preset === 'tm') {                       // this calendar month: 1st → end
+    d1 = new Date(now.getFullYear(), now.getMonth(), 1);
+    d2 = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  } else if (preset === 'lm') {                // last calendar month
+    d1 = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    d2 = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else {                                     // rolling last N days (incl. today)
+    d2 = new Date(now);
+    d1 = new Date(now); d1.setDate(d1.getDate() - (Number(preset) - 1));
+  }
+  document.getElementById('d1').value = ymd(d1);
+  document.getElementById('d2').value = ymd(d2);
+  go();
+}
+
+// Reset EVERY filter back to the page's default state: search box, the
+// document-type / status / project pickers, both dates, the quick-range
+// buttons, and any active column sort. Ends on page 1.
+// clearSort() re-orders the DOM back to the default (commented-first,
+// then newest) and calls go() itself, so it goes last and we don't
+// duplicate that reordering or fire go() twice.
+function clearFilters() {
+  var s = document.getElementById('srch'); if (s) s.value = '';
+
+  dtf = 'ALL';
+  var dtEl = document.getElementById('dt');
+  if (dtEl) { dtEl.value = 'ALL'; dtEl.classList.remove('on'); }
+
+  stf = 'ALL';
+  var stEl = document.getElementById('st');
+  if (stEl) { stEl.value = 'ALL'; stEl.classList.remove('on'); }
+
+  af = 'ALL';
+  document.querySelectorAll('#pfmsPanel .pfmsRow').forEach(function(el){
+    el.classList.remove('sel');
+  });
+  var firstRow = document.querySelector('#pfmsPanel .pfmsRow');
+  if (firstRow) firstRow.classList.add('sel');   // the "All projects" row
+  var pfBox = document.getElementById('pfms');
+  if (pfBox) pfBox.classList.remove('openMenu');
+  try { updatePfmsLabel(); } catch (e) {}
+
+  document.getElementById('d1').value = '';
+  document.getElementById('d2').value = '';
+  try { refreshDateLabels(); } catch (e) {}      // clear the in-box date labels
+  document.querySelectorAll('.qbtn').forEach(function(b){ b.classList.remove('on'); });
+
+  curPage = 1;
+  clearSort();                                   // also calls go()
+}
+
+// Date input change handler — applies the filter on desktop.
+// (On mobile, the custom picker calls go() directly.)
+function onDateChange(el){
+  go();
+}
+
+// Mobile-only short date labels (d/m/yy, Buddhist-era 2-digit year) drawn
+// over the native <input type=date>, which we can't restyle directly —
+// iOS renders its own long locale text ("3 Jul BE 2569") inside it. When
+// empty, each box shows a short "Date" placeholder instead — same pattern
+// as the doc-type/status dropdowns, which show their own placeholder text
+// inside the box, not beside it. There is no external label anymore.
+function refreshDateLabels(){
+  ['d1','d2'].forEach(function(id){
+    var el = document.getElementById(id);
+    var lbl = document.getElementById(id + 'lbl');
+    if(!el || !lbl) return;
+    var v = el.value;
+    if(!v){
+      lbl.textContent = t('date_short');
+      lbl.classList.add('dph');
+      return;
+    }
+    lbl.classList.remove('dph');
+    var p = v.split('-');
+    var y2 = String((Number(p[0]) + 543) % 100).padStart(2,'0');
+    lbl.textContent = Number(p[2]) + '/' + Number(p[1]) + '/' + y2;
+  });
+}
+
+// onFocus retained as a safety net in case readonly didn't apply yet
+// (e.g. resize from desktop to mobile mid-session).
+function onDateFocus(el, ev){
+  if(document.documentElement.classList.contains('is-mobile')){
+    if(ev) ev.preventDefault();
+    try { el.blur(); } catch(e){}
+    dpOpen(el.id);
+  }
+}
+
+// One-time wiring: on mobile, mark the date inputs readonly so iOS does
+// NOT open its native picker (which auto-defaults to today and shows
+// Reset/Done chrome we can't remove). A tap then opens our custom modal.
+(function(){
+  function wire(){
+    var mobile = document.documentElement.classList.contains('is-mobile');
+    ['d1','d2'].forEach(function(id){
+      var el = document.getElementById(id); if(!el) return;
+      if(mobile){
+        el.setAttribute('readonly','readonly');
+        if(!el._dpWired){
+          el.addEventListener('click', function(){ dpOpen(id); });
+          el._dpWired = true;
+        }
+      } else {
+        el.removeAttribute('readonly');
+      }
+    });
+    if(mobile) refreshDateLabels();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+  window.addEventListener('resize', wire);
+})();
+
+// ── Custom date picker ──
+var _dpTarget = '';
+var _dpYear = 0, _dpMonth = 0;
+function dpOpen(targetId){
+  _dpTarget = targetId;
+  var cur = document.getElementById(targetId).value;
+  if(cur && /^\d{4}-\d{2}-\d{2}$/.test(cur)){
+    var p = cur.split('-');
+    _dpYear = parseInt(p[0],10); _dpMonth = parseInt(p[1],10) - 1;
+  } else {
+    var d = new Date();
+    _dpYear = d.getFullYear(); _dpMonth = d.getMonth();
+  }
+  dpRender();
+  document.getElementById('dpModal').classList.add('show');
+}
+function dpClose(){ document.getElementById('dpModal').classList.remove('show'); }
+function dpNav(delta){
+  _dpMonth += delta;
+  if(_dpMonth < 0){ _dpMonth = 11; _dpYear--; }
+  if(_dpMonth > 11){ _dpMonth = 0; _dpYear++; }
+  dpRender();
+}
+function dpRender(){
+  var monthsEn=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthsTh=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var months = (typeof LANG !== 'undefined' && LANG === 'th') ? monthsTh : monthsEn;
+  var displayYear = (typeof DATE_ERA !== 'undefined' && DATE_ERA === 'be') ? (_dpYear + 543) : _dpYear;
+  document.getElementById('dpTitle').textContent = months[_dpMonth] + ' ' + displayYear;
+  var firstDay = new Date(_dpYear, _dpMonth, 1).getDay();
+  var daysInMonth = new Date(_dpYear, _dpMonth+1, 0).getDate();
+  var today = new Date();
+  var todayIso = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  var selectedIso = document.getElementById(_dpTarget).value;
+  var dowsEn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dowsTh = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+  var dows = (typeof LANG !== 'undefined' && LANG === 'th') ? dowsTh : dowsEn;
+  var html = dows.map(function(d){ return '<div class="dp-dow">'+d+'</div>'; }).join('');
+  for(var i=0;i<firstDay;i++) html += '<div class="dp-empty"></div>';
+  for(var d=1;d<=daysInMonth;d++){
+    var iso = _dpYear + '-' + String(_dpMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var cls = 'dp-day';
+    if(iso === todayIso) cls += ' today';
+    if(iso === selectedIso) cls += ' selected';
+    html += '<button class="'+cls+'" onclick="dpPick('+d+')">'+d+'</button>';
+  }
+  document.getElementById('dpGrid').innerHTML = html;
+}
+function dpPick(day){
+  var iso = _dpYear + '-' + String(_dpMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+  document.getElementById(_dpTarget).value = iso;
+  refreshDateLabels();
+  dpClose();
+  go();
+}
+function dpClear(){
+  document.getElementById(_dpTarget).value = '';
+  refreshDateLabels();
+  dpClose();
+  go();
+}
+
+function sort(col) {
+  // Same header cycles: ascending → descending → cleared (default order).
+  if (sortCol === col) {
+    if (sortDir === 1) sortDir = -1;
+    else { clearSort(); return; }
+  } else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('thead th').forEach((th,i) => {
+    th.classList.remove('asc','desc');
+    if (i === col) th.classList.add(sortDir===1?'asc':'desc');
+  });
+  const rows = Array.from(tb.querySelectorAll('tr'));
+  rows.sort((a,b) => {
+    let av = a.cells[col]?.textContent.trim() ?? '';
+    let bv = b.cells[col]?.textContent.trim() ?? '';
+    if (col === 0) return sortDir * ((parseInt(av)||0) - (parseInt(bv)||0));
+    if (col === 1) {
+      const ai = a.dataset.iso, bi = b.dataset.iso;
+      return sortDir * ai.localeCompare(bi);
+    }
+    return sortDir * av.localeCompare(bv, 'th');
+  });
+  rows.forEach(r => tb.appendChild(r));
+  curPage = 1; go();          // re-sorting starts back at page 1
+}
+
+// Remove sorting and restore the default order (the order of `all`:
+// commented-first, then newest). Third click on a header calls this.
+function clearSort() {
+  sortCol = -1; sortDir = 1;
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('asc','desc'));
+  const q = {};
+  Array.from(tb.querySelectorAll('tr')).forEach(tr => {
+    (q[tr.dataset.id] = q[tr.dataset.id] || []).push(tr);
+  });
+  all.forEach(r => { const a = q[r.id]; if (a && a.length) tb.appendChild(a.shift()); });
+  curPage = 1; go();
+}
+// Discoverability: tell users a third click clears the sort.
+(function(){ try{
+  document.querySelectorAll('#tbl thead th[onclick]').forEach(function(t){
+    t.title = 'Click to sort ↑ · click again for ↓ · third click clears the sort';
+  });
+}catch(e){} })();
+
+// Load the single source of truth (the staging sheet) on every page load
+function loadDocuments() {
+  document.getElementById('stat').textContent = t('loading');
+  var lb=document.getElementById('loadingBox'); if(lb) lb.style.display='flex';
+  var tw=document.getElementById('tw'); if(tw) tw.style.display='none';
+  google.script.run
+    .withSuccessHandler(function (data) {
+      RAW = data || {}; buildIndex();
+      // If the Add-Document panel is already open, refresh the running-
+      // number box now that the data has arrived (avoids it being stuck).
+      if (document.getElementById('panel').classList.contains('show')) {
+        try { updateRunningNo(); } catch(e){}
+      }
+    })
+    .withFailureHandler(function (err) {
+      var lb2=document.getElementById('loadingBox'); if(lb2) lb2.style.display='none';
+      document.getElementById('stat').textContent =
+        'Could not load documents: ' + (err && err.message ? err.message : err);
+    })
+    .getDocuments(_authToken || '');
+}
+if (_SHARE_DOC_ID) {
+  // This script block runs while the document is still parsing — #rvWrap
+  // and the other review-panel elements further down the page don't
+  // exist yet, so entering shared mode has to wait for them.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ enterSharedDocMode_(_SHARE_DOC_ID); });
+  } else {
+    enterSharedDocMode_(_SHARE_DOC_ID);
+  }
+} else {
+  loadDocuments();
+}
+
+// Shared-link mode: hide the dashboard chrome (header search/filters,
+// document table) so a recipient only ever sees the single document
+// they were sent — never the full memo list — then open it straight
+// into the review panel. Their access is exactly what the link grants;
+// there is no sign-in/permission gate on this route, so nothing here
+// depends on who (if anyone) is signed in.
+function enterSharedDocMode_(docId){
+  document.documentElement.classList.add('shared-doc-mode');
+  ['loadingBox','tw','stat','hdr'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  var bar=document.querySelector('.bar'), db=document.querySelector('.datebar'),
+      addBtn=document.querySelector('.add-btn');
+  if(bar) bar.style.display='none';
+  if(db) db.style.display='none';
+  if(addBtn) addBtn.style.display='none';
+  // The normal Close just hides the overlay — with the dashboard behind
+  // it never loaded, that would leave a blank page. Point it at the
+  // full app instead, so there's always a real way out.
+  var closeBtn=document.querySelector('#rvWrap .rvhd button[onclick="closeReview()"]');
+  if(closeBtn){
+    closeBtn.textContent='✕ Close';
+    closeBtn.title='Leave this document and go to the full e-Memo app';
+    closeBtn.onclick=function(){ location.href=(_APP_URL||'/'); };
+  }
+  openReviewShared(docId, {});
+}
+
+// Which projects can have a letter auto-generated (rest -> attach a
+// file), and the default เรียน recipient to pre-fill per project.
+var LH_PROJECTS = [];
+var LH_DEFAULTS = {};
+google.script.run
+  .withSuccessHandler(function(meta){
+    meta = meta || {};
+    LH_PROJECTS = meta.projects || [];
+    LH_DEFAULTS = meta.defaults || {};
+  })
+  .withFailureHandler(function(){ LH_PROJECTS = []; LH_DEFAULTS = {}; })
+  .getLetterheadMeta();
+
+// ── OAuth identity (one sign-in, shared across the whole page) ─────
+var _authToken = null;
+var _verifiedEmail = '';
+
+// Apply a sign-in everywhere and remember it for this browser tab so a
+// refresh (or any other button) does NOT require signing in again.
+function applyAuth(token, email){
+  var prevEmail=String(_verifiedEmail||'').toLowerCase();
+  _authToken = token; _verifiedEmail = email || '';
+  // Genuine identity change (switching account or signing out) → the set
+  // of confidential docs this person may see can differ, so refresh. The
+  // initial load already used the session identity, so skip when there
+  // was no previous email (avoids a redundant reload on first paint).
+  if(prevEmail && prevEmail !== String(_verifiedEmail||'').toLowerCase()){
+    _accessLoaded=false;
+    if(typeof loadDocuments==='function'){ try{ loadDocuments(); }catch(e){} }
+  }
+  try {
+    if (token) { sessionStorage.setItem('vcbAuthTok', token); sessionStorage.setItem('vcbAuthEmail', _verifiedEmail); }
+    else { sessionStorage.removeItem('vcbAuthTok'); sessionStorage.removeItem('vcbAuthEmail'); }
+  } catch(e){}
+  var disp=document.getElementById('fEmailDisplay');
+  if(disp){
+    disp.value=_verifiedEmail;
+    document.getElementById('fSignInRow').style.display = token ? 'none' : 'block';
+    document.getElementById('fSignedInRow').style.display = token ? 'block' : 'none';
+    // Signing in clears any "please sign in" prompt that was showing.
+    if(token){ var fe=document.getElementById('fErr'); if(fe) fe.style.display='none'; }
+  }
+  // applyAuth can run during the "restore sign-in on page load" IIFE,
+  // which fires while this <script> tag is still being parsed — #rvWrap's
+  // markup lives near the end of <body> and doesn't exist yet at that
+  // point. getElementById returns null then, and .style threw straight
+  // through the rest of this function (and, since this runs at the top
+  // level of the script, silently aborted everything the script had left
+  // to execute — including var declarations further down, like
+  // _rvActionCfg, that Comment/Approve/Reject depend on).
+  var rvWrapEl=document.getElementById('rvWrap');
+  if (rvWrapEl && rvWrapEl.style.display === 'block') refreshReviewAuth();
+  updateUserPill();
+}
+
+// Top-right "signed-in as" text — plain "email · role" on the header.
+// Reference format: "c.chavananand@vcb-con.com · admin".
+function updateUserPill(){
+  var pill=document.getElementById('userPill');
+  if(!pill) return;
+  var em=document.getElementById('upEmail');
+  var sp=document.getElementById('upSep');
+  var rl=document.getElementById('upRole');
+  // A verified email alone means signed in — this app can resolve identity
+  // from the active Google session without a custom _authToken, so
+  // requiring both here made the pill say "Sign in" even when the
+  // Settings panel (which only checks _verifiedEmail) correctly showed
+  // the signed-in account, and disagreed with rvPick()'s own check.
+  if(_verifiedEmail){
+    var addr=String(_verifiedEmail);
+    var isOwner=addr.toLowerCase()==='c.chavananand@vcb-con.com';
+    var role=(isOwner || _rvManager) ? 'admin' : 'user';
+    if(em) em.textContent=addr;
+    if(rl) rl.textContent=role;
+    if(sp) sp.style.display='inline';
+    if(rl) rl.style.display='inline';
+    pill.title=addr+' — click to switch account';
+  } else {
+    if(em) em.textContent='Sign in';
+    if(sp) sp.style.display='none';
+    if(rl) rl.style.display='none';
+    pill.title='Sign in';
+  }
+}
+function onUserPillClick(){ toggleSettings(); }   /* opens the Settings modal */
+
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'oauthToken'){
+    try{ localStorage.removeItem('vcbSignedOut'); }catch(_e){}  // explicit sign-in clears sticky sign-out
+    applyAuth(e.data.token, e.data.email);
+  }
+});
+
+// Restore an existing sign-in on page load (survives refresh in this tab).
+(function(){
+  var t='', em='', _so=false;
+  try { t=sessionStorage.getItem('vcbAuthTok')||''; em=sessionStorage.getItem('vcbAuthEmail')||''; }catch(e){}
+  try { _so=localStorage.getItem('vcbSignedOut')==='1'; }catch(e){}
+  if(_so){ try{ updateUserPill(); }catch(e){} return; }
+  if(t){
+    applyAuth(t, em);                 // optimistic restore so the UI isn't blank
+    // …then VERIFY the token is still alive. The custom token is the only
+    // way the server knows the user (webapp access = ANYONE → Session is
+    // blank), so an EXPIRED token would otherwise keep showing the email
+    // while every write fails "Session expired". If it's dead, clear it so
+    // the user is shown as signed-out and cleanly prompted to sign in.
+    try{
+      google.script.run
+        .withSuccessHandler(function(r){
+          if(r && r.signedIn && r.email){ _rvManager=!!r.manager; applyAuth(t, r.email); }
+          else { applyAuth(null, ''); }
+          try{ updateUserPill(); }catch(e){}
+        })
+        .withFailureHandler(function(){})
+        .getReviewerRole(t);
+    }catch(e){}
+    return;
+  }
+  // No stored token: ask the server who they are (covers domain-restricted
+  // deployments where Session identifies the user) to populate the pill.
+  try{
+    google.script.run
+      .withSuccessHandler(function(r){
+        _rvManager=!!(r&&r.manager);
+        if(r && r.signedIn && r.email && !_authToken){ applyAuth('__session__', r.email); }
+        try{ if(document.getElementById('stModal').classList.contains('show')) updateSettingsModal(); }catch(e){}
+      })
+      .withFailureHandler(function(){})
+      .getReviewerRole('');
+  }catch(e){}
+})();
+// Ensure the pill is in its correct initial state even before any auth check.
+try { updateUserPill(); } catch(e){}
+
+var _authPoll=null;
+function signInWithGoogle(){
+  var state='s'+Date.now()+Math.random().toString(36).slice(2,10);
+  google.script.run
+    .withSuccessHandler(function(url){
+      // Open the sign-in. On iPad a same-tab open is the most reliable;
+      // on desktop a popup is nicer. Either way we POLL for the result
+      // (claimAuth) so we never depend on popup→app messaging.
+      var w=window.open(url,'googleSignIn','width=500,height=620,left=200,top=100');
+      if(!w){ // popup blocked (common on iPad) → open in a new tab
+        try{ window.open(url,'_blank'); }catch(e){}
+      }
+      if(_authPoll) clearInterval(_authPoll);
+      var tries=0;
+      _authPoll=setInterval(function(){
+        tries++;
+        if(tries>90){ clearInterval(_authPoll); _authPoll=null; return; } // ~3 min
+        google.script.run
+          .withSuccessHandler(function(r){
+            if(r&&r.token){
+              clearInterval(_authPoll); _authPoll=null;
+              try{ localStorage.removeItem('vcbSignedOut'); }catch(e){}  // explicit sign-in clears sticky sign-out
+              applyAuth(r.token, r.email||'');
+              try{ if(w&&!w.closed) w.close(); }catch(e){}
+            }
+          })
+          .withFailureHandler(function(){})
+          .claimAuth(state);
+      },2000);
+    })
+    .withFailureHandler(function(err){ showE('Could not start sign-in: '+(err.message||String(err))); })
+    .getOAuthUrl(state);
+}
+
+// ── Review / approval ────────────────────────────────────────────
+var _rvId='', _rvProj='', _rvManager=false, _rvLocked=false, _rvMangoSent=false, _rvStatus='pending', _rvFallbackUrl='';
+// Bumped by openReviewCore (new document) and by every successful rvDo/
+// rvSendMango/rvDelete (fresh state just arrived from the server). The
+// slow, async refreshReviewAuth() identity check fired when a document
+// first opens can still be in flight when the user acts on it seconds
+// later — if its response lands after a newer render, blindly re-running
+// updateReviewControls() from that stale snapshot could revert a
+// just-approved/locked document back to a "not a manager"-looking state.
+// Each refreshReviewAuth() call snapshots this counter and checks it
+// hasn't moved before applying its result.
+var _rvGen=0;
+// Which action the user picked in stage 1 (comment|approve|reject|reopen),
+// null while the action chooser is showing.
+var _rvPending=null;
+
+function rvEmbed(url){
+  if(!url) return '';
+  var m=String(url).match(/\/d\/([^/]+)/);
+  if(m){
+    if(url.indexOf('/document/')>=0) return 'https://docs.google.com/document/d/'+m[1]+'/preview';
+    return 'https://drive.google.com/file/d/'+m[1]+'/preview';
+  }
+  return url;
+}
+
+// Multi-attachment support: render N files stacked inside the viewer.
+// The first attachment loads into #rvDoc as before; any additional ones
+// get their own iframe (with a "N of M · name" label) appended below.
+// Each is streamed through the server so no Drive sharing is needed.
+function rvClearExtras_(){
+  var ex=document.getElementById('rvExtras'); if(ex) ex.parentNode.removeChild(ex);
+  var lbl=document.getElementById('rvFirstLbl'); if(lbl) lbl.style.display='none';
+}
+// Route through our own ?action=fview page (serveDriveFileViewer_) —
+// same PDF.js viewer already fixed to use the light background, served
+// as a normal script.google.com page. Deliberately NOT a blob: URL:
+// Edge's Scareware blocker silently blocks blob:-URL iframes (see the
+// note on _APP_URL above), which is also why fview exists at all.
+// Google's native Drive /preview iframe was the earlier approach here,
+// but that page is Google's own UI (dark background, its own fullscreen
+// chrome) that we can't restyle from inside our page.
+function rvLoadAtt_(att, iframeId){
+  if(!att) return;
+  var f=document.getElementById(iframeId); if(!f) return;
+  var id=att.id || (function(){ var m=String(att.url||'').match(/\/d\/([^/]+)/); return m?m[1]:''; })();
+  f.removeAttribute('srcdoc');
+  if(id){
+    f.src=(_APP_URL||'')+'?action=fview&id='+encodeURIComponent(id);
+  } else if(att.url){
+    f.src=att.url;
+  } else {
+    f.removeAttribute('src');
+    f.srcdoc='<html><body style="font-family:sans-serif;padding:30px;text-align:center;color:#666">No file link</body></html>';
+  }
+}
+function rvStreamGmail_(tid, mi, ai, mime, iframeId){
+  var f=document.getElementById(iframeId); if(!f) return;
+  f.removeAttribute('src');
+  f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#666;background:#fafafa;text-align:center"><p>Loading from Gmail…</p></body></html>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(res && res.ok && res.base64){
+        try{
+          var bin=atob(res.base64), len=bin.length, arr=new Uint8Array(len);
+          for(var i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
+          var blob=new Blob([arr], {type: res.mime || mime || 'application/octet-stream'});
+          var burl=URL.createObjectURL(blob);
+          _rvBlobUrls.push(burl);
+          f.removeAttribute('srcdoc'); f.src=burl;
+          return;
+        }catch(e){}
+      }
+      var msg=(res && res.error)?String(res.error):'Could not load attachment from Gmail.';
+      f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#c5221f;background:#fff;text-align:center"><h3>Could not load file</h3><p style="color:#444">'+msg.replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';})+'</p></body></html>';
+    })
+    .withFailureHandler(function(err){
+      var msg=err&&err.message?err.message:String(err||'unknown');
+      f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#c5221f;background:#fff;text-align:center"><h3>Could not reach the server</h3><p style="color:#444">'+msg.replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';})+'</p></body></html>';
+    })
+    .streamGmailAttachment(tid, mi, ai);
+}
+function rvLoadAllAttachments_(){
+  if(!_rvId) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      var atts=(res && res.ok && res.atts)?res.atts:[];
+      if(!atts.length){
+        var f=document.getElementById('rvDoc');
+        var why=res && res.error ? String(res.error)
+              : (res && res.threadId ? 'No attachments found in Gmail thread '+res.threadId
+                                     : 'Server returned no attachment list');
+        var dump=JSON.stringify(res).slice(0,400).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';});
+        f.removeAttribute('src');
+        f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#8a5a00;background:#fff4e5">'+
+          '<h3 style="text-align:center">Could not list attachments</h3>'+
+          '<p style="text-align:center">'+why.replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';})+'</p>'+
+          '<pre style="margin-top:18px;padding:10px;background:#fff;border:1px solid #f0d999;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all;color:#444">'+dump+'</pre>'+
+          '<p style="text-align:center;margin-top:14px;font-size:12px;color:#666">Send this screenshot to the developer — it pinpoints the exact failure.</p>'+
+          '</body></html>';
+        return;
+      }
+      // Load the first attachment into the existing #rvDoc iframe.
+      rvLoadAtt_(atts[0],'rvDoc');
+      if(atts.length<=1) return;
+      var stack=document.querySelector('#rvWrap .rvstack'); if(!stack) return;
+      var lbl=document.getElementById('rvFirstLbl');
+      if(!lbl){
+        lbl=document.createElement('div'); lbl.id='rvFirstLbl'; lbl.className='rvflbl';
+        stack.insertBefore(lbl, document.getElementById('rvDoc'));
+      }
+      lbl.textContent='1 of '+atts.length+' · '+atts[0].name;
+      lbl.style.display='block';
+      var extras=document.createElement('div'); extras.id='rvExtras';
+      extras.style.cssText='display:flex;flex-direction:column;gap:16px;margin-top:16px';
+      var afterEl=document.getElementById('rvAttWrap');
+      stack.insertBefore(extras, afterEl ? afterEl.nextSibling : null);
+      for(var i=1;i<atts.length;i++){
+        var w=document.createElement('div'); w.className='rvextra';
+        var l=document.createElement('div'); l.className='rvflbl';
+        l.textContent=(i+1)+' of '+atts.length+' · '+atts[i].name;
+        var iid='rvDocX'+i;
+        var ifr=document.createElement('iframe'); ifr.id=iid; ifr.className='rvdoc';
+        w.appendChild(l); w.appendChild(ifr);
+        extras.appendChild(w);
+        rvLoadAtt_(atts[i], iid);
+      }
+    })
+    .withFailureHandler(function(err){
+      // If the lookup itself failed, at least try the row's saved URL.
+      if(_rvFallbackUrl) rvLoadFile_(_rvFallbackUrl,'rvDoc');
+      else {
+        var f=document.getElementById('rvDoc');
+        if(f) f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#c5221f;background:#fff;text-align:center"><h3>Could not list attachments</h3><p>'+(err&&err.message?err.message:String(err))+'</p></body></html>';
+      }
+    })
+    .getDocAttachments(_rvId, _authToken || '');
+}
+
+// Stream-and-embed: fetch the file bytes through our server (script runs
+// as USER_DEPLOYING), build a blob URL in the browser, and point the
+// iframe at it. No public sharing required → "blank iframe" can never
+// come back. Falls back to the standard /preview URL only for native
+// Google formats (Docs/Sheets/Slides), where bytes aren't applicable.
+var _rvBlobUrls=[];
+function rvRevokeBlobs_(){
+  try{ _rvBlobUrls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} }); }catch(e){}
+  _rvBlobUrls=[];
+}
+function rvLoadFile_(url, iframeId){
+  var f=document.getElementById(iframeId);
+  if(!f) return;
+  if(!url){
+    f.removeAttribute('src');
+    f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#8a5a00;background:#fff4e5;text-align:center">'+
+      '<h3>No file link recorded for this row</h3>'+
+      '<p style="color:#666">The Drive Link cell is empty. Most likely the auto-logger logged the row before its first successful attachment save — running <b>gmailAutoLog</b> once in the editor will re-attach and fix it.</p>'+
+      '</body></html>';
+    return;
+  }
+  var m=String(url).match(/\/d\/([^/]+)/);
+  var id=m?m[1]:url;
+  f.removeAttribute('src');
+  f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#666;background:#fafafa;text-align:center"><p>Loading file…</p></body></html>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res){ f.src=rvEmbed(url)||url; return; }
+      if(res.ok && res.base64){
+        try{
+          var bin=atob(res.base64), len=bin.length, arr=new Uint8Array(len);
+          for(var i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
+          var blob=new Blob([arr], {type: res.mime || 'application/octet-stream'});
+          var burl=URL.createObjectURL(blob);
+          _rvBlobUrls.push(burl);
+          f.removeAttribute('srcdoc'); f.src=burl;
+          return;
+        }catch(e){ /* fall through to preview */ }
+      }
+      if(res.isNative && res.previewUrl){ f.removeAttribute('srcdoc'); f.src=res.previewUrl; return; }
+      if(res.tooLarge && res.openUrl){
+        f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#444;background:#fafafa;text-align:center">'+
+          '<h3>'+(res.name||'File')+'</h3>'+
+          '<p>This file is '+(res.sizeKb||'?')+' KB — too large to preview inline.</p>'+
+          '<p><a href="'+res.openUrl+'" target="_blank" rel="noopener" style="color:#1a73e8;font-weight:600">Open in Drive ↗</a></p>'+
+          '</body></html>';
+        return;
+      }
+      // Surface the real error (instead of dropping to a broken Drive iframe).
+      var msg=res&&res.error?String(res.error):'Server returned no file content.';
+      f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#c5221f;background:#fff;text-align:center">'+
+        '<h3>Could not stream this file</h3>'+
+        '<p style="color:#444">'+msg.replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';})+'</p>'+
+        '<p style="margin-top:18px"><a href="'+(url||'#')+'" target="_blank" rel="noopener" style="color:#1a73e8;font-weight:600">Open original ↗</a></p>'+
+        '</body></html>';
+    })
+    .withFailureHandler(function(err){
+      var msg=err&&err.message?err.message:String(err||'unknown');
+      f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#c5221f;background:#fff;text-align:center">'+
+        '<h3>Could not reach the server</h3>'+
+        '<p style="color:#444">'+msg.replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';})+'</p>'+
+        '<p style="font-size:12px;color:#888;margin-top:12px">Tip: open <b>Deploy → Manage Deployments</b> in the Apps Script editor and make sure the active deployment is on the latest version.</p>'+
+        '</body></html>';
+    })
+    .streamFileForViewer(id);
+}
+
+function openReview(btn){
+  var tr=btn.closest('tr');
+  openReviewCore(tr.dataset.id||'', tr.dataset.proj||'', tr.dataset.subject||'',
+                 tr.dataset.url||'', tr.dataset.att||'');
+}
+// Open the review panel straight from a document id + metadata, with no
+// table row involved. Used for shared single-document links (?doc=<id>),
+// where the dashboard/list is never loaded in the first place.
+function openReviewShared(id, meta){
+  meta = meta || {};
+  openReviewCore(id, meta.proj||'', meta.subject||'', meta.url||'', meta.attachUrl||'');
+}
+function openReviewCore(id, proj, subject, url, att){
+  _rvId=id; _rvProj=proj;
+  document.getElementById('rvTitle').textContent=(subject||'Document').slice(0,90);
+  var f=document.getElementById('rvDoc');
+  f.removeAttribute('srcdoc');           // clear any previous combined doc
+  // Reset to the CSS default (viewport-filling, scrolls internally) —
+  // rvFitDoc() grows it to full content height only for the letterhead
+  // case, which has no scroll of its own.
+  f.style.removeProperty('height'); f.style.pointerEvents='auto';
+  f.style.display='block';
+  rvRevokeBlobs_();
+  rvClearExtras_();                      // remove any prior stacked attachments
+  // Show a Loading state while getDocAttachments resolves the real list
+  // (Drive copies + Gmail-source fallbacks). It always loads, even when
+  // the Drive Link cell is empty.
+  f.removeAttribute('src');
+  f.srcdoc='<!doctype html><html><body style="font-family:sans-serif;padding:30px;color:#666;background:#fafafa;text-align:center"><p>Loading file…</p></body></html>';
+  _rvFallbackUrl=url;                    // used only if attachments lookup fails
+  rvLoadAllAttachments_();
+  // Supplementary attachment (parsed from Remarks) shown below the letter.
+  var aw=document.getElementById('rvAttWrap'), af=document.getElementById('rvAtt');
+  if(att){ rvLoadFile_(att,'rvAtt'); aw.style.display='block'; }
+  else { af.src='about:blank'; aw.style.display='none'; }
+  document.getElementById('rvThread').innerHTML='<div style="color:#999;font-size:12px">Loading…</div>';
+  document.getElementById('rvStatus').textContent='…';
+  document.getElementById('rvText').value='';
+  document.getElementById('rvMsg').textContent='';
+  _rvMangoSent=false;
+  (function(){ var mb=document.getElementById('rvMango');
+    mb.disabled=false; mb.textContent='↗ Send to Mango ERP';
+    mb.style.background='#1a73e8'; mb.style.color='#fff'; })();
+  // Action-first: on open we show the small stage-1 action chooser, so the
+  // composer no longer needs to start collapsed to save space. (Collapse
+  // is still available inside the composer once an action is picked.)
+  try{ document.getElementById('rvFoot').classList.remove('compact'); }catch(e){}
+  // Reset review state to a neutral "pending" baseline immediately so
+  // the action buttons (Reopen / Approve / Reject) from the previous
+  // document don't linger on the screen while the new doc's status
+  // loads. updateReviewControls() will re-render with the real state
+  // once renderReview() arrives.
+  _rvLocked=false; _rvStatus='pending'; _rvMangoSent=false;
+  _rvGen++;
+  try{ updateReviewControls(); }catch(e){}
+  rvMsgSet('Loading review state…','busy');
+  document.getElementById('rvWrap').style.display='block';
+  // #rvWrap is position:fixed so it stays pinned on screen, but without
+  // this the page underneath can still scroll — the mouse wheel / trackpad
+  // keeps moving the dashboard behind the panel instead of scrolling the
+  // panel's own content, which reads as "I can scroll past this into the
+  // document list."
+  document.body.style.overflow='hidden';
+  loadReview();
+  refreshReviewAuth();
+}
+// Delete the last entry of the current review, if it's mine. Server
+// enforces the same rule (no later entries from anyone else / no later
+// decision) — so we don't have to worry about race conditions.
+function rvDeleteOwnLast(){
+  appConfirm({
+    title:'Remove your last entry?',
+    message:'Your latest comment or decision on this document will be removed from the audit trail. This can only be done while no one else has replied after you.',
+    okLabel:'Remove', danger:true
+  },function(ok){
+    if(!ok) return;
+    google.script.run
+      .withSuccessHandler(function(res){
+        if(!res||!res.ok){ rvMsgSet('⚠️ '+((res&&res.error)||'Could not delete.'),'err'); return; }
+        rvMsgSet('✅ Removed.','ok');
+        renderReview(res);
+      })
+      .withFailureHandler(function(e){ rvMsgSet('⚠️ Error: '+(e&&e.message?e.message:String(e)),'err'); })
+      .deleteOwnLastEntry(_authToken||'', _rvId);
+  });
+}
+// Copy a link that opens straight into this document's review panel
+// (dashboard skipped) — see doGet's ?doc= handling and enterSharedDocMode_.
+function shareReview(){
+  if(!_rvId){ rvMsgSet('Nothing to share yet — still loading.','err'); return; }
+  var base=(_APP_URL||(location.origin+location.pathname));
+  var link=base+(base.indexOf('?')>=0?'&':'?')+'doc='+encodeURIComponent(_rvId);
+  var done=function(ok){
+    rvMsgSet(ok?'🔗 Link copied — paste it anywhere to share this document.':('Link: '+link),ok?'ok':'busy');
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(link).then(function(){done(true);}, function(){done(false);});
+  } else {
+    try{
+      var ta=document.createElement('textarea');
+      ta.value=link; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      done(true);
+    }catch(e){ done(false); }
+  }
+}
+
+function closeReview(){
+  document.getElementById('rvWrap').style.display='none';
+  document.body.style.removeProperty('overflow');
+  var rd=document.getElementById('rvDoc');
+  rd.onload=null; rd.removeAttribute('srcdoc'); rd.src='about:blank';
+  rd.style.removeProperty('height');
+  document.getElementById('rvAtt').src='about:blank';
+  rvClearExtras_();                     // remove stacked-attachment iframes
+  rvRevokeBlobs_();                     // free streamed-file memory
+}
+
+// Size the combined-doc iframe to its full content so there's no inner
+// scrollbar, and block interaction so it can't independently scroll/zoom.
+function rvFitDoc(){
+  var rd=document.getElementById('rvDoc');
+  try{
+    var doc=rd.contentDocument||rd.contentWindow.document;
+    var h=Math.max(doc.documentElement.scrollHeight, doc.body?doc.body.scrollHeight:0);
+    if(h>200){ rd.style.height=h+'px'; }
+  }catch(e){}
+}
+
+function loadReview(){
+  google.script.run
+    .withSuccessHandler(renderReview)
+    .withFailureHandler(function(e){
+      document.getElementById('rvThread').innerHTML='<div style="color:#c5221f;font-size:12px">Could not load: '+esc(e&&e.message?e.message:String(e))+'</div>';
+    })
+    .getReview(_rvId);
+}
+
+// Localized status-badge label — same source as the table render (i18n),
+// so opening a document never flips its badge from Thai to English.
+function statusLabel(s){ return t('status_'+s) || t('status_pending'); }
+function renderReview(res){
+  if(!res||!res.ok){
+    document.getElementById('rvThread').innerHTML='<div style="color:#c5221f;font-size:12px">'+esc((res&&res.error)||'Error')+'</div>';
+    return;
+  }
+  // Shared-link mode opens with no row metadata on hand (openReviewShared
+  // passes {}), so backfill the header/project/attachment from getReview's
+  // response — the only source of that metadata on this path.
+  if(document.documentElement.classList.contains('shared-doc-mode')){
+    if(res.subject) document.getElementById('rvTitle').textContent=res.subject.slice(0,90);
+    if(res.proj) _rvProj=res.proj;
+    if(res.url && !_rvFallbackUrl) _rvFallbackUrl=res.url;
+    if(res.attachUrl){
+      var aw=document.getElementById('rvAttWrap');
+      if(aw && aw.style.display==='none'){ rvLoadFile_(res.attachUrl,'rvAtt'); aw.style.display='block'; }
+    }
+  }
+  _rvLocked=!!res.locked;
+  _rvMangoSent=!!(res.entries&&res.entries.some(function(e){return e.action==='mango';}));
+  var s=res.status||'pending';
+  _rvStatus=s;
+  var sp=document.getElementById('rvStatus');
+  sp.textContent = statusLabel(s);
+  sp.className = 's-'+s;
+  sp.style.color = s==='approved'?'#137333':s==='rejected'?'#c5221f':s==='commented'?'#1a56c4':'#8a5a00';
+  var th=document.getElementById('rvThread');
+  // Preferred: the whole document (letter + numbered comments on the
+  // same A4, attachments after) rendered server-side as one HTML doc.
+  if(res.combinedHtml){
+    var rd=document.getElementById('rvDoc');
+    rd.removeAttribute('src');
+    // pointer-events must stay 'auto': rvFitDoc() sizes the iframe to its
+    // exact content height (no internal scrollbar to fight the outer
+    // .rvbody scroll), but 'none' here made iOS Safari swallow scroll
+    // touches that start on top of the iframe instead of forwarding them
+    // to the parent scroller — the page got stuck unable to scroll past
+    // whatever fit in the first screenful.
+    rd.style.pointerEvents='auto';
+    rd.onload=function(){ rvFitDoc(); };
+    rd.srcdoc=res.combinedHtml;
+    document.getElementById('rvAttWrap').style.display='none';
+    th.innerHTML='';
+    var row0=[].slice.call(document.querySelectorAll('#tb tr')).filter(function(t){return t.dataset.id===_rvId;})[0];
+    if(row0){ var b0=row0.querySelector('.stb');
+      if(b0){ b0.className='stb st-'+s; b0.textContent=statusLabel(s); } }
+    updateReviewControls();
+    return;
+  }
+  var pageHead='<div class="rvcmtbox"><h4>ความเห็น / Comments</h4>'+
+    '<div class="sub">บันทึกความเห็นและการพิจารณา</div>';
+  if(!res.entries||!res.entries.length){
+    th.innerHTML=pageHead+'<div style="color:#999;font-size:14px;padding:14px 0">ยังไม่มีความเห็น — No comments yet.</div></div>';
+  } else {
+    var nonMango=res.entries.filter(function(en){return en.action!=='mango';});
+    // Only the LAST entry in the thread is deletable, and only by its
+    // own author. The moment anyone (or any approve/reject) posts after,
+    // it becomes locked in. Server enforces the same rule.
+    var lastIdx=nonMango.length-1;
+    var myEmail=String(_verifiedEmail||'').trim().toLowerCase();
+    var items=nonMango.map(function(en,idx){
+      var label=en.action==='approve'?'✓ Approved':en.action==='reject'?'✕ Rejected':en.action==='reopen'?'↺ Reopened / revision requested':en.action==='delete'?'🗑 Deleted':'💬 Comment';
+      var bodyHtml='';
+      var t=String(en.text||''), ccPart='';
+      var cpos=t.indexOf('␟CC␟');
+      if(cpos>=0){ ccPart=t.slice(cpos+4); t=t.slice(0,cpos); }
+      if(t.indexOf('INK:')===0){
+        var nl=t.indexOf('\n');
+        var img=(nl>=0?t.slice(4,nl):t.slice(4));
+        var note=(nl>=0?t.slice(nl+1):'');
+        bodyHtml='<img src="'+img+'" style="max-width:100%;border:1px solid #e0e0e0;border-radius:4px;background:#fff">'+
+          (note?'<div class="tx">'+esc(note)+'</div>':'');
+      } else if(t){
+        bodyHtml='<div class="tx">'+esc(t)+'</div>';
+      }
+      if(ccPart) bodyHtml+='<div style="font-size:12px;color:#8a5a00;background:#fff4e5;border:1px solid #ffd9a8;border-radius:5px;padding:3px 8px;margin-top:5px;display:inline-block">🔔 CC: '+esc(ccPart)+'</div>';
+      var delLink='';
+      if(idx===lastIdx && myEmail && String(en.email||'').trim().toLowerCase()===myEmail){
+        delLink='<button class="rvCmtDel" onclick="rvDeleteOwnLast()" title="Remove your last entry">× Delete</button>';
+      }
+      return '<li><div class="rvc1 '+esc(en.action)+'">'+
+        '<div class="meta"><span class="act">'+label+'</span> · '+esc(en.email)+' · '+esc(en.time)+delLink+'</div>'+
+        bodyHtml+'</div></li>';
+    }).join('');
+    th.innerHTML=pageHead+'<ol class="rvol" start="1">'+items+'</ol></div>';
+  }
+  // reflect new status onto the table row badge without a full reload
+  var row=[].slice.call(document.querySelectorAll('#tb tr')).filter(function(t){return t.dataset.id===_rvId;})[0];
+  if(row){ var b=row.querySelector('.stb');
+    if(b){ b.className='stb st-'+s; b.textContent=statusLabel(s); } }
+  updateReviewControls();
+}
+
+function updateReviewControls(){
+  var signIn=document.getElementById('rvSignIn');
+  var form=document.getElementById('rvForm');
+  var lock=document.getElementById('rvLock');
+  // Shared-link view is read-only: whoever opens the link only sees the
+  // document, comments and audit trail — no sign-in prompt, no comment/
+  // approve/reject controls, even if this browser happens to be signed
+  // in from a previous session.
+  if(document.documentElement.classList.contains('shared-doc-mode')){
+    signIn.style.display='none'; form.style.display='none';
+    lock.style.display='block';
+    lock.textContent='📄 View-only shared link — the discussion above stays visible.';
+    var delBtn0=document.getElementById('rvDel'); if(delBtn0) delBtn0.style.display='none';
+    var mb0=document.getElementById('rvMango'); if(mb0) mb0.style.display='none';
+    return;
+  }
+  // Managers (and always the owner) can delete at any time, even locked.
+  var isOwner=(String(_verifiedEmail||'').trim().toLowerCase()==='c.chavananand@vcb-con.com');
+  // visibility instead of display: keeps header layout stable while the
+  // signed-in / manager check is still loading on first open.
+  var delBtn=document.getElementById('rvDel');
+  delBtn.style.display='inline-block';
+  delBtn.style.visibility=(_rvManager||isOwner)?'visible':'hidden';
+  var isMgr=_rvManager||isOwner;
+  // Mango ERP push only makes sense once the document is authorised —
+  // show it (in the action bar, by Reopen) only when approved + manager.
+  var mb=document.getElementById('rvMango');
+  mb.style.display=(isMgr && _rvStatus==='approved')?'inline-block':'none';
+  if(_rvMangoSent && !mb.disabled){
+    mb.textContent='✓ In Mango ERP';
+    mb.style.background='#137333'; mb.style.color='#fff';
+  }
+  var who=document.getElementById('rvWho');
+  var cm=document.getElementById('rvPickComment');
+  var ap=document.getElementById('rvPickApprove'), rj=document.getElementById('rvPickReject'),
+      ro=document.getElementById('rvReopen');
+  if(_rvLocked){
+    var stTxt=document.getElementById('rvStatus').textContent.replace(/[✓✕•]/g,'').trim().toLowerCase();
+    if(isMgr && (_authToken||_verifiedEmail)){
+      // Locked: the only available action is Reopen.
+      signIn.style.display='none'; lock.style.display='none'; form.style.display='block';
+      if(cm) cm.style.display='none';
+      ap.style.display='none'; rj.style.display='none'; ro.style.display='inline-block';
+      if(who) who.textContent='';
+      rvMsgSet('🔒 This document is '+stTxt+' — locked. Press “Reopen / Request revision” to enable commenting again.','busy');
+    } else {
+      signIn.style.display='none'; form.style.display='none';
+      lock.style.display='block';
+      lock.textContent='This document is '+stTxt+' — locked. The discussion above stays visible.';
+    }
+    return;
+  }
+  lock.style.display='none';
+  if(ro) ro.style.display='none';
+  if(cm) cm.style.display='';
+  // Same identity check as rvPick()/updateUserPill(): a verified email is
+  // enough to be considered signed in, since the server can resolve
+  // identity from the active Google session without a custom token.
+  if(!_authToken && !_verifiedEmail){ signIn.style.display='block'; form.style.display='none'; return; }
+  signIn.style.display='none'; form.style.display='block';
+  var show=isMgr?'inline-block':'none';
+  ap.style.display=show;
+  rj.style.display=show;
+  rvMsgSet('','');
+  if(who) who.textContent=isMgr?('Signed in as '+_verifiedEmail+' (manager)'):('Signed in as '+_verifiedEmail);
+}
+
+function refreshReviewAuth(){
+  // If the user has explicitly signed out, do NOT silently re-identify
+  // them from the ambient Google session — opening a document must keep
+  // them signed out (the comment/approve/reject panel stays hidden).
+  var _so=false; try{ _so=localStorage.getItem('vcbSignedOut')==='1'; }catch(e){}
+  // Keep the UI's own idea of "signed in" consistent with this state: if
+  // we're bailing out as signed-out, _verifiedEmail must not be left set
+  // from an earlier point in the session — otherwise updateReviewControls
+  // shows "Signed in as ..." and the form, while rvPick()/rvSubmit() (which
+  // gate on the same two variables) correctly still treat it as signed-out.
+  // That mismatch made every Comment/Approve/Reject click silently no-op
+  // even though the panel looked fully signed in.
+  if(_so && !_authToken){ _rvManager=false; _verifiedEmail=''; updateReviewControls(); return; }
+  // Ask the server who's signed in. When a custom OAuth token exists we
+  // pass it; otherwise the server may identify a same-domain user via
+  // Session.getActiveUser() so the popup isn't required just to comment.
+  var _genAtCall=_rvGen;
+  google.script.run
+    .withSuccessHandler(function(r){
+      // If the user opened a new document or completed an action (e.g.
+      // Approve, Send to Mango) while this identity check was still in
+      // flight, _rvGen has already moved on — applying this now-stale
+      // response would blindly overwrite the fresher state that
+      // renderReview() just rendered (this is what made an
+      // already-approved/locked document, or the just-clicked Mango
+      // button, seem to "disappear" a moment after the action succeeded).
+      if(_genAtCall!==_rvGen) return;
+      _rvManager=!!(r&&r.manager);
+      if(r && r.signedIn && r.email && (!_authToken || !_verifiedEmail)){
+        applyAuth('__session__', r.email);  // sentinel token; server uses Session
+      }
+      updateReviewControls();
+    })
+    .withFailureHandler(function(){ if(_genAtCall!==_rvGen) return; _rvManager=false; updateReviewControls(); })
+    .getReviewerRole(_authToken || '');
+}
+
+
+function rvMsgSet(txt,kind){   // kind: 'ok' | 'err' | 'busy'
+  var m=document.getElementById('rvMsg');
+  m.textContent=txt;
+  m.style.fontWeight='700';
+  m.style.color = kind==='ok' ? '#137333' : kind==='err' ? '#c5221f' : '#5b6172';
+}
+// ── Action-first review flow ──────────────────────────────────────
+// Stage 1: rvPick() — the user chooses Comment / Approve / Reject /
+// Reopen. Stage 2: the composer (note + CC) opens, labelled for that
+// action, so it's unambiguous that the note and CC attach to THIS action.
+var _rvActionCfg={
+  comment:{title:'💬 Add a comment',            ph:'Write your comment… (required)',     btn:'💬 Post comment',     cls:'cm'},
+  approve:{title:'✓ Approve this document',     ph:'Add a note (optional)…',             btn:'✓ Confirm approval',  cls:'ap'},
+  reject :{title:'✕ Reject this document',      ph:'Add the reason (optional)…',         btn:'✕ Confirm rejection', cls:'rj'},
+  reopen :{title:'↺ Reopen / request revision', ph:'Add a note for why (optional)…',     btn:'↺ Confirm reopen',    cls:''}
+};
+var _rvPickIds=['rvPickComment','rvPickApprove','rvPickReject','rvReopen'];
+var _rvKindToId={comment:'rvPickComment',approve:'rvPickApprove',reject:'rvPickReject',reopen:'rvReopen'};
+// Direct submit — no separate "arm, then confirm" step. Type in the
+// always-open textarea and press Comment / Approve / Reject; each posts
+// straight away with whatever's currently typed (Comment requires text,
+// Approve/Reject don't). Being "signed in" is shown to the user via
+// _verifiedEmail (the pill, Settings, "Signed in as ..." all key off
+// it) — this app can resolve identity from the active Google session
+// without a custom _authToken, so that's accepted here too.
+function rvDo(kind){
+  if(!_authToken && !_verifiedEmail){
+    rvMsgSet('⚠️ Please sign in first (button top-right).','err');
+    var si=document.getElementById('rvSignIn'); if(si) si.style.display='block';
+    return;
+  }
+  if(!_authToken) _authToken='__session__';
+  var cfg=_rvActionCfg[kind]; if(!cfg) return;
+  var ta=document.getElementById('rvText');
+  var text=(ta&&ta.value||'').trim();
+  if(kind==='comment' && !text){ rvMsgSet('Type a comment first.','err'); if(ta) ta.focus(); return; }
+  if(kind==='reject' && !text){ rvMsgSet('Please explain why you\'re rejecting this document.','err'); if(ta) ta.focus(); return; }
+  var cc=rvCcSelected();
+  var ccEmEl=document.getElementById('rvCcEmail');
+  var ccEm=(ccEmEl&&ccEmEl.value||'').trim();
+  var btns=document.querySelectorAll('#rvStep1 .rvb');
+  btns.forEach(function(b){b.disabled=true;});
+  rvMsgSet(kind==='reopen'?'Reopening…':'Saving…','busy');
+  var done=function(res){
+    btns.forEach(function(b){b.disabled=false;});
+    if(!res||!res.ok){
+      var em=(res&&res.error)||'Could not save.';
+      if(/session expired|sign in/i.test(em)){ applyAuth(null,''); return; }
+      rvMsgSet('⚠️ '+em,'err'); return;
+    }
+    if(ta) ta.value='';
+    rvCcClear();
+    if(ccEmEl) ccEmEl.value='';
+    rvMsgSet(kind==='reopen' ? '✅ Reopened — the document is open again for comments & a new decision.'
+            : kind==='approve' ? '✅ Approved.'
+            : kind==='reject' ? '✅ Rejected.' : '✅ Saved.','ok');
+    _rvGen++;   // this response is now the freshest known state — outrank any in-flight refreshReviewAuth()
+    renderReview(res);
+  };
+  var fail=function(e){ btns.forEach(function(b){b.disabled=false;}); rvMsgSet('⚠️ Error: '+(e&&e.message?e.message:String(e)),'err'); };
+  if(kind==='comment'){
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail)
+      .addReviewComment({authToken:_authToken,docId:_rvId,project:_rvProj,text:text,ink:'',ccDepts:cc,ccEmails:ccEm});
+  } else if(kind==='reopen'){
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail)
+      .reopenDocument({authToken:_authToken,docId:_rvId,project:_rvProj,text:text,ink:'',ccDepts:cc,ccEmails:ccEm});
+  } else {
+    google.script.run.withSuccessHandler(done).withFailureHandler(fail)
+      .submitDecision({authToken:_authToken,docId:_rvId,project:_rvProj,decision:kind,text:text,ink:'',ccDepts:cc,ccEmails:ccEm});
+  }
+}
+// "Also notify" — collapsed by default; toggled open by #rvCcToggle.
+function rvCcToggle(){
+  var w=document.getElementById('rvCcWrap'); if(!w) return;
+  w.style.display = (w.style.display==='none') ? 'block' : 'none';
+}
+var _ccDepts = [];
+google.script.run
+  .withSuccessHandler(function(list){ _ccDepts = list || []; buildCcDepts(); })
+  .withFailureHandler(function(){ _ccDepts = []; })
+  .getDepartments();
+function buildCcDepts(){
+  var w = document.getElementById('rvCcDepts');
+  if(!w) return;
+  w.innerHTML = _ccDepts.map(function(d){
+    return '<button type="button" class="ccchip" data-k="'+d.key+'" onclick="this.classList.toggle(\'on\')">'+
+      esc(d.label)+'</button>';
+  }).join('');
+}
+function rvCcSelected(){
+  return [].slice.call(document.querySelectorAll('#rvCcDepts .ccchip.on'))
+    .map(function(b){ return b.getAttribute('data-k'); }).join(',');
+}
+function rvCcClear(){
+  [].slice.call(document.querySelectorAll('#rvCcDepts .ccchip.on'))
+    .forEach(function(b){ b.classList.remove('on'); });
+}
+// Push this document into Mango ERP via our server (which calls Mango's
+// API). Manager/owner only. Records the push in the audit log; re-sends
+// are allowed but ask for confirmation.
+function rvSendMango(){
+  if(!_authToken){ rvMsgSet('Please sign in first.','err'); return; }
+  var run=function(){
+    var b=document.getElementById('rvMango');
+    var prev=b.textContent;
+    b.disabled=true; b.textContent='Sending…';
+    google.script.run
+      .withSuccessHandler(function(res){
+        b.disabled=false;
+        if(!res||!res.ok){
+          b.textContent=prev;
+          rvMsgSet('⚠️ '+((res&&res.error)||'Could not send to Mango ERP.'),'err');
+          return;
+        }
+        _rvMangoSent=true;
+        b.textContent='✓ In Mango ERP';
+        b.style.background='#137333'; b.style.color='#fff';
+        rvMsgSet((res.demo?'🟡 ':'✓ ')+(res.message||'Sent to Mango ERP.'),res.demo?'busy':'ok');
+      })
+      .withFailureHandler(function(e){
+        b.disabled=false; b.textContent=prev;
+        rvMsgSet('⚠️ Error: '+(e&&e.message?e.message:String(e)),'err');
+      })
+      .sendToMangoERP({authToken:_authToken,docId:_rvId,project:_rvProj});
+  };
+  if(_rvMangoSent){
+    appConfirm({
+      title:'Send again to Mango ERP?',
+      message:'This document was already pushed to Mango ERP. Sending it again will create a second record there.',
+      okLabel:'Send again'
+    },function(ok){ if(ok) run(); });
+  } else { run(); }
+}
+
+function rvDelete(){
+  if(!_authToken){ document.getElementById('rvMsg').textContent='Please sign in first.'; return; }
+  var subject=(document.getElementById('rvTitle').textContent||'this document').trim();
+  appConfirm({
+    title:'Permanently delete this document?',
+    message:'<b style="color:#c5221f">'+esc(subject)+'</b><br><br>This removes it from the register and moves the generated letter file to Trash. <b>This cannot be undone from the web.</b>',
+    okLabel:'Delete permanently', danger:true
+  },function(ok){
+    if(!ok) return;
+    var del=document.getElementById('rvDel');
+    del.disabled=true; del.textContent='Deleting…';
+    google.script.run
+      .withSuccessHandler(function(res){
+        del.disabled=false; del.textContent='🗑 Delete';
+        if(!res||!res.ok){ document.getElementById('rvMsg').textContent=(res&&res.error)||'Delete failed.'; return; }
+        // Remove it instantly from data + table — no page/data reload.
+        var gone=_rvId;
+        for (var p in RAW){ if(RAW[p]) RAW[p]=RAW[p].filter(function(r){return r.id!==gone;}); }
+        all=all.filter(function(r){return r.id!==gone;});
+        Array.prototype.slice.call(document.querySelectorAll('#tb tr'))
+          .forEach(function(tr){ if(tr.dataset.id===gone) tr.parentNode.removeChild(tr); });
+        var linked=all.filter(function(r){return r.url;}).length;
+        document.getElementById('hdr').innerHTML=all.length+' documents &nbsp;·&nbsp; '+linked+' linked';
+        go();                    // refresh the "showing N of M" line
+        closeReview();
+      })
+      .withFailureHandler(function(e){
+        del.disabled=false; del.textContent='🗑 Delete';
+        document.getElementById('rvMsg').textContent='Error: '+(e&&e.message?e.message:String(e));
+      })
+      .deleteDocument({authToken:_authToken,docId:_rvId,project:_rvProj});
+  });
+}
+
+function switchAccount(){
+  applyAuth(null, '');
+  signInWithGoogle();
+}
+
+// ── Manual submission panel ──────────────────────────────────────
+function openPanel(){
+  var d=new Date();
+  document.getElementById('fDate').value=d.toISOString().slice(0,10);
+  document.getElementById('fErr').style.display='none';
+  document.getElementById('fOk').style.display='none';
+  if (_verifiedEmail) {
+    document.getElementById('fEmailDisplay').value = _verifiedEmail;
+    document.getElementById('fSignInRow').style.display = 'none';
+    document.getElementById('fSignedInRow').style.display = 'block';
+  } else {
+    document.getElementById('fSignInRow').style.display = 'block';
+    document.getElementById('fSignedInRow').style.display = 'none';
+  }
+  document.getElementById('rnBar').style.display='none';
+  updateRunningNo();
+  document.getElementById('panel').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+function closePanel(){
+  document.getElementById('panel').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+var _file=null;
+// Robust drag & drop: handled at document level so it works no matter
+// when this script ran or exactly where inside the panel you drop.
+(function(){
+  function panelOpen(){
+    var p=document.getElementById('panel');
+    return p && p.classList.contains('show');
+  }
+  function modalOpen(){
+    var a=document.getElementById('bxWrap'), b=document.getElementById('rvWrap'), c=document.getElementById('pvWrap');
+    return (a&&a.style.display==='block')||(b&&b.style.display==='block')||(c&&c.style.display==='block');
+  }
+  document.addEventListener('dragover',function(e){
+    e.preventDefault();
+    if(panelOpen()&&!modalOpen()){ var z=document.getElementById('dz'); if(z) z.classList.add('ov'); }
+  },false);
+  document.addEventListener('dragleave',function(e){
+    var z=document.getElementById('dz'); if(z&&e.target===z) z.classList.remove('ov');
+  },false);
+  document.addEventListener('drop',function(e){
+    e.preventDefault();                       // never let the browser open the file
+    var z=document.getElementById('dz'); if(z) z.classList.remove('ov');
+    if(!panelOpen()||modalOpen()) return;
+    var f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) onFilePick(f);
+  },false);
+})();
+function onFilePick(f){
+  if(!f)return;
+  if(f.size>7*1024*1024){showE('File too large — max 7 MB.');return;}
+  _file=f;
+  document.getElementById('fcN').textContent=f.name;
+  document.getElementById('fcZ').textContent=(f.size/1024/1024).toFixed(2)+' MB';
+  document.getElementById('fc').style.display='flex';
+  document.getElementById('dz').style.display='none';
+  document.getElementById('fFile').value='';
+}
+function clearFile(){
+  _file=null;
+  document.getElementById('fc').style.display='none';
+  document.getElementById('dz').style.display='block';
+}
+function showE(m){var e=document.getElementById('fErr');e.className='al al-e';e.textContent=m;e.style.display='block';document.getElementById('fOk').style.display='none';}
+function showS(m){var e=document.getElementById('fOk');e.textContent=m;e.style.display='block';document.getElementById('fErr').style.display='none';}
+// Friendly "you need to sign in" prompt — NOT an error. Nothing failed;
+// the user just needs to authenticate. Shows a neutral info banner with a
+// sign-in button and reveals the sign-in row, instead of a red failure.
+function needSignIn(m){
+  try{ applyAuth(null,''); }catch(e){}   // reflect signed-out → reveals fSignInRow
+  var e=document.getElementById('fErr');
+  e.className='al al-i';
+  e.innerHTML='🔐 '+(m||'Please sign in with Google to continue.')+
+    ' <button class="btp" onclick="signInWithGoogle()" style="margin-left:6px;padding:5px 12px;font-size:12px">Sign in with Google</button>';
+  e.style.display='block';
+  document.getElementById('fOk').style.display='none';
+}
+// Suggest the next running number whenever project + code are both set.
+// Computed instantly in-browser from the already-loaded `all` list — no
+// server round-trip (that was the slow part). The running number is the
+// digits right after the code in the Subject, e.g. "BP/วิศวะ/02B/038"
+// or "BV-02A-016" -> 38 / 16. Highest + 1, scoped to that project.
+function pad3(x){ var s=String(x); while(s.length<3) s='0'+s; return s; }
+
+function updateRunningNo(){
+  try { updateTemplateUI(); } catch(e){}   // never let UI errors hide the bar
+  var bar  = document.getElementById('rnBar');
+  var proj = document.getElementById('fProject').value;
+  var code = document.getElementById('fCode').value;
+  if(!proj || !code){ bar.style.display='none'; return; }
+  bar.style.display='block';
+
+  function set(bg,bd,fg,html){ bar.style.background=bg; bar.style.border='1px solid '+bd; bar.style.color=fg; bar.innerHTML=html; }
+
+  if(!all || !all.length){
+    set('#fff4e5','#ffd9a8','#8a5a00','⚠️ Documents still loading — reopen in a moment, or assign the number manually.');
+    return;
+  }
+
+  // ignore leading zeros on the code ("08"~"8", "02A"~"2A"); accept
+  // / - or space between the code and the running number.
+  var sig = String(code).replace(/^0+/,'');
+  var escd = sig.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  var re = new RegExp('(?:^|[^0-9A-Za-z])0*'+escd+'[\\/\\-\\s]+0*(\\d{1,5})','gi');
+
+  var max=-1;
+  for(var i=0;i<all.length;i++){
+    var r=all[i];
+    if(r.proj!==proj) continue;
+    // scan subject AND the auto-generated ref (in Remarks) so generated
+    // letters keep advancing the number even when the user's subject
+    // text no longer contains the code/number.
+    var subj=String(r.subject||'')+'  '+String(r.ref||'');
+    re.lastIndex=0;
+    var m;
+    while((m=re.exec(subj))!==null){
+      var n=parseInt(m[1],10);
+      if(!isNaN(n) && n>max) max=n;
+    }
+  }
+
+  if(max<0){
+    set('#e6f4ea','#bfe3c9','#137333','Next running number for <b>'+esc(proj)+' / '+esc(code)+
+      '</b>: <span style="font-size:15px;font-weight:700">001</span>'+
+      ' &nbsp;<span style="opacity:.7">(no earlier documents on file — this starts the series)</span>');
+  } else {
+    set('#e6f4ea','#bfe3c9','#137333','Next running number for <b>'+esc(proj)+' / '+esc(code)+
+      '</b>: <span style="font-size:15px;font-weight:700">'+pad3(max+1)+
+      '</span> &nbsp;<span style="opacity:.7">(latest on file: '+pad3(max)+')</span>');
+  }
+}
+
+// Show the body box (auto-letter) only for projects that have a
+// configured letterhead; others get a "please attach a file" note.
+// Default "เรียน" recipient by document code (user can still edit it).
+var TO_BY_CODE = {
+  '01':'ฝ่ายบริหาร',
+  '02A':'ผู้จัดการฝ่ายวิศวกรรม','02B':'ผู้จัดการฝ่ายวิศวกรรม',
+  '02C':'ผู้จัดการฝ่ายวิศวกรรม','03':'ผู้จัดการฝ่ายวิศวกรรม',
+  '05':'ฝ่ายการเงิน',
+  // Procurement/supply is logged under 07 in the register; 06 kept as an
+  // alias so older 06-coded docs still resolve to the same department.
+  '06':'ฝ่ายพัสดุทรัพย์สิน','07':'ฝ่ายพัสดุทรัพย์สิน',
+  '08':'ฝ่ายทรัพยากรบุคคล',
+  '09':'ฝ่ายบัญชี'
+};
+// Labels shown in the document-type filter dropdown. Mostly mirrors
+// TO_BY_CODE but adds entries (like 10 = ขอหนังสือรับรอง) that aren't
+// recipients but should still display next to their code so the
+// dropdown reads consistently.
+var CODE_LABEL = Object.assign({}, TO_BY_CODE, {
+  '10':'ขอหนังสือรับรอง'
+});
+var _lastTplKey = null;
+function updateTemplateUI(){
+  var proj = document.getElementById('fProject').value;
+  var code = document.getElementById('fCode').value;
+  var note = document.getElementById('tplNote');
+  var row  = document.getElementById('rowBody');
+  var rowTo= document.getElementById('rowTo');
+  var rowTy= document.getElementById('rowTypist');
+  var prev = document.getElementById('prevBtn');
+  if(!proj){ note.style.display='none'; row.style.display='none'; rowTo.style.display='none'; rowTy.style.display='none'; prev.style.display='none'; _lastTplKey=null; return; }
+  if(LH_PROJECTS.indexOf(proj)>=0){
+    row.style.display='block';
+    rowTo.style.display='grid';   // .fr2 two-column (เรียน | CC side by side)
+    rowTy.style.display='block';
+    prev.style.display='inline-block';
+    // Default เรียน by the selected code (falls back to the project
+    // default). Re-applied whenever project OR code changes; the field
+    // stays editable for one-off recipients.
+    var key = proj+'|'+code;
+    if(key!==_lastTplKey){
+      document.getElementById('fTo').value =
+        TO_BY_CODE[code] || LH_DEFAULTS[proj] || '';
+    }
+    // Typist defaults to the signed-in email, editable; don't clobber
+    // a value the user already typed.
+    var ty=document.getElementById('fTypist');
+    if(!ty.value) ty.value=_verifiedEmail||'';
+    note.style.display='none';
+  } else {
+    row.style.display='none';
+    rowTo.style.display='none';
+    rowTy.style.display='none';
+    prev.style.display='none';
+    note.style.display='block';
+    note.style.background='#fff4e5'; note.style.border='1px solid #ffd9a8'; note.style.color='#8a5a00';
+    note.innerHTML='No letterhead template for <b>'+esc(proj)+
+      '</b> yet — please attach a file for this project.';
+  }
+  _lastTplKey = proj+'|'+code;
+}
+
+function closePreview(){ document.getElementById('pvWrap').style.display='none'; }
+var _submittedHtml='';
+function reopenSubmitted(){
+  if(_submittedHtml){
+    document.getElementById('pvFrame').srcdoc=_submittedHtml;
+    document.getElementById('pvWrap').style.display='block';
+  }
+}
+
+function openPreview(){
+  var proj=document.getElementById('fProject').value;
+  var code=document.getElementById('fCode').value;
+  var subj=document.getElementById('fSubject').value.trim();
+  var toVal=document.getElementById('fTo').value.trim();
+  var body=document.getElementById('fBody').value;
+  var dval=document.getElementById('fDate').value;
+  if(!proj||LH_PROJECTS.indexOf(proj)<0){showE('Select a project that has a letter template.');return;}
+  if(!code){showE('Select a code first (it sets the ref number).');return;}
+  if(!body.trim()){showE('Type the letter body to preview it.');return;}
+  var btn=document.getElementById('prevBtn');
+  btn.disabled=true;btn.textContent='…';
+  document.getElementById('fErr').style.display='none';
+  google.script.run
+    .withSuccessHandler(function(res){
+      btn.disabled=false;btn.textContent='👁 Preview';
+      if(!res||!res.ok){showE((res&&res.error)||'Could not build preview.');return;}
+      function show(finalHtml){
+        document.getElementById('pvTitle').textContent='Preview — '+(res.ref||'');
+        document.getElementById('pvFrame').srcdoc=finalHtml;
+        document.getElementById('pvWrap').style.display='block';
+      }
+      // Append the supplementary attachment as following page(s).
+      if(_file){
+        var fr=new FileReader();
+        fr.onload=function(ev){ show(res.html.replace('</body>', attachPagesHtml(ev.target.result,_file.type||'',_file.name||'')+'</body>')); };
+        fr.onerror=function(){ show(res.html); };
+        fr.readAsDataURL(_file);
+      } else { show(res.html); }
+    })
+    .withFailureHandler(function(err){
+      btn.disabled=false;btn.textContent='👁 Preview';
+      showE('Preview failed: '+(err&&err.message?err.message:String(err)));
+    })
+    .previewLetter({project:proj,code:code,subject:subj,to:toVal,cc:document.getElementById('fCc').value.trim(),typist:document.getElementById('fTypist').value.trim(),body:body,docDate:dval});
+}
+
+// Build extra A4 "pages" for the attachment shown after the letter.
+function attachPagesHtml(dataUrl, mime, name){
+  var safe=String(name||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Header banner marking the following page(s) as an attachment, not part
+  // of the letter itself.
+  var lab='<div style="font-weight:700;font-size:14px;color:#111;background:#f3f4f6;'+
+    'border-bottom:1px solid #cfd3dc;padding:7px 12px">📎 เอกสารแนบ (Attachment)'+
+    (safe?' — <span style="font-weight:400">'+safe+'</span>':'')+'</div>';
+  if(/^image\//.test(mime)){
+    return '<div class="pg" style="padding:0;overflow:hidden">'+lab+
+      '<div style="display:flex;align-items:center;justify-content:center;padding:8mm;height:265mm">'+
+      '<img src="'+dataUrl+'" style="max-width:100%;max-height:100%;object-fit:contain"></div></div>';
+  }
+  if(mime==='application/pdf'){
+    return '<div class="pg" style="padding:0;overflow:hidden;height:297mm">'+lab+
+      '<iframe src="'+dataUrl+'" style="border:0;width:100%;height:calc(100% - 34px)"></iframe></div>';
+  }
+  return '<div class="pg" style="padding:0;overflow:hidden">'+lab+
+    '<div style="margin-top:40mm;text-align:center;color:#555">'+
+    '📎 แนบไฟล์เพิ่มเติม: <b>'+safe+'</b><br>'+
+    '<span style="font-size:12px">(ไม่สามารถแสดงตัวอย่างไฟล์ชนิดนี้ได้ — ระบบจะบันทึกไฟล์นี้พร้อมเอกสาร)</span></div></div>';
+}
+
+// Open the A4 with the body editable directly on the page.
+function closeBodyEditor(){ document.getElementById('bxWrap').style.display='none'; }
+function openBodyEditor(){
+  var proj=document.getElementById('fProject').value;
+  var code=document.getElementById('fCode').value;
+  if(!proj||LH_PROJECTS.indexOf(proj)<0){showE('Select a project that has a letter template.');return;}
+  if(!code){showE('Select a code first (it sets the ref number).');return;}
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res||!res.ok){showE((res&&res.error)||'Could not open the editor.');return;}
+      var f=document.getElementById('bxFrame');
+      f.srcdoc=res.html;
+      document.getElementById('bxWrap').style.display='block';
+      // focus the editable region once the iframe has rendered
+      f.onload=function(){ try{ var d=f.contentDocument, el=d.getElementById('bxBody'); if(el) el.focus(); }catch(e){} };
+    })
+    .withFailureHandler(function(err){ showE('Editor failed: '+(err&&err.message?err.message:String(err))); })
+    .previewLetter({
+      project:proj, code:code,
+      subject:document.getElementById('fSubject').value.trim(),
+      to:document.getElementById('fTo').value.trim(),
+      cc:document.getElementById('fCc').value.trim(),
+      typist:document.getElementById('fTypist').value.trim(),
+      body:document.getElementById('fBody').value,
+      docDate:document.getElementById('fDate').value,
+      editable:true
+    });
+}
+function applyBodyEditor(){
+  var f=document.getElementById('bxFrame');
+  try{
+    var el=f.contentDocument.getElementById('bxBody');
+    if(el){
+      // Convert the edited HTML back to text, preserving line breaks.
+      var html=el.innerHTML
+        .replace(/<div[^>]*>/gi,'\n').replace(/<\/div>/gi,'')
+        .replace(/<br\s*\/?>/gi,'\n')
+        .replace(/&nbsp;/gi,' ');
+      var tmp=document.createElement('div'); tmp.innerHTML=html;
+      var txt=(tmp.textContent||'').replace(/\n{3,}/g,'\n\n').replace(/^\n+/,'');
+      document.getElementById('fBody').value=txt;
+    }
+  }catch(e){ showE('Could not read the edited text: '+e); }
+  closeBodyEditor();
+}
+
+function submitForm(){
+  if(!_authToken||!_verifiedEmail){needSignIn('Please sign in with Google to submit this document. Your entries are kept — just sign in and press Submit again.');return;}
+  var proj=document.getElementById('fProject').value;
+  var code=document.getElementById('fCode').value;
+  var subj=document.getElementById('fSubject').value.trim();
+  var dval=document.getElementById('fDate').value;
+  if(!proj){showE('Select a project.');return;}
+  if(!code){showE('Select a code.');return;}
+  if(!subj){showE('Enter a subject.');return;}
+  var body=document.getElementById('fBody').value.trim();
+  var toVal=document.getElementById('fTo').value.trim();
+  var configured=LH_PROJECTS.indexOf(proj)>=0;
+  if(configured && !body){showE('The letter body is required for this project.');return;}
+  if(!configured && !_file){showE('No letter template for this project — please attach a file.');return;}
+  var btn=document.getElementById('subBtn');
+  btn.disabled=true;btn.textContent=configured?'Generating…':'Submitting…';
+  document.getElementById('fErr').style.display='none';
+  var pts=dval.split('-');
+  var fmt=pts.length===3?pts[2]+'/'+pts[1]+'/'+pts[0]:dval;
+
+  function send(b64,fname,mime){
+    google.script.run
+      .withSuccessHandler(function(res){
+        btn.disabled=false;btn.textContent='Submit Document';
+        if(res&&res.success){
+          if(res.generated&&(res.letterHtml||res.fileUrl)){
+            var o=document.getElementById('fOk');
+            o.innerHTML='✅ Letter <b>'+esc(res.ref||'')+'</b> submitted &amp; logged. '+
+              '<a href="#" onclick="reopenSubmitted();return false" style="color:#137333;font-weight:700;text-decoration:underline">Open / Print ↗</a>'+
+              (res.pending?' &nbsp;<span style="opacity:.7">(document file generating in the background…)</span>':((res.editUrl||res.fileUrl)?' &nbsp;·&nbsp; <a href="'+(res.editUrl||res.fileUrl)+'" target="_blank" rel="noopener" style="color:#137333;text-decoration:underline">edit doc ↗</a>':''));
+            o.style.display='block';
+            document.getElementById('fErr').style.display='none';
+            // Build a combined, printable view (letter + attachment pages)
+            // and pop it open. This uses our own HTML, so it never hits
+            // the "unable to open the file" Drive-embed problem.
+            if(res.letterHtml){
+              var attFile=_file;
+              var openIt=function(html){
+                _submittedHtml=html;
+                document.getElementById('pvTitle').textContent='Submitted — '+(res.ref||'');
+                document.getElementById('pvFrame').srcdoc=html;
+                document.getElementById('pvWrap').style.display='block';
+              };
+              if(attFile){
+                var fr=new FileReader();
+                fr.onload=function(ev){ openIt(res.letterHtml.replace('</body>', attachPagesHtml(ev.target.result,attFile.type||'',attFile.name||'')+'</body>')); };
+                fr.onerror=function(){ openIt(res.letterHtml); };
+                fr.readAsDataURL(attFile);
+              } else { openIt(res.letterHtml); }
+            }
+            // The Doc/PDF are created in the background so this submit
+            // returned fast. Kick that off; refresh links when it's done.
+            if(res.pending&&res.token){
+              var tyVal=document.getElementById('fTypist').value.trim();
+              var ccVal=document.getElementById('fCc').value.trim();
+              google.script.run
+                .withSuccessHandler(function(fz){
+                  if(fz&&fz.ok){
+                    var o2=document.getElementById('fOk');
+                    if(o2 && o2.style.display!=='none'){
+                      o2.innerHTML='✅ Letter <b>'+esc(res.ref||'')+'</b> ready. '+
+                        '<a href="#" onclick="reopenSubmitted();return false" style="color:#137333;font-weight:700;text-decoration:underline">Open / Print ↗</a>'+
+                        (fz.editUrl?' &nbsp;·&nbsp; <a href="'+fz.editUrl+'" target="_blank" rel="noopener" style="color:#137333;text-decoration:underline">edit doc ↗</a>':'');
+                    }
+                    loadDocuments();
+                  }
+                })
+                .withFailureHandler(function(){})
+                .finalizeLetter({authToken:_authToken,project:proj,code:code,subject:subj,to:toVal,cc:ccVal,typist:tyVal,body:body,docDate:fmt,ref:res.ref,token:res.token});
+            }
+          } else {
+            showS('Document submitted and added to the register.');
+          }
+          loadDocuments();          // refresh the table so it shows now
+          document.getElementById('fProject').value='';
+          document.getElementById('fCode').value='';
+          document.getElementById('fSubject').value='';
+          document.getElementById('fBody').value='';
+          document.getElementById('fTo').value='';
+          document.getElementById('fCc').value='';
+          document.getElementById('fTypist').value='';
+          document.getElementById('rnBar').style.display='none';
+          document.getElementById('tplNote').style.display='none';
+          document.getElementById('rowBody').style.display='none';
+          document.getElementById('rowTo').style.display='none';
+          document.getElementById('rowTypist').style.display='none';
+          document.getElementById('prevBtn').style.display='none';
+          closePreview();
+          _lastTplKey=null;
+          clearFile();
+        } else if(res&&res.error&&/session expired|sign in/i.test(res.error)){
+          // Not a real failure — the sign-in just lapsed. Prompt cleanly
+          // (no scary red error) and keep everything the user typed.
+          needSignIn('Your sign-in has expired. Please sign in with Google again — your document was not lost, just sign in and press Submit.');
+        } else {
+          showE((res&&res.error)||'Submission failed. Please try again.');
+        }
+      })
+      .withFailureHandler(function(err){
+        btn.disabled=false;btn.textContent='Submit Document';
+        showE('Error: '+(err.message||String(err)));
+      })
+      .submitDocument({authToken:_authToken,project:proj,code:code,subject:subj,docDate:fmt,to:toVal,cc:document.getElementById('fCc').value.trim(),typist:document.getElementById('fTypist').value.trim(),body:body,filename:fname,fileBase64:b64,mimeType:mime});
+  }
+
+  if(_file){
+    var r=new FileReader();
+    r.onload=function(ev){ send(ev.target.result.split(',')[1],_file.name,_file.type||'application/octet-stream'); };
+    r.readAsDataURL(_file);
+  } else {
+    send('','','');                        // attachment is optional
+  }
+}
+
+</script>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="ph">
+    <h2>📎 Add Document Manually</h2>
+    <button onclick="closePanel()" title="Close">✕</button>
+  </div>
+  <div class="pbody">
+    <div class="al al-e" id="fErr"></div>
+    <div class="al al-s" id="fOk"></div>
+
+    <div class="fr" id="fSignInRow">
+      <label>Sign in to submit</label>
+      <button class="btp" onclick="signInWithGoogle()" style="width:100%;margin-top:2px">&#x1F510; Sign in with Google</button>
+      <div class="hint">Your verified Google account will be recorded with the submission</div>
+    </div>
+    <div class="fr" id="fSignedInRow" style="display:none">
+      <label>Submitting as</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="text" id="fEmailDisplay" readonly style="background:#f0f7ec;color:#1a6e2e;font-weight:600;border-color:#b7dfb8;flex:1;cursor:default">
+        <button onclick="switchAccount()" style="padding:7px 12px;background:#fff;border:1.5px solid #d0d0d0;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;color:#555" title="Switch account">&#x21A9; Switch</button>
+      </div>
+      <div class="hint">Verified via Google OAuth — cannot be changed without re-signing in</div>
+    </div>
+
+    <div class="fr2">
+      <div class="fr" style="margin:0">
+        <label>Project *</label>
+        <select id="fProject" onchange="updateRunningNo()">
+          <option value="">— Select —</option>
+          <option>BT1</option><option>VC</option><option>VK2</option><option>CVE</option>
+          <option>LPB</option><option>BV</option><option>PN4</option>
+          <option>EP</option><option value="V&amp;K">V&amp;K</option>
+        </select>
+      </div>
+      <div class="fr" style="margin:0">
+        <label>Code *</label>
+        <select id="fCode" onchange="updateRunningNo()">
+          <option value="">— Select —</option>
+          <option>01</option><option>02A</option><option>02B</option><option>02C</option>
+          <option>03</option><option>05</option><option>06</option>
+          <option>08</option><option>09</option><option>10</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="rnBar" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:6px;font-size:12px;line-height:1.5"></div>
+
+    <div class="fr">
+      <label>Document Date</label>
+      <input type="date" id="fDate">
+    </div>
+
+    <div class="fr">
+      <label>Subject *</label>
+      <input type="text" id="fSubject" placeholder="e.g. ขออนุมัติ...">
+    </div>
+
+    <div id="tplNote" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:6px;font-size:12px;line-height:1.5"></div>
+
+    <div class="fr2" id="rowTo" style="display:none">
+      <div class="fr" style="margin:0">
+        <label>เรียน (Addressed to)</label>
+        <input type="text" id="fTo" placeholder="e.g. ผู้จัดการฝ่ายวิศวกรรม">
+      </div>
+      <div class="fr" style="margin:0">
+        <label>สำเนาเรียน / CC (optional)</label>
+        <input type="text" id="fCc" placeholder="e.g. ฝ่ายบัญชี, ฝ่ายบุคคล">
+      </div>
+    </div>
+
+    <div class="fr" id="rowBody" style="display:none">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        <span>Document body *</span>
+        <button type="button" onclick="openBodyEditor()" style="padding:3px 9px;background:#fff;border:1.5px solid #1a73e8;color:#1a73e8;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">⤢ Write on the A4</button>
+      </label>
+      <textarea id="fBody" rows="7" placeholder="พิมพ์เนื้อความของเอกสารที่นี่… (ระบบจะสร้างหัวจดหมาย วันที่ เลขที่ และลายเซ็นให้อัตโนมัติ)"></textarea>
+      <div class="hint">Only the body — the letterhead, date, ref number and signature are filled in automatically. Use “⤢ Write on the A4” to type directly on the page.</div>
+    </div>
+
+    <div class="fr" id="rowTypist" style="display:none">
+      <label>ผู้พิมพ์ (Typed by)</label>
+      <input type="text" id="fTypist" placeholder="e.g. อรสา">
+      <div class="hint">Shown at the bottom as “…/พิมพ์”. Defaults to your email — change it to the typist’s name.</div>
+    </div>
+
+    <div class="fr">
+      <label>Attach supplementary file (optional)</label>
+      <div class="hint" style="margin:-2px 0 6px">Extra supporting material attached <b>in addition to</b> the letter — it does not replace it.</div>
+      <div class="dz" id="dz" onclick="document.getElementById('fFile').click()">
+        <div class="dz-i">📄</div>
+        <div class="dz-t">Click or drag file here</div>
+        <div class="dz-s">PDF, Word, Excel, Image · max 7 MB</div>
+      </div>
+      <input type="file" id="fFile" style="display:none" onchange="onFilePick(this.files[0])">
+      <div class="fc" id="fc">
+        <span class="fc-n" id="fcN"></span>
+        <span class="fc-z" id="fcZ"></span>
+        <span class="fc-x" onclick="clearFile()" title="Remove">✕</span>
+      </div>
+    </div>
+  </div>
+  <div class="pf">
+    <button class="btc" onclick="closePanel()">Cancel</button>
+    <button class="btc" id="prevBtn" onclick="openPreview()" style="display:none">👁 Preview</button>
+    <button class="btp" id="subBtn" onclick="submitForm()">Submit Document</button>
+  </div>
+</div>
+
+<!-- A4 letter preview -->
+<div id="pvWrap" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55)">
+  <div style="position:absolute;top:0;left:0;right:0;height:48px;background:#1a1a2e;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
+    <span id="pvTitle" style="font-size:13px;font-weight:600">Letter preview</span>
+    <span>
+      <button class="btc" onclick="document.getElementById('pvFrame').contentWindow.print()" style="margin-right:8px">🖨 Print</button>
+      <button class="btc" onclick="closePreview()">✕ Close</button>
+    </span>
+  </div>
+  <iframe id="pvFrame" style="position:absolute;top:48px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px);border:0;background:#525659"></iframe>
+</div>
+
+<!-- Write-on-A4 body editor -->
+<div id="bxWrap" style="display:none;position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.55)">
+  <div style="position:absolute;top:0;left:0;right:0;height:48px;background:#1a1a2e;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
+    <span style="font-size:13px;font-weight:600">✍️ Write directly on the A4 — only the dashed area is editable</span>
+    <span>
+      <button class="btc" onclick="applyBodyEditor()" style="margin-right:8px;border-color:#34a853;color:#34a853">✓ Apply &amp; close</button>
+      <button class="btc" onclick="closeBodyEditor()">✕ Cancel</button>
+    </span>
+  </div>
+  <iframe id="bxFrame" style="position:absolute;top:48px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px);border:0;background:#525659"></iframe>
+</div>
+
+<!-- Review / approval -->
+<div id="rvWrap">
+  <div class="rvbox">
+    <div class="rvhd">
+      <h3 id="rvTitle">Review</h3>
+      <span>
+        <button class="btc" onclick="shareReview()" title="Copy a link straight to this document">🔗 Share</button>
+        <button class="btc" onclick="closeReview()">✕ Close</button>
+        <button id="rvDel" class="btc" onclick="rvDelete()" style="display:inline-block;visibility:hidden;margin-right:8px;border-color:#c5221f;color:#c5221f">🗑 Delete</button>
+      </span>
+    </div>
+    <div class="rvbody">
+      <div class="rvsplit">
+        <div class="rvstack">
+          <iframe id="rvDoc" class="rvdoc"></iframe>
+          <div id="rvAttWrap" style="display:none">
+            <iframe id="rvAtt" class="rvdoc"></iframe>
+          </div>
+        </div>
+        <div class="rvside">
+          <div class="rvst"><span id="rvStatus"></span><span id="rvWho"></span></div>
+          <div id="rvFoot">
+            <div id="rvSignIn" style="display:none;text-align:center">
+              <button class="rvb cm" onclick="signInWithGoogle()">🔐 Sign in with Google to comment / decide</button>
+            </div>
+            <div id="rvForm" style="display:none">
+              <textarea id="rvText" placeholder="Write a comment…"></textarea>
+              <button type="button" id="rvCcToggle" onclick="rvCcToggle()">🔔 Also notify (optional)</button>
+              <div id="rvCcWrap" style="display:none">
+                <div id="rvCcDepts"></div>
+                <input type="text" id="rvCcEmail" placeholder="…or type email(s)">
+              </div>
+              <div id="rvStep1" class="rvacts">
+                <button class="rvb cm" id="rvPickComment" onclick="rvDo('comment')">💬 Comment</button>
+                <button class="rvb ap" id="rvPickApprove" onclick="rvDo('approve')" style="display:none">✓ Approve</button>
+                <button class="rvb rj" id="rvPickReject" onclick="rvDo('reject')" style="display:none">✕ Reject</button>
+                <button class="rvb" id="rvReopen" onclick="rvDo('reopen')" style="display:none">↺ Reopen / Request revision</button>
+                <button class="rvb" id="rvMango" onclick="rvSendMango()" title="File this approved document into Mango ERP automatically" style="display:none">↗ Send to Mango ERP</button>
+              </div>
+              <span class="rvmsg" id="rvMsg" style="display:block;margin-top:8px"></span>
+            </div>
+            <div id="rvLock" class="rvlock" style="display:none"></div>
+          </div>
+          <div id="rvThread"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+/* Dark-mode toggle. Preference stored in localStorage('vcb-dm'); the
+   <html> class was already set by the early head script to prevent
+   flash, so on load we just sync the body class + the menu item glyph. */
+function syncDarkUi(){
+  var dark=document.documentElement.classList.contains('dark');
+  document.body.classList.toggle('dark',dark);
+  var i=document.getElementById('stDmIcon'); if(i) i.textContent=dark?'☀️':'🌙';
+  var l=document.getElementById('stDmLabel'); if(l) l.textContent=dark? t('light_mode') : t('dark_mode');
+}
+syncDarkUi();
+try { applyI18n(); } catch(e){}
+function toggleDark(){
+  var on=!document.documentElement.classList.contains('dark');
+  document.documentElement.classList.toggle('dark',on);
+  try{ localStorage.setItem('vcb-dm',on?'1':'0'); }catch(e){}
+  syncDarkUi();
+}
+
+/* Settings modal — gear button (and the signed-in-as pill) open a
+   centered dialog with Account / Display / Language / Sign-out. */
+function toggleSettings(e){
+  if(e) e.stopPropagation();
+  var m=document.getElementById('stModal');
+  if(!m) return;
+  var willShow=!m.classList.contains('show');
+  m.classList.toggle('show', willShow);
+  if(willShow){ collapseAccessPanel(); updateSettingsModal(); }
+}
+function updateSettingsModal(){
+  // Theme segment — active reflects html.dark
+  var dark=document.documentElement.classList.contains('dark');
+  document.querySelectorAll('#stThemeSeg .st-seg-btn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-mode') === (dark?'dark':'light'));
+  });
+  // Language segment — active reflects LANG
+  document.querySelectorAll('#stLangSeg .st-seg-btn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-lang') === LANG);
+  });
+  // Date-era segment — active reflects DATE_ERA
+  document.querySelectorAll('#stEraSeg .st-seg-btn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-era') === DATE_ERA);
+  });
+  // Signed-in-as text inside the modal
+  var ut=document.getElementById('stUserText');
+  if(ut){
+    if(_verifiedEmail){
+      var addr=String(_verifiedEmail);
+      var isOwner=addr.toLowerCase()==='c.chavananand@vcb-con.com';
+      var role=(isOwner || _rvManager) ? 'admin' : 'user';
+      ut.textContent=addr+' · '+role;
+    } else {
+      ut.textContent='Not signed in';
+    }
+  }
+  // Sign in/out button label
+  var so=document.getElementById('stSignOut');
+  if(so) so.textContent=_verifiedEmail ? 'Sign out' : 'Sign in';
+  // Access-control section — admins only (owner or a manager). The header
+  // shows; the panel itself stays collapsed until tapped.
+  var acc=document.getElementById('stAccessSection');
+  if(acc){
+    var em=String(_verifiedEmail||'').toLowerCase();
+    var isAdmin=!!_verifiedEmail &&
+                (em==='c.chavananand@vcb-con.com' || _rvManager);
+    acc.style.display=isAdmin?'block':'none';
+  }
+}
+
+/* ── Access control (admin-only) ──────────────────────────────────
+   Confidential projects / document types limited to an email allow-list.
+   Public 🌐 = everyone; Confidential 🔒 = owner + listed emails. */
+var _accessLoaded=false;
+function collapseAccessPanel(){
+  var p=document.getElementById('stAccessPanel');
+  var head=document.getElementById('stAccessHead');
+  if(p) p.style.display='none';
+  if(head) head.classList.remove('open');
+}
+function toggleAccessPanel(){
+  var p=document.getElementById('stAccessPanel');
+  var head=document.getElementById('stAccessHead');
+  if(!p) return;
+  var show=(p.style.display==='none'||!p.style.display);
+  p.style.display=show?'block':'none';
+  if(head) head.classList.toggle('open',show);
+  if(show && !_accessLoaded) loadAccessConfig();   // lazy-load on first open
+}
+function loadAccessConfig(){
+  var body=document.getElementById('stAccessBody');
+  if(body) body.textContent='Loading…';
+  var msg=document.getElementById('stAccessMsg'); if(msg){msg.textContent='';msg.className='acc-msg';}
+  google.script.run
+    .withSuccessHandler(function(cfg){
+      if(!cfg||!cfg.ok){
+        if(body) body.textContent=(cfg&&cfg.error)||'Unable to load access settings.';
+        return;
+      }
+      _accessLoaded=true;
+      renderAccessConfig(cfg);
+    })
+    .withFailureHandler(function(err){
+      if(body) body.textContent='Error: '+(err&&err.message?err.message:err);
+    })
+    .getAccessConfig(_authToken||'');
+}
+function accRow(key,label,conf,emails){
+  return '<div class="acc-row'+(conf?' confidential':'')+'" data-key="'+esc(key)+'">'+
+      '<span class="acc-key">'+esc(label)+'</span>'+
+      '<span class="acc-toggle">'+
+        '<button type="button" class="acc-tg pub'+(conf?'':' active')+'" onclick="accSetConf(this,false)">Public</button>'+
+        '<button type="button" class="acc-tg conf'+(conf?' active':'')+'" onclick="accSetConf(this,true)">Confidential</button>'+
+      '</span>'+
+      '<textarea class="acc-emails" rows="2" oninput="accEmailInput(this)" '+
+        'placeholder="one email per line (or comma-separated)">'+
+        esc(emails)+'</textarea>'+
+    '</div>';
+}
+function accSetConf(btn,conf){
+  var row=btn.closest('.acc-row'); if(!row) return;
+  accApplyConf(row,conf);
+  if(conf){ var inp=row.querySelector('.acc-emails'); if(inp) inp.focus(); }
+}
+function accApplyConf(row,conf){
+  row.classList.toggle('confidential',conf);
+  row.querySelector('.acc-tg.pub').classList.toggle('active',!conf);
+  row.querySelector('.acc-tg.conf').classList.toggle('active',conf);
+}
+// Typing any email instantly makes the row confidential (no need to click
+// the lock first). Clearing the box does NOT auto-unlock — use 🌐 for that,
+// so a code can stay "owner-only" with an empty list.
+function accEmailInput(inp){
+  var row=inp.closest('.acc-row'); if(!row) return;
+  if(inp.value.trim()) accApplyConf(row,true);
+}
+function renderAccessConfig(cfg){
+  var body=document.getElementById('stAccessBody');
+  if(!body) return;
+  var rules=cfg.rules||{codes:{},projects:{}};
+  var rc=rules.codes||{}, rp=rules.projects||{}, lbl=cfg.codeLabels||{};
+  // Prefer the portal's fuller code→department map (covers 05/06/10), then
+  // the server's letterhead map, then bare code.
+  function codeName(c){
+    var d=(typeof CODE_LABEL!=='undefined'&&CODE_LABEL[c])?CODE_LABEL[c]:lbl[c];
+    return d?(c+' — '+d):c;
+  }
+  var pubPrefix={}; (cfg.defaultPublicPrefixes||[]).forEach(function(p){ pubPrefix[p]=1; });
+  function codePrefix(c){ var m=String(c).match(/^(\d+)/); return m?m[1]:''; }
+  // Build the list of codes/projects from the documents already loaded in
+  // the portal (instant) plus the known standard codes — no server scan.
+  var codeSet={}, EXCLUDE_CODES={'04':1,'07':1};
+  ['01','02A','02B','02C','03','05','06','08','09','10'].forEach(function(c){ codeSet[c]=1; });
+  try{ (all||[]).forEach(function(r){ var c=fmtCode(r.code); if(c) codeSet[c]=1; }); }catch(e){}
+  Object.keys(lbl).forEach(function(c){ codeSet[fmtCode(c)]=1; });
+  if(typeof CODE_LABEL!=='undefined') Object.keys(CODE_LABEL).forEach(function(c){ codeSet[fmtCode(c)]=1; });
+  var codes=Object.keys(codeSet).filter(function(c){ return !EXCLUDE_CODES[c]; })
+              .sort(function(a,b){ return a.localeCompare(b,undefined,{numeric:true}); });
+  var projSet={};
+  try{ Object.keys(RAW||{}).forEach(function(p){ if(p) projSet[p]=1; }); }catch(e){}
+  if(typeof PROJ_NAMES!=='undefined') Object.keys(PROJ_NAMES).forEach(function(p){ projSet[p]=1; });
+  var projects=Object.keys(projSet).sort();
+  var h='<div class="acc-group" data-kind="codes"><div class="acc-group-h">ประเภทเอกสาร / Document types</div>';
+  codes.forEach(function(c){
+    var entry=rc[c]||rc[codePrefix(c)];
+    var conf=(entry&&typeof entry.conf==='boolean')?entry.conf:!pubPrefix[codePrefix(c)];
+    var emails=(entry&&entry.allow?entry.allow:[]).join('\n');
+    h+=accRow(c,codeName(c),conf,emails);
+  });
+  h+='</div><div class="acc-group" data-kind="projects"><div class="acc-group-h">โครงการ / Projects</div>';
+  projects.forEach(function(p){
+    var entry=rp[p];
+    var conf=!!(entry&&entry.conf);
+    var emails=(entry&&entry.allow?entry.allow:[]).join('\n');
+    h+=accRow(p,p,conf,emails);
+  });
+  h+='</div>';
+  body.innerHTML=h;
+}
+function collectAccess(kind){
+  var out={}, grp=document.querySelector('#stAccessBody .acc-group[data-kind="'+kind+'"]');
+  if(grp){
+    grp.querySelectorAll('.acc-row').forEach(function(row){
+      var conf=row.classList.contains('confidential');
+      var inp=row.querySelector('.acc-emails');
+      var allow=inp?inp.value.split(/[\s,;]+/).filter(Boolean):[];
+      out[row.getAttribute('data-key')]={conf:conf,allow:allow};
+    });
+  }
+  return out;
+}
+function saveAccessConfig(){
+  var msg=document.getElementById('stAccessMsg');
+  var btn=document.getElementById('stAccessSave');
+  var payload={codes:collectAccess('codes'),projects:collectAccess('projects')};
+  if(msg){msg.textContent='Saving…';msg.className='acc-msg';}
+  if(btn) btn.disabled=true;
+  google.script.run
+    .withSuccessHandler(function(r){
+      if(btn) btn.disabled=false;
+      if(r&&r.ok){
+        if(msg){msg.textContent='✓ Saved — confidential documents are now hidden from anyone not listed.';msg.className='acc-msg ok';}
+        loadDocuments();   // re-apply enforcement to the live view
+      } else {
+        if(msg){msg.textContent=(r&&r.error)||'Save failed.';msg.className='acc-msg err';}
+      }
+    })
+    .withFailureHandler(function(err){
+      if(btn) btn.disabled=false;
+      if(msg){msg.textContent='Error: '+(err&&err.message?err.message:err);msg.className='acc-msg err';}
+    })
+    .setAccessConfig(_authToken||'', JSON.stringify(payload));
+}
+function setTheme(mode){
+  var wantDark=(mode==='dark');
+  var isDark=document.documentElement.classList.contains('dark');
+  if(wantDark !== isDark) toggleDark();   // flips the html.dark class + persists
+  updateSettingsModal();
+}
+function setLang(lang){
+  if(LANG !== lang){
+    LANG=lang;
+    try { localStorage.setItem('vcb-lang', LANG); } catch(e){}
+    applyI18n();
+  }
+  updateSettingsModal();
+}
+function setDateEra(era){
+  if(DATE_ERA !== era){
+    DATE_ERA = era;
+    try { localStorage.setItem('vcb-era', DATE_ERA); } catch(e){}
+    if (typeof buildIndex === 'function' && all && all.length) buildIndex();
+  }
+  updateSettingsModal();
+}
+function onSignOutClick(){
+  if(_verifiedEmail){
+    // Sticky sign-out: remember the explicit choice so the page-load
+    // session probe (getReviewerRole) does NOT silently re-identify a
+    // same-domain user from their ambient Google session on next load.
+    try{ localStorage.setItem('vcbSignedOut','1'); }catch(e){}
+    applyAuth(null,'');   // clear auth (also fires updateUserPill)
+    updateSettingsModal();
+  } else {
+    signInWithGoogle();
+    toggleSettings();     // close modal so the popup is visible
+  }
+}
+
+/* In-app confirmation dialog. Replaces window.confirm() everywhere with
+   a clean modal that matches the app's design (light + dark mode).
+   Usage: appConfirm({title, message, okLabel, cancelLabel, danger}, cb)
+   The callback receives true if the user clicks the primary button. */
+function appConfirm(opts,cb){
+  opts=opts||{};
+  var w=document.getElementById('ackWrap');
+  document.getElementById('ackTitle').textContent=opts.title||'Confirm';
+  document.getElementById('ackMsg').innerHTML=opts.message||'';
+  var ok=document.getElementById('ackOk'), cancel=document.getElementById('ackCancel');
+  ok.textContent=opts.okLabel||'OK';
+  cancel.textContent=opts.cancelLabel||'Cancel';
+  ok.className='ackBtn ackBtnPri'+(opts.danger?' danger':'');
+  function close(yes){
+    w.classList.remove('show');
+    document.removeEventListener('keydown',onKey);
+    ok.onclick=null; cancel.onclick=null;
+    if(cb) cb(!!yes);
+  }
+  function onKey(e){ if(e.key==='Escape') close(false); else if(e.key==='Enter') close(true); }
+  ok.onclick=function(){ close(true); };
+  cancel.onclick=function(){ close(false); };
+  document.addEventListener('keydown',onKey);
+  w.classList.add('show');
+  setTimeout(function(){ try{ cancel.focus(); }catch(e){} },20);
+}
+</script>
+
+<!-- Floating action button — mobile-only Add Document trigger. -->
+<button class="fab" onclick="openPanel()" aria-label="Add Document" title="Add Document">＋</button>
+
+<!-- Custom date picker — mobile only. Tap a day to commit + close. -->
+<div id="dpModal" class="dp-modal" onclick="if(event.target===this)dpClose()">
+  <div class="dp-sheet">
+    <div class="dp-head">
+      <button class="dp-nav" onclick="dpNav(-1)" aria-label="Previous month">◀</button>
+      <div class="dp-title" id="dpTitle"></div>
+      <button class="dp-nav" onclick="dpNav(1)" aria-label="Next month">▶</button>
+      <button class="dp-close" onclick="dpClose()" aria-label="Close">✕</button>
+    </div>
+    <div class="dp-grid" id="dpGrid"></div>
+    <div class="dp-actions">
+      <button class="dp-clear" onclick="dpClear()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- In-app confirmation modal (used everywhere instead of window.confirm). -->
+<div id="ackWrap" class="ackWrap" role="dialog" aria-modal="true">
+  <div class="ackBox">
+    <h3 id="ackTitle">Confirm</h3>
+    <div id="ackMsg" class="msg"></div>
+    <div class="ackActs">
+      <button id="ackCancel" class="ackBtn ackBtnSec" type="button">Cancel</button>
+      <button id="ackOk" class="ackBtn ackBtnPri" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

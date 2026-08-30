@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VCB Onboarding Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <?!= include('styles'); ?>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div class="shell">
+
+    <button class="menu-toggle" id="menu-toggle-btn" aria-label="Open navigation"></button>
+    <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+    <aside class="sidebar" id="site-sidebar">
+      <button class="sidebar-close" id="sidebar-close-btn" aria-label="Close navigation"></button>
+      <a class="sidebar-brand" href="?page=home" data-link="home">
+        <span>
+          <span class="sidebar-brand-name" id="brand-title">VCB ONBOARDING</span>
+          <span class="sidebar-brand-sub" id="brand-subtitle">Vichitbhan Construction</span>
+        </span>
+      </a>
+
+      <nav class="sidebar-nav sidebar-progress" id="sidebar-progress" aria-label="Onboarding journey"></nav>
+
+      <div class="sidebar-foot">
+        <span id="footer-company">Vichitbhan Construction Co., Ltd.</span>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="settings-wrap settings-wrap-floating">
+        <button class="icon-btn" id="settings-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+          <span id="settings-btn-icon"></span>
+        </button>
+        <div class="settings-menu" id="settings-panel">
+          <div class="settings-section" id="lbl-language">Language</div>
+          <div class="settings-row">
+            <div class="seg" id="lang-control">
+              <button type="button" data-lang="en" class="seg-btn">EN</button>
+              <button type="button" data-lang="th" class="seg-btn">TH</button>
+            </div>
+          </div>
+          <div class="settings-divider"></div>
+          <div class="settings-section" id="lbl-appearance">Appearance</div>
+          <div class="settings-row">
+            <div class="seg" id="theme-control">
+              <button type="button" data-theme="light" class="seg-btn"><span id="lbl-light-icon"></span><span id="lbl-light">Light</span></button>
+              <button type="button" data-theme="dark" class="seg-btn"><span id="lbl-dark-icon"></span><span id="lbl-dark">Dark</span></button>
+            </div>
+          </div>
+          <div class="settings-divider"></div>
+          <!-- Name correction. A typo'd name silently starts a fresh, empty
+               progress record (the server can't tell a typo from a genuinely
+               new employee), and until now there was no way to fix it from
+               anywhere in the UI — the name modal only ever appears when no
+               name is set at all. -->
+          <button type="button" class="settings-admin-link" id="change-name-btn">
+            <span id="settings-name-icon"></span>
+            <span id="lbl-change-name">Change my name</span>
+          </button>
+          <div class="settings-divider"></div>
+          <a class="settings-admin-link" href="?page=admin" data-link="admin" id="lbl-admin-link">
+            <span id="settings-admin-icon"></span>
+            <span id="lbl-admin">Admin</span>
+          </a>
+        </div>
+      </div>
+
+      <main id="main-content">
+        <div id="app"></div>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-inner">
+          <span>&copy; <span id="year"></span> <span id="footer-company-2">Vichitbhan Construction Co., Ltd. — Internal Onboarding Portal</span></span>
+        </div>
+      </footer>
+    </div>
+
+  </div>
+
+  <script>window.INITIAL_PAGE = <?!= JSON.stringify(initialPage) ?>;</script>
+  <script>window.CHECKLIST_OVERRIDES = <?!= checklistOverridesJson ?>;</script>
+  <?!= include('icons'); ?>
+  <?!= include('translations'); ?>
+  <?!= include('images'); ?>
+  <?!= include('content'); ?>
+  <?!= include('progress'); ?>
+  <?!= include('admin'); ?>
+  <?!= include('app'); ?>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

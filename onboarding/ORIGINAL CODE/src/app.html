@@ -1,0 +1,2372 @@
+<script>
+(function () {
+  'use strict';
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function nl2p(lines) {
+    return (lines || []).map(function (line) { return '<p>' + esc(t(line)) + '</p>'; }).join('');
+  }
+  function ul(items) {
+    return '<ul class="plain-list">' + items.map(function (i) { return '<li>' + esc(t(i)) + '</li>'; }).join('') + '</ul>';
+  }
+  function pageUrl(page) {
+    return '?page=' + encodeURIComponent(page);
+  }
+
+  /* Org chart building blocks — shared by every plain team node (Engineering,
+     Accounting, ...) and by Leadership's own nested hierarchy, so the same
+     click-to-reveal-role mechanic (initOrgChart) works identically no matter
+     how deep a person sits in the tree. */
+  /* zone (optional) colors this person's avatar per the app-wide zone
+     system (.org-zone-office default blue / .org-zone-offsite amber /
+     .org-zone-admin green — styles.html), an explicit request so an
+     employee can tell at a glance which "world" someone belongs to:
+     Head Office (blue, the default — omitting zone or passing 'office'
+     both resolve to it), off-site/Project Sites operations (amber), or
+     site Administration reporting to HQ departments (green). Every
+     existing call site that doesn't care about zoning (Head Office's own
+     flat department lists, Leadership, Group Structure) is unaffected —
+     omitting the argument keeps the original default blue exactly as
+     before. */
+  function orgPersonHtml(m, zone) {
+    var initials = m.name.replace(/^(Mr\.|Mrs\.|Ms\.)\s*/, '').split(' ').slice(0, 2).map(function (w) { return w[0]; }).join('');
+    var zoneClass = zone && zone !== 'office' ? ' org-zone-' + zone : '';
+    return '<div class="org-person' + zoneClass + '">' +
+      '<button type="button" class="org-person-btn"' + (m.role ? ' aria-expanded="false"' : '') + '>' +
+        '<span class="org-member-avatar">' + esc(initials) + '</span>' +
+        '<span class="org-member-name">' + esc(m.name) + '</span>' +
+      '</button>' +
+      (m.role ? '<div class="org-person-role"><div class="org-person-role-inner"><span class="org-member-role">' + esc(t(m.role)) + '</span></div></div>' : '') +
+    '</div>';
+  }
+
+  /* A plain team node: button (label + headcount) + an expandable flat list
+     of people. Used for every department except Asset Management (see
+     below) and for Project Managers. */
+  function orgTeamNodeHtml(team) {
+    if (team.branches) return orgTeamBranchesNodeHtml(team);
+    var memberCount = team.members.length;
+    var peopleHtml = team.members.map(orgPersonHtml).join('');
+    return '<div class="org-team" data-org-team="' + esc(team.id) + '">' +
+      '<button type="button" class="org-team-btn">' +
+        '<span class="org-team-label">' + esc(t(team.label)) + '</span>' +
+        '<span class="org-team-count">' + memberCount + (memberCount === 1 ? ' person' : ' people') + '</span>' +
+      '</button>' +
+      '<div class="org-team-people"><div class="org-team-people-inner">' + peopleHtml + '</div></div>' +
+    '</div>';
+  }
+
+  /* Asset Management is the one Head Office department with two branches
+     instead of one flat member list (see content.html: branches, not
+     members) — Inventory & Land Assets (stays at Head Office) and Sai-5
+     Maintenance Unit (vehicles/heavy machinery, physically off-site but
+     organizationally still part of Asset Management, not a separate
+     department — explicit request: "even though they're located away from
+     head office, they're essentially part of head office").
+     Two earlier versions of this got explicit corrections:
+     1. Both branches nested inside ONE Asset Management card, stacked
+        vertically — rejected as misleading (read like Sai-5 reported INTO
+        Inventory, not that both report to Asset Management equally).
+     2. Asset Management turned into a plain always-expanded label with
+        the two branches ALWAYS visible beside it — rejected because that
+        made Asset Management's card permanently much taller than every
+        sibling department, forcing the whole Head Office row into a
+        horizontal scrollbar ("the border itself should not be smaller
+        than the panels... a scroller at the bottom, which we do not
+        want... they have to be on the same plane as every other team").
+     Now Asset Management is a completely normal .org-team card —
+     identical collapsed size/shape to Engineering, Accounting, etc.,
+     clickable the same way — and its two branches render side by side
+     ONLY inside its own .org-team-people panel once opened (same
+     click-to-expand mechanic every other team already uses), joined by a
+     fork bar (renderDeptBranchFork) that only exists while that panel is
+     open. Collapsed, Asset Management takes no more room than any
+     sibling; opened, it's the only one whose panel holds two branches
+     instead of a flat member list — the "same plane" requirement is
+     about the row's collapsed geometry, not about every team's expanded
+     content being identical in shape. Sai-5 gets a distinct amber color
+     code (.org-dept-branch-offsite / .org-zone-offsite, styles.html —
+     part of a broader zone color system: blue = Head Office, amber =
+     off-site/Project Sites, green = site Administration, see
+     orgPersonHtml/orgAdminPersonHtml) so it reads as organizationally
+     Asset Management but physically distinct, without needing a written
+     caption to say so. */
+  function orgTeamBranchesNodeHtml(team) {
+    var totalCount = team.branches.reduce(function (sum, b) { return sum + b.members.length; }, 0);
+    var branchesHtml = team.branches.map(function (b) {
+      var memberCount = b.members.length;
+      var peopleHtml = b.members.map(function (m) { return orgPersonHtml(m, b.offsite ? 'offsite' : 'office'); }).join('');
+      var branchHtml = '<div class="org-team org-dept-branch' + (b.offsite ? ' org-dept-branch-offsite' : '') + '" data-org-team="' + esc(b.id) + '">' +
+        '<button type="button" class="org-team-btn">' +
+          '<span class="org-team-label">' + esc(t(b.label)) + '</span>' +
+          '<span class="org-team-count">' + memberCount + (memberCount === 1 ? ' person' : ' people') + '</span>' +
+        '</button>' +
+        '<div class="org-team-people"><div class="org-team-people-inner">' + peopleHtml + '</div></div>' +
+      '</div>';
+      /* b.location (e.g. "Sai-5") is the physical site this branch sits
+         at, deliberately kept OUT of the clickable team name itself (see
+         this function's own top comment — "Sai-5 Maintenance Unit" as a
+         label was corrected because it named a place, not a function,
+         unlike every other team in this tree). Wrapped in its own framed
+         box (.org-dept-branch-site, styles.html) around the branch card,
+         with the location as a small caption below it — a visual "this
+         one sits in its own physical location" cue distinct from the
+         amber team-color already signaling "off-site" on the card
+         itself, without putting the place name back into the name. */
+      if (b.location) {
+        return '<div class="org-dept-branch-site">' + branchHtml +
+          '<div class="org-dept-branch-site-label">' + esc(t(b.location)) + '</div>' +
+        '</div>';
+      }
+      return branchHtml;
+    }).join('');
+    return '<div class="org-team org-dept-fork" data-org-team="' + esc(team.id) + '" data-org-dept-fork="' + esc(team.id) + '">' +
+      '<button type="button" class="org-team-btn">' +
+        '<span class="org-team-label">' + esc(t(team.label)) + '</span>' +
+        '<span class="org-team-count">' + totalCount + ' ' + esc(t('people')) + '</span>' +
+      '</button>' +
+      '<div class="org-team-people"><div class="org-team-people-inner org-dept-fork-branches">' + branchesHtml + '</div></div>' +
+    '</div>';
+  }
+
+  /* Site Administration members (see content.html's adminMembers) carry an
+     hqDept id instead of just a role string — their real reporting line is
+     a MATRIX one: physically at the project site, but each function
+     (procurement/accounting/finance/inventory) reports to that function's
+     actual HQ department, not to the Project Manager the way Site
+     Operations does. deptLabels (id -> label, built from sec.departments
+     in orgProjectNodeHtml below) resolves that id to a real department
+     name for the small tag shown under their role. Falls back to plain
+     orgPersonHtml when a member has no hqDept (every Site Operations
+     member), so this is safe to use as a drop-in replacement across both
+     groups. */
+  function orgAdminPersonHtml(m, deptLabels) {
+    if (!m.hqDept) return orgPersonHtml(m);
+    var deptLabel = (deptLabels || {})[m.hqDept] || m.hqDept;
+    var initials = m.name.replace(/^(Mr\.|Mrs\.|Ms\.)\s*/, '').split(' ').slice(0, 2).map(function (w) { return w[0]; }).join('');
+    /* Always green (.org-zone-admin) — site Administration's own zone
+       color, distinct from Site Operations' amber (see the 'offsite' zone
+       passed in orgProjectNodeHtml below) and from Head Office's default
+       blue, per the app-wide zone color system (orgPersonHtml's own
+       comment). Every admin member has an hqDept by construction (see the
+       early return above), so this is unconditional here. */
+    return '<div class="org-person org-zone-admin">' +
+      '<button type="button" class="org-person-btn">' +
+        '<span class="org-member-avatar">' + esc(initials) + '</span>' +
+        '<span class="org-member-name">' + esc(m.name) + '</span>' +
+      '</button>' +
+      '<div class="org-person-role"><div class="org-person-role-inner">' +
+        '<span class="org-member-role">' + esc(t(m.role)) + '</span>' +
+        '<span class="org-member-hq-tag">' + esc(t('Reports to')) + ' ' + esc(t(deptLabel)) + '</span>' +
+      '</div></div>' +
+    '</div>';
+  }
+
+  /* Each project renders exactly like a Head Office department card — no
+     wrapping "Project Managers" node to click through first (that
+     intermediate step was removed per explicit request: Project Sites'
+     segment label alone should reveal all 6 project cards directly, same
+     as Head Office's own label reveals all its department cards). Reuses
+     the exact same .org-team/.org-team-btn/click-to-expand mechanic
+     (initOrgChart doesn't care how deep a .org-team sits, only that it has
+     that class) — click a project to reveal its crew.
+     Crew splits into two side-by-side columns, a matrix-reporting
+     structure per explicit request (2026-08 revision — previously stacked
+     vertically, Operations above Administration; changed to horizontal
+     columns, Administration on the LEFT, specifically so the two chains of
+     command read as parallel/separate branches rather than one column
+     "under" the other):
+     - Site Administration (adminMembers, LEFT column) — physically placed
+       at the site for documents/internal-audit support, but each person's
+       REAL reporting line runs to a Head Office department instead
+       (HR/Procurement/Administration/Asset Management/Finance & Accounting
+       — see hqDept, orgAdminPersonHtml above). The two-tier cue for this:
+       (1) a short solid stub above the column (.org-project-admin-uplink)
+       gesturing "answers upward, to headquarters" without literally
+       drawing a connector across the whole chart to the real Head Office
+       cards elsewhere on the page — deliberately out of scope, see this
+       function's own note below on why; (2) each person's own "Reports to
+       X" tag (orgAdminPersonHtml) still names the actual HQ department in
+       text, which remains the source of truth for who they report to.
+     - Site Operations (opsMembers, including the project lead, RIGHT
+       column) — the normal chain of command: Engineering Team controls
+       the Project Manager, who controls Site Operations. No different
+       visually from how every other team's flat member list looks.
+     A dashed VERTICAL divider between the two columns
+     (.org-project-matrix-divider) is the matrix line itself — day-to-day
+     collaboration between Site Operations and Site Administration at the
+     same project, without either controlling the other. Reuses the same
+     dashed-line device already established elsewhere in this app for
+     "connected but not the same reporting line" (Group Structure's family
+     companies, .group-family-connector) rather than inventing a new visual
+     language for the same underlying idea.
+     Why no real drawn line to Head Office: a project card lives inside
+     Project Sites, a completely separate .org-segment from Head Office's
+     own row, often scrolled far apart — routing an actual measured
+     connector between them would cross the whole chart and re-introduce
+     exactly the stale-selector/cross-container fragility this codebase's
+     own docs (KNOWN_ISSUES.md) warn about; a contained visual cue plus the
+     existing text tag was the explicit choice instead of that. */
+  /* One named sub-department card within a project's Operations or
+     Administration column (see orgProjectNodeHtml below) — a label (e.g.
+     "Survey") plus its lead PLUS a couple of generic staff (dept.staff,
+     content.html — added 2026-08 after "only one person per role" read as
+     too sparse), each rendered via the same orgPersonHtml/
+     orgAdminPersonHtml click-to-expand person button every other part of
+     this chart already uses (consistency, and the role-reveal-on-click
+     behavior comes for free rather than being reimplemented here).
+     zone/deptLabels are passed straight through to whichever
+     person-renderer applies — every staff member in an Administration
+     department shares that department's own hqDept (the matrix
+     relationship is per-function, not per-individual), same as the lead. */
+  function orgProjectDeptHtml(dept, zoneOrDeptLabels, isAdmin) {
+    var members = [dept.lead].concat(dept.staff || []);
+    var peopleHtml = members.map(function (m) {
+      return isAdmin ?
+        orgAdminPersonHtml({ name: m.name, role: m.role, hqDept: dept.hqDept }, zoneOrDeptLabels) :
+        orgPersonHtml(m, zoneOrDeptLabels);
+    }).join('');
+    return '<div class="org-project-dept">' +
+      '<div class="org-project-dept-label">' + esc(t(dept.label)) + '</div>' +
+      peopleHtml +
+    '</div>';
+  }
+
+  function orgProjectNodeHtml(project, departments) {
+    var deptLabels = {};
+    (departments || []).forEach(function (d) { deptLabels[d.id] = d.label; });
+    var opsDepartments = project.opsDepartments || [];
+    var adminDepartments = project.adminDepartments || [];
+    /* Deliberately excludes the Project Manager (project.lead) — the
+       collapsed card's badge counts DEPARTMENTS, not headcount, and the
+       PM heads the WHOLE project (see leadHtml below), not one department
+       within it. "10 departments" (9 depts + counting the PM) read as
+       wrong once departments replaced the old flat person-count. */
+    var deptCount = opsDepartments.length + adminDepartments.length;
+    /* 'offsite' zone (amber) — Site Operations is physically at the
+       project site, same zone color as Sai-5's own branch (see
+       orgTeamBranchesNodeHtml above) and Project Sites' own segment tint.
+       Explicit wrapper, not a bare orgProjectDeptHtml reference, because
+       Array#map passes (element, index, array) to its callback — passing
+       orgProjectDeptHtml directly would leak the array INDEX into its
+       zone/isAdmin parameters for every dept past the first. */
+    /* The Project Manager (project.lead) now renders as its OWN header
+       row, above BOTH groups — not inside Site Operations — since they
+       head the entire project (both branches answer to them, directly or
+       via the matrix line), not just the Operations side specifically
+       (2026-08 correction: an earlier draft nested them inside Operations,
+       which read as Administration NOT ultimately being under the PM at
+       all). A small "PM" tag next to their name (.org-project-pm-tag)
+       identifies the role — the name itself stays the primary label,
+       consistent with how every other lead in this chart is shown by
+       name first, not reduced to a bare role abbreviation. */
+    var leadHtml = '<div class="org-project-lead">' + orgPersonHtml(project.lead, 'offsite') +
+      '<span class="org-project-pm-tag">' + esc(t('PM')) + '</span></div>';
+    var opsHtml = opsDepartments.map(function (d) { return orgProjectDeptHtml(d, 'offsite', false); }).join('');
+    var adminHtml = adminDepartments.map(function (d) { return orgProjectDeptHtml(d, deptLabels, true); }).join('');
+    /* PM header full width on top, Operations and Administration side by
+       side beneath it — Operations LEFT, Administration RIGHT — for
+       EVERY opened project, always (2026-08 correction: two earlier
+       rounds made this conditional on the org chart's .focused state,
+       showing a plain vertical stack by default and only switching to
+       side-by-side when a project was clicked in isolation; explicit
+       follow-up request to drop that split entirely, since both views
+       showed identical content anyway — see styles.html's matching
+       comment above .org-project-group for the CSS side of this). Operations
+       renders first in DOM (left in the row), Administration second
+       (right). A dashed "uplink" line (.org-project-admin-uplink) rises
+       from the Administration group's own top — see that class's comment
+       in styles.html for why it stops at the panel's own top rather than
+       crossing further to the PM header or all the way to Head Office's
+       real cards elsewhere in the chart. */
+    var peopleHtml = leadHtml +
+      '<div class="org-project-groups">' +
+        '<div class="org-project-group org-project-ops">' +
+          '<div class="org-project-group-label">' + esc(t('Site Operations')) + '</div>' +
+          opsHtml +
+        '</div>' +
+        (adminDepartments.length ? '<div class="org-project-matrix-divider" aria-hidden="true"></div>' +
+        '<div class="org-project-group org-project-admin-group">' +
+          '<div class="org-project-admin-uplink" aria-hidden="true"></div>' +
+          '<div class="org-project-group-label">' + esc(t('Site Administration')) + '</div>' +
+          adminHtml +
+        '</div>' : '') +
+      '</div>';
+    return '<div class="org-team org-project" data-org-team="' + esc(project.id) + '">' +
+      '<button type="button" class="org-team-btn">' +
+        '<span class="org-team-label">' + esc(t(project.label)) + '</span>' +
+        '<span class="org-team-count">' + deptCount + (deptCount === 1 ? ' department' : ' departments') + '</span>' +
+      '</button>' +
+      '<div class="org-team-people"><div class="org-team-people-inner">' + peopleHtml + '</div></div>' +
+    '</div>';
+  }
+
+  /* Leadership's node is the same button + expandable panel as any other
+     team, but what's inside the panel is a real multi-level hierarchy
+     (Board of Directors + Board Advisors side by side -> Managing Director
+     -> Assistants) instead of one flat list — the first two levels
+     (indices 0 and 1) share one row (see .org-leadership-row in
+     styles.html), then each subsequent level stacks beneath with a
+     connecting line. */
+  function orgLeadershipLevelHtml(level, hasConnector) {
+    return '<div class="org-leadership-level' + (hasConnector ? ' has-connector' : '') + '">' +
+      '<div class="org-leadership-level-heading">' + esc(t(level.heading)) + '</div>' +
+      '<div class="org-leadership-level-people">' + level.members.map(orgPersonHtml).join('') + '</div>' +
+    '</div>';
+  }
+  function orgLeadershipNodeHtml(leadership) {
+    var totalCount = leadership.levels.reduce(function (sum, lvl) { return sum + lvl.members.length; }, 0);
+    var boardLevel = leadership.levels[0], advisorLevel = leadership.levels[1];
+    /* Board of Directors (4) + Board Advisors (2) render as ONE shared
+       6-column grid row (.org-leadership-people-grid) — a CSS grid with a
+       fixed column count, not a flex-wrap row, specifically because
+       flex-wrap previously let the browser interleave the two groups
+       unpredictably across lines depending on available width (see the
+       org-leadership-people-break history). Grid with an explicit
+       column-count keeps every card in strict source order (directors
+       first, then advisors) regardless of how it wraps on narrow screens. */
+    var topRowHtml = '<div class="org-leadership-row">' +
+      '<div class="org-leadership-row-headings">' +
+        '<div class="org-leadership-level-heading">' + esc(t(boardLevel.heading)) + '</div>' +
+        '<div class="org-leadership-level-heading">' + esc(t(advisorLevel.heading)) + '</div>' +
+      '</div>' +
+      '<div class="org-leadership-people-grid">' +
+        boardLevel.members.map(orgPersonHtml).join('') +
+        advisorLevel.members.map(orgPersonHtml).join('') +
+      '</div>' +
+    '</div>';
+    var restHtml = '<div class="org-leadership-tiers">' +
+      leadership.levels.slice(2).map(function (level, i) {
+        return orgLeadershipLevelHtml(level, i > 0);
+      }).join('') +
+    '</div>';
+    var levelsHtml = topRowHtml + restHtml;
+    /* Restructured to genuinely match Head Office/Project Sites' own shape
+       — an .org-segment (colored panel, own background) with an ALWAYS-
+       VISIBLE .org-segment-label-btn header (the same chevron-bearing
+       label those two use, toggled via the same [data-org-expand-all]
+       mechanism in initOrgChart, not a bespoke Leadership-only chevron
+       bolted onto a plain .org-team-btn as a prior version of this
+       function did). That prior version kept the count/chevron INSIDE the
+       collapsing .org-team-btn, and the whole thing had no colored
+       .org-segment background at all — so despite having *a* chevron, it
+       still didn't look or behave like its two siblings, which was the
+       actual complaint ("treat the leadership panel as the same as head
+       office and project sites... look the same"). The people/hierarchy
+       itself (levelsHtml) still lives inside its own .org-team-people
+       collapsible panel — .org-leadership keeps that inner .org-team
+       wrapper (data-org-expand-group's expand-all click sets .open on
+       every .org-team inside it via openTeam/closeTeam in initOrgChart,
+       so this needs to remain an actual .org-team for that to keep
+       working) — just moved beneath a persistent segment label instead of
+       carrying the label itself. */
+    return '<div class="org-segment org-segment-leadership" data-org-expand-group>' +
+      '<button type="button" class="org-segment-label org-segment-label-btn" data-org-expand-all>' + esc(t(leadership.label)) + ' &middot; ' + totalCount + ' ' + esc(t('people')) + '</button>' +
+      '<div class="org-team org-leadership" data-org-team="' + esc(leadership.id) + '">' +
+        '<div class="org-team-people"><div class="org-team-people-inner org-leadership-levels">' + levelsHtml + '</div></div>' +
+      '</div>' +
+    '</div>';
+  }
+  /* Group Structure view — Vichitbhan's position within the wider
+     Vichitbhan Group: parent, subsidiaries, and joint-venture partnerships.
+     Same trunk/branches/segment visual language as the org-chart tree above
+     (.org-tree-trunk, .org-tree-branches, .org-segment) reused via distinct
+     group-structure/group-entity classes so this can be styled
+     independently without affecting the org chart. Cards use the same
+     icon-band-plus-body treatment as .dept-card (Department Selection)
+     rather than plain bordered rectangles, so this reads as part of the
+     same design system as the rest of the app.
+     Subsidiaries and Joint Ventures are SIBLING segments at the same tier
+     under Vichitbhan (same pattern as Head Office/Project Sites in the org
+     chart above) — not one nested under the other. Subsidiary cards are
+     plain (nothing to expand: a subsidiary doesn't carry its own
+     "co-owners" the way a JV does). Each JV card DOES click-to-expand,
+     reusing the exact same .org-team/.org-team-btn/.org-team-people
+     mechanism the org chart's teams already use (see initOrgChart, which
+     drives any .org-team regardless of which section rendered it) —
+     collapsed it shows just the short name (VK) with a handshake icon;
+     clicking reveals its co-owning parent companies in place inside that
+     same card. */
+  function groupEntityCardHtml(entity, iconName) {
+    return '<div class="group-entity-card">' +
+      '<div class="group-entity-icon">' + icon(iconName || 'building') + '</div>' +
+      '<div class="group-entity-body">' +
+        '<span class="group-entity-label">' + esc(t(entity.label)) + '</span>' +
+        (entity.sub ? '<span class="group-entity-sub">' + esc(t(entity.sub)) + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }
+  /* Wraps a card with its OWN short vertical stem + a small always-visible
+     label on that stem (e.g. "Subsidiary" / "Joint Venture") — explicit
+     request: "I want a line for each one... visible on each line", i.e.
+     each individual entity gets its own labeled connector rather than
+     relying on the shared segment heading above the whole row to say what
+     kind of relationship it is. */
+  function groupStemHtml(cardHtml, stemLabel, extraClass) {
+    /* Single continuous line running the full height of the stem (behind
+       the label, which sits on top with its own background patch so the
+       line doesn't visually cut through the text) down to the card's top
+       edge with zero gap — reads as one branch physically plugging into
+       the card, not a short dash floating above an unrelated box. See
+       .group-stem-item/.group-stem-line/.group-stem-label in styles.html.
+       extraClass (optional) adds a modifier class to the stem item itself —
+       used by the family-owned sibling companies (see
+       groupFamilyCompanyCardHtml) to get a dashed .group-family-stem line
+       instead of the normal solid one, without a second near-duplicate
+       function. */
+    return '<div class="group-stem-item' + (extraClass ? ' ' + extraClass : '') + '">' +
+      '<div class="group-stem-line"></div>' +
+      '<div class="group-stem-label">' + esc(t(stemLabel)) + '</div>' +
+      cardHtml +
+    '</div>';
+  }
+  /* Back to click-to-expand (a prior always-visible ownership-chart version
+     was tried, then explicitly reverted: "remove the names of the company,
+     and they should expand only upon clicking") — reuses the same
+     .org-team/.org-team-btn/.org-team-people mechanism the org chart's
+     teams use (initOrgChart wires any .org-team regardless of which
+     section rendered it). Collapsed, a JV card shows ONLY its short code
+     (VK) — no icon this time (an earlier icon version was called "bland"),
+     no parent names. Clicking it reveals the two co-owning parent company
+     names in place, joined by "+", inside that same card. */
+  function groupJvCardHtml(jv) {
+    var parentsHtml = (jv.parents || []).map(function (p) {
+      return '<div class="group-jv-parent-chip">' + esc(t(p)) + '</div>';
+    }).join('<span class="group-jv-plus">+</span>');
+    /* Small handshake glyph next to the short code — the earlier icon
+       version of this card (a full-height tinted icon band, matching
+       .group-entity-icon's treatment on subsidiary cards) was explicitly
+       called "bland" and dropped in favor of plain typography. This isn't
+       that: a small inline glyph sitting beside real text (the JV code)
+       rather than replacing it, requested specifically as "a symbol for
+       the joint ventures" once the rest of the card already carries real
+       information (the always-visible "Joint Venture" stem label, the
+       click-to-reveal parent names) — same handshake icon (two overlapping
+       circles, see icons.html) already built for this exact purpose and
+       never removed, just never wired up after the icon-band version was
+       reverted. */
+    return '<div class="org-team group-jv-team" data-org-team="' + esc(jv.id) + '">' +
+      '<button type="button" class="org-team-btn group-jv-btn">' +
+        '<span class="group-jv-icon">' + icon('handshake') + '</span>' +
+        '<span class="org-team-label">' + esc(t(jv.label)) + '</span>' +
+      '</button>' +
+      '<div class="org-team-people"><div class="org-team-people-inner group-jv-parents-inner">' + parentsHtml + '</div></div>' +
+    '</div>';
+  }
+  /* Shareholder tier — who OWNS Vichitbhan, drawn ABOVE the parent card
+     (everything else in this view sits below it). Matches the reference
+     ownership chart the user provided: each shareholder box carries its
+     ownership %, connector lines run down from every box to one merge
+     point, then a single line continues into Vichitbhan. New Investor is
+     styled distinctly (highlight: true, see content.html) matching the
+     reference's orange callout box for that same not-yet-finalized entity,
+     with its "and/or other forms of investment" note reproduced the same
+     way the reference shows it — small italic text beside the line, not
+     inside the box itself. */
+  function shareholderBoxHtml(sh) {
+    return '<div class="group-shareholder-box' + (sh.highlight ? ' group-shareholder-highlight' : '') + '">' +
+      '<span class="group-shareholder-label">' + esc(t(sh.label)) + (sh.note && !sh.highlight ? ' <sup>' + esc(t(sh.note)) + '</sup>' : '') + '</span>' +
+      (sh.pct ? '<span class="group-shareholder-pct">' + esc(t(sh.pct)) + '</span>' : '') +
+    '</div>';
+  }
+  function renderShareholderTierHtml(shareholders) {
+    if (!shareholders || !shareholders.length) return '';
+    var highlightNote = shareholders.filter(function (sh) { return sh.highlight && sh.note; })[0];
+    return '<div class="group-shareholder-tier">' +
+      '<div class="group-shareholder-row">' + shareholders.map(shareholderBoxHtml).join('') + '</div>' +
+      '<div class="group-shareholder-connector"></div>' +
+      (highlightNote ? '<div class="group-shareholder-note">' + esc(t(highlightNote.note)) + '</div>' : '') +
+    '</div>';
+  }
+  /* One "sibling company" card at the same tier as VCB (see
+     renderGroupStructureHtml's .org-tree-top below) — collapsed to just
+     its name by default (explicit request: these two should read as
+     visually minor next to VCB, not equally prominent — VCB is where
+     employees using this portal actually work and should stay the clear
+     focus). Originally used the SAME .org-team/.org-team-btn/.org-team-people
+     click-to-expand mechanism the org chart's own teams and the JV cards
+     elsewhere in this view use, but changed to a pure CSS hover tooltip per
+     explicit request — no click, no expand/collapse state, the description
+     just fades in above the card on mouseover and fades out on mouseleave
+     (.group-family-tooltip below, styles.html). This also means these two
+     cards no longer register with initOrgChart's .org-team wiring at all,
+     so the .focused chart-wide-fade side effect that once required a
+     special-case exclusion for .group-family-team (see initOrgChart) can no
+     longer happen here by construction — nothing to click, nothing to
+     focus. Not wrapped in groupStemHtml's usual local CSS-line stem (that
+     mechanism assumes a short, fixed vertical gap between a segment label
+     directly above and the card — right for Subsidiary/JV cards sitting
+     just under their own segment label, wrong here where the line needs to
+     travel much further up, all the way to the shareholder tier at the
+     very top of the diagram). renderGroupStructureTrunk draws that longer
+     connector itself, measured, the same way it already draws VCB's own
+     trunk — just dashed instead of solid, and forking off the shared
+     vertical line the same way Subsidiaries/Joint Ventures already fork
+     off VCB's own trunk, not as an isolated line with no visible branch
+     point. */
+  function groupFamilyCompanyCardHtml(company) {
+    return '<div class="group-family-slot" data-group-family-slot>' +
+      '<div class="group-family-hover" tabindex="0">' +
+        '<div class="group-family-btn">' +
+          '<span class="group-entity-icon">' + icon('building') + '</span>' +
+          '<span class="org-team-label">' + esc(t(company.label)) + '</span>' +
+        '</div>' +
+        (company.sub ? '<div class="group-family-tooltip">' +
+          '<span class="group-entity-sub">' + esc(t(company.sub)) + '</span>' +
+        '</div>' : '') +
+      '</div>' +
+    '</div>';
+  }
+  function renderGroupStructureHtml(gs, subheading) {
+    var familyCompanies = gs.familyCompanies || [];
+    return '<div class="org-view-panel-wrap" data-org-view-panel="group">' +
+      (subheading ? '<div class="subheading">' + esc(t(subheading)) + '</div>' : '') +
+      '<div class="org-chart group-structure" data-org-chart>' +
+        /* group-structure-frame draws the visible border around Vichitbhan
+           + Subsidiaries + Joint Ventures together — the group name sits
+           just inside that frame, at the top, so the whole enclosed tree
+           reads as "this is Vichitbhan Group" rather than the label only
+           applying to the Vichitbhan card directly beneath it. */
+        '<div class="group-structure-frame">' +
+          (gs.groupName ? '<div class="group-name-label">' + esc(t(gs.groupName)) + '</div>' : '') +
+          renderShareholderTierHtml(gs.shareholders) +
+          '<div class="org-tree group-structure-tree">' +
+            /* Family-owned sibling companies (VPO, Chavananand Holding —
+               see content.html) sit in this SAME top row as VCB, each
+               wrapped in its own stem (group-stem-item, same mechanism
+               Subsidiary/JV cards use elsewhere in this view) carrying a
+               DASHED connector (.group-family-stem, styles.html) up to
+               the shareholder tier — deliberately different from VCB's
+               own solid .org-tree-trunk below, so "commonly owned by the
+               family but otherwise unrelated to VCB" reads directly from
+               the line style, not just from position. A small caption on
+               each stem spells it out further. Nothing branches beneath
+               these two — only VCB's own card continues down into
+               Subsidiaries/Joint Ventures. VCB renders centered in this
+               row (source order: family companies split evenly before/
+               after it) so it reads as the anchor the row is built
+               around, not just one of three in a plain left-to-right
+               list. */
+            '<div class="org-tree-top group-structure-top">' +
+              (familyCompanies.length > 1 ? groupFamilyCompanyCardHtml(familyCompanies[0]) : '') +
+              /* VCB wrapped in the SAME .group-family-slot shape as its two
+                 siblings — with no caption on any of the three now (see
+                 groupFamilyCompanyCardHtml), all three slots are just a
+                 lone card each, so align-items:stretch on the row (see
+                 .group-structure-top, styles.html) already equalizes all
+                 three card heights directly with nothing extra needed. */
+              '<div class="group-family-slot group-family-slot-parent">' +
+                '<div class="group-entity-card group-entity-parent">' +
+                  '<div class="group-entity-icon">' + icon('building') + '</div>' +
+                  '<div class="group-entity-body">' +
+                    '<span class="group-entity-label">' + esc(t(gs.parent.label)) + '</span>' +
+                    (gs.parent.sub ? '<span class="group-entity-sub">' + esc(t(gs.parent.sub)) + '</span>' : '') +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              (familyCompanies.length > 0 ? groupFamilyCompanyCardHtml(familyCompanies[familyCompanies.length > 1 ? 1 : 0]) : '') +
+            '</div>' +
+            '<div class="org-tree-trunk"></div>' +
+            '<div class="org-tree-branches group-structure-branches">' +
+              '<div class="org-segment org-segment-departments">' +
+                '<div class="org-segment-label">' + esc(t('Subsidiaries')) + '</div>' +
+                '<div class="group-entity-row">' +
+                  gs.subsidiaries.map(function (s) { return groupStemHtml(groupEntityCardHtml(s, 'building'), 'Subsidiary'); }).join('') +
+                '</div>' +
+              '</div>' +
+              '<div class="org-segment org-segment-pm">' +
+                '<div class="org-segment-label">' + esc(t('Joint Ventures')) + '</div>' +
+                '<div class="group-jv-row">' +
+                  gs.jvs.map(function (jv) { return groupStemHtml(groupJvCardHtml(jv), 'Joint Venture'); }).join('') +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function crumbLabel(page) {
+    return t(PAGE_TITLES[page] || page);
+  }
+
+  /* Multi-up image carousel — shows up to 3 slides at once side by side
+     (CAROUSEL_VISIBLE_COUNT), advancing the visible window one slide at a
+     time rather than swapping one full-bleed image for the next. A single
+     very wide/long image reads oddly on its own, and Track Record (the
+     only current caller) has several separate jobsite shots that read
+     better side by side than one-at-a-time. Renders as a plain static
+     strip with no arrows/dots when there are <= CAROUSEL_VISIBLE_COUNT
+     slides — nothing to advance to. */
+  var CAROUSEL_VISIBLE_COUNT = 3;
+  function renderCarousel(slides, idBase) {
+    slides = slides || [];
+    if (!slides.length) return '';
+    var slidesHtml = slides.map(function (s, i) {
+      return '<div class="carousel-slide" data-index="' + i + '">' +
+        '<img src="' + s.image + '" alt="' + esc(t(s.caption || '')) + '" loading="lazy">' +
+        (s.caption ? '<div class="carousel-caption">' + esc(t(s.caption)) + '</div>' : '') +
+      '</div>';
+    }).join('');
+    if (slides.length <= CAROUSEL_VISIBLE_COUNT) {
+      return '<div class="carousel carousel-static" style="--carousel-visible:' + slides.length + '">' +
+        '<div class="carousel-track">' + slidesHtml + '</div>' +
+      '</div>';
+    }
+    var carouselId = 'carousel-' + idBase;
+    /* The leading CAROUSEL_VISIBLE_COUNT slides are cloned and appended
+       after the real ones — a "train" loop (see initCarousels): the track
+       only ever advances forward, and once it scrolls past the real last
+       slide into these clones, it snaps invisibly back to the matching
+       real position so it can keep advancing forever without ever
+       reversing or leaving a gap. data-clone marks them so initCarousels
+       can tell a clone from a real slide. */
+    var cloneSlidesHtml = slides.slice(0, CAROUSEL_VISIBLE_COUNT).map(function (s, i) {
+      return '<div class="carousel-slide" data-index="' + i + '" data-clone="1">' +
+        '<img src="' + s.image + '" alt="' + esc(t(s.caption || '')) + '" loading="lazy">' +
+        (s.caption ? '<div class="carousel-caption">' + esc(t(s.caption)) + '</div>' : '') +
+      '</div>';
+    }).join('');
+    return '<div class="carousel" id="' + carouselId + '" data-carousel style="--carousel-visible:' + CAROUSEL_VISIBLE_COUNT + '">' +
+      '<div class="carousel-viewport"><div class="carousel-track">' + slidesHtml + cloneSlidesHtml + '</div></div>' +
+      '<button type="button" class="carousel-arrow next" data-carousel-next aria-label="Next slide">' + icon('chevronRight') + '</button>' +
+    '</div>';
+  }
+
+  var CAROUSEL_INTERVAL_MS = 5000;
+  /* One-directional "train" loop: the track only ever moves left (never
+     back), one slide-width per step. After the real slides comes a set of
+     cloned leading slides (see renderCarousel) — once the visible window
+     scrolls into that cloned region, the carousel waits for the CSS
+     transition to finish, then jumps (transition disabled for one frame)
+     back to the equivalent real position, so it can keep going forward
+     indefinitely with the "first picture becomes the last" train effect
+     and no visible seam. */
+  function initCarousels(container) {
+    container.querySelectorAll('[data-carousel]').forEach(function (el) {
+      if (el.dataset.wired) return;
+      el.dataset.wired = '1';
+      var track = el.querySelector('.carousel-track');
+      var realCount = el.querySelectorAll('.carousel-slide:not([data-clone])').length;
+      var visible = parseInt(getComputedStyle(el).getPropertyValue('--carousel-visible'), 10) || 3;
+      var current = 0; // can run past realCount into the cloned region
+      var timer = null;
+
+      function render(withTransition) {
+        track.style.transition = withTransition ? '' : 'none';
+        track.style.transform = 'translateX(-' + (current * (100 / visible)) + '%)';
+        if (!withTransition) track.offsetHeight; // force reflow so the no-transition jump actually applies before re-enabling it
+      }
+      function next() {
+        current++;
+        render(true);
+        if (current >= realCount) {
+          track.addEventListener('transitionend', function snapBack() {
+            track.removeEventListener('transitionend', snapBack);
+            current -= realCount;
+            render(false);
+          }, { once: true });
+        }
+      }
+      function stopAuto() { if (timer) clearInterval(timer); timer = null; }
+      function startAuto() {
+        stopAuto();
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        timer = setInterval(next, CAROUSEL_INTERVAL_MS);
+      }
+
+      el.querySelector('[data-carousel-next]').addEventListener('click', function () { next(); startAuto(); });
+      el.addEventListener('mouseenter', stopAuto);
+      el.addEventListener('mouseleave', startAuto);
+      render(false);
+      startAuto();
+    });
+  }
+
+  /* Org chart (Meet Our Team): gradual inline drill-down.
+     - Clicking a team's button toggles a .open class on its .org-team,
+       which animates .org-team-people's max-height from 0 to a generously
+       large fixed ceiling (see setExpanded below) so the people list slides
+       open smoothly beneath that exact button, without affecting any other
+       team's position.
+     - Clicking a person within an open team's list toggles .open on that
+       .org-person, animating .org-person-role the same way to reveal their
+       role text inline beneath their name.
+     - The instant any person is opened, .org-chart gets a "focused" class
+       which fades out every other team via CSS — the back button (shown
+       only while focused) clears both states to return to the full row. */
+  function initOrgChart(container) {
+    container.querySelectorAll('[data-org-chart]').forEach(function (chart) {
+      if (chart.dataset.wired) return;
+      chart.dataset.wired = '1';
+      var backBtn = chart.querySelector('[data-org-back]');
+
+      /* Opening/closing a team or person reflows this chart's own rows —
+         .focused hides siblings instantly (position: absolute, no
+         transition, see .org-chart.focused .org-team:not(.open) in
+         styles.html) while .org-team-people/.org-person-role animate their
+         max-height over .35s/.3s. renderOrgConnectors previously only ran on
+         initial page render, view-toggle switch, and window resize — never
+         on expand/collapse — so the elbow bars/drops stayed frozen at
+         whatever geometry existed at the last of those events, going stale
+         the moment a click changed which cards were visible or where they
+         sat. Redraw once immediately (catches the instant .focused reflow)
+         and once more after the longer transition finishes (catches the
+         height-animated panel settling into its final size). */
+      function refreshConnectors() {
+        renderOrgConnectors(chart);
+        setTimeout(function () { renderOrgConnectors(chart); }, 380);
+      }
+
+      /* max-height can't transition to/from "none"/"auto", so this animates
+         to a generously large fixed value instead of the panel's exact
+         measured height — safe because the panel is overflow:hidden either
+         way, so an oversized ceiling never clips anything or adds blank
+         space; the box's real rendered height still comes from its content.
+         That avoids having to re-measure a team's own panel every time a
+         nested person's role panel changes size inside it. 3000px comfortably
+         covers Leadership's own nested 4-level hierarchy, the tallest node. */
+      function setExpanded(panel, open) {
+        panel.style.maxHeight = open ? '3000px' : '0px';
+      }
+
+      /* aria-expanded lives on the trigger button, not the panel/container
+         it controls — kept in sync here rather than only via CSS classes,
+         so a screen reader announces open/closed state the same way the
+         chevron already communicates it visually. Additive only: doesn't
+         change any layout/positioning behavior above it. */
+      function closeTeam(team) {
+        team.classList.remove('open');
+        setExpanded(team.querySelector('.org-team-people'), false);
+        var teamBtn = team.querySelector('.org-team-btn');
+        if (teamBtn) teamBtn.setAttribute('aria-expanded', 'false');
+        team.querySelectorAll('.org-person.open').forEach(function (p) {
+          p.classList.remove('open');
+          setExpanded(p.querySelector('.org-person-role'), false);
+          var pBtn = p.querySelector('.org-person-btn');
+          if (pBtn) pBtn.setAttribute('aria-expanded', 'false');
+        });
+      }
+      function openTeam(team) {
+        team.classList.add('open');
+        setExpanded(team.querySelector('.org-team-people'), true);
+        var teamBtn = team.querySelector('.org-team-btn');
+        if (teamBtn) teamBtn.setAttribute('aria-expanded', 'true');
+      }
+
+      chart.querySelectorAll('.org-team').forEach(function (team) {
+        var btn = team.querySelector('.org-team-btn');
+        /* .org-leadership (see orgLeadershipNodeHtml) no longer has its own
+           .org-team-btn — it moved to matching Head Office/Project Sites'
+           shape exactly: a persistent .org-segment-label-btn header
+           OUTSIDE the .org-team, wired below via [data-org-expand-all],
+           with .org-leadership itself only providing the .org-team/
+           .org-team-people pair that openTeam/closeTeam operate on. Every
+           other .org-team still has its own clickable .org-team-btn and
+           keeps this per-team listener as before. */
+        if (!btn) return;
+        /* Asset Management's two branches (Inventory & Land Assets, Sai-5
+           Maintenance Unit — see .org-dept-fork-branches/orgTeamBranchesNodeHtml,
+           app.html) are meant to be independently open at once, not
+           one-at-a-time like every other nested .org-team pair (e.g.
+           Project Managers' individual projects) — explicit request: show
+           both branches, don't collapse one when the other opens. */
+        var isDeptBranch = team.classList.contains('org-dept-branch');
+        btn.addEventListener('click', function () {
+          var wasOpen = team.classList.contains('open');
+          /* Only one team open at a time PER LEVEL — scoped to this team's
+             own siblings (the .org-team-people panel it lives directly
+             inside), not chart-wide. Project Managers nests a second level
+             of .org-team (one per project, see orgProjectNodeHtml): without
+             this scoping, opening a project would also match-and-close the
+             Project Managers node itself via a chart-wide query, since it's
+             ALSO a still-open .org-team — collapsing the very panel the
+             project lives in the instant you opened it. Skipped entirely
+             for .org-dept-branch (see isDeptBranch above). */
+          if (!isDeptBranch) {
+            var siblingScope = team.parentElement; // the .org-team-people-inner (or org-project-row) wrapper
+            siblingScope.querySelectorAll(':scope > .org-team.open').forEach(closeTeam);
+          }
+          if (wasOpen) {
+            if (!isDeptBranch) chart.classList.remove('focused');
+            closeTeam(team);
+            refreshConnectors();
+            return;
+          }
+          openTeam(team);
+          /* .focused is what actually hides this team's sibling tiles (see
+             .org-chart.focused .org-team:not(.open) in styles.html) — until
+             now it was only ever set when opening a PERSON inside a team
+             (below), so opening a team on its own (e.g. clicking "Project A"
+             without drilling into a person) left every other project tile
+             sitting there instead of narrowing down to just the one team,
+             same as person-level focus already does. VPO/Chavananand
+             Holding used to need a special-case exclusion here (they were
+             once .org-team elements sharing this same click handler) — no
+             longer applies since they moved to a plain hover tooltip (see
+             groupFamilyCompanyCardHtml) and never reach this handler at
+             all now. .org-dept-branch is skipped too, for the same reason:
+             narrowing the WHOLE chart's focus to just Sai-5 because someone
+             opened it would hide every OTHER Head Office department, an
+             unrelated side effect of a click that only concerns Asset
+             Management's own two branches. */
+          if (!isDeptBranch) chart.classList.add('focused');
+          refreshConnectors();
+        });
+      });
+
+      /* Wired once per PERSON chart-wide, not once per team the way the
+         loop above used to also do via team.querySelectorAll('.org-person').
+         Project Managers nests .org-team inside .org-team (each project
+         lives inside the Project Managers root) — with the old
+         per-team approach a project's people got matched twice: once from
+         the project team's own iteration, once again from the outer
+         Project Managers team's iteration (querySelectorAll descends
+         through nested .org-team boundaries too), attaching two click
+         listeners that toggled the same person open then immediately
+         closed again on a single click. A single chart-wide query avoids
+         that duplicate attachment entirely. */
+      chart.querySelectorAll('.org-person').forEach(function (person) {
+        var personBtn = person.querySelector('.org-person-btn');
+        var rolePanel = person.querySelector('.org-person-role');
+        if (!rolePanel) return;
+        personBtn.addEventListener('click', function () {
+          var open = !person.classList.contains('open');
+          person.classList.toggle('open', open);
+          setExpanded(rolePanel, open);
+          personBtn.setAttribute('aria-expanded', String(open));
+          if (open) chart.classList.add('focused');
+          refreshConnectors();
+        });
+      });
+
+      /* "Head Office" (or any other [data-org-expand-all] label) is an
+         expand-ALL shortcut layered on top of the normal one-team-at-a-time
+         toggle above — clicking it opens every .org-team within its own
+         [data-org-expand-group] container at once (bypassing the "opening
+         one closes the others" rule those buttons enforce individually),
+         and clicking it again closes all of them. Individual department
+         buttons keep working exactly as before either way. */
+      chart.querySelectorAll('[data-org-expand-all]').forEach(function (expandBtn) {
+        var group = expandBtn.closest('[data-org-expand-group]');
+        if (!group) return;
+        var teams = group.querySelectorAll('.org-team');
+        expandBtn.addEventListener('click', function () {
+          var allOpen = Array.prototype.every.call(teams, function (t) { return t.classList.contains('open'); });
+          teams.forEach(function (t) { allOpen ? closeTeam(t) : openTeam(t); });
+          expandBtn.classList.toggle('is-expanded', !allOpen);
+          expandBtn.setAttribute('aria-expanded', String(!allOpen));
+          if (allOpen) chart.classList.remove('focused');
+          refreshConnectors();
+        });
+      });
+
+      if (backBtn) {
+        backBtn.addEventListener('click', function () {
+          chart.classList.remove('focused');
+          chart.querySelectorAll('.org-team.open').forEach(closeTeam);
+          refreshConnectors();
+        });
+      }
+
+      /* Org Chart (Leadership/Department Heads/Project Managers) starts
+         fully expanded by default — every .org-team already open, no click
+         needed to see who's in each team — per explicit request so
+         employees see the whole org at a glance rather than having to
+         click through each one. Scoped to the plain .org-chart container,
+         NOT .group-structure (same [data-org-chart] wiring, different
+         container — see renderGroupStructureHtml/renderOrgChartHtml,
+         above): Group Structure's JV click-cards and the family-company
+         hover tooltips are deliberately left click/hover-only, unchanged.
+         Opens every level (including nested project teams under Project
+         Managers) but deliberately does NOT set .focused — that class
+         narrows the view down to ONE selection by fading every sibling
+         out, the opposite of "show everything at once." openTeam() alone
+         (no chart.classList.add('focused')) shows every team's people
+         panel with all siblings still visible, exactly the "fully
+         expanded" state asked for. The existing click handlers above are
+         untouched, so any team can still be manually collapsed afterward
+         (closeTeam removes .open and un-focuses if needed) — this only
+         changes the STARTING state, not the interaction. */
+      if (!chart.classList.contains('group-structure')) {
+        chart.querySelectorAll('.org-team').forEach(openTeam);
+        /* Also mark every [data-org-expand-all] button (Leadership/Head
+           Office/Project Sites' own segment-label chevrons) as
+           .is-expanded to match — without this, the teams underneath were
+           correctly open but their segment header's chevron still pointed
+           "collapsed," since that class is normally only set by the
+           button's own click handler, which never fires on this
+           programmatic initial-expand path. */
+        chart.querySelectorAll('[data-org-expand-all]').forEach(function (expandBtn) {
+          expandBtn.classList.add('is-expanded');
+          expandBtn.setAttribute('aria-expanded', 'true');
+        });
+        refreshConnectors();
+      }
+    });
+  }
+
+  /* Draws an explicit right-angle elbow connector — a horizontal branch
+     bar plus one short vertical drop per card — between a row and the
+     cards inside it (see .org-branch-bar/.org-branch-drop in styles.html).
+     This is deliberately NOT done with CSS alone: earlier attempts relied
+     on every card's own independent stem lining up with a separately-drawn
+     horizontal bar by pure coordinate math, which kept coming out subtly
+     wrong in ways automated screenshots didn't catch — an explicit
+     measured bar spanning the ACTUAL leftmost-to-rightmost card, with
+     drops at each ACTUAL card center, can't drift out of sync with what's
+     rendered because it's built from the same rendered positions every
+     time. Safe to call repeatedly (clears its own previously-drawn
+     elements first).
+     Handles TWO different row shapes with the same logic: .org-team-row
+     (Head Office/Project Sites — never wraps, cards scroll horizontally
+     instead, see styles.html) and .group-entity-row/.group-jv-row (Group
+     Structure's Subsidiaries/Joint Ventures — .group-jv-row is a CSS grid
+     that DOES intentionally wrap to a 2x2 block for 4 JV cards, "a clean
+     2x2 instead of the 4th wrapping alone"). Cards are grouped by rounded
+     offsetTop (same top = same visual line, works whether there's 1 line
+     or several); each line after the first gets its own bar+drops
+     connecting it back to the ROW's overall horizontal center at that
+     line's own y — so a 2x2 grid gets two independent elbows, one per row
+     of 2, rather than assuming everything sits on one line the way a
+     single central drop + single top-anchored bar did before (which left
+     the outer cards in a row with nothing reaching them, and any second
+     line completely disconnected). */
+  function renderOrgConnectors(container) {
+    /* .group-structure-branches (Subsidiaries + Joint Ventures side by
+       side — see renderGroupStructureHtml above) is included here too:
+       its two .org-segment panels need the exact same "trunk forks into
+       a bar, bar drops into each child's own top" treatment as a row of
+       team cards gets, just with .org-segment as the "card" instead of
+       .org-team/.group-stem-item. Its own .org-tree-branches::before
+       (a single fixed center drop, correct for the org chart's single-
+       column Head Office/Project Sites stack) is disabled in styles.html
+       specifically because two side-by-side panels need a real two-way
+       fork instead, which only this measured JS version can produce. */
+    var rows = container.querySelectorAll('.org-team-row, .group-entity-row, .group-jv-row, .group-structure-branches');
+    rows.forEach(function (row) {
+      row.querySelectorAll('.org-branch-bar, .org-branch-drop').forEach(function (el) { el.remove(); });
+      var cardSelector = row.classList.contains('org-team-row') ? '.org-team' :
+        row.classList.contains('group-structure-branches') ? '.org-segment' : '.group-stem-item';
+      /* .org-chart.focused .org-team:not(.open) (see styles.html) hides
+         every sibling but the focused card via opacity:0 + pointer-events:
+         none + position:absolute — no display:none and no visibility:
+         hidden, so it stays in normal offsetWidth/offsetHeight/offsetParent
+         terms indistinguishable from a normally laid-out card; only its
+         opacity is 0. It's still a DOM child matching cardSelector, just no
+         longer visibly part of the row. Without excluding it here, its
+         (now-absolute, but still non-zero) offsetLeft/offsetTop kept
+         feeding into the bar's min/max span and got its own drop drawn —
+         the exact "branches to nothing visible" artifact reported: a wide
+         bar and extra drop lines reaching toward cards that aren't shown.
+         No generic geometry check (offsetParent, dimensions, visibility)
+         catches this, so test the same condition the CSS selector itself
+         encodes: this card's own chart is .focused and this card isn't
+         .open. */
+      var rowChart = row.closest('.org-chart');
+      var cards = Array.prototype.slice.call(row.children).filter(function (el) {
+        if (!el.matches(cardSelector)) return false;
+        if (rowChart && rowChart.classList.contains('focused') && el.matches('.org-team') && !el.classList.contains('open')) return false;
+        return true;
+      });
+      if (!cards.length) return;
+      var rowCenterX = row.clientWidth / 2;
+      /* Subsidiaries/Joint Ventures (.group-entity-row/.group-jv-row only —
+         not the org chart's own .org-team-row) also need a lead-in drop
+         from their SEGMENT's own top edge down to this row's top, matching
+         Head Office/Project Sites' .org-segment::before (see styles.html).
+         That CSS version is deliberately NOT reused here: it centers on
+         .org-segment's own box (left:50%), while this row's bar centers on
+         row.clientWidth/2 — the row sits inset by .org-segment's own
+         padding (24px 20px), so in principle both resolve to the same
+         absolute x today, but that's two independently-computed centers
+         happening to agree rather than one guaranteed to. Drawing this
+         drop AS PART of the same measured pass, at the row's own
+         rowCenterX, makes it impossible for the two to drift apart the way
+         the previously-reported kink (a bend right where the segment's
+         label ends and the row's own connector picks up) showed they
+         could. See the matching `.group-structure-frame .org-segment::before
+         { content: none }` override in styles.html that turns off the old
+         CSS version for exactly these two row types so this doesn't double
+         up with it. */
+      /* A previous version tagged every connector inside
+         .group-structure-frame's Subsidiaries/Joint Ventures branches with
+         an extra .group-scope-line class, rendering VCB's own branch in
+         accent blue with a glow to distinguish it from VPO/Chavananand
+         Holding's muted lines — explicitly reverted per direct feedback
+         ("some lines are darker and bolder than the others... use the
+         same code for the lines"). Every connector in this tree now uses
+         the exact same base .org-branch-bar/.org-branch-drop style
+         (styles.html) regardless of which part of the tree it's in — no
+         scope-based class needed here anymore. */
+      if (row.classList.contains('group-entity-row') || row.classList.contains('group-jv-row')) {
+        var leadIn = document.createElement('div');
+        leadIn.className = 'org-branch-drop';
+        leadIn.style.left = (rowCenterX - 1) + 'px';
+        leadIn.style.top = (-row.offsetTop) + 'px';
+        leadIn.style.width = '2px';
+        leadIn.style.height = Math.max(row.offsetTop, 2) + 'px';
+        row.appendChild(leadIn);
+      }
+      var lines = {};
+      cards.forEach(function (c) {
+        var top = Math.round(c.offsetTop);
+        (lines[top] = lines[top] || []).push(c);
+      });
+      var tops = Object.keys(lines).map(Number).sort(function (a, b) { return a - b; });
+      var prevBarY = null;
+      tops.forEach(function (top, lineIndex) {
+        var lineCards = lines[top];
+        var centers = lineCards.map(function (c) { return c.offsetLeft + c.offsetWidth / 2; });
+        /* barY is where THIS line's horizontal bar sits — the first line's
+           bar belongs at the row's own top (y:0, matching the row's own
+           padding-top, which is exactly where the segment-level drop above
+           the row ends — see .org-segment::before in styles.html), NOT at
+           that line's own offsetTop the way every later wrapped line's bar
+           correctly does. Using the card's own offsetTop for line 1's bar
+           collapsed this to 0 height (bar sitting flush against the card,
+           nothing visible above it) — the actual bug reported: card tops
+           lost their connector, line ran "behind" the panel top instead of
+           stopping visibly above it. */
+        var barY = lineIndex === 0 ? 0 : top;
+        /* Each wrapped line's bar was floating independently — correct on
+           its own, but with nothing joining it to the line above, multiple
+           wrapped lines (e.g. Project Sites' cards wrapping once opened
+           panels no longer fit one row, see .org-segment-pm .org-team-row
+           in styles.html) read as disconnected segments instead of one
+           continuous tree. Both this and the previous line's bar already
+           share the same x (rowCenterX is always included in their min/max
+           span, see barLeft/barRight below), so a single vertical trunk
+           segment from the previous bar's y down to this one's, at that
+           shared x, is all that's needed to visually join them. */
+        if (lineIndex > 0 && prevBarY !== null) {
+          var trunk = document.createElement('div');
+          trunk.className = 'org-branch-drop';
+          trunk.style.left = (rowCenterX - 1) + 'px';
+          trunk.style.top = prevBarY + 'px';
+          trunk.style.width = '2px';
+          trunk.style.height = Math.max(barY - prevBarY, 2) + 'px';
+          row.appendChild(trunk);
+        }
+        prevBarY = barY;
+        if (lineCards.length > 1 || tops.length > 1) {
+          var barLeft = Math.min.apply(null, centers.concat([rowCenterX]));
+          var barRight = Math.max.apply(null, centers.concat([rowCenterX]));
+          var bar = document.createElement('div');
+          bar.className = 'org-branch-bar';
+          bar.style.left = barLeft + 'px';
+          bar.style.top = barY + 'px';
+          bar.style.width = Math.max(barRight - barLeft, 2) + 'px';
+          bar.style.height = '2px';
+          row.appendChild(bar);
+        }
+        lineCards.forEach(function (c, i) {
+          var drop = document.createElement('div');
+          drop.className = 'org-branch-drop';
+          drop.style.left = (centers[i] - 1) + 'px';
+          drop.style.top = barY + 'px';
+          drop.style.width = '2px';
+          drop.style.height = Math.max(c.offsetTop - barY, 2) + 'px';
+          row.appendChild(drop);
+        });
+      });
+    });
+    renderGroupStructureTrunk(container);
+    renderDeptBranchFork(container);
+  }
+
+  /* Asset Management's own local two-way fork — its label sits above two
+     REAL sibling .org-team cards (Inventory & Land Assets, Sai-5
+     Maintenance Unit — see orgTeamBranchesNodeHtml/.org-dept-fork,
+     app.html), joined by a measured drop-bar-drops run scoped to just
+     THIS card's own box (position:relative on .org-dept-fork), same
+     "real DOM, not CSS" technique as every other fork in this app
+     (renderOrgConnectors' row bars, renderGroupStructureTrunk). A plain
+     CSS ::before per branch (each independently centered on its own
+     card) was NOT used here for the same reason it's never used for any
+     other fork in this tree: two independently-computed centers can
+     drift apart the moment either branch's card width changes (e.g.
+     Sai-5's longer name wrapping, or the row narrowing) — a single
+     measured bar spanning both branches' ACTUAL centers can't drift out
+     of sync with what's actually rendered. Wiped and redrawn on every
+     call, same as every other connector here, so it never goes stale
+     across expand/collapse or resize. */
+  function renderDeptBranchFork(container) {
+    container.querySelectorAll('.org-dept-fork').forEach(function (fork) {
+      var branchesRow = fork.querySelector('.org-dept-fork-branches');
+      if (!branchesRow) return;
+      branchesRow.querySelectorAll(':scope > .org-branch-bar, :scope > .org-branch-drop').forEach(function (el) { el.remove(); });
+      /* A branch with its own physical `location` (see b.location,
+         content.html) renders wrapped in an extra .org-dept-branch-site
+         box (app.html, orgTeamBranchesNodeHtml) rather than sitting
+         directly under .org-dept-fork-branches — ":scope > .org-team"
+         alone stopped matching it once that wrapper existed. querySelectorAll
+         on '.org-team' (any depth) plus filtering to depth-1-or-2
+         (":scope > .org-team, :scope > .org-dept-branch-site > .org-team")
+         finds both shapes; the fork bar/drop math below still measures
+         each CARD's own position (not its wrapper's), so the connector
+         lands on the actual card regardless of which shape it's in. */
+      var branches = branchesRow.querySelectorAll(':scope > .org-team, :scope > .org-dept-branch-site > .org-team');
+      /* Same zoom-correction as renderGroupStructureTrunk (below) — see
+         its own comment for the full explanation. getBoundingClientRect()
+         returns real screen pixels (post-zoom), but style.left/top/width/
+         height on an element living inside the zoomed .org-chart get
+         zoomed AGAIN by the browser, so every value derived from a rect
+         must be divided by the zoom factor before being written back. */
+      var zoom = parseFloat(getComputedStyle(fork.closest('.org-chart') || fork).zoom) || 1;
+      /* Asset Management is a normal collapsible .org-team now (see
+         orgTeamBranchesNodeHtml's own comment for why) — .org-dept-fork-branches
+         only has real, non-zero geometry while its ancestor .org-team-people
+         panel is open (collapsed, everything inside reports 0-height).
+         Calling this while collapsed just draws nothing, same "harmless
+         no-op, redrawn correctly next time something relevant changes" as
+         every other connector function in this file — no separate guard
+         needed beyond the branches.length check below, since a collapsed
+         row's own getBoundingClientRect() naturally yields a degenerate
+         (but not crashing) result. */
+      if (branches.length < 2) return;
+      /* Anchored to branchesRow's own coordinate space (position:relative,
+         see styles.html) rather than the whole .org-dept-fork card — the
+         row IS the panel content, already inset by the card's own
+         padding, so there's no separate label-padding measurement to get
+         wrong here the way an earlier version (when Asset Management was
+         a plain always-open label outside its own team-people panel) had
+         to work around. topY = 0 (the row's OWN top edge, i.e. the actual
+         padding-box top) rather than reading the row's computed
+         padding-top and trusting that value to match where the branch
+         cards visually start — measured directly, a branch's real
+         offsetTop was consistently a couple px LESS than its own
+         padding-top's nominal value (border-box/line-height rounding,
+         not a padding mismatch), which silently collapsed every drop to
+         its 2px minimum. Real measured child positions relative to the
+         row's own top edge are what stay correct; a CSS property value
+         assumed to equal that isn't guaranteed to. */
+      var rowRect = branchesRow.getBoundingClientRect();
+      var topY = 0;
+      var branchPoints = Array.prototype.map.call(branches, function (b) {
+        var r = b.getBoundingClientRect();
+        return { centerX: r.left + r.width / 2 - rowRect.left, top: r.top - rowRect.top };
+      });
+      var xs = branchPoints.map(function (p) { return p.centerX; });
+      var barLeft = Math.min.apply(null, xs);
+      var barRight = Math.max.apply(null, xs);
+      var bar = document.createElement('div');
+      bar.className = 'org-branch-bar';
+      bar.style.left = (barLeft / zoom) + 'px';
+      bar.style.top = (topY / zoom) + 'px';
+      bar.style.width = Math.max((barRight - barLeft) / zoom, 2) + 'px';
+      bar.style.height = '2px';
+      branchesRow.appendChild(bar);
+      branchPoints.forEach(function (p) {
+        var drop = document.createElement('div');
+        drop.className = 'org-branch-drop';
+        drop.style.left = ((p.centerX - 1) / zoom) + 'px';
+        drop.style.top = (topY / zoom) + 'px';
+        drop.style.width = '2px';
+        drop.style.height = Math.max((p.top - topY) / zoom, 2) + 'px';
+        branchesRow.appendChild(drop);
+      });
+    });
+  }
+
+  /* The shareholder-tier-to-Vichitbhan-to-branches run in Group Structure
+     (see renderGroupStructureHtml above) used to be assembled from up to 4
+     separately positioned pieces: two CSS stub elements
+     (.group-shareholder-connector, .org-tree-trunk, each independently
+     centered/rounded by the browser) plus the JS fork/lead-in drops this
+     function draws elsewhere. Every individual piece measured "correct" in
+     isolation, but 3-4 independent sub-pixel roundings stacked along one
+     visually continuous run is exactly what read as a rigid, kinked line —
+     several short segments lined up to LOOK like one, not actually one.
+     This draws that entire run as a SINGLE absolutely positioned element,
+     measured once in .group-structure-frame's own coordinate space, so
+     there is nothing left for two pieces to disagree about. Only handles
+     the trunk ABOVE the branches fork (shareholders -> Vichitbhan ->
+     branches) — the fork itself (branches splitting into Subsidiaries vs
+     Joint Ventures) is a real two-way split and stays as the existing
+     measured bar+drops above; this trunk's own bottom anchor is exactly
+     where that fork's own top (barY 0) already sits, so the two meet with
+     zero gap by construction (one ends exactly where the measured other
+     begins) rather than by two numbers happening to agree. */
+  function renderGroupStructureTrunk(container) {
+    container.querySelectorAll('.group-structure-frame').forEach(function (frame) {
+      /* Removes EVERY previously-drawn connector direct child, not just
+         the first — this frame can hold up to 5 now (one shared
+         horizontal fork bar + VCB's own solid drop + one dashed drop per
+         family-owned sibling company, see below), and querySelector
+         (singular) only ever found/removed ONE of them on each redraw,
+         leaving stale extras (measured against an earlier, incomplete
+         layout pass — e.g. before text had wrapped or fonts had loaded)
+         piled up underneath the freshly-drawn ones instead of being
+         replaced by them. That's what produced a short, disconnected-
+         looking dashed stub in the live app: a leftover first-pass
+         element, not the final correctly-measured one. */
+      frame.querySelectorAll(':scope > .org-branch-drop, :scope > .org-branch-bar').forEach(function (el) { el.remove(); });
+      var branches = frame.querySelector('.group-structure-branches');
+      var parentCard = frame.querySelector('.group-entity-parent');
+      if (!branches || !parentCard) return;
+      /* .org-chart carries a CSS `zoom` (see styles.html, added so the
+         whole Company Structure section fits its available width without
+         a horizontal scrollbar) — getBoundingClientRect() below returns
+         REAL SCREEN pixels (already zoom-adjusted), but the elements this
+         function creates are absolutely positioned INSIDE that same
+         zoomed ancestor, so any style.left/top/width/height value gets
+         zoomed a SECOND time by the browser when it renders them — every
+         connector this function draws was landing at its true position
+         multiplied by the zoom factor again (e.g. a real center of 553px
+         rendering at 553 * 0.66 ≈ 365px), which is exactly the reported
+         "trees are unaligned" bug. renderOrgConnectors' own bars (the
+         Subsidiaries/Joint Ventures fork) never hit this because they use
+         element.clientWidth/offsetTop (already LOCAL, pre-zoom values,
+         not getBoundingClientRect()) throughout — this function mixed
+         the two coordinate systems. Dividing every getBoundingClientRect()-
+         derived measurement by the zoom factor once, up front, converts
+         them all to the same local coordinate space style.* expects. */
+      var zoom = parseFloat(getComputedStyle(frame.closest('.org-chart') || frame).zoom) || 1;
+      var frameRect = frame.getBoundingClientRect();
+      var shareholderConnector = frame.querySelector('.group-shareholder-connector');
+      /* Top anchor: TOP edge of the shareholder connector stub if a
+         shareholder tier is rendered above Vichitbhan (that stub's own top
+         is exactly where the shareholder box's bottom sits — the stub
+         occupies the gap between the two, kept in flow with its
+         background removed, see styles.html, specifically so this trunk
+         can span across it), else Vichitbhan's own top edge (nothing above
+         it to connect from). Anchoring to the stub's BOTTOM instead (an
+         earlier version of this code) started the trunk right next to the
+         card rather than up at the shareholder box, leaving the shareholder
+         box itself with nothing visibly connecting it to anything below. */
+      var topEl = shareholderConnector || parentCard;
+      var topRect = topEl.getBoundingClientRect();
+      var topY = topRect.top - frameRect.top;
+      var branchesRect = branches.getBoundingClientRect();
+      var bottomY = branchesRect.top - frameRect.top;
+      var parentRect = parentCard.getBoundingClientRect();
+      var centerX = parentRect.left + parentRect.width / 2 - frameRect.left;
+
+      /* Family-owned sibling companies (VPO, Chavananand Holding — see
+         groupFamilyCompanyCardHtml) sit in the same row as VCB but need
+         their own fork point, same as Subsidiaries/Joint Ventures already
+         fork off VCB's own trunk further down (see the bar/drop pattern
+         in the main renderOrgConnectors loop above) — a shared horizontal
+         bar at topY spanning every card's own center, with one vertical
+         drop per card down from that bar. Earlier versions of this
+         function drew 3 independent vertical lines from the same topY
+         with NO horizontal bar joining them — each one correct in
+         isolation, but with nothing visually forking them apart from a
+         single point, they read as disconnected parallel lines rather
+         than one tree splitting into three, which is what was reported
+         ("the dotted lines coming down do not have a horizontal path
+         connecting to the family"). Collected into one array first (VCB
+         + each family slot's card) so the bar's own left/right extent is
+         computed from every real card position at once, not guessed. */
+      var forkCards = [{ centerX: centerX, dashed: false, card: parentCard }];
+      frame.querySelectorAll('[data-group-family-slot]').forEach(function (slot) {
+        /* Family slots render as .group-family-hover > .group-family-btn
+           (see groupFamilyCompanyCardHtml) — a plain hover-tooltip pair,
+           NOT .group-entity-card (that class only exists on VCB's own
+           card) and NOT .org-team-btn any more (dropped along with the
+           click-to-expand mechanism these used to share with the rest of
+           the org chart, see groupFamilyCompanyCardHtml's comment).
+           Anchoring to .group-family-btn (always visible, fixed position —
+           the tooltip below it is purely a hover overlay, never changes
+           this element's own layout) means the drop's top point never
+           moves regardless of hover state. */
+        var card = slot.querySelector('.group-family-btn');
+        if (!card) return;
+        var cardRect = card.getBoundingClientRect();
+        forkCards.push({ centerX: cardRect.left + cardRect.width / 2 - frameRect.left, dashed: true, card: card });
+      });
+
+      /* The shared fork bar (Chavananand Family -> VCB/VPO/Holding) uses
+         the same base .org-branch-bar style as every other connector in
+         this tree — a previous version tagged it .group-family-stem-bar
+         and gave VCB's own drop below a separate accent-glow treatment
+         (.group-scope-line) to signal "this is VCB's scope" — reverted
+         per direct feedback that the resulting mismatched line weights
+         read as broken, not intentional ("use the same code for the
+         lines"). Dashed vs solid (see .group-family-connector, styles.html)
+         is now the ONLY visual difference between VPO/Holding's drops and
+         everything else — same color, same weight, both. */
+      if (forkCards.length > 1) {
+        var xs = forkCards.map(function (f) { return f.centerX; });
+        var barLeft = Math.min.apply(null, xs);
+        var barRight = Math.max.apply(null, xs);
+        var bar = document.createElement('div');
+        bar.className = 'org-branch-bar';
+        bar.style.left = (barLeft / zoom) + 'px';
+        bar.style.top = (topY / zoom) + 'px';
+        bar.style.width = Math.max((barRight - barLeft) / zoom, 2) + 'px';
+        bar.style.height = '2px';
+        frame.appendChild(bar);
+      }
+
+      forkCards.forEach(function (f) {
+        var cardRect = f.card.getBoundingClientRect();
+        var cardTopY = cardRect.top - frameRect.top;
+        /* VCB's own drop continues past its card's top, all the way down
+           to the Subsidiaries/Joint Ventures fork below (bottomY) — it's
+           the only one of the three with anything branching further
+           beneath it. VPO/Holding's dashed drops stop at their own card's
+           top; nothing continues under them. */
+        var dropBottom = f.dashed ? cardTopY : bottomY;
+        var drop = document.createElement('div');
+        drop.className = 'org-branch-drop' + (f.dashed ? ' group-family-connector' : '');
+        drop.style.left = ((f.centerX - 1) / zoom) + 'px';
+        drop.style.top = (topY / zoom) + 'px';
+        drop.style.width = '2px';
+        drop.style.height = Math.max((dropBottom - topY) / zoom, 2) + 'px';
+        frame.appendChild(drop);
+      });
+    });
+  }
+
+  /* Org Chart / Group Structure toggle (see the 'orgchart' case in
+     renderSectionContent above) — separate from initOrgChart's
+     [data-org-chart] loop since the group-structure panel has no
+     click-to-expand teams to wire, just a show/hide switch between the two
+     already-rendered panels. Both panels stay in the DOM at all times;
+     toggling only flips which one has .org-view-active (display handled in
+     styles.html), so switching is instant with no re-render or data
+     re-fetch. */
+  function initOrgViewToggle(container) {
+    container.querySelectorAll('.org-view-toggle').forEach(function (toggle) {
+      if (toggle.dataset.wired) return;
+      toggle.dataset.wired = '1';
+      var wrap = toggle.closest('.org-view-toggle-wrap');
+      var panels = wrap && wrap.parentElement ?
+        wrap.parentElement.querySelectorAll('[data-org-view-panel]') : [];
+      toggle.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-org-view]');
+        if (!btn) return;
+        var view = btn.getAttribute('data-org-view');
+        toggle.querySelectorAll('.seg-btn').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+        panels.forEach(function (panel) {
+          panel.classList.toggle('org-view-active', panel.getAttribute('data-org-view-panel') === view);
+        });
+        /* Group Structure's rows (.group-entity-row/.group-jv-row) sit in a
+           panel that's display:none (see [data-org-view-panel] in
+           styles.html) until this toggle switches it in — renderOrgConnectors
+           ran once already on initial page render, but at that point this
+           panel measured clientWidth/offsetTop as 0 for everything inside
+           it (a hidden element's layout box collapses), producing degenerate
+           zero-sized connectors that never got corrected since nothing
+           re-measured them afterward. Re-running now, with the panel
+           actually visible, gives it real geometry to work from.
+           A single synchronous call here was still occasionally stale —
+           reported directly ("the trees are unaligned... from when we
+           expanded the ones for the organizational chart"): after the Org
+           Chart's own zoom/full-width breakout was added, this panel's
+           display:none -> block switch didn't always finish reflowing in
+           the exact same synchronous tick this ran in, so a fork bar/drop
+           could get drawn against a layout that was still mid-transition
+           (same class of bug refreshConnectors, above, already guards
+           against for the Org Chart side with its own second delayed
+           pass). Mirrors that same fix here — one immediate call plus one
+           after a short delay to catch whatever the first one might have
+           measured too early. */
+        renderOrgConnectors(wrap.parentElement);
+        setTimeout(function () { renderOrgConnectors(wrap.parentElement); }, 100);
+      });
+    });
+  }
+
+  function renderHero(hero) {
+    if (!hero) return '';
+    var photoStyle = hero.photo ? ' style="--hero-photo:url(\'' + hero.photo + '\')"' : '';
+    var html = '<div class="hero' + (hero.photo ? ' has-photo' : '') + '"' + photoStyle + '>';
+    html += '<div class="hero-inner">';
+    if (hero.eyebrow) html += '<div class="hero-eyebrow">' + esc(t(hero.eyebrow)) + '</div>';
+    html += '<h1>' + esc(t(hero.title)) + '</h1>';
+    if (hero.subtitle) html += '<div class="subtitle">' + esc(t(hero.subtitle)) + '</div>';
+    if (hero.lead) html += '<p class="lead">' + esc(t(hero.lead)) + '</p>';
+    if (hero.note) html += '<div class="note">' + esc(t(hero.note)) + '</div>';
+    if (hero.cta) html += '<a class="cta" href="' + pageUrl(hero.cta.page) + '" data-link="' + hero.cta.page + '">' + esc(t(hero.cta.label)) + '</a>';
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderSection(sec, pageKey, blockIndex) {
+    return renderSectionContent(sec, pageKey, blockIndex);
+  }
+
+  function renderSectionContent(sec, pageKey, blockIndex) {
+    var bandClass = sec.band ? ' band-' + sec.band : '';
+    var centeredClass = sec.centered !== false ? ' centered' : '';
+    var idAttr = sec.sectionId ? ' id="' + esc(sec.sectionId) + '"' : '';
+    var out = '<section' + idAttr + ' class="block' + bandClass + centeredClass + '"><div class="section-inner">';
+    if (sec.eyebrow) out += '<div class="section-eyebrow">' + esc(t(sec.eyebrow)) + '</div>';
+    if (sec.heading) out += '<h2>' + esc(t(sec.heading)) + '</h2>';
+    if (sec.subheading) out += '<div class="subheading">' + esc(t(sec.subheading)) + '</div>';
+
+    switch (sec.type) {
+      case 'text':
+        out += '<div class="section-inner-narrow">';
+        out += nl2p(sec.body);
+        if (sec.bullets) out += ul(sec.bullets);
+        if (sec.footer) out += '<div class="list-footer">' + esc(t(sec.footer)) + '</div>';
+        if (sec.image) out += sec.image;
+        if (sec.link) {
+          if (sec.link.url) {
+            /* Real external URL (e.g. the orientation schedule PDF once
+               matched via matchAndLinkRequiredDocuments in Code.gs) —
+               opens in a new tab, same as a real doc link. */
+            out += '<p><a class="feature-link" href="' + esc(sec.link.url) + '" target="_blank" rel="noopener">' + esc(t(sec.link.label)) + ' &rarr;</a></p>';
+          } else if (sec.link.placeholder) {
+            out += docLink(sec.link.label);
+          } else {
+            out += '<p><a class="feature-link" href="' + pageUrl(sec.link.page) + '" data-link="' + sec.link.page + '">' + esc(t(sec.link.label)) + ' &rarr;</a></p>';
+          }
+        }
+        out += '</div>';
+        /* org chart is genuinely wide content — render it outside the 760px
+           narrow column instead of squashed inside it. */
+        if (sec.orgChart) out += renderOrgChart();
+        break;
+
+      case 'quote':
+        out += '<div class="quote-card">';
+        if (sec.portrait) out += '<img class="quote-portrait" src="' + sec.portrait + '" alt="' + esc(sec.attribution) + '">';
+        out += '<blockquote>&ldquo;' + esc(t(sec.quote)) + '&rdquo;</blockquote>' +
+               '<cite>&mdash; ' + esc(t(sec.attribution)) + '</cite></div>';
+        break;
+
+      case 'values':
+        out += '<div class="values-grid">' + sec.values.map(function (v) {
+          var iconHtml = '<img class="value-icon" src="' + v.icon + '" alt="' + esc(t(v.name)) + '" loading="lazy">';
+          return '<div class="value-card">' + iconHtml + '<h3>' + esc(t(v.name)) + '</h3><p>' + esc(t(v.body)) + '</p>' +
+                 ul(v.bullets) + '<p class="footer-note">' + esc(t(v.footer)) + '</p></div>';
+        }).join('') + '</div>';
+        break;
+
+      case 'trackrecord':
+        out += renderCarousel(sec.slides, pageKey + '-' + blockIndex);
+        break;
+
+      case 'feature':
+        /* image is optional — sections like Company Structure are
+           conceptual (a link to an org chart), not a photo moment, so
+           forcing an image (a portrait headshot stretched into this wide
+           landscape slot looked wrong) isn't always right. Without one,
+           .feature-card.no-image collapses to a single centered column
+           instead of leaving an empty second grid cell. */
+        out += '<div class="feature-card' + (sec.image ? '' : ' no-image') + '">' + (sec.image || '') +
+               '<div class="feature-text"><h3>' + esc(t(sec.title)) + '</h3><p>' + esc(t(sec.body)) + '</p>' +
+               '<a class="feature-link" href="' + pageUrl(sec.link.page) + '" data-link="' + sec.link.page + '">' + esc(t(sec.link.label)) + '</a></div></div>';
+        break;
+
+      case 'featuregrid':
+        out += '<div class="feature-grid" style="--feature-grid-cols:' + sec.features.length + '">' + sec.features.map(function (f) {
+          var media = f.image || (f.icon ? '<div class="feature-tile-icon">' + icon(f.icon) + '</div>' : '');
+          var bodyIdAttr = f.bodyId ? ' id="' + esc(f.bodyId) + '"' : '';
+          var linkHtml = f.link ? '<a class="feature-link" href="' + pageUrl(f.link.page) + '" data-link="' + f.link.page + '">' + esc(t(f.link.label)) + '</a>' : '';
+          return '<div class="feature-tile' + (f.image ? '' : ' no-image') + '">' + media +
+                 '<div class="feature-tile-text"><h3>' + esc(t(f.title)) + '</h3><p' + bodyIdAttr + '>' + esc(t(f.body)) + '</p>' +
+                 linkHtml + '</div></div>';
+        }).join('') + '</div>';
+        if (sec.externalCta) {
+          out += '<div class="external-cta-row">' +
+            '<button type="button" class="external-cta-btn secondary" onclick="openCompletionCertificate()">' +
+              icon('document') + esc(t('Print Completion Form')) +
+            '</button>' +
+            '<a class="external-cta-btn" href="' + sec.externalCta.url + '" target="_top">' +
+              esc(t(sec.externalCta.label)) + icon('chevronRight') +
+            '</a>' +
+          '</div>';
+        }
+        break;
+
+      case 'list':
+        out += '<div class="section-inner-narrow">';
+        if (sec.intro) out += '<p class="list-intro">' + esc(t(sec.intro)) + '</p>';
+        out += ul(sec.items);
+        if (sec.footer) out += '<div class="list-footer">' + esc(t(sec.footer)) + '</div>';
+        out += '</div>';
+        break;
+
+      case 'checklist':
+        /* Senior-only items (sr(...) in content.html) are simply absent from
+           the DOM for a Junior-track employee — not shown-but-disabled — so
+           the progress bar's total and the checklist itself only ever count
+           what that employee actually needs to complete. Each item keeps its
+           ORIGINAL index i for its task id regardless of whether it got
+           filtered out, matching how getPageTaskIds/getPageBlockTaskIds in
+           progress.html compute the same ids — otherwise a Junior's saved
+           checkbox state would silently point at the wrong item if they're
+           later promoted to Senior and the full list renders.
+           Phase pages the employee is allowed to VIEW but hasn't reached
+           yet in order (see isPhasePageUnlocked in progress.html) still
+           render their checklist in full — nothing is hidden — but each
+           checkbox is disabled so tasks can only be ticked off in sequence;
+           performToggle in progress.html enforces the same rule server-side
+           of the click, this is just the initial pre-JS visible state
+           (initChecklists reconfirms/reapplies the same disabled state once
+           progress has actually loaded, so this only matters before that
+           resolves — it doesn't render its own lock explanation banner
+           here, since that would repeat once per checklist block on a page
+           with several; see renderPhaseLockNotice in progress.html for the
+           single page-level banner that explains why). */
+        var pageLocked = pageKey && !isPhasePageUnlocked(pageKey);
+        var visibleItems = sec.items.filter(isItemVisible);
+        out += '<div class="section-inner-narrow checklist-group">';
+        out += '<div class="progress-bar"><div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>' +
+               '<span class="progress-bar-label">0 / ' + visibleItems.length + ' ' + esc(t('complete')) + '</span></div>';
+        out += '<ul class="check-list">' + visibleItems.map(function (item) {
+          var taskId = itemId(item);
+          var isSenior = itemLevel(item) === 'senior';
+          return '<li class="check-item' + (isSenior ? ' senior-task' : '') + (pageLocked ? ' locked' : '') + '"><label>' +
+                 '<input type="checkbox" data-task-id="' + taskId + '" onclick="toggleTask(\'' + taskId + '\', this)"' + (pageLocked ? ' disabled' : '') + '>' +
+                 '<span class="check-item-text">' + esc(t(itemText(item))) +
+                 (isSenior ? ' <span class="senior-badge">' + esc(t('Senior')) + '</span>' : '') +
+                 '</span></label></li>';
+        }).join('') + '</ul>';
+        if (sec.footer) out += '<div class="list-footer">' + esc(t(sec.footer)) + '</div>';
+        out += '</div>';
+        break;
+
+      case 'doclist':
+        if (sec.intro) out += '<p class="doclist-intro">' + esc(t(sec.intro)) + '</p>';
+        out += '<div class="doc-grid">' + sec.docs.map(function (d) {
+          return docCard(d);
+        }).join('') + '</div>';
+        break;
+
+      case 'deptgrid':
+        if (sec.intro) out += '<p class="deptgrid-intro">' + esc(t(sec.intro)) + '</p>';
+        out += '<div class="dept-grid">' + sec.depts.map(function (d, di) {
+          var thumb = '<span class="dept-card-icon" aria-hidden="true">' + icon(d.icon) + '</span>';
+          var descHtml = d.desc ? '<span class="dept-card-desc">' + esc(t(d.desc)) + '</span>' : '';
+          var leadHtml = d.lead ? '<span class="dept-card-lead"><span class="dept-card-lead-label">' + esc(t('Led by')) + '</span>' + esc(t(d.lead)) + '</span>' : '';
+          var focusHtml = d.focus ? '<span class="dept-card-focus"><span class="dept-card-focus-label">' + esc(t('Focus')) + '</span>' + esc(t(d.focus)) + '</span>' : '';
+          var num = '<span class="dept-card-num">' + String(di + 1).padStart(2, '0') + '</span>';
+          return '<a class="dept-card" href="' + pageUrl(d.page) + '" data-link="' + d.page + '" data-dept-id="' + d.deptId + '">' +
+                 num + thumb +
+                 '<span class="dept-card-label">' + esc(t(d.label)) + '</span>' + descHtml +
+                 '<span class="dept-card-meta">' + leadHtml + focusHtml + '</span>' +
+                 '<span class="dept-card-cta">' + esc(t('Choose this department')) + icon('chevronRight') + '</span>' +
+                 '</a>';
+        }).join('') + '</div>';
+        if (sec.footer) out += '<p class="deptgrid-footer">' + esc(t(sec.footer)) + '</p>';
+        break;
+
+      case 'levelpicker':
+        /* Junior/Senior segmented control, same visual language as the
+           existing language/theme toggles in the settings panel (.seg/.seg-
+           btn, see Index.html). data-level (not data-link) so it doesn't get
+           swept up by the generic [data-link] click handler — wired
+           separately in initLevelPicker, called after this HTML lands in
+           the DOM (see renderPage in this file). */
+        var currentLevel = getEmployeeLevel();
+        out += '<div class="section-inner-narrow level-picker" id="level-picker">' +
+          '<p class="level-picker-intro">' + esc(t('Junior tasks cover the core baseline. Senior adds extra tasks on top, marked in amber.')) + '</p>' +
+          '<div class="seg level-picker-seg" id="level-control">' +
+            '<button type="button" data-level="junior" class="seg-btn' + (currentLevel === 'junior' ? ' active' : '') + '">' + esc(t('Junior')) + '</button>' +
+            '<button type="button" data-level="senior" class="seg-btn' + (currentLevel === 'senior' ? ' active' : '') + '">' + esc(t('Senior')) + '</button>' +
+          '</div>' +
+        '</div>';
+        break;
+
+      case 'phaselinks':
+        /* Every phase page is always a real link — an employee can freely
+           browse ahead to Day 61-90 material or back to Day 1-30 without
+           hitting a wall, since Department Selection is already gated on
+           Required Documents before any phase page is reachable at all.
+           Ticking off a phase's own tasks is still sequential though (see
+           isPhasePageUnlocked in progress.html): a phase card is "locked"
+           when it isn't done AND the previous phase isn't done either,
+           which gets its own dimmer/lock-icon treatment so the employee is
+           steered toward the chronological first incomplete phase without
+           being blocked from previewing later ones. "current" (the
+           brightest, most inviting state) is specifically the first
+           not-yet-done phase in order — the one the employee should
+           actually be working on next. */
+        out += '<div class="phase-grid">' + sec.phases.map(function (p) {
+          var done = isPagePhaseComplete(p.page);
+          var unlocked = done || isPhasePageUnlocked(p.page);
+          var stateIcon = done ? icon('check') : (unlocked ? '' : icon('lock'));
+          var stateClass = done ? ' done' : (unlocked ? ' current' : ' locked');
+          return '<a class="phase-card' + stateClass + '" href="' + pageUrl(p.page) + '" data-link="' + p.page + '">' +
+            '<span class="phase-card-label">' + esc(t(p.label)) + '</span>' +
+            (stateIcon ? '<span class="phase-card-icon">' + stateIcon + '</span>' : '') +
+          '</a>';
+        }).join('') + '</div>';
+        break;
+
+      case 'orgchart':
+        /* Interactive org chart, laid out as a real tree matching the
+           company's actual chart: Leadership sits alone at the top center,
+           a connecting line runs down to a horizontal bar spanning the two
+           clearly separated bands below it — Head Office (every functional
+           department plus Administration, all on the same plane), then
+           Project Managers (own band, like the site/HQ split in the source
+           chart). Every node (Leadership included) uses the same gradual
+           inline drill-down: click a node to slide its people open beneath
+           it in place (no pop, no swap); click a person to reveal their
+           role text the same way, at which point every OTHER top-level
+           node fades out to narrow focus onto just the one open. A "Back to
+           All Teams" control (visible only while focused) restores the
+           full tree. See initOrgChart in this file for the underlying
+           expand/collapse and orgTeamNodeHtml/orgLeadershipNodeHtml above
+           for each node's markup.
+           Two extra behaviors layered on top of that base mechanic:
+           - Head Office's own label is a button (data-org-expand-all) that
+             expands/collapses every department underneath it at once,
+             independent of (and in addition to) each department's own
+             individual click-to-expand.
+           - Project Sites' label works exactly the same way, over the 6
+             project cards (orgProjectNodeHtml above) — there's no
+             intermediate "Project Managers" node to click through first;
+             the projects render directly in this segment's .org-team-row,
+             same as Head Office's departments. Each project still expands
+             into its own ~20-person crew, shown as a compact grid rather
+             than one long vertical list, when clicked individually. */
+        /* View toggle — Org Chart (roles/people within Vichitbhan, the
+           existing tree below) vs Group Structure (Vichitbhan's position
+           relative to its subsidiaries/JV partners, see
+           renderGroupStructureHtml below) — two different axes of
+           "structure", switched via the same .seg/.seg-btn segmented
+           control already used for language/theme/level elsewhere in this
+           app. Both views' markup is always in the DOM; the toggle just
+           shows/hides via .org-view-active (see initOrgChart's view-toggle
+           wiring) rather than re-rendering, since there's nothing async or
+           per-employee about either view. */
+        out += '<div class="org-view-toggle-wrap">' +
+          '<div class="seg org-view-toggle" id="org-view-toggle">' +
+            '<button type="button" data-org-view="chart" class="seg-btn active">' + esc(t('Org Chart')) + '</button>' +
+            '<button type="button" data-org-view="group" class="seg-btn">' + esc(t('Group Structure')) + '</button>' +
+          '</div>' +
+        '</div>';
+        out += '<div class="org-view-panel-wrap org-view-active" data-org-view-panel="chart">' +
+          (sec.chartSubheading ? '<div class="subheading">' + esc(t(sec.chartSubheading)) + '</div>' : '') +
+          '<div class="org-chart" data-org-chart>' +
+            '<button type="button" class="org-back-btn" data-org-back>' + icon('chevronLeft') + esc(t('Back to All Teams')) + '</button>' +
+            '<div class="org-tree">' +
+              '<div class="org-tree-top">' + orgLeadershipNodeHtml(sec.leadership) + '</div>' +
+              '<div class="org-tree-trunk"></div>' +
+              '<div class="org-tree-branches">' +
+                '<div class="org-segment org-segment-departments" data-org-expand-group>' +
+                  '<button type="button" class="org-segment-label org-segment-label-btn" data-org-expand-all>' + esc(t('Head Office')) + '</button>' +
+                  '<div class="org-team-row">' +
+                    sec.departments.map(orgTeamNodeHtml).join('') +
+                    orgTeamNodeHtml(sec.administration) +
+                  '</div>' +
+                '</div>' +
+                '<div class="org-segment org-segment-pm" data-org-expand-group>' +
+                  '<button type="button" class="org-segment-label org-segment-label-btn" data-org-expand-all>' + esc(t('Project Sites')) + '</button>' +
+                  '<div class="org-team-row">' + sec.projectManagers.projects.map(function (p) { return orgProjectNodeHtml(p, sec.departments); }).join('') + '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+        if (sec.groupStructure) out += renderGroupStructureHtml(sec.groupStructure, sec.groupSubheading);
+        break;
+
+      case 'teamgroup':
+        /* Flip card: front shows avatar + name (identical to before), back
+           reveals a one-line role blurb on hover/focus, or on tap for touch
+           devices (see .team-member.flipped in app.html's click handler and
+           the touch-only CSS fallback in styles.html). tabindex + role/aria
+           make the flip reachable by keyboard, not just mouse hover. */
+        out += '<div class="team-members">' +
+              sec.members.map(function (m) {
+                var name = typeof m === 'string' ? m : m.name;
+                var role = typeof m === 'string' ? '' : (m.role || '');
+                var initials = name.replace(/^(Mr\.|Mrs\.|Ms\.)\s*/, '').split(' ').slice(0,2).map(function(w){return w[0];}).join('');
+                return '<div class="team-member" tabindex="0" role="button" aria-label="' + esc(name) + (role ? ': ' + esc(role) : '') + '">' +
+                  '<div class="team-member-face team-member-front">' +
+                    '<div class="team-avatar">' + esc(initials) + '</div>' +
+                    '<span class="team-member-name">' + esc(name) + '</span>' +
+                  '</div>' +
+                  (role ? '<div class="team-member-face team-member-back"><span class="team-member-role">' + esc(t(role)) + '</span></div>' : '') +
+                '</div>';
+              }).join('') + '</div>';
+        break;
+
+      case 'gallery':
+        out += '<div class="section-inner-narrow">';
+        if (sec.body) out += '<p>' + esc(t(sec.body)) + '</p>';
+        out += '</div>';
+        if (sec.images && sec.images.length) {
+          /* Each image entry is either a plain URL string (old shape, still
+             supported — used by the 2-photo topic sections above, which
+             already have their own shared heading/body) or an
+             { image, caption } object with its own caption shown under
+             that specific photo — used by the single-photo "site
+             facilities" entries (Navigation Lock, Power House Unit, etc.),
+             which used to each be their own full-width gallery section
+             (one image stretched edge to edge, no room for anything
+             alongside it) and are now one shared gallery-grid tile row
+             instead, 4 per row, each labeled individually. */
+          out += '<div class="gallery-grid">' + sec.images.map(function (item) {
+            /* Plain string entries (the existing 2-photo topic sections —
+               Safety Talk, Tool Box Talk, etc.) never get a per-image
+               caption box, same as before this change — only { image,
+               caption } object entries do (the merged single-photo "site
+               facilities" gallery). */
+            if (typeof item === 'string') {
+              return '<img class="content-image" src="' + item + '" alt="' + esc(t(sec.heading)) + '" loading="lazy">';
+            }
+            var imgHtml = '<img class="content-image" src="' + item.image + '" alt="' + esc(t(item.caption || sec.heading)) + '" loading="lazy">';
+            return item.caption ?
+              '<div class="gallery-tile">' + imgHtml + '<div class="gallery-tile-caption">' + esc(t(item.caption)) + '</div></div>' :
+              imgHtml;
+          }).join('') + '</div>';
+        }
+        break;
+    }
+    out += '</div></section>';
+    return out;
+  }
+
+  /* Bottom-of-page phase trail — replaces the old Back/Next link pair.
+     Shows all 3 phases of the current department (Day 1-30 / 31-60 / 61-90)
+     as a row of color-coded pills instead of only ever exposing one
+     direction at a time, so jumping to ANY phase — earlier, current, or
+     later — is always one click, in any order to VIEW; ticking off a
+     phase's own tasks is still sequential (see isPhasePageUnlocked in
+     progress.html), which is what "locked" reflects below. "current" is
+     specifically the phase page actually being viewed right now (per
+     explicit request), not the sidebar's "next incomplete phase" — those
+     two can differ when revisiting an already-completed earlier phase, or
+     jumping ahead to a later one, and this row should still mark that one
+     as current since that's where the employee actually is. */
+  function renderPhaseTrail(pageKey) {
+    var chain = (typeof getFullPhaseChain === 'function') ? getFullPhaseChain(pageKey) : [];
+    if (chain.length < 2) return '';
+    var dayRanges = ['Day 1–30', 'Day 31–60', 'Day 61–90'];
+    var cardsHtml = chain.map(function (key, i) {
+      var isCurrent = key === pageKey;
+      var done = isPagePhaseComplete(key);
+      var unlocked = done || isPhasePageUnlocked(key) || isCurrent;
+      var label = dayRanges[i] || crumbLabel(key);
+      /* "Next up": the immediately-following phase, unlocked but not yet
+         started, while the phase being viewed is finished. This is the one
+         the employee should move to now, and it previously looked identical
+         to any other plain unlocked pill — nothing marked the transition
+         from "locked" to "you can go here". */
+      var isNextUp = !isCurrent && !done && unlocked &&
+        chain[i - 1] === pageKey && isPagePhaseComplete(pageKey);
+      var stateIcon = done ? icon('check') : (unlocked ? '' : icon('lock'));
+      var stateClass = (isCurrent ? ' current' : (done ? ' done' : (unlocked ? '' : ' locked'))) +
+        (isNextUp ? ' next-up' : '');
+      /* The "Next up" tag is text, not just the highlight styling — a
+         colour/glow cue alone conveys nothing to a screen reader, and is
+         easy to miss on a phone. */
+      var inner = '<span class="phase-card-label">' + esc(t(label)) + '</span>' +
+        (isNextUp ? '<span class="phase-card-nextup">' + esc(t('Next up')) + '</span>' : '') +
+        (stateIcon ? '<span class="phase-card-icon">' + stateIcon + '</span>' : '');
+      if (isCurrent) {
+        return '<div class="phase-card' + stateClass + '" aria-current="page">' + inner + '</div>';
+      }
+      return '<a class="phase-card' + stateClass + '" href="' + pageUrl(key) + '" data-link="' + key + '">' + inner + '</a>';
+    }).join('');
+    /* "Back to Team" link above the phase pills — goes to this department's
+       landing page (Meet Your Supervisor / Department Overview), matched by
+       pageKey's prefix against DEPARTMENTS (see progress.html). Sits here,
+       not just in the sidebar, because the level picker moved off that
+       landing page onto every phase page (see phasePage() in content.html)
+       — the landing page's Meet Your Supervisor content is otherwise no
+       longer reachable from a phase page without this. */
+    var dept = (typeof DEPARTMENTS !== 'undefined') ? DEPARTMENTS.filter(function (d) { return pageKey.indexOf(d.prefix) === 0; })[0] : null;
+    var backToTeamHtml = (dept && dept.landingPage) ?
+      '<a class="back-to-team-link" href="' + pageUrl(dept.landingPage) + '" data-link="' + dept.landingPage + '">&larr; ' + esc(t('Back to')) + ' ' + esc(t(dept.label)) + '</a>' : '';
+    /* data-phase-trail carries the page key so refreshPhaseTrail (below) can
+       re-render this in place after a checkbox toggle without knowing which
+       page it's on. Without that the trail kept whatever lock/done states it
+       had at page-render time, so the next phase still looked locked right
+       after the employee finished unlocking it. */
+    return '<div class="closing-line phase-trail-row" data-phase-trail="' + esc(pageKey) + '">' + backToTeamHtml + '<div class="phase-grid phase-trail-grid">' + cardsHtml + '</div></div>';
+  }
+
+  /* Re-renders the phase trail in place from current progress state. Exposed
+     on window because progress.html lives outside this IIFE (see the
+     include-order note in docs/KNOWN_ISSUES.md). Safe to call on any page —
+     it no-ops where there is no trail. */
+  window.refreshPhaseTrail = function () {
+    var el = document.querySelector('[data-phase-trail]');
+    if (!el) return;
+    var key = el.getAttribute('data-phase-trail');
+    var html = renderPhaseTrail(key);
+    if (!html) return;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    var fresh = tmp.firstElementChild;
+    if (fresh) el.replaceWith(fresh);
+  };
+
+  function renderPage(pageKey, anchor) {
+    /* Admin checklist editor — an entirely different UI shape (no hero, a
+       password gate, its own department/phase/block navigation), so it
+       owns the #app root directly instead of going through the normal
+       hero/sections renderer below (see renderAdminPage, admin.html). Not
+       part of PAGES since it isn't real onboarding content — checked
+       first so it can never collide with an actual page key. */
+    if (pageKey === 'admin') {
+      var adminEl = document.getElementById('app');
+      adminEl.innerHTML = '';
+      renderAdminPage(adminEl);
+      document.title = 'Admin — VCB Onboarding Portal';
+      return;
+    }
+    if (pageKey === 'home') markHomeVisited();
+    var data = PAGES[pageKey];
+    if (!data) {
+      data = {
+        hero: { eyebrow: 'Not Found', title: 'Page not found' },
+        sections: [{ type: 'text', body: ['The page "' + pageKey + '" does not exist in this portal.'],
+                     link: { label: 'Return Home', page: 'home' } }]
+      };
+    }
+    /* Completion page's gate — a plain synchronous check, same pattern
+       every other progress-gated read in this app already uses
+       (isPhasePageUnlocked, etc.), NOT the old async requireOnboardingComplete
+       placeholder-swap (revealGatedSections) this page replaced. Reached
+       almost always right after actually finishing (via
+       celebrateOnboardingComplete's Continue button, whose click only
+       fires once isEmployeeOnboardingComplete() is already true in
+       PROGRESS_CACHE from the checkbox toggle that triggered it) — but a
+       typed URL or a stale link could reach it before that, so
+       notCompleteSections is real content, never a blank pending state,
+       for exactly that case. */
+    if (pageKey === 'completion' && typeof isEmployeeOnboardingComplete === 'function' && !isEmployeeOnboardingComplete()) {
+      data = { hero: data.hero, sections: data.notCompleteSections || [] };
+    }
+    var html = '';
+    html += renderHero(data.hero);
+    /* Placeholder rendered fresh into the HTML string on every page, right
+       after the hero, so the progress bar always sits directly under the
+       banner. (Previously the real widget node was physically relocated in
+       here via insertAdjacentElement — but appEl.innerHTML further below
+       wipes out anything already inside #app, including a node moved in on
+       a prior render, so it only ever worked once and then vanished.) */
+    html += '<div id="overall-progress-widget" class="overall-progress-wrap"></div>';
+    /* Rendered OUTSIDE data.sections on purpose — PHASE_BLOCK_ANCHORS /
+       getPageBlockTaskIds (progress.html) still assume block order is
+       exactly [Reading, Knowledge, Outputs] at indices [0,1,2] (see
+       phasePage in content.html), so inserting this into the array would
+       shift that mapping even though individual checkbox state (keyed on
+       each item's own permanent id, not position — see it()/itemId())
+       would survive it unharmed. blockIndex is irrelevant to the
+       'levelpicker' case itself (it only matters for 'checklist'), so
+       passing null here is safe. */
+    if (data.showLevelPicker) {
+      html += renderSectionContent({ type: 'levelpicker', heading: 'Choose Your Level' }, pageKey, null);
+    }
+    (data.sections || []).forEach(function (sec, i) { html += renderSection(sec, pageKey, i); });
+
+    var phaseTrailHtml = renderPhaseTrail(pageKey);
+    if (phaseTrailHtml) html += phaseTrailHtml;
+    if (data.closing) {
+      if (typeof data.closing === 'string') {
+        /* Every department's final phase page uses this plain-string form
+           (see phasePage, content.html). Used to just be inert text — the
+           only way to actually reach the new Completion page (see
+           PAGES['completion']) was the celebration popup's Continue
+           button, which only exists for the ONE moment onboarding first
+           completes; visiting this page again afterward (or if the popup
+           was dismissed by clicking outside it) left no way back at all.
+           Explicit request: a real button here too. Only shown once
+           isEmployeeOnboardingComplete() is genuinely true — someone
+           viewing this page before finishing (every phase is viewable in
+           any order, see renderPhaseTrail) still just sees the plain
+           closing text, nothing to click ahead of actually finishing. */
+        html += '<div class="closing-line">' + esc(t(data.closing)) + '</div>';
+        if (typeof isEmployeeOnboardingComplete === 'function' && isEmployeeOnboardingComplete()) {
+          html += '<div class="closing-line"><a class="next-phase" href="' + pageUrl('completion') + '" data-link="completion">' + esc(t('Continue to Completion')) + '</a></div>';
+        }
+      } else {
+        html += '<div class="closing-line">';
+        if (data.closing.text) html += '<p>' + esc(t(data.closing.text)) + '</p>';
+        html += '<a class="next-phase" href="' + pageUrl(data.closing.page) + '" data-link="' + data.closing.page + '">' + esc(t(data.closing.label)) + '</a></div>';
+      }
+    }
+
+    var appEl = document.getElementById('app');
+    appEl.innerHTML = html;
+    /* Force the CSS animation to restart on every page render (it only
+       plays once per element by default) by toggling the class off and
+       triggering a reflow before re-adding it. */
+    appEl.classList.remove('app-enter');
+    void appEl.offsetWidth;
+    appEl.classList.add('app-enter');
+    initCarousels(appEl);
+    initOrgChart(appEl);
+    renderOrgConnectors(appEl);
+    initOrgViewToggle(appEl);
+    initLevelPicker(appEl, pageKey);
+    /* Web fonts (Orbitron for labels like "SUBSIDIARIES"/"บริษัทย่อย", Noto
+       Sans Thai for Thai body text — see the Google Fonts <link> in
+       Index.html, loaded with display:swap) are almost never finished
+       downloading by the time this synchronous render runs, so the very
+       first renderOrgConnectors call above measures every label/card box
+       at its FALLBACK-FONT width. Once the real font swaps in a moment
+       later, any box whose width depends on that text (most visibly a
+       .org-segment-label like "SUBSIDIARIES") can reflow by a few px —
+       exactly enough to leave the already-drawn connector lines pointing
+       at stale positions, seen as a slight kink or offset right where a
+       label sits. document.fonts.ready resolves once every requested face
+       has actually loaded (or immediately, if the browser has no Font
+       Loading API — same as skipping this), so this redraw is a no-op
+       when fonts were already cached/loaded and a real fix on the first
+       visit when they weren't. */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { renderOrgConnectors(appEl); });
+    }
+    /* #app.app-enter's own entrance animation (see styles.html) translates
+       each top-level child (hero, each section) up from translateY(10px)
+       over up to .5s, staggered up to a further .7s depending on the
+       child's position — renderOrgConnectors above runs synchronously
+       right after the HTML is inserted, i.e. WHILE these elements are
+       still mid-animation and not yet at their final resting position.
+       Measuring mid-animation is exactly what put a connector line
+       through the middle of a card instead of stopping at its edge: the
+       card's animated (still-offset) position got baked into the line's
+       coordinates, then nothing redrew once the animation actually
+       settled a moment later. 1300ms comfortably covers the longest
+       stagger (.7s delay + .5s duration = 1.2s) with a little margin. */
+    setTimeout(function () { renderOrgConnectors(appEl); }, 1300);
+
+    document.title = (pageKey === 'home' ? t('VCB 90-Day Onboarding Portal') : crumbLabel(pageKey) + ' — VCB Onboarding Portal');
+    /* Jumping to a specific step (e.g. Required Documents / Department
+       Selection from the sidebar stepper) scrolls straight to that section
+       instead of the page top. */
+    if (location.hash && !anchor) {
+      history.replaceState(history.state, '', location.pathname + location.search);
+    }
+    /* Always an exact jump (behavior: 'instant'), never CSS smooth-scroll
+       (html/body has scroll-behavior: smooth globally, for in-page anchor
+       links). Under smooth-scroll, calling this while a previous smooth
+       scroll from the same click sequence is still animating can resolve
+       short of true 0/target, and each repeated click compounds that
+       shortfall, which is exactly what made "Pre-boarding" appear to creep
+       one notch further down the page on every click instead of always
+       landing at the top. */
+    /* THE actual root cause of every "lands scrolled past the top" report in
+       this app (Pre-boarding, department cards, Required Documents alike):
+       html/body both have height:100%/min-height:100vh (see styles.html) so
+       the page can end up scrolling inside <body> itself instead of the
+       window/<html> — confirmed by inspecting a live reproduction: after
+       clicking a department card, window.scrollY read 0 (looked "already at
+       top") while document.body.scrollTop was really 1142. window.scrollTo
+       only ever moves the window/documentElement, so on a page where body is
+       the actual scrolling box it silently did nothing — every previous fix
+       in this area (scroll-restoration, re-scrolling after async content,
+       waiting for images) was real but could never have addressed this,
+       because the single scrollTo(0,0) call itself was targeting the wrong
+       element the whole time. Now resets all three candidates unconditionally
+       — whichever one the browser is actually using for this render, this
+       covers it. */
+    /* userScrolledAway flips true the moment a real user input (wheel,
+       touch drag, or a scroll-moving key) happens after this render
+       started — NOT on every 'scroll' event, which also fires for the
+       programmatic scrolls forceScroll() itself performs and therefore
+       can't distinguish "the browser nudged this" from "the person
+       scrolled on purpose." Once true, every LATER forceScroll() call in
+       this render (from the async widgets below — checklists, doc cards,
+       the overall-progress bar) becomes a no-op.
+       Without this, scrolling down manually while any of those were still
+       waiting on loadProgress would get silently yanked back to the top
+       the moment that widget's data landed — reported directly: "when I
+       scroll down and then it loads up the progress panel, it jumps back
+       up." The very FIRST forceScroll() call immediately below still
+       always runs (nothing has had a chance to scroll yet at that point),
+       matching the original intent: land at the top (or the requested
+       anchor) right when a page navigation happens, then get out of the
+       user's way. */
+    var userScrolledAway = false;
+    function markUserScrolled() { userScrolledAway = true; }
+    ['wheel', 'touchmove', 'keydown'].forEach(function (evt) {
+      window.addEventListener(evt, markUserScrolled, { once: true, passive: true });
+    });
+    function forceScroll() {
+      if (userScrolledAway) return;
+      if (anchor) {
+        var el = document.getElementById(anchor);
+        if (el) { el.scrollIntoView({ block: 'start', behavior: 'instant' }); return; }
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+    forceScroll();
+    /* General safety net on every render: any page can carry <img>s
+       (embedded base64 photos/icons) that are
+       still mid-decode at this exact tick, so the browser hasn't reserved
+       their final layout height yet — a moment later, when they do finish
+       decoding, the page can grow under the scroll position forceScroll()
+       just set, and (now that native scroll-restoration is off) nothing
+       else corrects it. This was the actual cause of "Pre-boarding" in the
+       sidebar landing on Company Structure instead of the top of Home —
+       Home's CEO portrait/hero photo/value icons hadn't finished decoding
+       when the first forceScroll() ran. */
+    scrollToElementAfterImagesSettle(appEl, forceScroll);
+    initChecklists(appEl, forceScroll);
+    initDocCards(appEl, forceScroll);
+    var progressWidget = document.getElementById('overall-progress-widget');
+    if (progressWidget) renderOverallProgress(progressWidget, forceScroll);
+    buildNav();
+    highlightNav(pageKey);
+  }
+
+  /* Scrolls to el only once every <img> inside it has finished loading (or
+     is already loaded/broken) — inline base64 <img> data can still be
+     mid-decode at the exact tick a page render finishes, so the browser
+     hasn't reserved final layout height for those images yet. Calling the
+     scroll callback synchronously in that window can land short of (or,
+     via scroll-anchoring, past) the target — it looked like a click
+     "needed to be pressed twice", or in one case landed at the very
+     bottom of the page instead of the top, when actually the very same
+     click's scroll fired before the page's layout had settled. onScrolled
+     is called once settled — the caller decides what "scrolled" means
+     (scrollIntoView a specific element, or window.scrollTo(0,0), etc.),
+     this function only owns the timing. Falls back to a fixed short delay
+     if, for any reason, an image's load event never fires. */
+  function scrollToElementAfterImagesSettle(el, onScrolled) {
+    var imgs = el.querySelectorAll('img');
+    var pending = 0;
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      onScrolled();
+    }
+    imgs.forEach(function (im) {
+      if (im.complete) return;
+      pending++;
+      var settle = function () { pending--; if (pending <= 0) finish(); };
+      im.addEventListener('load', settle, { once: true });
+      im.addEventListener('error', settle, { once: true });
+    });
+    if (pending === 0) {
+      requestAnimationFrame(function () { requestAnimationFrame(finish); });
+    } else {
+      setTimeout(finish, 1200); // safety net in case a load/error event never fires
+    }
+  }
+
+  function highlightNav(pageKey) {
+    document.querySelectorAll('nav.sidebar-nav a').forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('data-link') === pageKey);
+    });
+  }
+
+  /* Simplified nav: department Day 1-30/31-60/61-90 sub-pages are no longer listed
+     here as clickable nav children — they're replaced by the progress tracker in
+     the sidebar (see renderSidebarProgress in progress.html). Once the employee has
+     selected a department, only that department's landing page appears in nav;
+     before that (pre-boarding), all 5 remain visible so they can browse and pick one. */
+  /* The sidebar is now the vertical journey stepper (renderSidebarProgress in
+     progress.html) instead of a flat clickable nav list — it already covers
+     every page an employee needs to reach (pre-boarding, documents, department
+     selection, each phase, completion), so there is no separate nav to build. */
+  function buildNav() {
+    if (typeof renderSidebarProgress === 'function') {
+      renderSidebarProgress(document.getElementById('sidebar-progress'));
+    }
+  }
+
+  /* body.nav-open drives one mobile-only rule in styles.html: hiding the
+     fixed .menu-toggle, which sits at a higher z-index than the drawer and
+     would otherwise stay painted over the brand name. It deliberately does
+     NOT lock background scroll — see the note in styles.html's 980px block
+     for why that breaks this particular page. */
+  function closeSidebar() {
+    document.getElementById('site-sidebar').classList.remove('open');
+    document.getElementById('sidebar-scrim').classList.remove('open');
+    document.body.classList.remove('nav-open');
+  }
+  function openSidebar() {
+    document.getElementById('site-sidebar').classList.add('open');
+    document.getElementById('sidebar-scrim').classList.add('open');
+    document.body.classList.add('nav-open');
+  }
+
+  /* Exposed on window (see below) so progress.html — outside this IIFE —
+     can trigger a real page navigation the same way any [data-link] click
+     does, without needing its own copy of the pushState/renderPage
+     plumbing. Used by celebrateOnboardingComplete's Continue button to
+     navigate to the dedicated completion page. */
+  function navigate(pageKey, push, anchor) {
+    if (push !== false) {
+      var url = pageUrl(pageKey) + (anchor ? '#' + anchor : '');
+      history.pushState({ page: pageKey, anchor: anchor || null }, '', url);
+    }
+    renderPage(pageKey, anchor);
+    if (window.innerWidth <= 980) closeSidebar();
+    /* Any real page navigation (e.g. the Admin link inside the settings
+       panel, see Index.html) should close that panel too — unlike the
+       language/theme toggle buttons inside it, which stay open since
+       you might flip both in one visit, clicking a navigation link is a
+       one-shot action that should feel like leaving the panel, not
+       leaving it open behind the page it just navigated away from. */
+    var settingsPanel = document.getElementById('settings-panel');
+    if (settingsPanel && settingsPanel.classList.contains('open')) {
+      settingsPanel.classList.remove('open');
+      var settingsBtn = document.getElementById('settings-btn');
+      if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+  }
+  window.navigate = navigate;
+  /* app.html is wrapped in an IIFE, so anything progress.html needs to
+     call must be attached to window explicitly (see the include-order note
+     in docs/KNOWN_ISSUES.md). Used by promptToChangeName to repaint the
+     page after a rename, so the new name shows in the progress widget. */
+  window.rerenderCurrentPage = function () { renderPage(currentPage()); };
+
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-link]');
+    if (link) {
+      e.preventDefault();
+      var anchor = link.getAttribute('data-anchor');
+      var deptId = link.getAttribute('data-dept-id');
+      if (deptId) {
+        ensureEmployeeNamed(function () {
+          /* Hard-gated on Required Documents — checked here, before
+             selectDepartment/navigate run, so an employee who hasn't
+             finished pre-boarding docs never actually lands on a
+             department page (matches isPhasePageUnlocked's same
+             requirement for a department's own Day 1-30, so the lock chain
+             now genuinely starts at step one instead of only kicking in
+             one step later). */
+          if (typeof areRequiredDocsComplete === 'function' && !areRequiredDocsComplete()) {
+            promptRequiredDocsIncomplete(getMissingRequiredDocTitles());
+            return;
+          }
+          selectDepartment(deptId);
+          navigate(link.getAttribute('data-link'), true, anchor);
+        });
+        return;
+      }
+      navigate(link.getAttribute('data-link'), true, anchor);
+      return;
+    }
+    if (e.target.closest('.menu-toggle')) {
+      openSidebar();
+      return;
+    }
+    if (e.target.closest('.sidebar-close') || e.target.closest('.sidebar-scrim')) {
+      closeSidebar();
+      return;
+    }
+    /* Meet Our Team cards flip on hover via CSS for mouse users; tap-to-flip
+       here covers touch devices, which have no hover state at all. */
+    var teamCard = e.target.closest('.team-member');
+    if (teamCard) {
+      teamCard.classList.toggle('flipped');
+      return;
+    }
+    /* A locked checklist item's checkbox is disabled (see the 'checklist'
+       case above), so it never fires a click of its own — nothing told the
+       employee WHY clicking it did nothing, it just silently ignored the
+       click same as any other disabled control. This catches the click on
+       the surrounding <label> (which still receives it even though the
+       input inside is disabled) and shows a brief explanation instead of
+       leaving it looking broken. */
+    var lockedItem = e.target.closest('.check-item.locked');
+    if (lockedItem) {
+      e.preventDefault();
+      showLockedToast();
+      return;
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var teamCard = e.target.closest && e.target.closest('.team-member');
+    if (teamCard) {
+      e.preventDefault();
+      teamCard.classList.toggle('flipped');
+    }
+  });
+
+  window.addEventListener('popstate', function (e) {
+    var page = (e.state && e.state.page) || 'home';
+    var anchor = e.state && e.state.anchor;
+    renderPage(page, anchor);
+  });
+
+  /* Card x-positions (see renderOrgConnectors) only change with viewport
+     width, not with expand/collapse — re-measure on resize so the elbow
+     connectors stay correct after a window/orientation resize. Debounced
+     since 'resize' fires continuously while a user drags a window edge. */
+  var orgConnectorResizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(orgConnectorResizeTimer);
+    orgConnectorResizeTimer = setTimeout(function () {
+      var appEl = document.getElementById('app');
+      if (appEl) renderOrgConnectors(appEl);
+    }, 150);
+  });
+
+  /* Injects the shared SVG icon set into the static chrome (settings gear,
+     hamburger/close, theme toggle) — done once on load, not translated. */
+  function setChromeIcons() {
+    var map = {
+      'menu-toggle-btn': 'menu',
+      'sidebar-close-btn': 'close',
+      'settings-btn-icon': 'gear',
+      'lbl-light-icon': 'sun',
+      'lbl-dark-icon': 'moon',
+      'settings-name-icon': 'document',
+      'settings-admin-icon': 'lock'
+    };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = icon(map[id]);
+    });
+  }
+
+  function currentPage() {
+    var p = new URLSearchParams(location.search).get('page');
+    return p || window.INITIAL_PAGE || 'home';
+  }
+
+  function applyLangUI() {
+    document.querySelectorAll('#lang-control .seg-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-lang') === LANG);
+    });
+    /* Index.html hardcodes lang="en" and nothing used to update it, so
+       after switching to Thai a screen reader kept announcing Thai text
+       with an English voice. This runs on first load as well as on every
+       switch, so the attribute always matches what's actually rendered. */
+    document.documentElement.lang = LANG;
+  }
+
+  function setText(id, str) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = t(str);
+  }
+  function applyChromeTranslations() {
+    setText('brand-title', 'VCB ONBOARDING');
+    setText('brand-subtitle', 'Vichitbhan Construction');
+    setText('lbl-language', 'Language');
+    setText('lbl-appearance', 'Appearance');
+    setText('lbl-light', 'Light');
+    setText('lbl-dark', 'Dark');
+    setText('lbl-change-name', 'Change my name');
+    setText('lbl-admin', 'Admin');
+    setText('footer-company', 'Vichitbhan Construction Co., Ltd.');
+    setText('footer-company-2', 'Vichitbhan Construction Co., Ltd. — Internal Onboarding Portal');
+  }
+
+  function setLang(lang) {
+    if (lang !== 'en' && lang !== 'th') lang = 'en';
+    LANG = lang;
+    try { localStorage.setItem('vcb-lang', lang); } catch (e) {}
+    applyLangUI();
+    applyChromeTranslations();
+    buildNav();
+    renderPage(currentPage());
+  }
+
+  function applyThemeUI(theme) {
+    document.querySelectorAll('#theme-control .seg-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-theme') === theme);
+    });
+  }
+  function setTheme(theme) {
+    if (theme !== 'light' && theme !== 'dark') theme = 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('vcb-theme', theme); } catch (e) {}
+    applyThemeUI(theme);
+  }
+
+  /* Wires the Junior/Senior toggle on a department landing page (see the
+     'levelpicker' case in renderSectionContent above). Changing level
+     changes which checklist items are visible on every phase page for this
+     department (see isItemVisible in progress.html), so it re-renders the
+     current page immediately after switching — same as setLang/setTheme
+     re-applying UI state, except here the DOM itself has to change, not
+     just labels/CSS variables. No dataset.wired guard needed: unlike the
+     carousels/org-chart (which persist across re-renders of the SAME page),
+     #level-picker's markup is fully replaced by appEl.innerHTML on every
+     renderPage call, so there's never a stale listener to skip. */
+  function initLevelPicker(container, pageKey) {
+    var control = container.querySelector('#level-control');
+    if (!control) return;
+    control.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-level]');
+      if (!btn) return;
+      var level = btn.getAttribute('data-level');
+      if (level === getEmployeeLevel()) return;
+      setEmployeeLevel(level);
+      renderPage(pageKey);
+    });
+  }
+
+  function initSettings() {
+    var savedLang = 'en', savedTheme = null;
+    try { savedLang = localStorage.getItem('vcb-lang') || 'en'; } catch (e) {}
+    try { savedTheme = localStorage.getItem('vcb-theme'); } catch (e) {}
+    if (!savedTheme) {
+      savedTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    LANG = (savedLang === 'th') ? 'th' : 'en';
+    applyLangUI();
+    applyChromeTranslations();
+    setTheme(savedTheme);
+
+    document.getElementById('settings-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var panel = document.getElementById('settings-panel');
+      var willOpen = !panel.classList.contains('open');
+      panel.classList.toggle('open', willOpen);
+      document.getElementById('settings-btn').setAttribute('aria-expanded', String(willOpen));
+    });
+    document.addEventListener('click', function (e) {
+      var panel = document.getElementById('settings-panel');
+      if (panel.classList.contains('open') && !e.target.closest('.settings-wrap')) {
+        panel.classList.remove('open');
+        document.getElementById('settings-btn').setAttribute('aria-expanded', 'false');
+      }
+    });
+    document.getElementById('lang-control').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-lang]');
+      if (btn) setLang(btn.getAttribute('data-lang'));
+    });
+    document.getElementById('theme-control').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-theme]');
+      if (btn) setTheme(btn.getAttribute('data-theme'));
+    });
+    var changeNameBtn = document.getElementById('change-name-btn');
+    if (changeNameBtn) {
+      changeNameBtn.addEventListener('click', function () {
+        var panel = document.getElementById('settings-panel');
+        if (panel) panel.classList.remove('open');
+        var sBtn = document.getElementById('settings-btn');
+        if (sBtn) sBtn.setAttribute('aria-expanded', 'false');
+        promptToChangeName();
+      });
+    }
+  }
+
+  /* This SPA already owns scroll position entirely via forceScroll() inside
+     renderPage — every navigate() call is a pushState to a URL made of
+     nothing but ?page=..., and revisiting the same ?page=... value later in
+     the same session (e.g. clicking back into a department you'd already
+     scrolled around in before) is exactly the case the browser's default
+     scroll restoration ('auto') tries to "help" with by restoring whatever
+     scroll offset that URL last had — landing wherever the user happened to
+     leave off (e.g. down at the level picker) instead of forceScroll's
+     intended top-of-page. 'manual' hands scroll position fully to our own
+     code, which is the only thing that should be deciding it here. */
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setChromeIcons();
+    initSettings();
+    buildNav();
+    var initial = window.INITIAL_PAGE || 'home';
+    history.replaceState({ page: initial }, '', pageUrl(initial));
+    renderPage(initial);
+  });
+})();
+</script>

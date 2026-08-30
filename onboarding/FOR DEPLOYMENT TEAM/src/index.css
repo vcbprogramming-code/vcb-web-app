@@ -1,0 +1,128 @@
+/* Theme tokens ported verbatim from the original app's styles.html
+   (:root / :root[data-theme="light"] / :root[data-theme="dark"]). */
+:root,
+:root[data-theme="light"] {
+  --bg-0: #eef1f8;
+  --bg-1: #f7f8fc;
+  --sidebar-0: #0a1440;
+  --sidebar-1: #101c56;
+  --sidebar-text: #c7cdf0;
+  --sidebar-text-dim: #8992c4;
+  --sidebar-active: #1b2a72;
+  --accent: #3a5bff;
+  --accent-2: #5b7cff;
+  --accent-soft: rgba(58, 91, 255, 0.35);
+  --accent-glow: rgba(58, 91, 255, 0.55);
+  --text: #171b2e;
+  --text-dim: #666f9c;
+  --card: #ffffff;
+  --card-border: #e4e7f4;
+  --card-border-hover: #c3caf2;
+  --topbar-bg: rgba(255, 255, 255, 0.85);
+  --shadow-card: 0 1px 2px rgba(23, 27, 46, .04), 0 8px 24px rgba(23, 27, 46, .06);
+  --shadow-card-hover: 0 4px 10px rgba(23, 27, 46, .06), 0 16px 36px rgba(23, 27, 46, .10);
+  --pill-bg: #eef1fb;
+  --status-good: #16a34a;
+  --status-good-soft: #bdedd0;
+  --status-warn-soft: #ffdcb0;
+  --zone-admin: #0d9488;
+  --zone-admin-soft: #ccfbf1;
+  --tree-line: #9aa3d1;
+  color-scheme: light;
+  --radius: 14px;
+  --maxw: 1520px;
+  --sidebar-w: 274px;
+}
+
+:root[data-theme="dark"] {
+  --bg-0: #02050d;
+  --bg-1: #061029;
+  --sidebar-0: #05070f;
+  --sidebar-1: #0a0f22;
+  --sidebar-text: #c9d6f0;
+  --sidebar-text-dim: #7686b3;
+  --sidebar-active: #16214a;
+  --accent: #4fd1ff;
+  --accent-2: #7ee8ff;
+  --accent-soft: rgba(79, 209, 255, 0.45);
+  --accent-glow: rgba(79, 209, 255, 0.75);
+  --text: #e6f3ff;
+  --text-dim: #93acce;
+  --card: rgba(15, 24, 48, 0.75);
+  --card-border: rgba(79, 209, 255, 0.16);
+  --card-border-hover: rgba(126, 232, 255, 0.5);
+  --topbar-bg: rgba(6, 12, 28, 0.85);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+  --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, .35), 0 16px 40px rgba(0, 0, 0, .4);
+  --pill-bg: rgba(79, 209, 255, 0.08);
+  --status-good: #34d399;
+  --status-good-soft: rgba(52, 211, 153, 0.22);
+  --status-warn-soft: rgba(255, 176, 74, 0.22);
+  --zone-admin: #2dd4bf;
+  --zone-admin-soft: rgba(45, 212, 191, 0.22);
+  --tree-line: rgba(147, 172, 206, 0.6);
+  color-scheme: dark;
+}
+
+/* System-preference fallback when no explicit data-theme is set, matching
+   the original app's own light/dark media-query fallback behavior. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-0: #02050d;
+    --bg-1: #061029;
+    --sidebar-0: #05070f;
+    --sidebar-1: #0a0f22;
+    --sidebar-text: #c9d6f0;
+    --sidebar-text-dim: #7686b3;
+    --sidebar-active: #16214a;
+    --accent: #4fd1ff;
+    --accent-2: #7ee8ff;
+    --accent-soft: rgba(79, 209, 255, 0.45);
+    --accent-glow: rgba(79, 209, 255, 0.75);
+    --text: #e6f3ff;
+    --text-dim: #93acce;
+    --card: rgba(15, 24, 48, 0.75);
+    --card-border: rgba(79, 209, 255, 0.16);
+    --card-border-hover: rgba(126, 232, 255, 0.5);
+    --topbar-bg: rgba(6, 12, 28, 0.85);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+    --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, .35), 0 16px 40px rgba(0, 0, 0, .4);
+    --pill-bg: rgba(79, 209, 255, 0.08);
+    --status-good: #34d399;
+    --status-good-soft: rgba(52, 211, 153, 0.22);
+    --status-warn-soft: rgba(255, 176, 74, 0.22);
+    --zone-admin: #2dd4bf;
+    --zone-admin-soft: rgba(45, 212, 191, 0.22);
+    --tree-line: rgba(147, 172, 206, 0.6);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: "Inter", "Noto Sans Thai", "Leelawadee UI", "Segoe UI", system-ui, -apple-system, sans-serif;
+  transition: background-color .15s, color .15s;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+#root {
+  min-height: 100vh;
+}

@@ -1,0 +1,1126 @@
+
+*{box-sizing:border-box;margin:0;padding:0}
+/* Reserve the scrollbar gutter so the layout never shifts horizontally
+   when a filter shortens the table and the vertical scrollbar vanishes. */
+html{overflow-y:scroll;scrollbar-gutter:stable}
+/* Safety net independent of the html.is-mobile JS detector below: some
+   in-app browsers (share-sheet webviews, embedded readers) report a UA
+   string that doesn't match our /iPhone|Android/ sniff AND misreport
+   viewport width, so is-mobile never gets added and the wide desktop
+   toolbar rows (.bar/.datebar) overflow past the screen edge instead of
+   wrapping. This guarantees the page itself never scrolls sideways no
+   matter which layout is active. */
+html,body{max-width:100vw;overflow-x:hidden}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:13px}
+
+header{background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);color:white;padding:16px 28px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;font-weight:600;letter-spacing:.3px}
+header span{font-size:11px;opacity:.55}
+
+.bar{background:white;padding:12px 28px 10px;border-bottom:1px solid #e8e8e8;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+#srch{padding:7px 12px;border:1px solid #d0d0d0;border-radius:6px;font-size:13px;width:240px;outline:none}
+#srch:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+
+.divider{width:1px;height:28px;background:#e0e0e0;margin:0 2px}
+
+/* Document-type / status / project dropdowns */
+.dtsel{padding:6px 9px;border:1.5px solid #d0d0d0;border-radius:6px;background:white;cursor:pointer;font-size:12px;font-weight:600;color:#555;outline:none;max-width:240px}
+.dtsel:focus{border-color:#1a73e8}
+.dtsel.on{border-color:#1a73e8;color:#1a73e8}
+/* Project picker: SINGLE-select, but a custom button+popover rather than a
+   native <select>, because an <option> can't render a styled badge chip.
+   Each row = plain full name on the left + the same .pb chip the table
+   rows use on the right. Selecting a row closes the panel immediately —
+   one click to switch projects, same as the old <select>. */
+.pfms{position:relative}
+.pfmsBtn{display:flex;align-items:center;gap:6px;text-align:left}
+.pfmsCaret{font-size:10px;color:#8a90a2;transition:transform .15s;margin-left:auto}
+.pfms.openMenu .pfmsCaret{transform:rotate(180deg)}
+.pfmsPanel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:40;
+  min-width:270px;max-height:340px;overflow-y:auto;background:white;
+  border:1.5px solid #d0d0d0;border-radius:8px;box-shadow:0 6px 20px rgba(20,25,55,.14);padding:6px}
+.pfms.openMenu .pfmsPanel{display:block}
+/* Name left, chip right — gap:14px keeps them from ever touching. */
+.pfmsRow{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:7px 9px;border-radius:6px;font-size:12.5px;font-weight:600;color:#333;
+  cursor:pointer;white-space:nowrap}
+.pfmsRow:hover{background:#f2f5fb}
+.pfmsRow.sel{background:#e8f0fe}
+.pfmsRow .pb{flex-shrink:0}
+.pfmsDiv{height:1px;background:#eceff5;margin:4px 2px}
+
+/* Date range row */
+.datebar{background:#fafafa;padding:8px 28px;border-bottom:1px solid #ececec;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.datebar input[type=date],.datebar .dfld{padding:5px 8px;border:1px solid #d0d0d0;border-radius:5px;font-size:12px;color:#333;outline:none;background:white}
+.datebar .dfld{width:104px;text-align:center}
+.datebar input[type=date]:focus,.datebar .dfld:focus{border-color:#1a73e8}
+.qbtn{padding:5px 11px;border:1.5px solid #d0d0d0;border-radius:16px;background:white;cursor:pointer;font-size:11px;font-weight:500;color:#555;transition:all .15s;white-space:nowrap}
+.qbtn:hover{border-color:#34a853;color:#34a853}
+.qbtn.on{background:#34a853;border-color:#34a853;color:white}
+.clrbtn{padding:4px 10px;border:1.5px solid #e57373;border-radius:16px;background:white;cursor:pointer;font-size:11px;font-weight:500;color:#e57373;transition:all .15s}
+.clrbtn:hover{background:#e57373;color:white}
+
+.stat{padding:5px 28px 0;font-size:11px;color:#888}
+
+.tw{padding:14px 28px 40px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+thead tr{background:#1a1a2e;color:white}
+th{padding:10px 12px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{background:#2a2a4e}
+th.asc::after{content:" ▲";font-size:9px;opacity:.7}
+th.desc::after{content:" ▼";font-size:9px;opacity:.7}
+tbody tr{border-bottom:1px solid #f0f0f0;transition:background .1s}
+tbody tr:hover{background:#f5f9ff}
+tbody tr.h{display:none}
+tbody tr.pg{display:none}
+#pager{display:none;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;padding:16px 0}
+#pager .qbtn.on{background:#1a1f38;color:#fff;border-color:#1a1f38}
+#pager .qbtn:disabled{opacity:.4;cursor:not-allowed}
+td{padding:9px 12px;vertical-align:top}
+td.n{width:34px;color:#bbb;font-size:11px;text-align:right}
+td.dt{width:88px;white-space:nowraw;color:#666;font-size:12px}
+td.pj{width:56px}
+td.cd{width:120px;font-size:11px;word-break:break-all;color:#555}
+td.sb{max-width:320px}
+.ti{font-weight:500;color:#1a1a2e;line-height:1.4}
+.de{font-size:11px;color:#777;margin-top:2px;line-height:1.4}
+td.lk{width:72px;text-align:center}
+
+.pb{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.BT1{background:#e3f2fd;color:#1565c0}.VK2{background:#f3e5f5;color:#6a1b9a}
+.CVE{background:#e8f5e9;color:#2e7d32}.LPB{background:#fff3e0;color:#e65100}
+.BV{background:#fce4ec;color:#880e4f}.PN4{background:#e0f7fa;color:#006064}
+.EP{background:#f9fbe7;color:#558b2f}.VK{background:#fff8e1;color:#f57f17}
+.VC{background:#ede7f6;color:#4527a0}.VnK{background:#e8eaf6;color:#283593}
+.UNCLASSIFIED{background:#f5f5f5;color:#757575}
+
+.ol{display:inline-block;padding:4px 9px;background:#1a73e8;color:white;border-radius:5px;text-decoration:none;font-size:11px;font-weight:500;white-space:nowrap}
+.ol:hover{background:#1557b0}
+.nl{color:#ccc;font-size:11px}
+.empty{padding:40px;text-align:center;color:#aaa;font-size:13px}
+
+/* Review status */
+.stc{width:92px}.rvc{width:74px}
+.stb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap}
+.st-pending{background:#fff4e5;color:#8a5a00}
+.st-commented{background:#e8f0fe;color:#1a56c4}
+.st-approved{background:#e6f4ea;color:#137333}
+.st-rejected{background:#fce8e6;color:#c5221f}
+.rvb.dl{background:#fff;color:#c5221f;border:1.5px solid #c5221f}
+.rvb.dl:hover{background:#c5221f;color:#fff}
+.rvbtn{padding:4px 10px;background:#1a73e8;border:1.5px solid #1a73e8;color:#fff;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer}
+.rvbtn:hover{background:#1557b0;border-color:#1557b0}
+
+/* Review modal — a clean full-page view, not a floating card: no dark
+   backdrop margins, no card shadow/rounding, no "window inside a
+   window" look. The document sits directly on a plain light page. */
+#rvWrap{display:none;position:fixed;inset:0;z-index:200;background:#f0f2f5}
+.rvbox{position:static;width:100%;height:100vh;background:#f0f2f5;display:flex;flex-direction:column;overflow:hidden;box-shadow:none}
+.rvhd{background:#1a1a2e;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rvhd h3{font-size:14px;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+.rvbody{flex:1;overflow:auto;padding:24px 18px 40px;background:#f0f2f5;touch-action:pan-x pan-y;scrollbar-gutter:stable}
+/* ── Sidebar design tokens ──────────────────────────────────────
+   A small, deliberate palette: a blue-biased neutral ramp (not pure
+   gray) so borders/backgrounds read as chosen rather than default,
+   one accent for actions, and semantic colors kept distinct from it
+   for approve/reject/reopen states. One type scale, reused everywhere
+   instead of ad-hoc sizes per element. */
+.rvside{
+  --rv-ink:#0f1424; --rv-ink-soft:#5b6172; --rv-ink-faint:#8a90a2;
+  --rv-line:#e4e7f0; --rv-line-soft:#edeff5;
+  --rv-surface:#fff; --rv-surface-sunken:#f7f8fb;
+  --rv-accent:#2f5fd6; --rv-accent-soft:#eef2fd; --rv-accent-ink:#fff;
+  --rv-good:#1a7a43; --rv-good-bg:#2a9d5c; --rv-good-soft:#eaf7ee;
+  --rv-bad:#b3341f; --rv-bad-bg:#cf4a35; --rv-bad-soft:#fbeeec;
+  --rv-warn:#92400e; --rv-warn-bg:#c07a2e;
+  --rv-eyebrow-size:10.5px; --rv-label-size:11.5px; --rv-body-size:13px; --rv-heading-size:14.5px;
+}
+/* Document on the left, comments/audit trail on the right — two
+   independent columns, each scrolling within .rvbody, instead of one
+   long stacked page. Side-by-side only where there's room for it. */
+.rvsplit{display:flex;gap:22px;align-items:flex-start;max-width:1520px;margin:0 auto}
+.rvstack{flex:1 1 620px;min-width:0;display:flex;flex-direction:column;gap:16px;transform-origin:top center}
+.rvside{
+  flex:0 0 460px;min-width:0;
+  background:var(--rv-surface);border:1px solid var(--rv-line);border-radius:10px;
+  box-shadow:0 1px 2px rgba(15,20,36,.04),0 8px 24px rgba(15,20,36,.05);
+  padding:22px 24px 24px;position:sticky;top:0;
+  font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+  /* Cap the whole card to the viewport and let only the comment thread
+     scroll inside it — with many comments the card used to just keep
+     growing taller than the page (nothing to scroll it independently),
+     squeezing everything into an ever-longer narrow column instead of
+     a fixed-height panel with its own scrollbar. */
+  max-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;
+}
+@media (max-width:1100px){
+  .rvsplit{flex-direction:column}
+  .rvside{flex:1 1 auto;width:100%;position:static;max-height:none}
+}
+/* A Drive-hosted PDF preview paginates internally and needs to own its
+   scroll — nesting it inside another scrolling column makes the two
+   scrollbars fight (the page appears to jump instead of scrolling
+   smoothly). Give it the full visible height and let it scroll itself;
+   the letterhead HTML case (rvFitDoc) still grows a taller box that the
+   outer .rvbody scrolls, since that content has no scroll of its own. */
+.rvdoc{width:100%;height:calc(100vh - 130px);border:1px solid #dcdfe6;border-radius:2px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);display:block}
+.rvpage{background:#fff;border:1px solid #dcdfe6;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.15);padding:40px 48px;color:#000;min-height:600px}
+.rvpage h4{margin:0 0 4px;font-size:18px}
+.rvpage .sub{font-size:12px;color:#666;margin-bottom:16px;border-bottom:2px solid #000;padding-bottom:8px}
+/* Status block — its own tinted header strip at the top of the card,
+   so "what state is this document in" reads as the sidebar's headline
+   rather than one more line of text. */
+.rvst{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap;
+  margin:-22px -24px 14px;padding:10px 24px;
+  background:var(--rv-surface-sunken);border-bottom:1px solid var(--rv-line);
+  border-radius:10px 10px 0 0;
+}
+.rvst::before{
+  content:'STATUS';font-size:var(--rv-eyebrow-size);font-weight:700;color:var(--rv-ink-faint);
+  letter-spacing:.6px;flex:0 0 auto;
+}
+.rvst #rvStatus{font-size:var(--rv-heading-size);font-weight:700;color:var(--rv-ink);flex:0 0 auto;white-space:nowrap}
+/* "Signed in as ..." moved up onto the status row, right-aligned, in a
+   light weight — was its own line below the action buttons, wasting a
+   full row for what's really just ambient context, not something that
+   needs equal visual weight to Status. flex:1 1 auto + min-width:0 is
+   what actually makes text-overflow:ellipsis take effect inside a flex
+   row — without min-width:0 a flex item won't shrink below its content's
+   natural width, so it was forcing the whole row to wrap instead. */
+.rvst #rvWho{margin-left:auto;flex:1 1 auto;min-width:0;font-size:11px;font-weight:400;color:var(--rv-ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* ── Action area (#rvFoot): Comment / Approve / Reject → composer.
+   Muted, tinted button surfaces (not saturated blocks of color) with a
+   colored left rule — reads as a labeled control, not a warning light. */
+#rvStep1 .rvacts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:0}
+#rvStep1 #rvReopen,#rvStep1 #rvMango{grid-column:1/-1}
+#rvStep1 .rvb{
+  padding:7px 8px;font-size:var(--rv-label-size);font-weight:600;letter-spacing:.1px;
+  border-radius:7px;border:1px solid transparent;cursor:pointer;
+  transition:background .14s ease,border-color .14s ease,transform .08s ease;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#rvStep1 .rvb:active{transform:scale(.98)}
+#rvStep1 .rvb:focus-visible{outline:2px solid var(--rv-accent);outline-offset:2px}
+#rvPickComment{background:var(--rv-accent-soft);color:var(--rv-accent);border-color:#dbe4fb}
+#rvPickComment:hover{background:#e3eafc;border-color:#c7d6f8}
+#rvPickApprove{background:var(--rv-good-soft);color:var(--rv-good);border-color:#d5eedd}
+#rvPickApprove:hover{background:#ddf3e4;border-color:#c2e6cc}
+#rvPickReject{background:var(--rv-bad-soft);color:var(--rv-bad);border-color:#f3ddd8}
+#rvPickReject:hover{background:#f8e4df;border-color:#eecdc5}
+#rvReopen{background:#faf1e3;color:var(--rv-warn);border-color:#f0ddbe}
+#rvReopen:hover{background:#f6e9d1;border-color:#e9cf9d}
+#rvMango{background:var(--rv-accent-soft);color:var(--rv-accent);border-color:#dbe4fb}
+#rvMango:hover{background:#e3eafc;border-color:#c7d6f8}
+
+/* Always-open textarea — type a comment, then press Comment / Approve /
+   Reject directly. No separate "pick an action, then confirm" step. */
+#rvText{
+  width:100%;box-sizing:border-box;padding:8px 11px;margin-bottom:8px;
+  border:1px solid var(--rv-line);border-radius:8px;
+  font:400 var(--rv-body-size)/1.5 'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+  color:var(--rv-ink);background:var(--rv-surface);resize:vertical;min-height:44px;
+  transition:border-color .14s ease,box-shadow .14s ease;
+}
+#rvText:focus{outline:none;border-color:var(--rv-accent);box-shadow:0 0 0 3px rgba(47,95,214,.13)}
+#rvText::placeholder{color:var(--rv-ink-faint);font-style:normal}
+
+/* "Also notify" — collapsed by default so the simplified comment box
+   stays uncluttered; one click reveals the department chips + email
+   field. Feeds ccDepts/ccEmails into rvDo(), which server-side triggers
+   notifyCc_() to email the recipients a link to this document. */
+#rvCcToggle{
+  display:block;margin:0 0 6px;padding:2px 0;border:none;background:none;
+  font-size:11px;font-weight:600;color:var(--rv-accent);cursor:pointer;text-align:left;
+}
+#rvCcToggle:hover{text-decoration:underline}
+/* Compact: chips size to their own text and wrap in a flowing row
+   instead of a rigid 2-column grid that forced every chip (and the
+   whole picker) to full width — that was eating roughly half the
+   sidebar's height and pushing the audit trail below the fold. */
+#rvCcWrap{margin-bottom:10px;padding:8px 10px;background:var(--rv-surface-sunken);border:1px solid var(--rv-line-soft);border-radius:7px}
+#rvCcDepts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.ccchip{
+  width:auto;padding:4px 9px;border:1px solid var(--rv-line);border-radius:12px;
+  background:var(--rv-surface);color:var(--rv-ink-soft);font-size:10.5px;font-weight:600;cursor:pointer;
+  transition:all .14s ease;white-space:nowrap;
+}
+.ccchip:hover{border-color:var(--rv-accent)}
+.ccchip.on{background:var(--rv-accent-soft);border-color:var(--rv-accent);color:var(--rv-accent)}
+#rvCcEmail{
+  width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid var(--rv-line);border-radius:6px;
+  font-size:11.5px;font-family:inherit;color:var(--rv-ink);background:var(--rv-surface);
+}
+#rvCcEmail:focus{outline:none;border-color:var(--rv-accent)}
+.rvmsg{font-size:12px;font-weight:600;display:block;margin-top:8px}
+.rvlock{
+  font-size:12.5px;color:var(--rv-ink-soft);background:var(--rv-surface-sunken);
+  border:1px solid var(--rv-line);border-radius:8px;padding:12px 14px;text-align:center;line-height:1.5;
+}
+
+/* Sign-in prompt — an intentional call-to-action card, not a stray
+   floating button. */
+#rvSignIn{background:var(--rv-surface-sunken);border:1px solid var(--rv-line);border-radius:8px;padding:16px 14px}
+#rvSignIn .rvb{
+  width:100%;padding:11px 14px;font-size:var(--rv-label-size);font-weight:700;border-radius:8px;
+  background:var(--rv-accent);color:var(--rv-accent-ink);border:none;cursor:pointer;
+  box-shadow:0 1px 2px rgba(47,95,214,.3);transition:box-shadow .14s ease,transform .08s ease;
+}
+#rvSignIn .rvb:hover{box-shadow:0 4px 12px rgba(47,95,214,.32);transform:translateY(-1px)}
+
+/* Comments/audit-trail, styled as an actual timeline/history: a
+   connecting rail down the left edge with a colored dot per entry (by
+   action type), generous spacing between records instead of a cramped
+   card stack. #rvThread (the direct flex child inside .rvside) is the
+   one part of the sidebar that scrolls internally (see .rvside's
+   max-height/flex above) — Status and the action buttons stay in view
+   no matter how long the history gets; .rvcmtbox is the content
+   #rvThread wraps. */
+#rvThread{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  padding-right:6px;margin-right:-6px;   /* room for the scrollbar without shifting content */
+  /* Reserve the scrollbar's width whether or not it's actually showing.
+     Without this, expanding "Also notify" shrinks #rvThread enough to
+     newly need a scrollbar, which appears/disappears and changes this
+     column's content width by ~15px each time — reflowing the whole
+     .rvsplit row and visibly shifting the document a couple pixels
+     left/right depending on scroll state. */
+  scrollbar-gutter:stable;
+}
+.rvcmtbox{color:var(--rv-ink);margin-top:14px}
+.rvcmtbox h4{margin:0 0 2px;font-size:13px;font-weight:700;color:var(--rv-ink)}
+.rvcmtbox .sub{font-size:11px;color:var(--rv-ink-faint);margin-bottom:12px}
+/* Single rail spanning .rvol itself, from the first dot's center to the
+   last dot's center — NOT per-item segments guessed at a fixed pixel
+   offset (that broke as soon as comment bodies had different heights,
+   and still overshot past the final dot). Dots are 14px wide, so each
+   one's vertical center sits 7px below its <li>'s top edge (top:2px +
+   half of 14px border-box-sized width). Anchoring the rail's `top` and
+   `bottom` to those same two points — the FIRST li's dot-center from
+   .rvol's top, and the LAST li's dot-center from .rvol's bottom — means
+   it can never run past the last dot, however tall any comment in
+   between happens to render. */
+.rvol{list-style:none;margin:0;padding:0;position:relative}
+.rvol::before{
+  content:'';position:absolute;left:8px;width:2px;background:var(--rv-line);
+  top:9px;bottom:9px;
+}
+.rvol li{position:relative;padding:0 0 10px 22px}
+.rvol li:last-child{padding-bottom:2px}
+.rvol li::before{
+  content:'';position:absolute;left:2px;top:2px;box-sizing:border-box;z-index:1;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--rv-ink-faint);border:2px solid var(--rv-surface);
+  box-shadow:0 0 0 1px var(--rv-line);
+}
+.rvol li:has(.rvc1.approve)::before{background:var(--rv-good)}
+.rvol li:has(.rvc1.reject)::before{background:var(--rv-bad)}
+.rvol li:has(.rvc1.reopen)::before{background:var(--rv-warn-bg)}
+/* A single entry has no "next" to connect to — no rail at all. */
+.rvol:has(li:only-child)::before{display:none}
+.rvc1{
+  padding:8px 10px;border:1px solid var(--rv-line-soft);border-radius:7px;
+  background:var(--rv-surface-sunken);
+}
+.rvc1 .meta{font-size:11px;color:var(--rv-ink-faint);margin-bottom:3px}
+.rvc1 .act{font-weight:700;color:var(--rv-ink-soft)}
+.rvc1.approve .act{color:var(--rv-good)}
+.rvc1.reject .act{color:var(--rv-bad)}
+.rvc1.reopen .act{color:var(--rv-warn)}
+.rvc1 .tx{font-size:12.5px;color:var(--rv-ink);white-space:pre-wrap;word-break:break-word;line-height:1.45}
+
+/* ── Submission panel ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;opacity:0;transition:opacity .25s}
+.overlay.show{display:block;opacity:1}
+.panel{position:fixed;top:0;right:0;height:100%;width:460px;max-width:100vw;background:#fff;z-index:101;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-6px 0 28px rgba(0,0,0,.18)}
+.panel.show{transform:translateX(0)}
+.ph{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ph h2{font-size:15px;font-weight:600;margin:0}
+.ph button{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:.7;padding:0 4px;line-height:1}
+.ph button:hover{opacity:1}
+.pbody{flex:1;overflow-y:auto;padding:20px 22px}
+.pf{padding:14px 20px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.fr{margin-bottom:14px}
+.fr label{display:block;font-size:11px;font-weight:700;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.fr input,.fr select,.fr textarea{width:100%;padding:8px 10px;border:1.5px solid #d8d8d8;border-radius:6px;font-size:13px;color:#222;outline:none;font-family:inherit;box-sizing:border-box}
+.fr input:focus,.fr select:focus,.fr textarea:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.12)}
+.fr textarea{resize:vertical;min-height:58px}
+.fr .hint{font-size:11px;color:#aaa;margin-top:3px}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.dz{border:2px dashed #d0d0d0;border-radius:8px;padding:22px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa}
+.dz:hover,.dz.ov{border-color:#1a73e8;background:#f0f6ff}
+.dz-i{font-size:26px;margin-bottom:5px}
+.dz-t{font-size:13px;color:#666}
+.dz-s{font-size:11px;color:#aaa;margin-top:2px}
+.fc{display:none;align-items:center;gap:8px;padding:8px 12px;background:#eef4ff;border-radius:6px;margin-top:8px}
+.fc-n{font-size:12px;color:#1a73e8;font-weight:500;flex:1;word-break:break-all}
+.fc-z{font-size:11px;color:#888;white-space:nowrap}
+.fc-x{cursor:pointer;color:#999;font-size:14px;padding:2px 5px;line-height:1}
+.fc-x:hover{color:#c00}
+.btp{padding:9px 20px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+.btp:hover{background:#1557b0}
+.btp:disabled{background:#b0b0b0;cursor:not-allowed}
+.btc{padding:9px 18px;background:#fff;color:#555;border:1.5px solid #d0d0d0;border-radius:6px;font-size:13px;cursor:pointer}
+.btc:hover{border-color:#888}
+.add-btn{padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.5);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.add-btn:hover{background:rgba(255,255,255,.25)}
+.al{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px;display:none;line-height:1.5}
+.al-e{background:#fce8e6;color:#c5221f;border:1px solid #f5c6c4}
+.al-s{background:#e6f4ea;color:#137333;border:1px solid #c3e6cb}
+.al-i{background:#eef3fe;color:#1a4fa3;border:1px solid #c5d6f5}
+
+
+/* ───────── Demo polish layer (visual only) ───────── */
+body{font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;background:#eef1f6;color:#1f2433;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* Header / brand */
+header{padding:16px 30px;background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);box-shadow:0 2px 12px rgba(31,56,100,.25)}
+.brandwrap{display:flex;align-items:center;gap:18px}
+.logo-badge{height:64px;display:flex;align-items:center;justify-content:center;background:transparent;padding:0;box-shadow:none;border-radius:0}
+.logo-badge img{height:100%;width:auto;object-fit:contain;display:block;image-rendering:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+.brand-txt{display:flex;align-items:center;gap:16px}
+.brand-stack{display:flex;flex-direction:column;gap:6px}
+.brand-txt h1{font-size:24px;font-weight:800;letter-spacing:.3px;line-height:1;color:#fff;margin:0}
+.brand-home{text-decoration:none;color:inherit;display:inline-flex;align-items:center;cursor:pointer}
+.brand-home:hover h1{opacity:.85}
+.brand-div{width:1px;height:40px;background:rgba(255,255,255,.45)}
+.brand-sub{display:inline;font-size:12.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#fff;opacity:1;margin:0}
+.brand-th{font-size:13px;font-weight:500;color:#fff;opacity:1;letter-spacing:.5px;line-height:1}
+.hdr-right{display:flex;align-items:center;gap:14px}
+/* All three header-right chips share the same 40px height + 9px radius so
+   their top/bottom edges sit on the same plane. Sizes copied from the HR
+   Work Log reference (.topbar nav a, .gear inline). */
+#hdr{display:inline-flex;align-items:center;height:40px;padding:0 16px;
+  font-size:13px;color:#fff;font-weight:600;white-space:nowrap;
+  background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.18);border-radius:9px}
+.add-btn{display:inline-flex;align-items:center;height:40px;padding:0 18px;
+  background:#fff;color:#1a1f38;border:1px solid #fff;border-radius:9px;
+  font-weight:700;font-size:13px;box-shadow:0 3px 10px rgba(0,0,0,.26);
+  transition:transform .12s,box-shadow .12s}
+.add-btn:hover{background:#fff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.32)}
+
+/* Toolbars */
+.bar{background:#fff;padding:14px 30px;border-bottom:1px solid #ebedf3;gap:10px}
+.datebar{background:#f7f8fb;padding:11px 30px;border-bottom:1px solid #ebedf3;gap:9px}
+#srch{height:38px;width:280px;border:1.5px solid #e1e4ee;border-radius:9px;font-size:13px}
+#srch:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dtsel{height:38px;border:1.5px solid #e1e4ee;border-radius:9px;color:#4b5163}
+.dtsel:focus,.dtsel.on{border-color:#2563eb;color:#2563eb}
+.dfld{height:38px;border:1.5px solid #e1e4ee;border-radius:9px}
+.dfld:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dwrap{position:relative;display:inline-flex;align-items:center}
+.dwrap .dfld{padding-right:30px}
+.calbtn{position:absolute;right:1px;top:1px;bottom:1px;width:28px;border:0;background:transparent;cursor:pointer;font-size:14px;line-height:1;border-radius:0 8px 8px 0;color:#5b6172}
+.calbtn:hover{background:#eef2fb}
+.dpick{position:absolute;right:6px;bottom:0;width:1px;height:1px;padding:0;margin:0;border:0;opacity:0;pointer-events:none}
+.divider{height:24px;background:#e6e9f0}
+.qbtn{height:30px;border:1.5px solid #e1e4ee;border-radius:18px;font-weight:600;color:#5b6172;transition:all .15s}
+.qbtn:hover{border-color:#2563eb;color:#2563eb;background:#f4f7ff}
+.qbtn.on{background:#1a1f38;border-color:#1a1f38;color:#fff}
+.clrbtn{height:30px;border:1.5px solid #f0c9c9;border-radius:18px;color:#d24747;font-weight:600}
+.clrbtn:hover{background:#d24747;border-color:#d24747;color:#fff}
+
+/* Stat / loading line */
+.stat{padding:12px 30px 0;font-size:12px;color:#8a90a2;font-style:italic}
+
+/* Table */
+.tw{padding:16px 30px 48px}
+table{border-radius:13px;box-shadow:0 3px 16px rgba(20,25,55,.08);overflow:hidden}
+thead tr{background:#1a1f38}
+th{padding:13px 14px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#c9cde2;font-weight:700}
+th:hover{background:#262c4d;color:#fff}
+th.asc::after,th.desc::after{color:#e3c869;opacity:1}
+tbody tr{border-bottom:1px solid #f0f1f5;transition:background .12s}
+tbody tr:hover{background:#f5f8ff}
+td{padding:12px 14px;font-size:12.5px;color:#2b3045}
+td.n{color:#b9bdca}
+td.dt{color:#6b7280}
+.ti{font-weight:600;color:#1f2433;line-height:1.45}
+.de{color:#8a90a2;margin-top:3px}
+.pb{padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.4px}
+.stb{padding:4px 11px;border-radius:14px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.rvbtn{background:#2563eb;border:1.5px solid #2563eb;border-radius:8px;padding:6px 13px;font-weight:600;transition:transform .12s,background .14s}
+.rvbtn:hover{background:#1b4fd0;border-color:#1b4fd0;transform:translateY(-1px)}
+.empty{padding:64px 20px;color:#9aa0b2;font-size:14px}
+
+/* Modals & panel */
+.rvhd{background:linear-gradient(120deg,#171a30,#23284a);padding:13px 18px;flex-wrap:nowrap}
+.rvhd h3{font-weight:700;letter-spacing:.3px;flex:1 1 auto;min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rvhd>span:last-child{flex:0 0 auto;flex-shrink:0;white-space:nowrap;display:inline-flex;flex-wrap:nowrap;align-items:center;gap:8px}
+.rvhd>span:last-child > *{flex-shrink:0}
+.panel{box-shadow:-12px 0 44px rgba(20,25,55,.24)}
+.ph{background:linear-gradient(120deg,#171a30,#23284a)}
+.ph h2{font-weight:700;letter-spacing:.3px}
+.fr label{color:#6b7280;letter-spacing:.5px}
+.fr input,.fr select,.fr textarea{border:1.5px solid #e1e4ee;border-radius:8px}
+.fr input:focus,.fr select:focus,.fr textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
+.dz{border-radius:10px}
+.btp{background:#2563eb;border-radius:8px;font-weight:700;transition:transform .12s,background .14s}
+.btp:hover{background:#1b4fd0;transform:translateY(-1px)}
+.btp:disabled{background:#aeb4c4}
+.btc{border:1.5px solid #d7dae4;border-radius:8px;font-weight:600;color:#5b6172}
+.btc:hover{border-color:#9aa0b2;background:#f7f8fb}
+.rvb{border-radius:8px;font-weight:700;transition:transform .12s,filter .12s}
+.rvb:hover{transform:translateY(-1px);filter:brightness(1.06)}
+.rvb.cm{background:#2563eb}.rvb.ap{background:#16a34a}.rvb.rj{background:#dc2626}
+.rvmsg{font-size:12.5px;margin-left:0;flex-basis:100%;order:9;padding-top:4px}
+.add-btn,.btp,.btc,.rvb,.rvbtn,.qbtn,.clrbtn{cursor:pointer}
+/* Label that sits above each iframe in a multi-attachment view. */
+.rvflbl{display:none;font-size:12px;color:#fff;background:rgba(0,0,0,.6);padding:7px 14px;border-radius:6px;text-align:center;font-weight:600;letter-spacing:.3px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.rvextra{display:flex;flex-direction:column;gap:8px}
+
+/* In-app confirmation modal (replaces browser's native confirm). */
+.ackWrap{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.55);align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.ackWrap.show{display:flex}
+.ackBox{background:#fff;border-radius:12px;padding:24px 26px;width:min(460px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.42);animation:ackIn .14s ease-out}
+@keyframes ackIn{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ackBox h3{margin:0 0 10px;font-size:16px;font-weight:700;color:#1a1f38;letter-spacing:.2px}
+.ackBox .msg{margin:0 0 20px;font-size:13.5px;color:#444;line-height:1.6}
+.ackActs{display:flex;gap:10px;justify-content:flex-end}
+.ackBtn{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:0;font-family:inherit;transition:background .14s,border-color .14s,color .14s}
+.ackBtnPri{background:#1a73e8;color:#fff}
+.ackBtnPri:hover{background:#1557b0}
+.ackBtnPri.danger{background:#c5221f}
+.ackBtnPri.danger:hover{background:#a01816}
+.ackBtnSec{background:#fff;color:#555;border:1.5px solid #d0d0d0}
+.ackBtnSec:hover{border-color:#888;color:#222}
+html.dark .ackBox{background:#1a2030}
+html.dark .ackBox h3{color:#e4e7ef}
+html.dark .ackBox .msg{color:#a8aec1}
+html.dark .ackBtnSec{background:#1a2030;color:#cdd2e1;border-color:#2c3447}
+html.dark .ackBtnSec:hover{border-color:#5a6480;color:#fff}
+
+/* Delete-my-last-entry button on the thread (only on user's own last). */
+.rvCmtDel{background:none;border:0;color:#c5221f;font-size:11px;font-weight:600;cursor:pointer;padding:0 0 0 8px;text-decoration:underline}
+.rvCmtDel:hover{color:#a01816}
+html.dark .rvCmtDel{color:#ff8c84}
+
+/* ───────── Dark mode ─────────
+   Chrome inverts; A4 letter pages stay white (formal documents are
+   white paper). Toggled by `html.dark` so the class can be set in a
+   tiny inline script BEFORE <body> renders → no flash of light theme. */
+/* Signed-in-as: plain inline text on the header — "email · role". */
+.user-as{
+  display:inline-flex;align-items:center;
+  color:#dbe0f1;
+  font-size:13px;font-weight:500;
+  white-space:nowrap;cursor:pointer;
+  padding:6px 4px;line-height:1;
+  transition:color .14s;
+  max-width:260px;
+}
+.user-as:hover{color:#fff}
+.user-as .email{overflow:hidden;text-overflow:ellipsis;max-width:220px;display:inline-block;vertical-align:middle}
+.user-as .sep{opacity:.55;margin:0;flex-shrink:0}
+.user-as .role{opacity:.85;flex-shrink:0}
+
+/* Settings gear chip — same 40px height as the other header chips.
+   Glyph 18px so the gear fills the same proportion of its frame. */
+.dm-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:40px;padding:0 13px;
+  background:rgba(255,255,255,.10);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:9px;
+  font-size:18px;line-height:1;
+  cursor:pointer;white-space:nowrap;font-family:inherit;
+  transition:background .14s,border-color .14s;
+}
+.dm-btn:hover{background:rgba(255,255,255,.24)}
+html.dark .dm-btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+html.dark .dm-btn:hover{background:rgba(255,255,255,.24)}
+
+/* Settings modal — centered card with sections for account / theme /
+   language / sign-out, modelled on the sibling-app Settings panel. */
+.st-wrap{position:relative;display:inline-block}
+.st-modal{display:none;position:fixed;inset:0;z-index:250;
+  background:rgba(15,20,40,.55);align-items:center;justify-content:center}
+.st-modal.show{display:flex}
+.st-card{background:#fff;border-radius:16px;width:min(440px,92vw);max-height:90vh;
+  overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.42);
+  -webkit-overflow-scrolling:touch}
+.st-head{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px 14px;border-bottom:1px solid #ebedf3}
+.st-head h3{margin:0;font-size:16px;font-weight:700;color:#1a1f38;letter-spacing:.2px}
+.st-x{background:none;border:0;font-size:18px;color:#9aa0b2;cursor:pointer;
+  padding:4px 8px;line-height:1;font-family:inherit}
+.st-x:hover{color:#1a1f38}
+.st-body{padding:6px 0 14px}
+.st-section{padding:14px 22px}
+.st-divider{margin:0 22px;border:0;border-top:1px solid #ebedf3}
+.st-sect-label{font-size:11px;font-weight:700;color:#1f2937;letter-spacing:1.2px;
+  text-transform:uppercase;margin-bottom:6px}
+.st-sect-value{font-size:14px;font-weight:600;color:#111827;margin-bottom:4px;word-break:break-all}
+.st-sect-sub{font-size:13px;color:#374151;margin:8px 0}
+.st-seg{display:flex;background:#f1f3f7;border-radius:11px;padding:4px;gap:0}
+.st-seg-btn{flex:1;padding:10px 14px;background:transparent;border:0;border-radius:8px;
+  font-size:13.5px;font-weight:600;color:#1f2937;cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap}
+.st-seg-btn.active{background:#2563eb;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.st-signout{display:block;margin:14px 22px 4px;padding:12px 14px;
+  background:#fff;border:1px solid #e1e4ee;border-radius:10px;
+  font-size:13.5px;color:#1a1f38;font-weight:500;cursor:pointer;
+  font-family:inherit;text-align:left;width:calc(100% - 44px)}
+.st-signout:hover{background:#f4f7ff;border-color:#2563eb;color:#2563eb}
+html.dark .st-card{background:#1a2030;color:#e4e7ef}
+html.dark .st-head{border-bottom-color:#262d3e}
+html.dark .st-head h3{color:#e4e7ef}
+html.dark .st-x{color:#a8aec1}
+html.dark .st-x:hover{color:#fff}
+html.dark .st-divider{border-top-color:#262d3e}
+html.dark .st-sect-label{color:#7e8499}
+html.dark .st-sect-value{color:#e4e7ef}
+html.dark .st-sect-sub{color:#a8aec1}
+html.dark .st-seg{background:#0e1424}
+html.dark .st-seg-btn{color:#a8aec1}
+html.dark .st-seg-btn.active{background:#2E75B6;color:#fff}
+html.dark .st-signout{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .st-signout:hover{background:#222a3e;color:#fff;border-color:#5a6480}
+
+/* Access-control editor (admin only) inside the Settings modal. */
+.acc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  width:100%;background:#eef2fb;border:1px solid #d3dcef;border-radius:9px;
+  padding:11px 14px;cursor:pointer;font-family:inherit;text-align:left;
+  transition:background .15s,border-color .15s}
+.acc-head:hover{background:#e2e9f8;border-color:#b6c2e0}
+.acc-head.open{background:#e2e9f8;border-color:#b6c2e0;
+  border-bottom-left-radius:0;border-bottom-right-radius:0}
+.acc-caret{flex:0 0 auto;display:inline-block;color:#3b4254;font-size:12px;
+  transition:transform .18s;transform:rotate(-90deg)}
+.acc-head.open .acc-caret{transform:rotate(0)}
+.acc-panel{margin-top:0;border:1px solid #d3dcef;border-top:0;
+  border-radius:0 0 9px 9px;padding:12px 12px 4px}
+.acc-body{margin-top:6px}
+.acc-group{margin-bottom:12px}
+.acc-group-h{font-size:12px;font-weight:700;color:#374151;margin:10px 0 6px;
+  text-transform:uppercase;letter-spacing:.6px}
+.acc-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:5px;
+  padding:5px 8px;border:1px solid #ebedf3;border-radius:8px;background:#fbfcff}
+.acc-row.confidential{border-color:#f0b429;background:#fffaf0}
+.acc-key{flex:1 1 auto;min-width:80px;font-size:12.5px;font-weight:600;color:#1a1f38;word-break:break-word}
+.acc-toggle{flex:0 0 auto;display:inline-flex;border:1px solid #d3d8e4;border-radius:7px;overflow:hidden}
+.acc-tg{padding:6px 11px;background:#fff;border:0;font-size:12px;font-weight:700;
+  color:#3b4254;line-height:1.1;cursor:pointer;font-family:inherit;white-space:nowrap}
+.acc-tg+.acc-tg{border-left:1px solid #d3d8e4}
+.acc-tg:hover{background:#f1f4fa}
+.acc-tg.pub.active{background:#34a853;color:#fff}
+.acc-tg.conf.active{background:#e8a013;color:#fff}
+.acc-emails{flex:1 1 100%;display:none;margin-top:2px;padding:7px 9px;border:1px solid #e1e4ee;
+  border-radius:6px;font-size:12.5px;color:#1a1f38;font-family:inherit;background:#fff;
+  box-sizing:border-box;resize:vertical;min-height:38px;line-height:1.5}
+.acc-row.confidential .acc-emails{display:block}
+.acc-emails:focus{outline:none;border-color:#2563eb}
+.acc-emails::placeholder{color:#aab0c0}
+.acc-actions{display:flex;gap:8px;margin-top:12px}
+.acc-reload{flex:0 0 auto;padding:10px 14px;background:#f1f3f7;border:0;border-radius:9px;
+  font-size:13px;font-weight:600;color:#5b6172;cursor:pointer;font-family:inherit}
+.acc-reload:hover{background:#e6e9f0}
+.acc-save{flex:1;padding:10px 14px;background:#2563eb;border:0;border-radius:9px;
+  font-size:13.5px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit}
+.acc-save:hover{background:#1d4fd0}
+.acc-save:disabled{opacity:.6;cursor:default}
+.acc-msg{margin-top:8px;font-size:12.5px;min-height:16px}
+.acc-msg.ok{color:#137333}
+.acc-msg.err{color:#c5221f}
+html.dark .acc-group-h{color:#a8aec1}
+html.dark .acc-row{border-color:#2c3447;background:#141a29}
+html.dark .acc-row.confidential{border-color:#a87d18;background:#2a2410}
+html.dark .acc-key{color:#e4e7ef}
+html.dark .acc-head{background:#1a2030;border-color:#2c3447}
+html.dark .acc-head:hover{background:#222a3e;border-color:#3a455e}
+html.dark .acc-head.open{background:#222a3e;border-color:#3a455e}
+html.dark .acc-panel{border-color:#2c3447}
+html.dark .acc-caret{color:#a8aec1}
+html.dark .acc-toggle{border-color:#2c3447}
+html.dark .acc-tg{background:#1a2030;color:#c4cad8}
+html.dark .acc-tg+.acc-tg{border-left-color:#2c3447}
+html.dark .acc-tg:hover{background:#222a3e}
+html.dark .acc-tg.pub.active{background:#2e8b4f;color:#fff}
+html.dark .acc-tg.conf.active{background:#b9820f;color:#fff}
+html.dark .acc-emails{background:#1a2030;border-color:#2c3447;color:#e4e7ef}
+html.dark .acc-emails:focus{border-color:#4f9dff}
+html.dark .acc-reload{background:#222a3e;color:#cdd2e1}
+html.dark .acc-reload:hover{background:#2c3650}
+html.dark .acc-save{background:#2E75B6}
+html.dark .acc-save:hover{background:#3b86cb}
+html.dark .acc-msg.ok{color:#7ee2a8}
+html.dark .acc-msg.err{color:#ff9a94}
+
+/* Document-list loading state — centered spinner so a slow first load
+   never looks like a blank page. */
+.loadbox{display:flex;align-items:center;justify-content:center;gap:11px;
+  padding:60px 20px;color:#6b7280;font-size:14px;font-weight:500}
+.spinner{width:22px;height:22px;border:3px solid #d9deea;border-top-color:#2563eb;
+  border-radius:50%;animation:vcbspin .8s linear infinite;flex:0 0 auto}
+@keyframes vcbspin{to{transform:rotate(360deg)}}
+html.dark .loadbox{color:#a8aec1}
+html.dark .spinner{border-color:#2c3447;border-top-color:#4f9dff}
+
+/* Mobile: settings modal becomes a bottom sheet. */
+html.is-mobile .st-modal{align-items:flex-end}
+html.is-mobile .st-card{width:100%;max-width:100%;max-height:92vh;
+  border-radius:18px 18px 0 0;
+  padding-bottom:max(8px,env(safe-area-inset-bottom))}
+
+html.dark body{background:#0f1421;color:#e4e7ef}
+html.dark .bar{background:#1a2030;border-bottom-color:#262d3e}
+html.dark #srch{background:#11172a;border-color:#2c3447;color:#e4e7ef}
+html.dark #srch::placeholder{color:#6b7180}
+html.dark .divider{background:#2c3447}
+html.dark .dtsel{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .dtsel:focus{border-color:#4f9dff}
+html.dark .dtsel.on{border-color:#4f9dff;color:#9dc3e6}
+html.dark .pfmsPanel{background:#1a2030;border-color:#2c3447;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+html.dark .pfmsRow{color:#cdd2e1}
+html.dark .pfmsRow:hover{background:#232b40}
+html.dark .pfmsRow.sel{background:#243352}
+html.dark .pfmsDiv{background:#2c3447}
+html.dark .pfmsCaret{color:#7d8399}
+html.dark .datebar{background:#141a29;border-bottom-color:#262d3e}
+html.dark .datebar label{color:#9aa0b2}
+html.dark .datebar input[type=date],html.dark .datebar .dfld{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .qbtn{background:#1a2030;border-color:#2c3447;color:#a8aec1}
+html.dark .qbtn:hover{border-color:#4f9dff;color:#9dc3e6}
+html.dark .qbtn.on{background:#2E75B6;border-color:#2E75B6;color:#fff}
+html.dark .clrbtn{background:#1a2030}
+/* Native date picker icon is black by default → invisible on dark fields. */
+html.dark .datebar input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer}
+html.dark .stat{color:#9aa0b2}
+html.dark table{background:#1a2030;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+html.dark thead tr{background:#0b1020;color:#cdd2e1}
+html.dark th:hover{background:#141a2e}
+html.dark tbody tr{border-bottom-color:#262d3e}
+html.dark tbody tr:hover{background:#222a3e}
+html.dark .ti{color:#e4e7ef}
+html.dark .de{color:#9aa0b2}
+html.dark td.n{color:#5b6172}
+html.dark td.dt,html.dark td.cd{color:#a8aec1}
+html.dark .nl{color:#5b6172}
+html.dark .empty{color:#6b7180}
+html.dark #hdr{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+/* Submission panel */
+html.dark .overlay{background:rgba(0,0,0,.65)}
+html.dark .panel{background:#141a29;color:#e4e7ef}
+html.dark .pf{border-top-color:#262d3e}
+html.dark .fr label{color:#a8aec1}
+html.dark .fr input,html.dark .fr select,html.dark .fr textarea{background:#0e1424;border-color:#2c3447;color:#e4e7ef}
+html.dark .fr .hint{color:#6b7180}
+html.dark .dz{background:#0e1424;border-color:#2c3447}
+html.dark .dz:hover,html.dark .dz.ov{background:#162342}
+html.dark .dz-t{color:#a8aec1}
+html.dark .dz-s{color:#6b7180}
+html.dark .btc{background:#1a2030;color:#cdd2e1;border-color:#2c3447}
+html.dark .btc:hover{border-color:#5a6480}
+/* Review modal — keep the letter (rvpage/rvdoc) white; dark the chrome */
+html.dark .rvbox{background:#0e1424}
+html.dark .rvbody{background:#070a14}
+html.dark .rvft{background:#141a29;border-top-color:#262d3e}
+html.dark .rvft textarea{background:#0e1424;border-color:#2c3447;color:#e4e7ef}
+html.dark .rvft textarea::placeholder{color:#6b7180}
+html.dark .rvlock{background:#1a2030;color:#a8aec1}
+html.dark .al-e{background:#3a1414;color:#ffb4ad;border-color:#5a2020}
+html.dark .al-s{background:#0e2a18;color:#a7e0bd;border-color:#1a4a2c}
+html.dark .al-i{background:#13243f;color:#a9c6f5;border-color:#27406b}
+
+
+/* ──────────────────────────────────────────────────────────────────
+   MOBILE LAYOUT — single-pane stack-navigation pattern for phones.
+
+   Activated by html.is-mobile, set by the JS detector in <head>
+   (NOT by @media alone — in-app browsers like Gmail webview, Slack,
+   Twitter, and the Apps Script iframe wrapper often misreport the
+   viewport at 980px+ on a real iPhone, so @media never fires).
+   Desktop layout is untouched.
+   ────────────────────────────────────────────────────────────────── */
+
+/* iOS-wide tweaks: no bounce-through, brand-tinted tap highlight,
+   no auto text resizing in rotated webviews. */
+html.is-mobile, html.is-mobile body{
+  overscroll-behavior-y:contain;
+  -webkit-tap-highlight-color:rgba(46,117,182,.18);
+  -webkit-text-size-adjust:100%;
+}
+
+/* All form fields ≥16px so iOS Safari does NOT zoom on focus.
+   Buttons too — same height parity, no weird mid-tap zoom. */
+html.is-mobile input,
+html.is-mobile select,
+html.is-mobile textarea,
+html.is-mobile button{font-size:16px}
+html.is-mobile #srch,
+html.is-mobile .dtsel,
+html.is-mobile .dfld{font-size:16px}
+
+/* ── Header — tuned to the real iPhone viewport (after the viewport
+   meta-tag fix made CSS px = device px). */
+html.is-mobile header{
+  padding:9px 12px;
+  padding-top:max(9px,env(safe-area-inset-top));
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:nowrap;
+  gap:8px;
+  box-shadow:0 1px 6px rgba(31,56,100,.25);
+}
+html.is-mobile .brandwrap{min-width:0;flex:1 1 auto;overflow:hidden;gap:10px}
+html.is-mobile .logo-badge{height:38px !important;flex-shrink:0}
+html.is-mobile .brand-txt{gap:10px;flex-wrap:nowrap;align-items:center;min-width:0;flex:1 1 auto}
+html.is-mobile .brand-txt h1{font-size:18px !important;font-weight:800 !important;letter-spacing:.2px;flex-shrink:0;line-height:1 !important}
+html.is-mobile .brand-div{display:inline-block !important;height:28px !important;flex-shrink:0}
+html.is-mobile .brand-stack{flex-basis:auto;flex:1 1 auto;min-width:0;gap:2px;overflow:hidden;display:flex;flex-direction:column}
+html.is-mobile .brand-sub{font-size:10px !important;font-weight:700;letter-spacing:1.2px !important;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block !important}
+html.is-mobile .brand-th{display:block !important;font-size:10.5px !important;font-weight:500;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html.is-mobile .hdr-right{gap:6px;flex-shrink:0}
+html.is-mobile #hdr{display:none}                    /* counts move to .stat line */
+html.is-mobile .add-btn{display:none}                /* Add Document becomes the FAB on phones */
+html.is-mobile .dm-btn{height:36px;padding:0 10px;font-size:16px;flex-shrink:0;border-radius:8px}
+html.is-mobile .user-as{display:none}                /* email + role moved into Settings modal on mobile */
+
+/* Floating Add-Document button — phone-only. Bottom-right, above the
+   home indicator. Replicates Mail/Gmail/iOS-native FAB pattern. */
+.fab{display:none}
+html.is-mobile .fab{
+  display:flex;align-items:center;justify-content:center;
+  position:fixed;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  right:calc(14px + env(safe-area-inset-right));
+  width:48px;height:48px;border-radius:24px;
+  background:#2E75B6;color:#fff;border:0;
+  font-size:24px;font-weight:300;cursor:pointer;
+  box-shadow:0 5px 14px rgba(31,56,100,.4),0 2px 5px rgba(0,0,0,.2);
+  z-index:90;line-height:1;
+}
+html.is-mobile .fab:active{transform:translateY(1px);box-shadow:0 3px 10px rgba(31,56,100,.4)}
+
+/* ── Filter / search bar — search + dropdown share a row, project pills
+   become a tight horizontal scroller below them ── */
+html.is-mobile .bar{
+  padding:8px 12px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  gap:6px;
+  flex-direction:row;flex-wrap:wrap;
+  align-items:center;
+}
+html.is-mobile #srch{flex:1 1 100%;width:auto;min-width:0;height:36px;border-radius:8px;font-size:14px;padding:0 12px}
+html.is-mobile .bar .divider{display:none}
+html.is-mobile .dtsel{flex:1 1 calc(50% - 3px);width:auto;max-width:none;min-width:0;height:36px;border-radius:8px;font-size:13px;padding:0 8px}
+html.is-mobile .pfmsPanel{left:auto;right:0;min-width:min(300px,calc(100vw - 24px))}
+
+/* Date filter bar — 2 dense rows. Row 1: label + From + → + To.
+   Row 2: 3 quick buttons + Clear. Tight padding everywhere. */
+html.is-mobile .datebar{
+  padding:6px 12px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:5px;align-items:center;
+}
+html.is-mobile .datebar{flex-wrap:nowrap}
+/* One shared box spec, matching .dtsel (doc-type / status) exactly —
+   height:36px, radius:8px — so every filter control in the header looks
+   like one standardized set instead of some boxes taller than others. */
+html.is-mobile .datebar .dfld{
+  height:36px;border-radius:8px;padding:0 6px;font-size:12px;
+  min-width:0;box-sizing:border-box;
+}
+/* Native date inputs render their own (long, locale-formatted) text —
+   we can't shorten that directly, so the real input is shrunk/hidden and
+   a custom label is drawn on top instead: the short "d/m/yy" value once
+   picked, or a short "Date" placeholder when empty. Both boxes are the
+   same size and both draw their label inside the box, never beside it.
+   See .dwrap1/.dlbl below and refreshDateLabels() in the script. */
+html.is-mobile .datebar .dfld{flex:0 0 auto;width:70px;max-width:70px;text-align:center;color:transparent;-webkit-appearance:none;appearance:none;background:white}
+html.is-mobile .dwrap1{position:relative;display:inline-flex;flex:0 0 auto}
+html.is-mobile .dlbl{
+  position:absolute;inset:0;pointer-events:none;background:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:#333;white-space:nowrap;
+}
+html.is-mobile .dlbl.dph{background:none;font-size:11px;color:#888;font-weight:600}
+html.dark.is-mobile .dlbl{color:#cdd2e1}
+html.dark.is-mobile .dlbl.dph{color:#9aa0b2}
+html.is-mobile .datebar > span{color:#bbb;font-size:11px;flex-shrink:0;padding:0 1px}
+html.is-mobile .datebar .divider{display:none}
+/* Clutter — remove all the preset chips on mobile per user request. */
+html.is-mobile .qbtn,
+html.is-mobile .clrbtn{display:none !important}
+html.is-mobile .stat{padding:8px 12px 4px;font-size:11.5px;font-weight:500}
+
+/* ── Custom date picker modal (mobile-only). Replaces iOS native
+   picker so there's no auto-today on tap, no reset/tick chrome. ── */
+.dp-modal{display:none;position:fixed;inset:0;z-index:260;
+  background:rgba(15,20,40,.55);align-items:flex-end;justify-content:center}
+.dp-modal.show{display:flex}
+.dp-sheet{background:#fff;width:100%;max-width:100%;
+  border-radius:18px 18px 0 0;
+  padding:14px 14px max(18px,env(safe-area-inset-bottom));
+  box-shadow:0 -10px 40px rgba(0,0,0,.3)}
+.dp-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.dp-nav{background:#f1f3f7;border:0;border-radius:8px;
+  width:34px;height:34px;font-size:14px;color:#1a1f38;cursor:pointer;
+  font-family:inherit;display:inline-flex;align-items:center;justify-content:center}
+.dp-nav:active{background:#e1e4ee}
+.dp-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#1a1f38}
+.dp-close{background:none;border:0;font-size:18px;color:#9aa0b2;
+  cursor:pointer;padding:6px 10px;line-height:1;font-family:inherit}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-dow{text-align:center;font-size:11px;color:#9aa0b2;font-weight:700;
+  padding:6px 0;letter-spacing:.4px}
+.dp-empty{height:38px}
+.dp-day{background:transparent;border:0;border-radius:9px;
+  height:38px;font-size:13.5px;color:#1a1f38;cursor:pointer;
+  font-family:inherit;font-weight:500;
+  display:inline-flex;align-items:center;justify-content:center}
+.dp-day:active{background:#e8eef7}
+.dp-day.today{color:#2563eb;font-weight:700}
+.dp-day.selected{background:#2563eb;color:#fff;font-weight:700}
+.dp-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.dp-clear{background:transparent;border:0;color:#c5221f;
+  font-size:13px;font-weight:600;cursor:pointer;
+  padding:8px 14px;font-family:inherit}
+.dp-clear:active{opacity:.6}
+html.dark .dp-sheet{background:#1a2030;color:#e4e7ef}
+html.dark .dp-nav{background:#0e1424;color:#e4e7ef}
+html.dark .dp-title{color:#e4e7ef}
+html.dark .dp-day{color:#cdd2e1}
+html.dark .dp-day:active{background:#222a3e}
+
+/* ── Table → card stack on phones ──
+   Each <tr> becomes a flex container; tds become flex items whose
+   order/basis we control. No floats — keeps the bottom row clean. */
+html.is-mobile .tw{
+  padding:10px 12px 90px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  padding-bottom:max(90px,calc(env(safe-area-inset-bottom) + 60px));
+  overflow-x:visible;
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile table{box-shadow:none;background:transparent;border-radius:0;display:block;width:100%}
+html.is-mobile thead{display:none}
+html.is-mobile tbody{display:block}
+html.is-mobile tbody tr{
+  display:flex;flex-wrap:wrap;align-items:center;
+  background:#fff;border:0;
+  border-radius:11px;padding:11px 13px;
+  margin-bottom:8px;
+  box-shadow:0 1px 5px rgba(20,25,55,.08);
+  position:relative;
+  min-height:48px;
+}
+/* Filter-hidden rows must stay hidden even when the mobile flex rule
+   above re-declares `display`. Higher-specificity override. */
+html.is-mobile tbody tr.h{display:none}
+html.is-mobile tbody tr:hover{background:#fff}   /* no row hover on touch */
+html.is-mobile tbody td{
+  padding:0;white-space:normal;border:0;
+  width:auto !important;max-width:none !important;
+}
+/* # number → small superscript top-right */
+html.is-mobile td.n{
+  position:absolute;top:10px;right:14px;
+  font-size:10.5px;color:#c0c4d0;font-weight:600;
+  order:0;
+}
+/* Meta row: date + project pill + code, all inline */
+html.is-mobile td.dt{
+  order:1;flex:1 1 100%;
+  font-size:11px;color:#6b7280;font-weight:500;
+  margin:0 0 6px;padding-right:26px;
+}
+html.is-mobile td.pj{
+  order:2;flex:0 0 auto;
+  margin:0 6px 7px 0;
+}
+html.is-mobile td.cd{
+  order:3;flex:1 1 auto;
+  font-size:11px;color:#9aa0b2;font-weight:600;letter-spacing:.2px;
+  margin:0 0 7px;
+}
+/* Subject block: full-width, takes most of the card */
+html.is-mobile td.sb{
+  order:4;flex:1 1 100%;
+  margin:0 0 10px;
+}
+html.is-mobile td.sb .ti{
+  font-size:13.5px;line-height:1.38;font-weight:600;color:#1a1f38;
+}
+html.is-mobile td.sb .de{
+  font-size:11.5px;color:#9aa0b2;margin-top:4px;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+/* Bottom action row: status badge left, Open button pushed right */
+html.is-mobile td.stc{
+  order:5;flex:0 0 auto;
+  margin:0;
+}
+html.is-mobile td.rvc{
+  order:6;flex:0 0 auto;
+  margin-left:auto;
+}
+html.is-mobile .rvbtn{padding:7px 14px;font-size:11.5px;min-height:34px;border-radius:8px;font-weight:600;touch-action:manipulation;letter-spacing:.2px}
+html.is-mobile .add-btn,
+html.is-mobile .btp,
+html.is-mobile .btc,
+html.is-mobile .qbtn,
+html.is-mobile .clrbtn,
+html.is-mobile .rvb,
+html.is-mobile .ackBtn{touch-action:manipulation}
+html.is-mobile .pb{padding:4px 10px;font-size:11px}
+html.is-mobile .stb{padding:4px 11px;font-size:11px}
+
+html.dark.is-mobile tbody tr{background:#1a2030;box-shadow:0 1px 5px rgba(0,0,0,.4)}
+html.dark.is-mobile tbody tr:hover{background:#1a2030}
+
+/* ── Review modal: full-screen "detail pane" with ← Back bar ── */
+html.is-mobile #rvWrap{background:#fff;display:none}
+html.is-mobile .rvbox{
+  position:fixed;inset:0;top:0;left:0;
+  width:100vw;height:100vh;height:100dvh;
+  transform:none;border-radius:0;max-width:none;
+  box-shadow:none;
+}
+html.is-mobile .rvhd{
+  position:sticky;top:0;z-index:5;
+  padding:10px 12px;
+  padding-top:max(10px,env(safe-area-inset-top));
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:8px;
+  border-bottom:1px solid rgba(255,255,255,.1);
+}
+html.is-mobile .rvhd h3{font-size:13.5px;max-width:100%;flex:1 1 100%}
+/* Title takes its own row; the action buttons (Back, Delete) take the
+   next row and spread evenly across the full width. Zoom +/- and
+   "Open original" were dropped entirely (see desktop rules above) —
+   the doc preview's own expand-to-full-screen square covers that case. */
+html.is-mobile .rvhd > span:last-child{
+  flex-wrap:nowrap;gap:6px;flex:1 1 100%;
+  display:flex;justify-content:space-between;
+}
+html.is-mobile .rvhd .btc{
+  padding:8px 6px;font-size:11.5px;min-height:36px;
+  margin-right:0 !important;flex:1 1 0;min-width:0;
+  text-align:center;
+}
+/* Re-label the ✕ Close button as a ← Back chip and pin it first (left) */
+html.is-mobile .rvhd .btc[onclick*="closeReview"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border-color:rgba(255,255,255,.4);color:#fff;
+  min-height:36px;padding:8px 6px;order:1;
+}
+html.is-mobile .rvhd .btc[onclick*="closeReview"]::before{
+  content:"← Back";font-size:12px;font-weight:700;letter-spacing:.2px;
+}
+html.is-mobile #rvDel{order:2}
+html.is-mobile .rvbody{
+  padding:10px;
+  -webkit-overflow-scrolling:touch;
+  flex:1;min-height:0;
+}
+html.is-mobile .rvdoc{height:65vh;height:65dvh}
+html.is-mobile .rvft{
+  padding:10px 12px;
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+}
+html.is-mobile .rvft textarea{font-size:16px;min-height:54px}
+html.is-mobile .rvb{padding:10px 14px;font-size:14px;min-height:44px}
+/* Comment / Approve / Reject spread evenly across the full width instead
+   of bunching to the left — frees up more vertical room for the document
+   since the row no longer needs to wrap as easily. */
+html.is-mobile .rvacts{gap:6px;display:flex}
+html.is-mobile #rvStep1 .rvacts .rvb{flex:1 1 0;min-width:0;text-align:center}
+html.is-mobile .rvmsg{flex-basis:100%;order:9;text-align:center}
+
+/* ── Add Document panel: slides up from bottom on mobile ── */
+html.is-mobile .panel{
+  width:100vw;max-width:100vw;
+  top:0;right:0;bottom:0;left:0;height:100%;
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+}
+html.is-mobile .panel.show{transform:translateY(0)}
+html.is-mobile .ph{
+  padding:12px 14px;
+  padding-top:max(12px,env(safe-area-inset-top));
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+  position:sticky;top:0;z-index:5;
+}
+html.is-mobile .ph h2{font-size:15px}
+/* Re-label the ✕ close button as ← Back on the Add Document panel */
+html.is-mobile .ph button[onclick*="closePanel"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.4);
+  border-radius:7px;min-height:36px;padding:6px 12px;
+}
+html.is-mobile .ph button[onclick*="closePanel"]::before{
+  content:"← Back";font-size:13px;font-weight:700;color:#fff;letter-spacing:.2px;
+}
+html.is-mobile .pbody{
+  padding:14px;
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+  padding-bottom:max(20px,env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile .panel .pf{
+  padding:10px 14px;
+  padding-bottom:max(10px,env(safe-area-inset-bottom));
+  position:sticky;bottom:0;background:#fff;
+}
+html.dark.is-mobile .panel .pf{background:#141a29}
+html.is-mobile .fr2{grid-template-columns:1fr 1fr;gap:10px}
+html.is-mobile .btp,html.is-mobile .btc{min-height:44px;padding:11px 16px;font-size:14px}
+
+/* ── A4 preview & body-editor modals: full-screen with ← Back ── */
+html.is-mobile #pvWrap,
+html.is-mobile #bxWrap{background:#fff}
+html.is-mobile #pvWrap > div:first-child,
+html.is-mobile #bxWrap > div:first-child{
+  height:auto;min-height:48px;
+  padding-top:max(8px,env(safe-area-inset-top));
+  padding-bottom:8px;
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-right:max(12px,env(safe-area-inset-right));
+  flex-wrap:wrap;gap:6px;
+}
+html.is-mobile #pvWrap .btc[onclick*="closePreview"],
+html.is-mobile #bxWrap .btc[onclick*="closeBodyEditor"]{
+  font-size:0;background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.4);color:#fff;
+  min-height:36px;padding:7px 12px;
+}
+html.is-mobile #pvWrap .btc[onclick*="closePreview"]::before,
+html.is-mobile #bxWrap .btc[onclick*="closeBodyEditor"]::before{
+  content:"← Back";font-size:13px;font-weight:700;letter-spacing:.2px;
+}
+html.is-mobile #pvFrame,
+html.is-mobile #bxFrame{
+  top:calc(56px + env(safe-area-inset-top));
+  height:calc(100% - 56px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+/* ── Confirmation dialog → bottom sheet on phones ── */
+html.is-mobile .ackWrap{align-items:flex-end}
+html.is-mobile .ackBox{
+  width:100%;max-width:100%;
+  max-height:92vh;overflow-y:auto;
+  border-radius:18px 18px 0 0;
+  padding:22px 22px 0;
+  padding-bottom:max(26px,calc(env(safe-area-inset-bottom) + 22px));
+  animation:none;
+  -webkit-overflow-scrolling:touch;
+}
+html.is-mobile .ackBtn{min-height:44px;padding:11px 18px;font-size:14px}
+
+/* Drag-and-drop hint isn't useful on touch; keep tap-to-open instead. */
+html.is-mobile .dz{padding:18px 14px;min-height:84px}
+html.is-mobile .dz-i{font-size:24px}
+html.is-mobile .dz-t{font-size:13px}
+html.is-mobile .dz-s{font-size:11px}
+

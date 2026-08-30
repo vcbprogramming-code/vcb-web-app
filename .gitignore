@@ -1,51 +1,48 @@
-# dependencies
+# Dependencies
 node_modules/
-.pnp
-.pnp.js
 
-# env
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment / secrets — never commit
 .env
 .env.local
 .env.*.local
-*.env
+!.env.example
 
-# build output
-dist/
-build/
-frontend/dist/
-backend/dist/
+# Google Apps Script local credentials
+.clasprc.json
 
-# logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# editor / OS
-.DS_Store
-.vscode/*
-!.vscode/extensions.json
-.idea/
+# Windows / Google Drive noise
 desktop.ini
+Thumbs.db
+$RECYCLE.BIN/
 
-# Google Drive for Desktop sync artifacts
-.tmp.driveupload/
-.tmp.drivedownload/
+# Google Drive shortcut + binary mirror files (not source)
 *.gsheet
 *.gscript
+*.gdoc
+*.url
 
-# clasp (deployment-specific — contains the live script ID; .claspignore is kept, defines app source scope)
-.clasp.json
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
 
-# supabase
-supabase/.temp/
-supabase/.branches/
+# Logs
+npm-debug.log*
+yarn-error.log*
+*.log
 
-# misc
-coverage/
-*.local
+# Agent worktrees
+.claude/worktrees/
 
-# Claude Code local overrides (personal, not team-shared)
-.claude/settings.local.json
+# Large unreferenced media (kept on disk, not in git)
+*.mp4
+
+# Contains a live Google OAuth client secret - excluded until credential is moved out of source
+ememo/ORIGINAL CODE/Code.js
+ememo/ORIGINAL CODE/PROJECT_SUMMARY.md

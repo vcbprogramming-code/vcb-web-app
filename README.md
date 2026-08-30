@@ -1,133 +1,77 @@
-# ระบบบริหารงานบุคคลและการอนุมัติเอกสารอิเล็กทรอนิกส์
+# VCB Connect
 
-HR Operations, E-Approval & Onboarding System — สำหรับ **บริษัท วิจิตรภัณฑ์ก่อสร้าง**
+One company portal for VCB Group (vcb-con.com), made of modules that are
+developed separately but ship as one website.
 
-เว็บแอป Responsive ใช้งานผ่านเบราว์เซอร์ รองรับมือถือและคอมพิวเตอร์ ทำงานบนฐานข้อมูลกลางตัวเดียว และมีระบบสิทธิ์ตามบทบาท (Role-based Access)
+## Structure
 
-## โมดูล (4 โมดูลตามข้อเสนอโครงการ)
+Every module has the same two folders:
 
-1. **E-Memo & E-Signature** — บันทึกข้อความและอนุมัติอิเล็กทรอนิกส์ + ลายเซ็นดิจิทัล
-2. **รายงาน & วิเคราะห์การปฏิบัติงาน** — บันทึกงานรายวัน + OT, Dashboard เทียบ 5 หน่วยงาน
-3. **Credit Facility Management** — วงเงินสินเชื่อรายโครงการ, ติดตาม Drawdown / คงเหลือ
-4. **Onboarding 90 วัน** — แนะแนวและติดตามพนักงานใหม่
+| Folder | What it is | Status |
+|---|---|---|
+| `ORIGINAL CODE/` | Google Apps Script — plain JavaScript, no build step. | 🟢 **LIVE — this is what users see** |
+| `FOR DEPLOYMENT TEAM/` | React 18 + TypeScript (Vite) port. Backend is a typed mock. | ⚪ not deployed yet |
 
-> สถานะปัจจุบัน: **วางโครงสร้างพื้นฐานเสร็จแล้ว** (skeleton + DB schema + Auth + layout).
-> หน้าโมดูลทั้ง 4 เป็น placeholder พร้อมต่อยอด
+> **Edit `ORIGINAL CODE/` for anything real.** `FOR DEPLOYMENT TEAM/` is a
+> downstream mirror that gets synced afterwards — read its `PORT_NOTES.md`
+> before assuming a feature exists there.
 
-## สถาปัตยกรรม
+In Apps Script there is no frontend/backend split: the backend is the `api_*`
+functions and the frontend is the HTML served from the same file. That is why
+these folders are flat rather than split into `frontend/` + `backend/`.
 
+## Modules
+
+| Module | Folder |
+|---|---|
+| Portal (the launcher/shell) | `portal/` |
+| Credit Facility | `credit-facility/` |
+| System Map | `system-map/` |
+| SOP | `sop/` |
+| HR Work Log | `hr-worklog/` |
+| Meeting Minutes | `meeting-minutes/` |
+| Onboarding | `onboarding/` |
+| E-Memo | `ememo/` |
+
+## Shared
+
+| Folder | What it is |
+|---|---|
+| `platform/` | Node/Express API + React SPA + 23 Supabase migrations. Shared infrastructure with real auth/roles — **not a module**. |
+| `shared/` | Cross-module design tokens and theme controller (see Known issues). |
+| `docs/` | Architecture standards and setup notes. |
+
+## A note on `frontend/` and `backend/`
+
+No module has its own `frontend/` or `backend/` folder, and that is deliberate —
+in Apps Script the backend is the `api_*` functions and the frontend is the HTML
+served from the same file, so the split cannot exist.
+
+Copies of the platform app previously sat inside `portal/`, `meeting-minutes/`
+and `ememo/`. They were migration debris, not module code, and have been removed.
+The one real backend lives in `platform/`. The copy found under `ememo/` turned
+out to be **newer** than the one installed as `platform/` (23 migrations vs 17,
+plus an action-level permissions system, PDF merging, and a reorganised admin
+UI); it was promoted, and the older tree is archived in the backup folder.
+
+## Known issues
+
+**Theme fragmentation.** All modules ship light *and* dark, but each implements
+it differently — four different CSS selectors (`html[data-theme]`, `body.dark`,
+`html.theme-dark`, `html.dark`), five different `localStorage` keys, and only
+HR Work Log supports `auto` (follow-OS). Under one domain they share an origin,
+so a user's choice will not follow them between modules. `hr-worklog` has the
+most complete implementation — use it as the model when converging into
+`shared/`.
+
+**Design tokens differ.** Token names and palettes are unrelated between modules
+(`--brand` vs `--accent` vs `--blue`; navy `#1F3864` vs `#0b3d62`). They will not
+look like one website until this is unified.
+
+## Local setup
+
+`node_modules/` is not kept in this tree. In any `FOR DEPLOYMENT TEAM/` folder:
+
+```sh
+npm install && npm run dev
 ```
-[ React (Vite + Tailwind) ]  ──HTTP──>  [ Node.js / Express API ]  ──>  [ MongoDB Atlas (Mongoose + GridFS) ]
-       frontend/                              backend/                         backend/src/models/
-```
-
-**Deploy target: Railway.** Frontend + backend Express both deploy to Railway.
-The backend runs as a normal long-running Express server (no serverless
-restructure needed). Scheduled/long work (email auto-log, monthly rollups,
-interest recompute) runs as a Railway cron service or an in-process scheduler —
-no per-request timeout limits.
-
-- **Frontend** (`frontend/`): Vite + React + Tailwind CSS. คุยกับ backend ผ่าน REST `/api`
-- **Backend** (`backend/`): Node.js + Express เป็น API หลัก ถือ business logic/workflow ทั้งหมด
-  เชื่อมต่อ MongoDB ด้วย **Mongoose** (connection string เดียว) — ไฟล์แนบ/PDF เก็บใน **GridFS**
-- **Auth**: จัดการเองในฝั่ง backend — อีเมล + รหัสผ่าน (bcrypt) แลกเป็น JWT,
-  middleware ตรวจ token แล้วโหลด profile (role + unit) จาก collection `profiles`
-- **Database**: MongoDB (โฮสต์บน Atlas หรือที่ไหนก็ได้) — Mongoose models อยู่ใน `backend/src/models/`,
-  seed ข้อมูลอ้างอิงผ่าน `npm run seed`
-
-## โครงสร้างโฟลเดอร์
-
-```
-hr-system/
-├── backend/
-│   ├── src/
-│   │   ├── config/       env.js, db.js (Mongoose connect), storage.js (GridFS)
-│   │   ├── models/       Mongoose schemas (Profile, Project, Document, …)
-│   │   ├── middleware/   auth.js (requireAuth/requireRole), errorHandler.js
-│   │   ├── routes/       auth/org/projects/documents/approvals/admin.routes.js
-│   │   ├── services/     docNumber, approval, pdfDoc, letterhead, email
-│   │   ├── utils/        asyncHandler.js, auth.js (JWT+bcrypt), serialize.js
-│   │   ├── app.js        Express app (helmet, cors, json, routes)
-│   │   └── server.js     entrypoint (connect + syncIndexes + listen)
-│   ├── scripts/         db.mjs (seed / create-admin / list-users), verify-*.mjs
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── auth/         AuthContext.jsx, ProtectedRoute.jsx
-│   │   ├── components/   AppLayout.jsx (sidebar + header)
-│   │   ├── config/       nav.js (เมนู + สิทธิ์ตามบทบาท)
-│   │   ├── lib/          api.js (fetch + multipart/blob helpers), ememo.js
-│   │   ├── pages/        Login, Dashboard, ememo/*, admin/*
-│   │   ├── App.jsx       routes
-│   │   └── main.jsx
-│   └── .env.example
-└── supabase/             (legacy Postgres SQL — kept for reference only)
-    ├── migrations/*.sql
-    └── seed.sql
-```
-
-## บทบาทผู้ใช้ (Roles)
-
-| role        | ภาษาไทย         | สิทธิ์ |
-|-------------|-----------------|--------|
-| `admin`     | ผู้ดูแลระบบ      | ทั้งหมด รวมตั้งค่าระบบ |
-| `executive` | ผู้บริหาร        | ดูภาพรวมทุกหน่วยงาน (รวมข้อมูลการเงิน) |
-| `hr`        | เจ้าหน้าที่ HR    | จัดการข้อมูลเฉพาะหน่วยงานของตน |
-
----
-
-## การติดตั้ง (Setup)
-
-### 1) เตรียมฐานข้อมูล MongoDB
-
-ใช้ MongoDB ที่ไหนก็ได้ (Atlas, เครื่อง local ฯลฯ) แล้วคัดลอก **connection string** มา เช่น
-`mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/hr_system?retryWrites=true&w=majority`
-(บน Atlas อยู่ที่ **Cluster → Connect → Drivers**)
-
-### 2) ตั้งค่า backend
-```bash
-cd backend
-cp .env.example .env       # ใส่ MONGODB_URI และ JWT_SECRET
-npm install
-```
-สร้าง `JWT_SECRET` แบบสุ่ม:
-```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-```
-
-### 3) seed ข้อมูลอ้างอิง (idempotent — รันซ้ำได้)
-
-```bash
-cd backend
-npm run seed                          # โครงการ + doc-code mapping + ประเภทเอกสาร + counters
-```
-
-### 4) สร้างผู้ใช้คนแรก (admin)
-```bash
-cd backend
-npm run create-admin -- admin@vcb.local 'รหัสผ่านที่ต้องการ' "ผู้ดูแลระบบ"
-```
-รหัสผ่านจะถูก hash ด้วย bcrypt อัตโนมัติ ตรวจรายชื่อผู้ใช้ด้วย `npm run list-users`
-
-### 5) รัน backend + frontend
-```bash
-cd backend  && npm run dev   # http://localhost:4000
-cd frontend && npm install && npm run dev   # http://localhost:5173
-```
-
-เปิด http://localhost:5173 แล้วล็อกอินด้วยผู้ใช้ admin ที่สร้างในขั้นตอนที่ 4
-
-## ตรวจสุขภาพระบบ
-
-- API health: `GET http://localhost:4000/api/health` → `{ "status": "ok" }`
-- Frontend build: `cd frontend && npm run build`
-- End-to-end (in-memory MongoDB, no external services):
-  `cd backend && node scripts/verify-e2e.mjs` และ `node scripts/verify-concurrency.mjs`
-
-## หมายเหตุความปลอดภัย
-
-- `MONGODB_URI` และ `JWT_SECRET` เป็นความลับ — **ห้าม** ใส่ในฝั่ง frontend หรือ commit ขึ้น git
-- การควบคุมสิทธิ์ทั้งหมดอยู่ที่ชั้น API (`requireAuth` / `requireRole`) ไม่ใช่ที่ database
-- ไฟล์แนบ/PDF เก็บใน GridFS และสตรีมผ่าน API ที่ต้องมี token (ไม่มี public/presigned URL)
-- รหัสผ่านเก็บเป็น bcrypt hash เท่านั้น (ไม่เก็บ plaintext); JWT เซ็นด้วย `JWT_SECRET`
-- `.env` ถูก ignore ใน git แล้ว

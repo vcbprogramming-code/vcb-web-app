@@ -1,0 +1,7 @@
+# Push only the four real Apps Script source files. Everything else in this
+# folder (docs, backups, the .__check.js JS dump, Drive shortcuts) is local-only.
+**/**
+!appsscript.json
+!Code.js
+!Seed.js
+!index.html

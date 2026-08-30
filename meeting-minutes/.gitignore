@@ -1,0 +1,12 @@
+# Windows shell junk
+desktop.ini
+
+# Google Drive local pointer shortcuts (machine-specific, not app source)
+*.gsheet
+*.url
+*.gscript
+.clasp.json.deleted-project-backup
+
+# Local Drive-synced copy of meeting attachments — not app source, and may
+# contain confidential project documents that shouldn't land in GitHub.
+/Meeting Attachments/

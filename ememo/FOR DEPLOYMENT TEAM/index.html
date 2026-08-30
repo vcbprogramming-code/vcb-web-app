@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>VCB E-MEMO</title>
+  <script>
+    // Restore persisted dark-mode + mobile detection before paint (ported
+    // verbatim from the original Apps Script <head> bootstrap).
+    try { if (localStorage.getItem('vcb-dm') === '1') document.documentElement.classList.add('dark'); } catch (e) {}
+    (function () {
+      function isPhone() {
+        try { if (window.matchMedia && window.matchMedia('(pointer:coarse)').matches && window.innerWidth <= 820) return true; } catch (e) {}
+        return /Android|iPhone|iPod|Windows Phone/i.test(navigator.userAgent) ||
+          (/iPad|Macintosh/i.test(navigator.userAgent) && 'ontouchend' in document && window.innerWidth <= 1024);
+      }
+      function apply() { document.documentElement.classList.toggle('is-mobile', isPhone()); }
+      apply();
+      window.addEventListener('resize', apply);
+    })();
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

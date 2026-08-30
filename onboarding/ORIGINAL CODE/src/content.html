@@ -1,0 +1,1317 @@
+<script>
+/* ============================================================
+   VCB 90-Day Onboarding Portal — Content Data Model
+   Mirrors the published Google Site:
+   sites.google.com/vcb-con.com/vichitbhan-construction-co-ltd
+   ============================================================ */
+
+var NAV = [
+  { label: 'Home', page: 'home' },
+  { label: 'Accounting Team', page: 'accounting-team', children: [
+    { label: 'Day 1–30', page: 'accounting-day-1-30' },
+    { label: 'Day 31–60', page: 'accounting-day-31-60' },
+    { label: 'Day 61–90', page: 'accounting-day-61-90' }
+  ]},
+  { label: 'Finance Team', page: 'finance-team', children: [
+    { label: 'Day 1–30', page: 'finance-day-1-30' },
+    { label: 'Day 31–60', page: 'finance-day-31-60' },
+    { label: 'Day 61–90', page: 'finance-day-61-90' }
+  ]},
+  { label: 'Procurement Team', page: 'procurement-team', children: [
+    { label: 'Day 1–30', page: 'procurement-day-1-30' },
+    { label: 'Day 31–60', page: 'procurement-day-31-60' },
+    { label: 'Day 61–90', page: 'procurement-day-61-90' }
+  ]},
+  { label: 'Property & Asset Management', page: 'property-asset-management', children: [
+    { label: 'Day 1–30', page: 'property-day-1-30' },
+    { label: 'Day 31–60', page: 'property-day-31-60' },
+    { label: 'Day 61–90', page: 'property-day-61-90' }
+  ]},
+  { label: 'Engineering Team', page: 'engineering-team', children: [
+    { label: 'Day 1–30', page: 'engineering-day-1-30' },
+    { label: 'Day 31–60', page: 'engineering-day-31-60' },
+    { label: 'Day 61–90', page: 'engineering-day-61-90' }
+  ]},
+  { label: 'Meet Our Team', page: 'meet-our-team' },
+  { label: 'Life on Site', page: 'life-on-site' }
+];
+
+var PAGE_TITLES = {};
+NAV.forEach(function (item) {
+  PAGE_TITLES[item.page] = item.label;
+  if (item.children) item.children.forEach(function (c) { PAGE_TITLES[c.page] = c.label; });
+});
+/* Reached via the "Continue to Required Documents" button at the end of
+   Home (Pre-boarding), not a persistent nav entry — same pattern as when
+   Company Structure was its own page, before it got embedded on Home. */
+PAGE_TITLES['required-documents'] = 'Required Documents';
+/* Reached via the completion celebration popup's Continue button and the
+   sidebar's Completion step — same "not a persistent nav entry" pattern. */
+PAGE_TITLES['completion'] = 'Completion';
+
+/* Real image URLs pulled directly from the published Google Site
+   (lh3.googleusercontent.com/sitesv/... links are the same ones Sites itself serves). */
+var IMAGES = {
+  logo: 'https://lh3.googleusercontent.com/sitesv/AG8ngQUrMFsb9i--UnUra8QunUkUIOyliz88eWk_rdNa5g1zQad0MJZnk2WYnjcRm8stqRAvIPJvpYUVwSVw72aiLabWfsGZ800SxfLX-3DaEIKhsxEKcgrvnh1uYkg_MKE22X9asAIIrKvV62NeL2GS_YKxrT-wgZ09YXv1me31M47Fpj5_7c-6kB9bTti2KAY=w1280',
+
+  valueDiscipline: 'https://lh3.googleusercontent.com/sitesv/AG8ngQU_G27AUOwQFMG_LUpJDr4JQIEyJzuJ-LIAUXzoZDec-LSLgFoj7eRMcJgcgsji8dMEeY7YT27Dg9n65iccF17m61fMZ30t30K_gFYHsTT9ICHlRd_Aaz9cdD1AM-EEB9wIWKWaEsUr4nvPjK8ynXHr8g9_ZTwxpFSk_IHPGSmxsn83LwphiX9VpS6iQxaByHdPz26iwf7MwJEcSb8z3Dw7k8ZNknKxaY-yFmj3p9A=w1280',
+  valueResponsibility: 'https://lh3.googleusercontent.com/sitesv/AG8ngQUjz_E6tsFbmpLWbxrXzhZ16Vrb2Z2xxZBqj4Xc9rVHeM1jmPMzFsUJ3U6DeU6W_nrh8d17ZPIeMfCnaKBH1P-yD1tv0FnYbXyYEZw5IBiMmJKAbuECbi5D_Fg3TYKhfzjJBESTyV0Xlfx93s22A5jtQk4L_DKCPx_bxw0xjfVg_72wgl278OcpTlYeMwNh_B3uuAVqO8NDkB-amUDcUq9IFqy3n2hPg251=w1280',
+  valueIntegrity: 'https://lh3.googleusercontent.com/sitesv/AG8ngQXu6ufYRGTl6V658qjziNogbhSU1Hg4Io3tcP0_2Js5DZ6yEGLVjKD9Hw3IARIpM9aAWgTu9bvrn_ZqkG42PYiUSNuVxy8Ut60oD3-3OoHZH4H2vJPtNVsIAfw_ZNJG6MiRRO0bJyOTLLQ9BFLx50UJkSE44xLoFMNCqP0Aumt-yB-uQrbgynKN4bdbs_2eDUi_KOepIPEejPympGpE-qWSi0jrl4neDeBhiOeT=w1280',
+  valueExcellence: 'https://lh3.googleusercontent.com/sitesv/AG8ngQWK3itYYkyZBvODnqE6ljutPLzwUHgekwfCRHKZClHD3cAa5ogaP-RrMv34rIGQ6v603LVDgkr4_PxtsEFSJ8_WZtBrJFouNZmhPFho1uw92EU_Rut4SNL9TNBW0mGAF1b_F8WtW6zMHw408NFElRf5UBU7uuNwx7OtWDkDq9wR4tw2fTuSujFqGQn5LLN14MD-6zphi8BkOc9qZX7d5lgDiniMWUecGT0k9X-7UrE=w1280',
+
+  trackRecord1: 'https://lh3.googleusercontent.com/sitesv/AG8ngQUYlxXRYLLCsH--_g5QDW8Vl3V18I0LWh4Oj2V5ZtX352PpoNWATKn4DfiJyfv1h47hOW8MtB4Ni3Jsylla2mIoLTTgxzJmBxtmywbFNsx3QZt3ce5qiPRb69etaRKIrfGlnGFnQfvNZHkXI7Gda3lGhTAM8pxPX6buGXNd_kPmuBX6TFMPSTiCa5KTEMHhkTMHo3YCrN54R2Y6Er7X40J9WGDE5DQvvnIktx8hCk4=w1280',
+  lifeOnSiteBanner: 'https://lh3.googleusercontent.com/sitesv/AG8ngQVfl2nP_lLJCJi1pBZES6BBUUkQ9AJJxyImZ3KWGUyIvcx5aLsSPEhiOObS0AnNG6r4dni7UpYtTpbmXJDsq3HL8Vnn0q2jVJ_T0VpC8P1c1qYxPBF7d7Q-SmZF8WyijZyENKE138E9MYciQ699QoMI1S0q2nAUWFO_8NfrcB6gqn6qODqZ3VrW5552BQ3QAwfywxm8r6R3O-orJIK8KeV43RXqTqhFDuVfa4F1fQA=w1280',
+  meetTeamBanner: 'https://lh3.googleusercontent.com/sitesv/AG8ngQWqK2jAwE6o0ThPETmSrCh40_i-9p3T-4bk3A5iVjTMwUI5mJfNEzGSAYFQWWf-EmEtDQwxiQbHWc70VVLsPEnIlqmp6YQuq4l47fhaX1GRUU4IvzD4hM6KsFBAas6m41NqNgDi6seRBRMCNerlp3yShP06nm2DqjklBruM1dr5H9xOtQ-203VqHkopHpcALHfyiZ-IPr0bgzz6Eji1eVz6SqC9ah1ztw7IF552=w1280',
+
+
+  losSafety1: 'https://lh3.googleusercontent.com/sitesv/AG8ngQWz8RSR_QUeeVxdARvF8xxIdTW_pFcLKEyYmd-nt5Ub88w5TkXZ1Cxnf6Vwl3GAdU9CV3j2Sy6NsuXackNh92KREYe5R8Gmn7GMO3sWDgJs-MKvYaoIHkBqpoFL8gWH9ae5N-w4v1KqeePEjsFd8-8iHbSQn9zf8BFFJFX9HW3eQlkv4hfUIDtUs4mx-y3Kz4ydXy6nTrTDsA3gxSF997miB8sLWqHQaOGXwRRFTgs=w1280',
+  losSafety2: 'https://lh3.googleusercontent.com/sitesv/AG8ngQUbMbvz5wTC1de3XCoGnWWexRLwyelBVdPESZ-UabyFps5zKMcBOYqVrUrPUNIB4KJlhm5-RAG5Sm0Jzm8r7x7J8qVl56M0RBIw7xvMPyv4aAdo0qRVteqUAyiSZQ560z-bm0a5VrW3UxgDgzgaTXZ5vh-UO2GLIEwyFwMLteLboxUPxtX6cAQhdF5nERL3EUYB7nf29Cv_O7O0C9Xrqrq7PUqC-fc3ukJfeICA3no=w1280',
+  losToolbox1: 'https://lh3.googleusercontent.com/sitesv/AG8ngQX9e9rTCQ6xrnB5d34JP265ThpcAqICuMpauRvO1dC3GT8P81AIa3mSLCvudSj9ubiv2-iYNEVSnHo7q8r3X9WfMHtMzgSd_0bCgx6mhGAiTrt__jRbZGGIVr5gdkzUk4ARYNzi1Ops2svFT0t0U3R6RSxhqWRsWwulhzMdTObZGWrmkEWjdUoR9YrK63484RTPbZwN_VBkbw03cwmyY7KxIJyWCH-TVHvnkRwW=w1280',
+  losToolbox2: 'https://lh3.googleusercontent.com/sitesv/AG8ngQU3-7D2d0_Ctbp_ZJE7nBynTf6l4aOo9VymDKXIUsGF0IsVZUZ6lXG0HHtoiCp4dZM_35fUp2Mr8rOH91V89T1Krr9UVMdIY-k9JVRB22kjRSx4266TagmV97DkBAagxq8vyvf_3n7Dgxf_zPD0-OrLyafBjin6XLppsp38gl6kacox3uTMd3-Lsacma0jV3ViWAhjPzUg0ZW4e-VKYtx_ZK8UMh5gyKtQ7u5k8748=w1280',
+  losTraining1: 'https://lh3.googleusercontent.com/sitesv/AG8ngQX0hRFXxaLCyI_eM4S0x6qi5WNPrAAUeKbGRmW0bhdNLieQuD9kKe8PCajuTR7ER-5GFQD_DoZq6ewOk5K5J1QPsi1tTBnQVcpZfZ8A-bzfaydRxHywuxAqr2VnXzg12zG1z3ymmJuNXxwtnWvon2rLxeDbUznPOEeNnu_to6PM4xSb62yw4J9NFu5Bk2IVcHtte-ScLLJVZGIgHheU1T-JQAH_CGXZQ2h0oLdF=w1280',
+  losTraining2: 'https://lh3.googleusercontent.com/sitesv/AG8ngQW6i36daSd-rv4qFgJMoouryXy9UEmN2z-21hqsa50psYgMs3VhycbvPbUpSCeVe2qPc4KK_5F_iyew4AYuI9Fb4hvunDGPtBjqJUWxxLyU91QXfBNpBMjR4LcMDUPqX5uJUsKSyPD_B0uw3lCkE4sH6LkOC_ZFAmh6vmpvYwvmDNyTgOEtGEmOwK7jHJ7P4rXT0hIL-oNfXy4Je6LvlVixdpOqowI3-lAFy_d4xQE=w1280',
+  losHousekeeping1: 'https://lh3.googleusercontent.com/sitesv/AG8ngQXXTJNCIQsnGOFJMZmiO3cNsjdbzUx_BG8B7-zCG7AG7eCBRz2F-aFmv1kf_8wA81vg5tNekfc3kdFU4UeeEmdcpo9-o55dKeaLERT0xOydSZNvFpbc-8S3PvVfG2YfCYMpDt_KCXbqGR9_v7QqU7GqghqiofFljRYFp28LXu9gvmMXpYbcUoVIptLaljqtMvoyXcqvIGdu3aHGSfGW-JFsF2TvPUyEWE0Z3CNx6Ys=w1280',
+  losHousekeeping2: 'https://lh3.googleusercontent.com/sitesv/AG8ngQXKf2I9CWkAMXACFx6mxJ4Kq3u6vN1SATzj_k7YnFR0ZTQfPBzN92V1RhHjpI5L63poiqqJ9K50ui_A7JTu8p9oSuaWLz8cJqK9sY7YqOkl2wL2B7X1cUwdjNQG5UX8rv65Qux6si69vY44W9nyOYSxFer2KxerpWtUgRFcDQ7S_Iph_aIX6aOB2AJTrXQ30Eg-MlA7QAbj21CaU5l8fyrxNDf8wsu6y9m14i66zaY=w1280',
+  losWorkInProcess: 'https://lh3.googleusercontent.com/sitesv/AG8ngQVhZYwXV2vsxc8_Pt5zeu2sGVZtiUnX745DJLhtXhVN9MBsfMm8uqL2COLvTMrPeWwK107hsbu_RsrZ15ptcuBGws8RsBa13h8fSAehzQToGBgqzka_dVXbSqz0b5zI4idexYjkzHZflPQ31l0Vyc83MNIGD2KTxee-5cMXSf1ygV4eN4fmW_jQYzH44qPYYdudRMdwUrlEA-WsiMoyzfpQAmPpDgSfFD2YD9afJcc=w1280',
+  losNavigationLock: 'https://lh3.googleusercontent.com/sitesv/AG8ngQWUNE7bjyNHtW-zrn-HfmxCyh6p2NUiCZVsyn8ShOdipTSp9yTt1cVPSscnVwppqyWjV5v_RobPSrHfxR00NAQy1LVV9zCSpcFcUQHTUlAzDugUGy1eyt_sfnlH96VHk7762JpJLXSN-JmQ9dw2ffvurc3psMJdSEh7O-o2kgr4RbY_KbqXwxV1WRkxw66--p_-1IY0QlYC9aIKHFeMmG_-jKXVcqKgW2DHZ9Wz=w1280',
+  losPowerHouse: 'https://lh3.googleusercontent.com/sitesv/AG8ngQVKKIczeBMfXaYuybtJdDZaLcBuRc53PTbpXWOnIbS3hMfcTA_Wp-ZvsTXGtafYoCge5IC9g4vCjEIidJ3d49Uqnf7hWyF7R_NslhViAGYcZPA28-4fpafy_G0jCVOBNUB_oULkHLyxHVmfC9YJDOKcJSz8vpOpiZYMU43bi6_YiPlRIXRPV9jxGHgKEEz5LmdfyL3QZAX06JjIxEMJhf6wx1x6e1q2SbuiH_DA=w1280',
+  losTeamWork: 'https://lh3.googleusercontent.com/sitesv/AG8ngQWVIDcPJ3JS0oraQCLxg6rON22PE85tNESxAHsQYnu5PN4AybhZOuwwv2zmGh_sH5djEgANbAgZ963ATQAb7hCdJHy3caR8WOm57yiHHPxdPRJLOIiderXoeBlwnjfihv_yorAnwjtImK0n4WviLGgUOliMLwpDCQ-GhMpFCBedgLrlhwDbGg6577JNLzy_n1zoAVfxy8RcfdYXBaUW1eXSKf091sTeRCMAuJK7heo=w1280'
+};
+
+/* Helper builders used inline in PAGES below */
+function ph(label) {
+  return '<div class="placeholder-box" role="img" aria-label="' + label + '">' +
+         '<span class="placeholder-icon">' + icon('camera') + '</span><span>' + label + '</span></div>';
+}
+function img(url, label) {
+  return '<img class="content-image" src="' + url + '" alt="' + label + '" loading="lazy">';
+}
+/* url is optional — when set (a real Drive/DocuSign link), the link opens
+   it in a new tab; otherwise falls back to the placeholder alert, same as
+   before. See matchAndLinkRequiredDocuments in Code.gs for how real URLs
+   get attached to each doc entry. */
+function docLink(label, url) {
+  var attrs = url ?
+    ' href="' + esc(url) + '" target="_blank" rel="noopener"' :
+    ' href="#" onclick="alert(\'Placeholder link — replace with the real DocuSign / document URL.\'); return false;"';
+  return '<a class="doc-link-standalone"' + attrs + '>' +
+         '<span class="doc-icon">' + icon('document') + '</span>' + label + '<span class="doc-arrow">&rarr;</span></a>';
+}
+
+/* A required pre-boarding document: clicking the card itself opens Drive's
+   own in-browser preview (doc.viewUrl) so the employee can read it before
+   committing to anything, a separate Download button forces an actual file
+   download (doc.downloadUrl) only once they choose to, and a completion row
+   offers either an upload (saved to Drive, auto-marks done) or a manual
+   tick — any of those marks the document complete via the same task-id
+   system the department checklists use, so it flows through
+   PROGRESS_CACHE/setTaskDone. Not a DocuSign/e-sign flow: the employee
+   views/downloads the blank template, fills/signs it themselves (on paper
+   or in whatever app they have), then uploads the completed file back via
+   the Upload button — see triggerDocUpload in progress.html for that side
+   of it. */
+function docCard(doc) {
+  var taskId = 'doc::' + doc.id;
+  var linkAttrs = doc.viewUrl ?
+    ' href="' + esc(doc.viewUrl) + '" target="_blank" rel="noopener"' :
+    ' href="#" onclick="alert(\'Placeholder link — replace with the real document URL.\'); return false;"';
+  var downloadBtnHtml = doc.downloadUrl ?
+    '<a class="doc-download-btn" href="' + esc(doc.downloadUrl) + '" download target="_blank" rel="noopener">' +
+      icon('download') + '<span>' + esc(t('Download')) + '</span>' +
+    '</a>' : '';
+  var descHtml = doc.desc ? '<span class="doc-desc">' + esc(t(doc.desc)) + '</span>' : '';
+  return '<div class="doc-card" data-doc-card="' + doc.id + '">' +
+    '<a class="doc-link"' + linkAttrs + '>' +
+      '<span class="doc-icon">' + icon('document') + '</span>' +
+      '<span class="doc-link-body"><span class="doc-title">' + esc(t(doc.title)) + '</span>' + descHtml + '</span>' +
+      '<span class="doc-arrow">&rarr;</span>' +
+    '</a>' +
+    '<div class="doc-card-status">' +
+      '<label class="doc-check">' +
+        '<input type="checkbox" data-doc-task-id="' + taskId + '" onclick="toggleDocTask(\'' + taskId + '\', \'' + doc.id + '\', this)">' +
+        '<span class="doc-check-label">' + esc(t('Complete')) + '</span>' +
+      '</label>' +
+      downloadBtnHtml +
+      '<button type="button" class="doc-upload-btn" data-doc-id="' + doc.id + '" onclick="triggerDocUpload(\'' + doc.id + '\')">' +
+        icon('upload') + '<span>' + esc(t('Upload')) + '</span>' +
+      '</button>' +
+    '</div>' +
+    /* Filled in by updateDocCardUI (progress.html) when this employee has
+       an upload on record for this document — the employee previously got
+       no confirmation of what had actually been received. */
+    '<div class="doc-uploaded" data-doc-uploaded="' + doc.id + '"></div>' +
+  '</div>';
+}
+
+/* Meet Our Team / Life on Site / Return to VCB Portal — the content of the
+   dedicated Completion page (see PAGES['completion'] below). Used to be
+   conditionally revealed IN PLACE on Home/each department's final phase
+   page once onboarding was detected complete (requireOnboardingComplete,
+   an async placeholder-swap mechanism — see revealGatedSections, app.html)
+   — replaced with a real dedicated page per explicit request, after that
+   reveal mechanism went through five rounds of real bugs across earlier
+   sessions and still sometimes didn't appear right away. No
+   requireOnboardingComplete flag anymore: PAGES['completion'] itself
+   decides synchronously (like every other page in this app) whether to
+   show this content or a "not yet" message — nothing here needs to know
+   about that gating on its own. */
+function homeFeatureGridSection() {
+  return {
+    type: 'featuregrid',
+    sectionId: 'completion-section',
+    band: 'completion',
+    heading: '',
+    features: [
+      {
+        /* New Year Party 2019 award-ceremony photo — the actual company
+           event photo the user asked for here, pulled from the "03 EVENTS"
+           folder (see meetTeamNyp2019Award in images.html) rather than the
+           earlier mismatched safety-briefing / generic team-work photos. */
+        title: 'Meet Our Team',
+        body: 'Explore the infrastructure works that define our execution standards. Each project reflects coordination, discipline, and long-term durability.',
+        image: img(EMBEDDED_IMAGES.meetTeamNyp2019Award, 'Meet Our Team'),
+        link: { label: 'Learn more', page: 'meet-our-team' }
+      },
+      {
+        title: 'Check Out Life on Site',
+        body: 'From early morning briefings to milestone handovers, our teams operate in dynamic environments where teamwork and structure drive results.',
+        image: img(EMBEDDED_IMAGES.losToolboxReal, 'Life on Site'),
+        link: { label: 'Learn more', page: 'life-on-site' }
+      }
+    ],
+    externalCta: {
+      label: 'Return to VCB Portal',
+      url: 'https://script.google.com/a/macros/vcb-con.com/s/AKfycbxqIk8Qql3XWXIWn_p0f0FSd04i-FcWZjoXgRErlU5bTXUkpujbQ4ZN4mWco6HEQFUB/exec'
+    }
+  };
+}
+
+
+var PAGES = {};
+
+/* ---------------- COMPLETION (own dedicated page, not an in-place reveal)
+   ----------------
+   Reached two ways: (1) the "Continue" button in celebrateOnboardingComplete's
+   popup (progress.html) once the employee finishes their last checklist
+   item, and (2) the sidebar stepper's "Completion" step
+   (getJourneySteps, progress.html), any time afterward. Not part of NAV —
+   same "reachable but not a persistent nav destination" precedent as
+   'required-documents' (see PAGE_TITLES below).
+   The gate (isEmployeeOnboardingComplete()) is checked directly in
+   renderPage (app.html) — a plain synchronous read of PROGRESS_CACHE, the
+   same way every other progress-gated UI in this app already works
+   (isPhasePageUnlocked, etc.) — not the old async requireOnboardingComplete
+   placeholder-swap. If somehow reached before actually completing (a typed
+   URL, or a stale sidebar link), a real page render always produces SOME
+   content — never a blank/pending placeholder — so this data object
+   doubles as the "not yet" content too. */
+PAGES['completion'] = {
+  hero: { eyebrow: 'Onboarding Complete', title: 'Welcome, officially, to the team!' },
+  sections: [homeFeatureGridSection()],
+  notCompleteSections: [
+    {
+      type: 'text',
+      band: 'light',
+      heading: 'Not finished yet',
+      body: ['This page unlocks once every checklist item across all three phases of your department is complete.'],
+      link: { label: 'Return to your checklist', page: 'home' }
+    }
+  ]
+};
+
+/* One shared description for every Project Manager across all 5 project
+   sites (used inside PAGES['home']'s orgchart section, projectManagers.
+   projects[].lead.role, below) — every PM at every site does the same
+   job, so 5 different per-project sentences ("Oversees subcontractor
+   performance...", "Tracks project milestones...", etc., an earlier
+   version) read as if their responsibilities genuinely differed project
+   to project, which isn't true. Defined at top level, not inline in the
+   object literal below, since that literal has no enclosing function
+   scope to hold a local var. */
+var PM_ROLE = 'Oversees all site execution and staffing, coordinating day-to-day between Site Operations and Site Administration.';
+
+/* ---------------- HOME (merged with the former Pre-boarding page — one
+   entry point, no extra layer between landing and starting) ---------------- */
+PAGES['home'] = {
+  hero: {
+    title: 'VCB 90-Day Onboarding Portal',
+    lead: 'This portal defines the required knowledge, system mastery, execution standards, and governance expectations for all new employees during their first 90 days.',
+    note: 'Confirmation of employment is based on competency, documentation accuracy, system discipline, and risk awareness.',
+    photo: EMBEDDED_IMAGES.homeHeroPhoto
+  },
+  sections: [
+    {
+      type: 'quote',
+      band: 'light',
+      heading: 'Welcome Message from our CEO',
+      quote: 'We’re thrilled to have you onboard. We believe that every person here contributes to our success, and we’re committed to helping you thrive. Let’s build something great together.',
+      attribution: 'Mr. Voravith Chavananand',
+      portrait: EMBEDDED_IMAGES.ceoPortrait
+    },
+    {
+      type: 'values',
+      band: 'teal',
+      heading: 'VCB Culture & Values',
+      subheading: 'What we stand for — internalize these from Day 0',
+      values: [
+        {
+          name: 'Discipline',
+          icon: EMBEDDED_IMAGES.valueIconDiscipline,
+          body: 'We follow structured systems, documented processes, and approval hierarchies.',
+          bullets: ['No shortcuts', 'No undocumented commitments', 'No uncontrolled decisions'],
+          footer: 'Discipline protects our liquidity, reputation, and long-term stability.'
+        },
+        {
+          name: 'Responsibility',
+          icon: EMBEDDED_IMAGES.valueIconAccountability,
+          body: 'Every action has operational and financial impact. We take ownership of:',
+          bullets: ['Our decisions', 'Our documentation', 'Our deadlines', 'Our results'],
+          footer: 'Responsibility is not transferred — it is upheld.'
+        },
+        {
+          name: 'Integrity',
+          icon: EMBEDDED_IMAGES.valueIconIntegrity,
+          body: 'We operate with transparency, honesty, and regulatory compliance.',
+          bullets: ['Accurate reporting', 'Honest measurement', 'Proper documentation', 'Respect for public trust'],
+          footer: 'Integrity ensures sustainability.'
+        },
+        {
+          name: 'Excellence',
+          icon: EMBEDDED_IMAGES.valueIconExcellence,
+          body: 'We execute with precision, coordination, and continuous improvement.',
+          bullets: ['Accurate quantities', 'Controlled costs', 'Timely delivery', 'Risk awareness'],
+          footer: 'Excellence is achieved through consistency, not chance.'
+        }
+      ]
+    },
+    {
+      /* 3 scenery/infrastructure shots (no people) shown side by side at
+         once, not one-at-a-time — a single very wide image here read
+         oddly, and department heads photos aren't the point of a "track
+         record" section. Reuses the same real jobsite photos already
+         embedded for Life on Site (see losNavigationLockReal etc. in
+         images.html) rather than sourcing new ones. */
+      type: 'trackrecord',
+      band: 'teal',
+      heading: 'Our Track Record',
+      slides: [
+        { image: EMBEDDED_IMAGES.trackRecordReal, caption: 'Infrastructure project' },
+        { image: EMBEDDED_IMAGES.losPowerHouseReal, caption: 'Power House Unit' },
+        { image: EMBEDDED_IMAGES.losNavigationLockReal, caption: 'Navigation Lock' },
+        { image: EMBEDDED_IMAGES.losSpillway, caption: 'Spillway' }
+      ]
+    },
+    {
+      /* Company Structure lives directly on Home now, right beneath Our
+         Track Record — no separate page/navigation, so an employee never
+         has to click away and lose their place. It's the exact same
+         interactive org chart component used everywhere else in this app
+         (type: 'orgchart', see app.html): collapsed to plain labeled boxes
+         at rest, expanding in place when clicked. Previously this lived on
+         its own page ('company-structure') reached via a "View Company
+         Structure" link/button — removed entirely per explicit request:
+         embed it, don't navigate to it. */
+      type: 'orgchart',
+      band: 'teal',
+      heading: 'Company Structure',
+      /* No longer a plain sec.subheading — that field is rendered once,
+         shared by BOTH the Org Chart and Group Structure views (see
+         renderSectionContent in app.html), so it read wrong on Group
+         Structure ("click Leadership" makes no sense there, there's
+         nothing to click). Each view now carries its own subheading,
+         rendered/toggled inside the 'orgchart' case itself alongside its
+         panel — see chartSubheading/groupSubheading below. */
+      chartSubheading: 'Click Leadership or any team to see who’s in it, then click someone to see what they do.',
+      groupSubheading: 'Vichitbhan’s position relative to its subsidiaries and joint-venture partners.',
+      /* Leadership is a real 3-level hierarchy (mirrors the company's actual
+         board structure), not a flat member list like every other node:
+         Board of Directors + Board Advisors sit side by side on the same
+         row, then both trickle down into the Managing Director, who has two
+         Assistant Managing Directors under him. The first Director and the
+         third Director each hold two roles at once (board member + MD, and
+         board member + assistant, respectively) — that's intentional, not
+         a data error, and mirrors the real chart. Every name below is a
+         random placeholder (real names removed per request) — roles/titles
+         are unchanged and still reflect the real structure. */
+      leadership: {
+        id: 'leadership', label: 'Leadership',
+        levels: [
+          {
+            heading: 'Board of Directors',
+            members: [
+              { name: 'Mr. Somchai Placeholder', role: 'Director' },
+              { name: 'Mr. Anurak Placeholder', role: 'Director' },
+              { name: 'Mr. Kittipong Placeholder', role: 'Director' },
+              { name: 'Mrs. Suchada Placeholder', role: 'Director' }
+            ]
+          },
+          {
+            heading: 'Board Advisors',
+            members: [
+              { name: 'Mr. Prasert Placeholder', role: 'Advisor to the Board' },
+              { name: 'Mr. Somkiat Placeholder', role: 'Advisor to the Board' }
+            ]
+          },
+          {
+            heading: 'Managing Director',
+            members: [
+              { name: 'Mr. Somchai Placeholder', role: 'Managing Director — sets company direction and owns the final call on every major decision.' }
+            ]
+          },
+          {
+            heading: 'Assistant Managing Directors',
+            members: [
+              { name: 'Mr. Kittipong Placeholder', role: 'Assistant Managing Director — oversees day-to-day operations across all departments.' },
+              { name: 'Mr. Narong Placeholder', role: 'Assistant Managing Director — leads strategic planning and cross-department coordination.' }
+            ]
+          }
+        ]
+      },
+      /* Departments segment — every functional team except Project Managers,
+         which gets its own segment/band (see 'projectManagers' below) per
+         the real org chart's site/HQ separation. Names are random
+         placeholders (real names removed per request); roles unchanged. */
+      departments: [
+        { id: 'engineering', label: 'Engineering Team', members: [
+          { name: 'Mr. Thanawat Placeholder', role: 'Head of Engineering — owns execution accuracy and revenue realization.' },
+          { name: 'Mr. Pichai Placeholder', role: 'Reviews site progress against approved drawings and specifications.' },
+          { name: 'Mrs. Malee Placeholder', role: 'Senior Engineer Officer — coordinates measurement and progress documentation.' },
+          { name: 'Mr. Somsak Placeholder', role: 'Tracks material and labor efficiency across active sites.' },
+          { name: 'Mr. Wichai Placeholder', role: 'Prepares documentation supporting progress claims.' },
+          { name: 'Mrs. Ratana Placeholder', role: 'Coordinates schedules between Engineering and Project Management.' }
+        ] },
+        { id: 'accounting', label: 'Accounting Team', members: [
+          { name: 'Mrs. Pranee Placeholder', role: 'Head of Accounting — owns documentation discipline and audit readiness.' },
+          { name: 'Mrs. Siriporn Placeholder', role: 'Accounting Assistant — supports new employee onboarding and daily postings.' },
+          { name: 'Ms. Kanya Placeholder', role: 'Handles AP/AR posting and invoice verification.' },
+          { name: 'Ms. Orapin Placeholder', role: 'Manages VAT and withholding tax reconciliation.' },
+          { name: 'Ms. Duangjai Placeholder', role: 'Maintains the Chart of Accounts and journal entry accuracy.' },
+          { name: 'Ms. Nittaya Placeholder', role: 'Prepares monthly reconciliation reports.' }
+        ] },
+        { id: 'finance', label: 'Finance Team', members: [
+          { name: 'Mr. Chatchai Placeholder', role: 'Head of Finance — safeguards liquidity and long-term financial stability.' },
+          { name: 'Mrs. Sunisa Placeholder', role: 'Senior Finance Officer — monitors cashflow and funding requirements.' },
+          { name: 'Ms. Waraporn Placeholder', role: 'Manages banking facilities and financing instruments.' },
+          { name: 'Mr. Anucha Placeholder', role: 'Tracks debt servicing capacity and liquidity exposure.' }
+        ] },
+        /* Asset Management splits into two branches, per explicit request —
+           not one flat team the way every other department is: Inventory
+           & Land (inventory control, land, and every non-vehicle asset)
+           stays at Head Office; Vehicles & Machinery (fleet + heavy
+           equipment maintenance) sits physically off-site (at the Sai-5
+           site) but is organizationally still part of Asset Management,
+           not a separate department — "even though they're located away
+           from head office, they're essentially part of head office."
+           Both branches named by FUNCTION, matching how every other team
+           in this tree is named — "Sai-5 Maintenance Unit" was explicitly
+           corrected: Sai-5 is only the location, not what the team does,
+           and it was the one team in the whole chart not actually named
+           like a team ("why is that the only one that's not a team?").
+           The location now lives in its own `location` field (used only
+           for the branch's framing/description, see
+           orgTeamBranchesNodeHtml in app.html — NOT in the clickable name
+           itself) rather than being baked into the label. Previously
+           rendered as one of Project Sites' 6 project cards (proj-sai5)
+           — moved here instead, since it isn't a construction project and
+           never had the Operations/Administration matrix-reporting split
+           every real project site now has (see projectManagers below);
+           it's a small, differently-structured maintenance team. branches
+           (not members) on this one department is what
+           orgTeamBranchesNodeHtml (app.html) uses to tell it apart from
+           every other flat-member-list department — see
+           .org-dept-branch-* in styles.html for the different color code
+           (amber, matching --status-warn-soft, the same "off-site but
+           still HQ" signal Project Sites' own segment already uses
+           elsewhere in this tree) called for explicitly. */
+        { id: 'asset', label: 'Asset Management', branches: [
+          {
+            id: 'asset-inventory', label: 'Inventory & Land', members: [
+              { name: 'Mr. Prayut Placeholder', role: 'Head of Asset Management — protects company-owned assets and inventory integrity.' },
+              { name: 'Mr. Somboon Placeholder', role: 'Conducts periodic physical verification of site equipment.' },
+              { name: 'Ms. Ampha Placeholder', role: 'Maintains asset registration and warehouse movement records for inventory, land, and non-vehicle assets.' }
+            ]
+          },
+          {
+            id: 'asset-sai5', label: 'Vehicles & Machinery', offsite: true, location: 'Sai-5', members: [
+              { name: 'Mr. Wichit Placeholder', role: 'Head of Vehicles & Machinery — keeps the fleet and heavy equipment mission-ready.' },
+              { name: 'Mr. Utiss Placeholder', role: 'Coordinates preventive maintenance schedules for the vehicle and machinery fleet.' },
+              { name: 'Mr. Sombat Placeholder', role: 'Diagnoses and repairs heavy equipment mechanical faults.' },
+              { name: 'Mr. Kriangsak Placeholder', role: 'Maintains fleet vehicle service records and parts inventory.' }
+            ]
+          }
+        ] },
+        { id: 'procurement', label: 'Procurement Team', members: [
+          { name: 'Mrs. Ladda Placeholder', role: 'Head of Procurement — protects cost structure and supply reliability.' },
+          { name: 'Mrs. Wilai Placeholder', role: 'Senior Procurement Officer — evaluates supplier risk and terms.' },
+          { name: 'Ms. Chalida Placeholder', role: 'Processes purchase requests and purchase orders.' },
+          { name: 'Ms. Piyanuch Placeholder', role: 'Coordinates delivery schedules with project timelines.' }
+        ] },
+        { id: 'hr', label: 'Human Resources', members: [
+          { name: 'Mrs. Ratree Placeholder', role: 'Leads recruitment, onboarding, and employee relations.' },
+          { name: 'Ms. Suwanna Placeholder', role: 'Handles HR documentation and new employee support.' }
+        ] }
+      ],
+      /* Administration — placeholder team, rendered as one more card inside
+         the Head Office band (same plane as Engineering, Accounting, etc.),
+         not its own separate segment. Names/roles are generic placeholders,
+         not real staff, pending real data. */
+      administration: {
+        id: 'administration', label: 'Administration', members: [
+          { name: 'Mrs. Placeholder One', role: 'Head of Administration — placeholder role description.' },
+          { name: 'Mr. Placeholder Two', role: 'Placeholder role description.' },
+          { name: 'Ms. Placeholder Three', role: 'Placeholder role description.' },
+          { name: 'Mr. Placeholder Four', role: 'Placeholder role description.' },
+          { name: 'Ms. Placeholder Five', role: 'Placeholder role description.' },
+          { name: 'Mr. Placeholder Six', role: 'Placeholder role description.' }
+        ]
+      },
+      /* Project Sites — the 6 projects render directly under the "Project
+         Sites" segment label, same plane as Head Office's departments (no
+         intermediate "Project Managers" node to click through first).
+         "label" below is unused now that orgProjectNodeHtml renders each
+         project directly (kept for reference/debugging only) — the
+         segment's own visible label is "Project Sites" (see the 'orgchart'
+         case in app.html). Click a project to reveal its full on-site team
+         (~20 people), rendered by orgProjectNodeHtml in app.html in a
+         compact multi-column grid (.org-project-people-grid in
+         styles.html), not one long vertical list, since ~20 names stacked
+         vertically would make the panel far too tall. Names are random
+         placeholders (real names removed per request); roles unchanged for
+         the 6 PM leads, generic placeholder roles for the rest of each
+         project team (no real per-person data for on-site crews exists in
+         this app). */
+      projectManagers: {
+        id: 'pm', label: 'Project Managers',
+        /* PM_ROLE (defined once, top-level, right above PAGES['home']) is
+           ONE shared description reused across every project
+           (2026-08 correction) — explicit request: every Project Manager
+           at every site does the same job, so 5 different per-project
+           sentences read as if their responsibilities genuinely differed
+           project to project, which isn't true. An earlier version gave
+           each PM a distinct sentence ("Oversees subcontractor
+           performance...", "Tracks project milestones...", etc.) —
+           replaced with this one shared line, same precedent as
+           opsDepartments/adminDepartments below already being one shared
+           template applied to all 5 projects. */
+        projects: [
+          { id: 'proj-a', label: 'Project A', lead: { name: 'Mr. Decha Placeholder', role: PM_ROLE } },
+          { id: 'proj-b', label: 'Project B', lead: { name: 'Mr. Nattapong Placeholder', role: PM_ROLE } },
+          { id: 'proj-c', label: 'Project C', lead: { name: 'Mr. Sittichai Placeholder', role: PM_ROLE } },
+          { id: 'proj-d', label: 'Project D', lead: { name: 'Mr. Boonmee Placeholder', role: PM_ROLE } },
+          { id: 'proj-e', label: 'Project E', lead: { name: 'Mr. Charoen Placeholder', role: PM_ROLE } }
+        ].map(function (p) {
+          /* Site Operations — reports to the Project Manager (solid line,
+             the normal project hierarchy) — broken into named
+             sub-departments (2026-08 revision) instead of one flat 17-role
+             grid, translated/adapted from a real site org chart the client
+             provided (Thai labels, transcribed here in English — see the
+             chart's own department headers): ประมาณราคา/แบบก่อสร้าง,
+             งานสำรวจ, งานโครงสร้างสะพาน, งานทาง/ระบบระบายน้ำ,
+             งานความปลอดภัย/จราจร. Each department carries a lead PLUS 2
+             generic staff (staff: [...]) — an earlier version showed the
+             lead only, which read as "only one person per role"; adding a
+             couple of names per department (still not the source chart's
+             full numbered rosters — see the staff role vocabulary below,
+             drawn from the same chart's own labels like
+             พนักงานช่างสำรวจ/เจ้าหน้าที่) keeps it feeling like a real team
+             without transcribing headcounts as stable org-chart content.
+             Shared across all 5 projects via this one template (same
+             precedent as the old flat opsRoles/opsNames list it replaces)
+             since no real per-project staffing data exists in this app. */
+          var opsDepartments = [
+            { label: 'Budgeting / Shop Drawing', lead: { name: 'Mr. Somjit Placeholder', role: 'Design & Budgeting Engineer' },
+              staff: [{ name: 'Mr. Kittisak Placeholder', role: 'Quantity Surveyor' }, { name: 'Mr. Anucha Placeholder', role: 'Draftsman' }] },
+            { label: 'Survey', lead: { name: 'Mr. Preecha Placeholder', role: 'Survey Engineer' },
+              staff: [{ name: 'Mr. Somsak Placeholder', role: 'Survey Technician' }, { name: 'Mr. Wichai Placeholder', role: 'Survey Technician' }] },
+            { label: 'Structural & Bridge Works', lead: { name: 'Mr. Amnat Placeholder', role: 'Construction Supervisor Engineer' },
+              staff: [{ name: 'Mr. Direk Placeholder', role: 'Foreman' }, { name: 'Mr. Boonchu Placeholder', role: 'Foreman' }] },
+            { label: 'Roadworks / Drainage Systems', lead: { name: 'Mr. Kamon Placeholder', role: 'Construction Supervisor Engineer' },
+              staff: [{ name: 'Mr. Ratana Placeholder', role: 'Foreman' }, { name: 'Mr. Sompong Placeholder', role: 'Equipment Operator' }] },
+            { label: 'Safety / Traffic Control', lead: { name: 'Mr. Winai Placeholder', role: 'Professional Safety Officer' },
+              staff: [{ name: 'Mr. Ekachai Placeholder', role: 'Traffic Control Officer' }, { name: 'Mr. Pravit Placeholder', role: 'Traffic Control Officer' }] }
+          ];
+          /* Site Administration — a matrix reporting line, not a normal
+             chain-of-command one: physically placed at the project site to
+             handle documents/internal-audit support for daily operations,
+             but each person's actual reporting line runs to the matching
+             HQ department for whichever function they're doing (dotted
+             line in the org chart, see orgProjectNodeHtml/app.html) — NOT
+             to the Project Manager the way Site Operations does. Broken
+             into named sub-departments (2026-08), matching the same source
+             chart's Administration side: หัวหน้าซ่อมบำรุง, พัสดุ-ทรัพย์สิน,
+             บัญชี-การเงิน-จัดซื้อ, บุคคล-ธุรการ. hqDept records which HQ
+             department each maps back to for the "Reports to X" tag
+             (orgAdminPersonHtml) — not a description of the whole person;
+             every staff member in a department shares that department's
+             own hqDept, since the matrix relationship is per-FUNCTION, not
+             per-individual. */
+          var adminDepartments = [
+            { label: 'Maintenance', lead: { name: 'Mr. Suriya Placeholder', role: 'Maintenance Supervisor' }, hqDept: 'asset',
+              staff: [{ name: 'Mr. Anan Placeholder', role: 'Electrician' }, { name: 'Mr. Sakda Placeholder', role: 'Mechanic' }] },
+            { label: 'Supplies & Asset Management', lead: { name: 'Mr. Thawee Placeholder', role: 'Supplies & Asset Officer' }, hqDept: 'asset',
+              staff: [{ name: 'Mr. Pichit Placeholder', role: 'Store Officer' }, { name: 'Mr. Charnwit Placeholder', role: 'Store Officer' }] },
+            { label: 'Accounting - Finance - Procurement', lead: { name: 'Ms. Areeya Placeholder', role: 'Site Accounting & Procurement Officer' }, hqDept: 'accounting',
+              staff: [{ name: 'Ms. Kanya Placeholder', role: 'Accounting Officer' }, { name: 'Ms. Duangjai Placeholder', role: 'Procurement Officer' }] },
+            { label: 'HR - Administration', lead: { name: 'Ms. Rungnapa Placeholder', role: 'Site HR & Administration Officer' }, hqDept: 'procurement',
+              staff: [{ name: 'Ms. Siriporn Placeholder', role: 'HR Officer' }, { name: 'Ms. Malee Placeholder', role: 'Admin Officer' }] }
+          ];
+          return { id: p.id, label: p.label, lead: p.lead, opsDepartments: opsDepartments, adminDepartments: adminDepartments };
+        })
+      },
+      /* Group structure — a SEPARATE view from the org chart above (same
+       * 'orgchart' section, switchable via the view toggle rendered in the
+       * 'orgchart' case in app.html), not a merge of the two: the org chart
+       * is roles/people within Vichitbhan itself, this is Vichitbhan's
+       * position within the wider Vichitbhan Group — who OWNS Vichitbhan
+       * (shareholders), and what Vichitbhan itself owns/co-owns
+       * (subsidiaries, joint ventures).
+       *
+       * groupName is the overarching group label (Vichitbhan Group), shown
+       * with a visible frame/border around the ENTIRE tree beneath it (see
+       * .group-structure-frame in styles.html) — an actual bounding box
+       * around shareholders + Vichitbhan + subsidiaries + joint ventures
+       * together, so the whole thing reads as one group.
+       *
+       * shareholders sits ABOVE Vichitbhan — it OWNS Vichitbhan, it isn't
+       * owned BY it, so this is deliberately the one tier drawn above the
+       * parent card rather than below it like everything else in this
+       * view. An earlier version (matching a fuller reference ownership
+       * chart the user first showed) also listed Other Shareholders and a
+       * highlighted New Investor row with ownership percentages on each —
+       * simplified down to just Chavananand Family per explicit follow-up
+       * request ("you don't have to show the other shareholders and their
+       * percentages"). renderShareholderTierHtml (app.html) still supports
+       * pct/highlight/note per entry (a single plain box with none of
+       * those set renders with no percentage line at all), so restoring
+       * the fuller breakdown later is just adding entries back, not
+       * rebuilding the renderer.
+       *
+       * Subsidiaries and Joint Ventures are SIBLING branches at the same
+       * tier under Vichitbhan, laid out side by side on one row (see
+       * .group-structure-branches in styles.html — a 2-column flex row,
+       * deliberately NOT stacked top-to-bottom the way the org chart's own
+       * Head Office/Project Sites segments are) — they're different
+       * ownership relationships (a subsidiary is owned/controlled by
+       * Vichitbhan alone; a JV is co-owned with a separate partner company,
+       * a peer relationship) but both still sit directly under Vichitbhan
+       * in the tree. Each JV renders as a single click-to-expand card (see
+       * groupJvCardHtml in app.html) — collapsed, it shows just the short
+       * code (VK), no parent names; clicking reveals its co-owning parent
+       * companies in place, inside that same card (an always-visible
+       * ownership-chart version was tried in between and explicitly
+       * reverted back to this). VK and V&K are confirmed as two distinct
+       * JV entities (not a duplicate), both
+       * co-owned with Kolatach. */
+      groupStructure: {
+        groupName: 'Vichitbhan Group',
+        /* Simplified to just the Chavananand Family per explicit request —
+           no percentages, no Other Shareholders / New Investor rows (those
+           were in the original reference chart the user showed, but they
+           only wanted this view to establish that the family owns
+           Vichitbhan, not a full cap-table breakdown). See
+           renderShareholderTierHtml in app.html — a single entry with no
+           pct renders as one plain box feeding straight down into
+           Vichitbhan, no percentage line, no highlight styling. */
+        shareholders: [
+          { id: 'chavananand', label: 'Chavananand Family' }
+        ],
+        parent: { id: 'vcb', label: 'Vichitbhan Construction Co., Ltd.', sub: 'Vichitbhan Construction Company Limited (VCB) is a construction company specializing in large-scale infrastructure projects, including highways, roads, dams, and precast concrete works. The company primarily serves government and public-sector clients, delivering construction projects through its engineering, project management, procurement, and support functions.' },
+        /* Sibling companies — same Chavananand Family ownership as VCB, but
+           NOT part of VCB's own corporate structure: no shared ownership,
+           no shared operations, nothing further branches beneath them here
+           (unlike VCB, which continues down into Subsidiaries/Joint
+           Ventures). Explicit client request: these sit at the SAME tier
+           as VCB, directly under the family, with a visually distinct
+           (dashed, see renderGroupStructureHtml/styles.html) connector
+           specifically so the "family-owned but otherwise unrelated to
+           VCB" relationship reads correctly at a glance rather than
+           implying they're siblings/subsidiaries of VCB itself. VCB stays
+           the visually dominant card of the three (its existing blue
+           accent-gradient .group-entity-parent treatment) since that's the
+           one company employees using this portal actually work at. */
+        familyCompanies: [
+          { id: 'vpo', label: 'Vichitbhan Palm Oil PCL (VPO)', sub: 'Vichitbhan Palm Oil PCL is a Thailand-based company engaged in palm plantation and palm oil extraction. Its product line consists of crude palm oil, palm kernel, by-products such as shells, empty bunches, decanter cakes, and palm fiber products, and electricity which is produced from the treated waste water of the Palm Oil Crushing Mill.' },
+          { id: 'chavananand-holding', label: 'Chavananand Holding Co., Ltd.', sub: 'Operates and manages a commercial building, overseeing its day-to-day operations, maintenance, and tenant services. The company also manages the leasing of office spaces within the building, including tenant relations and rental administration.' }
+        ],
+        subsidiaries: [
+          { id: 'cve', label: 'CVE', sub: 'Manufactures pre-cast concrete components for Vichitbhan Group’s construction projects.' },
+          { id: 'cvn', label: 'CVN Development', sub: 'Develops property ventures on behalf of Vichitbhan Group, currently being established.' }
+        ],
+        jvs: [
+          { id: 'vk', label: 'VK', parents: ['Vichitbhan Construction Co., Ltd.', 'Kolatach'] },
+          { id: 'v-and-k', label: 'V&K', parents: ['Vichitbhan Construction Co., Ltd.', 'Kolatach'] },
+          { id: 'vn', label: 'VN', parents: ['Vichitbhan Construction Co., Ltd.', 'Napa Construction'] },
+          { id: 'vc', label: 'VC', parents: ['Vichitbhan Construction Co., Ltd.', 'CVN Development'] }
+        ]
+      }
+    }
+  ],
+  /* Pre-boarding ends here, at Company Structure — Required Documents,
+     Department Selection, and everything after used to all live on this
+     same Home page in one long scroll. Split into its own page
+     ('required-documents') per explicit request, with this closing link
+     as the "proceed to the next step" button between them. */
+  closing: { label: 'Continue to Required Documents', page: 'required-documents' }
+};
+
+/* ---------------- REQUIRED DOCUMENTS (split from Home/Pre-boarding) ----------------
+   The rest of the original pre-boarding flow: document signing, the
+   orientation schedule link, Department Selection, and the same
+   completion panel (homeFeatureGridSection) Home used to end with. Reached
+   via the "Continue to Required Documents" button at the end of the Home
+   page above, not a sidebar/nav entry of its own — the sidebar stepper's
+   Required Documents / Department Selection steps (see getJourneySteps in
+   progress.html) point to page:'required-documents' now, updated
+   alongside this split. */
+PAGES['required-documents'] = {
+  hero: { eyebrow: 'Pre-boarding', title: 'Required Documents' },
+  sections: [
+    {
+      type: 'doclist',
+      sectionId: 'required-documents',
+      band: 'light',
+      heading: 'Required Documents',
+      intro: 'View, download, complete, and upload these eight documents before the first working day:',
+      /* Each doc carries viewUrl (opens Drive's own in-browser preview —
+         what clicking the card itself does now) and downloadUrl (forces an
+         actual file download — what the separate Download button does).
+         Kept as two explicit fields rather than deriving one from the other
+         because the two document TYPES here need different URL shapes: a
+         regular uploaded file (PDF etc.) uses drive.google.com/file/d/ID for
+         viewing and /uc?export=download for downloading, but a native Google
+         Doc (the Employment Contract) uses docs.google.com/document/d/ID —
+         string-surgery between the two would be more fragile than just
+         writing both out per doc. See docCard() below for how these render. */
+      docs: [
+        { id: 'application-form', title: 'Employment Application Form', action: 'View Application Form',
+          desc: 'Your personal, education, and work-history details on record before the contract is drawn up.',
+          viewUrl: 'https://drive.google.com/file/d/1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C' },
+        { id: 'employment-contract', title: 'Employment Contract', action: 'View Employment Contract',
+          desc: 'The formal agreement covering your role, compensation, and terms of employment with VCB.',
+          /* Native Google Doc, not a PDF — /edit gives the standard Docs
+             viewer/editor; export?format=docx downloads an editable copy,
+             matching how an employee would actually fill in a template. */
+          viewUrl: 'https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/edit',
+          downloadUrl: 'https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/export?format=docx' },
+        { id: 'nda', title: 'Confidentiality Agreement', action: 'View NDA Form',
+          desc: 'Your commitment to keep company, project, and client information confidential.',
+          viewUrl: 'https://drive.google.com/file/d/1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3' },
+        { id: 'pdpa-consent', title: 'Personal Data Consent Form (PDPA)', action: 'View PDPA Consent Form',
+          desc: 'Your consent for VCB to collect, use, and store your personal data as an employee.',
+          viewUrl: 'https://drive.google.com/file/d/1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK' },
+        { id: 'pdpa-policy', title: 'PDPA Data Protection Policy (Reference)', action: 'View PDPA Policy',
+          desc: 'Acknowledgement that you have read the company’s policy on how personal data is protected.',
+          viewUrl: 'https://drive.google.com/file/d/1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw' },
+        { id: 'anti-corruption', title: 'Anti-Corruption Policy Acknowledgement', action: 'View Anti-Corruption Form',
+          desc: 'Acknowledgement of VCB’s zero-tolerance policy on bribery and corruption.',
+          viewUrl: 'https://drive.google.com/file/d/1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF' },
+        { id: 'reporting-form', title: 'New Employee Reporting Form', action: 'View Reporting Form',
+          desc: 'Confirms your official start date and reports you as active to HR on day one.',
+          viewUrl: 'https://drive.google.com/file/d/10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA/view',
+          downloadUrl: 'https://drive.google.com/uc?export=download&id=10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA' },
+        { id: 'tax-form', title: 'Tax Registration Form', action: 'View Tax Form',
+          desc: 'Your tax ID and withholding details for payroll registration.' }
+      ]
+    },
+    {
+      type: 'text',
+      band: 'light',
+      body: ['Your first working day will include an orientation session introducing the company, internal procedures, and your department.'],
+      link: { label: 'View Orientation Schedule', url: 'https://drive.google.com/uc?export=download&id=1ORoLccHOZCcIijLQIMvfmSys0En2Y3Q7' }
+    },
+    {
+      type: 'deptgrid',
+      sectionId: 'department-selection',
+      band: 'teal',
+      heading: 'Department Selection',
+      eyebrow: 'The most important step in pre-boarding',
+      intro: 'Choose the department you will spend your first 90 days in. This sets the checklists, milestones, and people you’ll work with from here on — choose carefully.',
+      depts: [
+        { deptId: 'accounting', label: 'Accounting Team', page: 'accounting-team', icon: 'ledger',
+          desc: 'Keep the company’s financial records complete, transparent, and audit-ready.',
+          lead: 'Mrs. Wanpen Yamploy, Head of Accounting', focus: 'Recording, tax compliance, audit readiness' },
+        { deptId: 'finance', label: 'Finance Team', page: 'finance-team', icon: 'coin',
+          desc: 'Protect liquidity and long-term financial stability through controlled cashflow.',
+          lead: 'Mr. Vivich Chavananand, Head of Finance', focus: 'Cashflow, financing, debt management' },
+        { deptId: 'procurement', label: 'Procurement Team', page: 'procurement-team', icon: 'package',
+          desc: 'Secure materials and services on terms that protect cost, schedule, and quality.',
+          lead: 'Mrs. Thongthip Chavananand, Head of Procurement', focus: 'Sourcing, supplier risk, approvals' },
+        { deptId: 'property', label: 'Asset Management Team', page: 'property-asset-management', icon: 'building',
+          desc: 'Track and safeguard every company-owned asset, from tools to heavy equipment.',
+          lead: 'Mr. Watcharit Chavananand, Head of Asset Management', focus: 'Registration, tracking, verification' },
+        { deptId: 'engineering', label: 'Engineering Team', page: 'engineering-team', icon: 'wrench',
+          desc: 'Turn project progress into certified, accurately measured revenue on site.',
+          lead: 'Mr. Vivat Chavananand, Head of Engineering', focus: 'Execution, measurement, documentation' }
+      ],
+      footer: 'Once selected, this becomes the department you complete all three onboarding phases in — switching later means starting your checklist over from day one.'
+    }
+    /* homeFeatureGridSection() (Meet Our Team / Life on Site / Print
+       Completion Form) intentionally does NOT appear here — it represents
+       finishing the whole 90-day journey, not picking a department, and
+       showing it under Department Selection read as confusing/out of
+       place. It still shows up in the one place it actually belongs: each
+       department's real Day 61-90 phase page (see phasePage()'s closing
+       handling below), where onboarding genuinely completes. */
+  ]
+};
+
+/* ---------------- DEPARTMENT LANDING PAGE BUILDER ---------------- */
+function deptLanding(opts) {
+  return {
+    hero: { eyebrow: opts.eyebrow, title: opts.title },
+    sections: [
+      { type: 'text', heading: 'Meet Your Supervisor', body: [opts.supervisor], image: opts.teamImage ? img(opts.teamImage, opts.title + ' team photo') : null },
+      { type: 'text', heading: 'Department Overview', body: opts.overview, bullets: opts.bullets, footer: opts.footerQuote },
+      { type: 'text', heading: 'Workflow Within the Mango Anywhere ERP System', body: opts.workflow,
+        image: '<img class="content-image erp-flow-photo" src="' + EMBEDDED_IMAGES.erpFlowchart + '" alt="Mango Anywhere ERP system flow diagram" loading="lazy">' },
+      /* Junior/Senior picker moved onto each phase page itself (see
+         phasePage() below, right before Required Reading) — this landing
+         page no longer carries it. */
+      { type: 'phaselinks', heading: 'Onboarding Phases', phases: opts.phases }
+    ]
+  };
+}
+
+PAGES['accounting-team'] = deptLanding({
+  eyebrow: 'Accounting Team', title: 'Accounting Team',
+  supervisor: 'Mrs. Wanpen Yamploy (Head of Accounting) and Mrs. Jirapon (Accounting Assistant) will guide new employees through onboarding.',
+  overview: ['Objective: maintaining complete, transparent, and verifiable financial records that accurately reflect the company’s operations.'],
+  bullets: ['Recording transactions correctly and consistently', 'Ensuring compliance with tax and regulatory requirements', 'Maintaining audit readiness at all times', 'Enforcing documentation discipline within ERP systems', 'Supporting financial reporting integrity'],
+  footerQuote: 'Accuracy is protection. Documentation is control.',
+  workflow: ['Operations use the Mango Anywhere ERP system, which integrates project operations, procurement, asset management, and financial reporting through AP, AR, and GL modules. Operational departments initiate transactions; Accounting verifies, documents, and records them for General Ledger consolidation.'],
+  teamImage: IMAGES.wfAccountingTeamPhoto,
+  phases: [
+    { label: 'ACCOUNTING – DAY 1–30', page: 'accounting-day-1-30' },
+    { label: 'ACCOUNTING – DAY 31–60', page: 'accounting-day-31-60' },
+    { label: 'ACCOUNTING – DAY 61–90', page: 'accounting-day-61-90' }
+  ]
+});
+
+PAGES['finance-team'] = deptLanding({
+  eyebrow: 'Finance Team', title: 'Finance Team',
+  supervisor: 'Mr. Vivich Chavananand (Head of Finance) and Mrs. Sirirat (Senior Finance Officer) will guide you through the onboarding process and help you understand the systems, responsibilities, and standards of the Finance Department.',
+  overview: ['The Finance Department safeguards the company’s liquidity, financial stability, and long-term sustainability.', 'Primary objective: ensuring controlled cashflow, responsible debt management, and early identification of funding gaps before operational risks emerge.', 'Finance safeguards liquidity through:'],
+  bullets: ['Monitoring cash inflows and outflows', 'Forecasting short- and medium-term funding requirements', 'Managing banking facilities and financing instruments', 'Evaluating debt servicing capacity', 'Protecting the company from liquidity exposure'],
+  footerQuote: 'Finance protects the liquidity that makes profitability sustainable.',
+  workflow: ['The Finance Department operates within the Mango Anywhere Enterprise Resource Planning (ERP) system, utilizing modules FIN, AP, and PM to manage resources, funding structure, and cash flow. The department monitors transactions across operational areas to maintain financial stability and enable strategic decision-making.'],
+  phases: [
+    { label: 'FINANCE – Day 1–30', page: 'finance-day-1-30' },
+    { label: 'FINANCE – Day 31–60', page: 'finance-day-31-60' },
+    { label: 'FINANCE – Day 61–90', page: 'finance-day-61-90' }
+  ]
+});
+
+PAGES['procurement-team'] = deptLanding({
+  eyebrow: 'Procurement Team', title: 'Procurement Team',
+  supervisor: 'Mrs. Thongthip Chavananand (Head of Procurement) and Mrs. Anongrak (Senior Procurement Officer) guide onboarding.',
+  overview: ['The procurement function protects the company’s cost structure, liquidity timing, and supply reliability. Objective: ensure that all purchasing decisions align with project requirements, financial capacity, and governance standards.'],
+  bullets: ['Secure materials and services at optimal commercial terms', 'Prevent cost escalation and over-purchasing', 'Align delivery schedules with project timelines', 'Evaluate supplier risk exposure', 'Enforce structured approval workflows'],
+  footerQuote: 'Procurement decisions directly affect project margin and cashflow stability. Cost control is not optional — it is structural protection.',
+  workflow: ['Procurement operates through the Mango Anywhere ERP system, managing purchasing activities via modules: PO, PR, and IC. Requirements flow from Engineering and Project teams through the system as purchase requests and orders.'],
+  phases: [
+    { label: 'PROCUREMENT – DAY 1–30', page: 'procurement-day-1-30' },
+    { label: 'PROCUREMENT – DAY 31–60', page: 'procurement-day-31-60' },
+    { label: 'PROCUREMENT – DAY 61–90', page: 'procurement-day-61-90' }
+  ]
+});
+
+PAGES['property-asset-management'] = deptLanding({
+  eyebrow: 'Property & Asset Management', title: 'Property & Asset Management',
+  supervisor: 'Mr. Watcharit Chavananand (Head of Asset Management) and Mr. Wichit (Head of Vehicles & Machinery) lead onboarding.',
+  overview: ['Core function: protecting company-owned assets, inventory integrity, and operational traceability. Objective: ensure that all assets are properly registered, documented, traceable, and physically verified at all times.'],
+  bullets: ['Accurate asset registration and tagging', 'Warehouse control and movement tracking', 'Periodic physical verification', 'Prevention of loss, misuse, or misstatement', 'Supporting financial reporting through asset accuracy'],
+  footerQuote: 'Control preserves value. Uncontrolled assets create financial and governance exposure.',
+  workflow: ['Operates within the Mango Anywhere ERP system, managing asset tracking, utilization, and lifecycle across project sites and operational facilities through FA and IC modules. The system monitors machinery, equipment, materials, and facilities to ensure proper allocation, maintenance, and financial accountability, integrating with procurement, engineering, and accounting processes.'],
+  phases: [
+    { label: 'PROPERTY – DAY 1–30', page: 'property-day-1-30' },
+    { label: 'PROPERTY – DAY 31–60', page: 'property-day-31-60' },
+    { label: 'PROPERTY – DAY 61–90', page: 'property-day-61-90' }
+  ]
+});
+
+PAGES['engineering-team'] = deptLanding({
+  eyebrow: 'Engineering Team', title: 'Engineering Team',
+  supervisor: 'Mr. Vivat Chavananand (Head of Engineering) and Mrs. Romanee Karunchadit (Senior Engineer Officer) guide onboarding.',
+  overview: ['Mission: revenue realization through accurate measurement, controlled execution, and disciplined documentation. Engineering must ensure project progress converts to certified revenue while maintaining cost efficiency and contractual compliance through:'],
+  bullets: ['Executing work per specifications and approved drawings', 'Maintaining accurate quantity measurement', 'Controlling material and labor efficiency', 'Preventing schedule delays', 'Preparing documentation supporting progress claims'],
+  footerQuote: 'Execution accuracy safeguards revenue.',
+  workflow: ['The Mango Anywhere ERP System integrates project planning, resource allocation, procurement, and financial management. Engineering initiates operational activities through Business Development (BD) and Project Management (PM) modules that connect with other departments.'],
+  phases: [
+    { label: 'ENGINEERING – DAY 1–30', page: 'engineering-day-1-30' },
+    { label: 'ENGINEERING – DAY 31–60', page: 'engineering-day-31-60' },
+    { label: 'ENGINEERING – DAY 61–90', page: 'engineering-day-61-90' }
+  ]
+});
+
+/* Tags a checklist item as Senior-only — plain strings in a block's items
+   array are shown to every employee regardless of level; wrapping one in
+   sr(...) marks it as an extra task that only renders (and only counts
+   toward phase completion) for employees on the Senior track. See
+   renderSectionContent's 'checklist' case in app.html for where this shape
+   is consumed, and getPageTaskIds/getPageBlockTaskIds in progress.html for
+   why level-filtering has to happen there too, not just at render time. */
+function sr(text) {
+  return { text: text, level: 'senior' };
+}
+/* Wraps a checklist item with a permanent, never-reused id — assigned once
+   when the item is authored and kept for its entire lifetime, independent
+   of its position in the array. Task completion (see progress.html) is
+   keyed on this id, not on array index, specifically so reordering,
+   inserting, or deleting items in the admin editor can never silently
+   repoint an employee's already-saved checkmark at a different task. */
+function it(id, text, opts) {
+  var o = { id: id, text: null, level: 'junior' };
+  if (typeof text === 'object' && text !== null) {
+    // text is actually an sr(...)-wrapped object: { text, level }
+    o.text = text.text;
+    o.level = text.level;
+  } else {
+    o.text = text;
+  }
+  if (opts && opts.level) o.level = opts.level;
+  return o;
+}
+/* Every checklist item is either a plain string (shown at every level) or an
+   sr(...)-tagged { text, level: 'senior' } object — these two accessors are
+   the single place that distinguishes them, used from app.html (rendering),
+   progress.html (task-id generation/completion checks), and the completion
+   certificate builder, so all three stay in agreement about what "this
+   item's text" and "this item's level" mean. */
+function itemText(item) {
+  return (item && typeof item === 'object') ? item.text : item;
+}
+function itemLevel(item) {
+  return (item && typeof item === 'object' && item.level) ? item.level : 'junior';
+}
+/* Every checklist item built via it(...) carries its own permanent id — see
+   it() above. Task ids (progress.html) are keyed on THIS, not on the
+   item's position in its array, so the admin editor (reorder/insert/
+   delete) can never silently repoint an employee's saved checkmark at a
+   different task. */
+function itemId(item) {
+  return (item && typeof item === 'object') ? item.id : null;
+}
+
+/* ---------------- PHASE PAGE BUILDER ---------------- */
+/* Every phase page's blocks always follow the same fixed order — Required
+   Reading, Knowledge Requirements, Required Outputs — so block index maps
+   directly onto PHASE_BLOCK_ANCHORS below. Each block gets that anchor as
+   its sectionId, letting the sidebar stepper's Reading/Knowledge/Outputs
+   sub-rows (see getJourneySteps in progress.html) deep-link and scroll
+   straight to the matching section instead of just the page top. Reused
+   across every phase page (not made unique per page) is safe because only
+   one phase page's DOM exists at a time — see renderPage in app.html. */
+var PHASE_BLOCK_ANCHORS = ['phase-reading', 'phase-knowledge', 'phase-outputs'];
+function phasePage(opts) {
+  var sections = [];
+  /* levelpicker is NOT pushed into sections here (it used to be, briefly —
+     see git history/conversation) — task ids now come from each item's own
+     permanent id (see it()/itemId()), not from its position, so reordering
+     or inserting checklist items can no longer orphan an employee's saved
+     progress the way it once could. PHASE_BLOCK_ANCHORS[i] (the sidebar's
+     Reading/Knowledge/Outputs deep-link) and getPageBlockTaskIds's
+     blockIndex parameter still both assume block order is exactly
+     [Reading, Knowledge, Outputs] at indices [0,1,2] though, so an extra
+     section inserted before Required Reading here would still break THAT
+     mapping (wrong block shown under each sidebar sub-step) even though
+     individual checkbox state would survive it unharmed. showLevelPicker:
+     true is read directly by renderPage (app.html), which renders it
+     OUTSIDE this sections array — same pattern as the progress widget
+     above it, that already isn't indexed either — so it can't perturb
+     PHASE_BLOCK_ANCHORS indexing no matter what. */
+  opts.showLevelPicker = true;
+  (opts.blocks || []).forEach(function (b, i) {
+    sections.push({ type: 'checklist', heading: b.heading, items: b.items, sub: b.sub, sectionId: PHASE_BLOCK_ANCHORS[i] });
+  });
+  if (opts.closing) {
+    sections.push({ type: 'text', body: [opts.closing] });
+    /* Used to also append homeFeatureGridSection() (Meet Our Team / Life on
+       Site / Print Completion Form) right here as an in-place "gated"
+       reveal once onboarding was detected complete — removed per explicit
+       request ("it's better for it to be its own actual completion page").
+       That reveal depended on an async placeholder-swap
+       (revealGatedSections/syncGatedSectionsVisibility, app.html/
+       progress.html) that went through five separate rounds of real bugs
+       across earlier sessions (see KNOWN_ISSUES.md) and STILL sometimes
+       didn't pop in right away — the actual bug report that prompted this
+       removal. Finishing the last phase now navigates to a real
+       PAGES['completion'] page instead (see below, and
+       celebrateOnboardingComplete's Continue button in progress.html) —
+       a genuine page render, synchronous like every other page, with
+       nothing left to "reveal" after the fact. */
+  }
+  return {
+    hero: { eyebrow: opts.eyebrow, title: opts.title, subtitle: opts.subtitle },
+    sections: sections,
+    nextPhase: opts.nextPhase,
+    showLevelPicker: opts.showLevelPicker
+  };
+}
+
+/* Accounting phases */
+PAGES['accounting-day-1-30'] = phasePage({
+  eyebrow: 'Accounting · Phase 1 (Day 1–30)', title: 'Foundation: Documentation & Recording Discipline',
+  blocks: [
+    { heading: 'Required Reading', items: [it('acct-p1-read-1', 'Chart of Accounts Structure'), it('acct-p1-read-2', 'PR → PO → AP Recording Flow (ERP Posting Rules)'), it('acct-p1-read-3', 'VAT & Withholding Tax Compliance'), it('acct-p1-read-4', sr('AP Credit Note (ลดหนี้) Procedure'))] },
+    { heading: 'Knowledge Requirements', items: [it('acct-p1-know-1', 'Debit/credit logic and expense vs asset classification'), it('acct-p1-know-2', 'VAT calculation and recording'), it('acct-p1-know-3', 'AP/AR posting and journal entries in Mango'), it('acct-p1-know-4', sr('Reversing a payable for returns, over-billing, or disputes'))] },
+    { heading: 'Required Outputs', items: [it('acct-p1-out-1', '15 accurate ERP postings'), it('acct-p1-out-2', '1 sample journal entry set'), it('acct-p1-out-3', 'VAT reconciliation example'), it('acct-p1-out-4', sr('1 reviewed AP credit note case'))] }
+  ],
+  nextPhase: { label: 'ACCOUNTING – DAY 31–60', page: 'accounting-day-31-60' }
+});
+PAGES['accounting-day-31-60'] = phasePage({
+  eyebrow: 'Accounting · Phase 2 (Day 31–60)', title: 'Control: Reconciliation & Compliance',
+  blocks: [
+    { heading: 'Required Reading', items: [it('acct-p2-read-1', 'Bank Reconciliation Procedure'), it('acct-p2-read-2', 'AP/AR Aging Review Standards'), it('acct-p2-read-3', 'Monthly Accrual & Depreciation Policy'), it('acct-p2-read-4', sr('IC Inventory Accounting Standard'))] },
+    { heading: 'Knowledge Requirements', items: [it('acct-p2-know-1', 'Bank reconciliation structure (complements GL Reconcile)'), it('acct-p2-know-2', 'AP/AR aging review'), it('acct-p2-know-3', 'Accrual entry logic & depreciation recording'), it('acct-p2-know-4', sr('IC inventory accounting and cost-transfer postings to GL'))] },
+    { heading: 'Required Outputs', items: [it('acct-p2-out-1', 'Bank reconciliation report'), it('acct-p2-out-2', 'Accrual journal summary'), it('acct-p2-out-3', 'AR/AP aging summary'), it('acct-p2-out-4', sr('1 IC inventory accounting review memo'))] }
+  ],
+  nextPhase: { label: 'ACCOUNTING – DAY 61–90', page: 'accounting-day-61-90' }
+});
+PAGES['accounting-day-61-90'] = phasePage({
+  eyebrow: 'Accounting · Phase 3 (Day 61–90)', title: 'Ownership: Reporting Accuracy & Audit Readiness',
+  blocks: [
+    { heading: 'Required Reading', items: [it('acct-p3-read-1', 'Financial Statement Structure'), it('acct-p3-read-2', 'Revenue Recognition Standards'), it('acct-p3-read-3', 'Audit Documentation Requirements'), it('acct-p3-read-4', sr('External Audit Coordination Guidelines'))] },
+    { heading: 'Knowledge Requirements', items: [it('acct-p3-know-1', 'Month-end GL closing procedure'), it('acct-p3-know-2', 'Trial balance review'), it('acct-p3-know-3', 'VAT/WHT/CIT filing requirements'), it('acct-p3-know-4', sr('External audit coordination and management cost-per-project reporting'))] },
+    { heading: 'Required Outputs', items: [it('acct-p3-out-1', 'Trial balance review sheet'), it('acct-p3-out-2', 'Financial statement draft'), it('acct-p3-out-3', 'Internal audit readiness checklist'), it('acct-p3-out-4', sr('1 management cost-per-project report'))] }
+  ],
+  closing: 'You have completed all three onboarding phases for this department.'
+});
+
+/* Finance phases */
+PAGES['finance-day-1-30'] = phasePage({
+  eyebrow: 'Finance · Phase 1 (Day 1–30)', title: 'Foundation: Liquidity Awareness & Cashflow Discipline',
+  blocks: [
+    { heading: 'Required Reading', items: [
+      it('fin-p1-read-1', 'Company Cash Cycle Structure — project-based cashflow model driven by certified progress payments from government projects.'),
+      it('fin-p1-read-2', 'Advance & Retention Mechanism — advance payments are progressively deducted from claims; retention is withheld until completion milestones.'),
+      it('fin-p1-read-3', 'ERP Documentation Flow — all payments must follow PR → PO → AP → Approval → Payment.'),
+      it('fin-p1-read-4', sr('Inter-JV Group Transfers Guide (VCB/CVE/VN JV)'))
+    ] },
+    { heading: 'Knowledge Requirements', items: [it('fin-p1-know-1', 'Operating vs financing cashflow'), it('fin-p1-know-2', 'Retention’s impact on liquidity'), it('fin-p1-know-3', 'Advance deduction process'), it('fin-p1-know-4', sr('Inter-JV fund transfers and AR-Without-Invoice postings'))] },
+    { heading: 'Required Outputs', items: [it('fin-p1-out-1', '10 accurate PL postings'), it('fin-p1-out-2', '1 complete bank reconciliation'), it('fin-p1-out-3', 'Identification of 3 liquidity risks'), it('fin-p1-out-4', sr('1 reviewed inter-JV transfer entry'))] }
+  ],
+  nextPhase: { label: 'FINANCE – Day 31–60', page: 'finance-day-31-60' }
+});
+PAGES['finance-day-31-60'] = phasePage({
+  eyebrow: 'Finance · Phase 2 (Day 31–60)', title: 'Control: Forecasting Accuracy & Funding Risk Monitoring',
+  blocks: [
+    { heading: 'Required Reading', items: [it('fin-p2-read-1', 'Loan Amortization Structure'), it('fin-p2-read-2', 'Promissory Note Interest Calculation'), it('fin-p2-read-3', 'Retention Ledger Monitoring Procedure'), it('fin-p2-read-4', sr('AVAL Discounting (B/E Sale) Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('fin-p2-know-1', 'Project-level cashflow tracking'), it('fin-p2-know-2', 'Liquidity forecasting method'), it('fin-p2-know-3', 'Credit Facility register basics (P/N, AVAL, BG, LC)'), it('fin-p2-know-4', sr('Shopping AVAL bills across banks for best discount rate'))] },
+    { heading: 'Required Outputs', items: [it('fin-p2-out-1', '3-month cash projection'), it('fin-p2-out-2', 'Retention tracking sheet'), it('fin-p2-out-3', 'Cost variance analysis'), it('fin-p2-out-4', sr('1 AVAL discounting rate comparison'))] }
+  ],
+  nextPhase: { label: 'FINANCE – Day 61–90', page: 'finance-day-61-90' }
+});
+PAGES['finance-day-61-90'] = phasePage({
+  eyebrow: 'Finance · Phase 3 (Day 61–90)', title: 'Ownership: Financial Stability & Strategic Liquidity Control',
+  blocks: [
+    { heading: 'Required Reading', items: [it('fin-p3-read-1', 'Break-Even Analysis Method'), it('fin-p3-read-2', 'Debt Servicing Capacity Guidelines'), it('fin-p3-read-3', 'Liquidity Stress Testing Procedure'), it('fin-p3-read-4', sr('Credit Facility Management & Bank Account Inquiry Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('fin-p3-know-1', 'Debt servicing capacity'), it('fin-p3-know-2', 'Liquidity stress testing'), it('fin-p3-know-3', 'Margin sensitivity'), it('fin-p3-know-4', sr('Selecting which facility to draw per payment batch'))] },
+    { heading: 'Required Outputs', items: [it('fin-p3-out-1', 'Independent monthly financial report'), it('fin-p3-out-2', 'Liquidity stress scenario'), it('fin-p3-out-3', 'Financial risk memo'), it('fin-p3-out-4', sr('1 credit facility utilisation review'))] }
+  ],
+  closing: 'You have completed all three onboarding phases for this department.'
+});
+
+/* Procurement phases */
+PAGES['procurement-day-1-30'] = phasePage({
+  eyebrow: 'Procurement · Phase 1 (Day 1–30)', title: 'Foundation: Process Control & Approval Discipline',
+  blocks: [
+    { heading: 'Required Reading', items: [it('proc-p1-read-1', 'PR → PO → IC → AP Workflow'), it('proc-p1-read-2', 'Authority Matrix (two-level PR approval)'), it('proc-p1-read-3', 'Vendor Registration Process'), it('proc-p1-read-4', sr('Vendor & Subcontractor Pre-qualification (AVL) Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('proc-p1-know-1', 'Approval hierarchy (site PM → HQ Engineer)'), it('proc-p1-know-2', 'Compare Price process'), it('proc-p1-know-3', 'Budget validation vs BOQ'), it('proc-p1-know-4', sr('AVL capability/financial/safety pre-qualification criteria'))] },
+    { heading: 'Required Outputs', items: [it('proc-p1-out-1', '5 compliant PR/PO cycles'), it('proc-p1-out-2', 'Vendor comparison report'), it('proc-p1-out-3', 'Documentation compliance checklist'), it('proc-p1-out-4', sr('1 draft vendor pre-qualification scorecard'))] }
+  ],
+  nextPhase: { label: 'PROCUREMENT – DAY 31–60', page: 'procurement-day-31-60' }
+});
+PAGES['procurement-day-31-60'] = phasePage({
+  eyebrow: 'Procurement · Phase 2 (Day 31–60)', title: 'Control: Cost Efficiency & Supplier Risk Management',
+  blocks: [
+    { heading: 'Required Reading', items: [it('proc-p2-read-1', 'Cost Benchmarking Guidelines'), it('proc-p2-read-2', 'Delivery Schedule Alignment Procedure'), it('proc-p2-read-3', 'Supplier Risk Assessment Criteria'), it('proc-p2-read-4', sr('Supplier Tier Classification (Tier 1–4) Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('proc-p2-know-1', 'Cost benchmarking method'), it('proc-p2-know-2', 'Delivery schedule alignment'), it('proc-p2-know-3', 'Supplier risk assessment'), it('proc-p2-know-4', sr('Tier classification and market price database maintenance'))] },
+    { heading: 'Required Outputs', items: [it('proc-p2-out-1', 'Cost saving analysis'), it('proc-p2-out-2', 'Supplier risk summary'), it('proc-p2-out-3', 'Delivery alignment plan'), it('proc-p2-out-4', sr('1 supplier tier classification review'))] }
+  ],
+  nextPhase: { label: 'PROCUREMENT – DAY 61–90', page: 'procurement-day-61-90' }
+});
+PAGES['procurement-day-61-90'] = phasePage({
+  eyebrow: 'Procurement · Phase 3 (Day 61–90)', title: 'Ownership: Strategic Procurement Planning & Liquidity Alignment',
+  blocks: [
+    { heading: 'Required Reading', items: [it('proc-p3-read-1', 'Procurement Liquidity Impact Guide'), it('proc-p3-read-2', 'Inventory Overstock Risk Policy'), it('proc-p3-read-3', 'Supplier Concentration Exposure Standard'), it('proc-p3-read-4', sr('Creditor Debt Restructuring & AVAL Offset Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('proc-p3-know-1', 'Procurement’s impact on liquidity'), it('proc-p3-know-2', 'Inventory overstock risk'), it('proc-p3-know-3', 'Supplier concentration exposure'), it('proc-p3-know-4', sr('Creditor debt restructuring and AVAL offset arrangements'))] },
+    { heading: 'Required Outputs', items: [it('proc-p3-out-1', 'Procurement phase forecast'), it('proc-p3-out-2', 'Supplier concentration analysis'), it('proc-p3-out-3', 'Over-purchase prevention memo'), it('proc-p3-out-4', sr('1 creditor debt restructuring proposal'))] }
+  ],
+  closing: 'You have completed all three onboarding phases for this department.'
+});
+
+/* Property phases */
+PAGES['property-day-1-30'] = phasePage({
+  eyebrow: 'Property & Asset Management · Phase 1 (Day 1–30)', title: 'Foundation: Asset Registration & Control Discipline',
+  blocks: [
+    { heading: 'Required Reading', items: [it('prop-p1-read-1', 'Asset Classification Policy'), it('prop-p1-read-2', 'Warehouse Coding Standard'), it('prop-p1-read-3', 'Tagging & Serialization Guide'), it('prop-p1-read-4', sr('Fleet Management & GPS Monitoring Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('prop-p1-know-1', 'Asset classification logic (FA masters: Type/Depreciation/Location/Rate)'), it('prop-p1-know-2', 'Warehouse coding structure'), it('prop-p1-know-3', 'Transfer documentation requirements'), it('prop-p1-know-4', sr('Fleet/GPS monitoring and machine-hours utilisation tracking'))] },
+    { heading: 'Required Outputs', items: [it('prop-p1-out-1', '10 registered assets'), it('prop-p1-out-2', 'Asset transfer documentation'), it('prop-p1-out-3', 'Serial verification checklist'), it('prop-p1-out-4', sr('1 fleet utilisation summary'))] }
+  ],
+  nextPhase: { label: 'PROPERTY – DAY 31–60', page: 'property-day-31-60' }
+});
+PAGES['property-day-31-60'] = phasePage({
+  eyebrow: 'Property & Asset Management · Phase 2 (Day 31–60)', title: 'Control: Inventory Reconciliation & Traceability Enforcement',
+  blocks: [
+    { heading: 'Required Reading', items: [it('prop-p2-read-1', 'Physical vs ERP Reconciliation Procedure'), it('prop-p2-read-2', 'Depreciation Basics'), it('prop-p2-read-3', 'Site Allocation Control Policy'), it('prop-p2-read-4', sr('Preventive Maintenance (PM) Scheduling Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('prop-p2-know-1', 'Physical vs ERP reconciliation (month-end Count Asset)'), it('prop-p2-know-2', 'Depreciation recording basics'), it('prop-p2-know-3', 'Site allocation control (inter-project IC Transfer)'), it('prop-p2-know-4', sr('Preventive maintenance scheduling and repair-cost recording'))] },
+    { heading: 'Required Outputs', items: [it('prop-p2-out-1', 'Inventory audit report'), it('prop-p2-out-2', 'Reconciliation sheet'), it('prop-p2-out-3', 'Depreciation schedule review'), it('prop-p2-out-4', sr('1 preventive maintenance schedule'))] }
+  ],
+  nextPhase: { label: 'PROPERTY – DAY 61–90', page: 'property-day-61-90' }
+});
+PAGES['property-day-61-90'] = phasePage({
+  eyebrow: 'Property & Asset Management · Phase 3 (Day 61–90)', title: 'Ownership: Asset Integrity & Governance Assurance',
+  blocks: [
+    { heading: 'Required Reading', items: [it('prop-p3-read-1', 'Asset Lifecycle Management Guide'), it('prop-p3-read-2', 'Disposal Procedure'), it('prop-p3-read-3', 'Audit Preparation Checklist'), it('prop-p3-read-4', sr('Project Insurance (CAR) Management Guide'))] },
+    { heading: 'Knowledge Requirements', items: [it('prop-p3-know-1', 'Asset lifecycle stages (registration → transfer → write-off)'), it('prop-p3-know-2', 'Disposal/scrap sale procedure'), it('prop-p3-know-3', 'Audit preparation standards'), it('prop-p3-know-4', sr('CAR insurance premium tracking, expiry/renewal, and claims handling'))] },
+    { heading: 'Required Outputs', items: [it('prop-p3-out-1', 'Warehouse audit report'), it('prop-p3-out-2', 'Asset risk assessment memo'), it('prop-p3-out-3', 'Surplus/scrap disposal summary'), it('prop-p3-out-4', sr('1 project insurance renewal review'))] }
+  ],
+  closing: 'You have completed all three onboarding phases for this department.'
+});
+
+/* Engineering phases */
+PAGES['engineering-day-1-30'] = phasePage({
+  eyebrow: 'Engineering · Phase 1 (Day 1–30)', title: 'Foundation: Measurement Accuracy & Site Reporting Discipline',
+  blocks: [
+    { heading: 'Required Reading', items: [
+      it('eng-p1-read-1', 'Engineering Operations Manual with document examples'),
+      it('eng-p1-read-2', 'Mango Module Study — BD/PM modules relevant to role'),
+      it('eng-p1-read-3', 'Company Organization Chart, Departments & Projects'),
+      it('eng-p1-read-4', sr('BD Tender Pipeline & e-Bidding Overview'))
+    ] },
+    { heading: 'Knowledge Requirements', items: [
+      it('eng-p1-know-1', 'Position responsibilities and Engineering department overview'),
+      it('eng-p1-know-2', 'Standard software operation (Microsoft suite, PDF, email)'),
+      it('eng-p1-know-3', 'Mango module use within responsibility area (New Project Registration, Budget Control)'),
+      it('eng-p1-know-4', sr('e-GP tender screening and bid/no-bid decision criteria'))
+    ] },
+    { heading: 'Required Outputs', items: [
+      it('eng-p1-out-1', 'Execute Doc 02/03 flow within job scope'),
+      it('eng-p1-out-2', 'Enter data into Mango system'),
+      it('eng-p1-out-3', 'Answer master plan questions across departments'),
+      it('eng-p1-out-4', sr('1 draft e-GP tender screening note'))
+    ] }
+  ],
+  nextPhase: { label: 'ENGINEERING – DAY 31–60', page: 'engineering-day-31-60' }
+});
+PAGES['engineering-day-31-60'] = phasePage({
+  eyebrow: 'Engineering · Phase 2 (Day 31–60)', title: 'Control: Productivity Monitoring & Revenue Documentation',
+  blocks: [
+    { heading: 'Required Reading', items: [
+      it('eng-p2-read-1', 'Mango Manual — relevant module complete'),
+      it('eng-p2-read-2', 'Master Plans of various projects (progress to 80%)'),
+      it('eng-p2-read-3', 'Branch-submission documents'),
+      it('eng-p2-read-4', sr('Additional Work (Variation Order · BD) Processing Guide'))
+    ] },
+    { heading: 'Knowledge Requirements', items: [
+      it('eng-p2-know-1', 'Project bidding submission documents'),
+      it('eng-p2-know-2', 'Branch-submission document study'),
+      it('eng-p2-know-3', 'Variation Order (VO) processing basics'),
+      it('eng-p2-know-4', sr('Linking a VO to the main BOQ and merging cost codes'))
+    ] },
+    { heading: 'Required Outputs', items: [
+      it('eng-p2-out-1', 'Perform Phase 1 tasks at 80% accuracy'),
+      it('eng-p2-out-2', 'Draft one bidding submission package'),
+      it('eng-p2-out-3', 'Track one Variation Order end to end'),
+      it('eng-p2-out-4', sr('1 VO cost-code merge processed end to end'))
+    ] }
+  ],
+  nextPhase: { label: 'ENGINEERING – DAY 61–90', page: 'engineering-day-61-90' }
+});
+PAGES['engineering-day-61-90'] = phasePage({
+  eyebrow: 'Engineering · Phase 3 (Day 61–90)', title: 'Ownership: Section Performance & Cost Variance Control',
+  blocks: [
+    { heading: 'Required Reading', items: [
+      it('eng-p3-read-1', 'Master Plans of various projects (complete 100%)'),
+      it('eng-p3-read-2', 'Project bidding documents (complete study)'),
+      it('eng-p3-read-3', 'Project Closure requirements (final budget revision, reports)'),
+      it('eng-p3-read-4', sr('PM Module Dashboard — Project Status Overview Guide'))
+    ] },
+    { heading: 'Knowledge Requirements', items: [
+      it('eng-p3-know-1', 'Project bidding documents — full command'),
+      it('eng-p3-know-2', 'Contractor grade/PQ renewal evidence requirements'),
+      it('eng-p3-know-3', 'Project Closure process'),
+      it('eng-p3-know-4', sr('Reading the PM Dashboard across BD/PO/OF/AR/AP/GL/IC convergence'))
+    ] },
+    { heading: 'Required Outputs', items: [
+      it('eng-p3-out-1', 'Perform Phase 1 tasks at 100% accuracy (minor errors acceptable)'),
+      it('eng-p3-out-2', 'Complete one Project Status Overview review'),
+      it('eng-p3-out-3', 'Prepare one Project Closure documentation set'),
+      it('eng-p3-out-4', sr('1 independent PM Dashboard health summary'))
+    ] }
+  ],
+  closing: 'You have completed all three onboarding phases for this department.'
+});
+
+/* ---------------- MEET OUR TEAM ----------------
+   Rendered as an interactive org chart (type: 'orgchart', see app.html) —
+   three collapsed tiers by default (Managing Director / Senior Leadership /
+   the department teams), no names shown until a node is clicked or hovered,
+   at which point that node's members expand directly beneath it. Each
+   member is { name, role }; role is a short, plausible one-liner describing
+   what they actually do day to day. Titles for department heads mirror
+   their real supervisor descriptions used elsewhere (deptLanding() below);
+   the rest are reasonable, made-up-but-consistent blurbs for the same team,
+   since this app has no HR data source for individual job descriptions. */
+/* ---------------- MEET OUR TEAM ----------------
+   Real company event photos (from the "03 EVENTS" folder the user shared —
+   see meetTeam* keys in images.html) split into separate carousels by
+   actual event, instead of one single mixed carousel — the page read as
+   too bland/one-note with just a single carousel behind one click. Each
+   carousel uses the same 'trackrecord' type as Our Track Record on Home
+   (renderCarousel in app.html): 3 photos visible at once, rotating
+   one-directionally like a train. Not the org chart — that's embedded
+   directly on Home now (see the 'orgchart' section in PAGES['home']
+   above), not a separate page. */
+PAGES['meet-our-team'] = {
+  hero: { eyebrow: 'Our People', title: 'Meet Our Team' },
+  sections: [
+    {
+      type: 'text',
+      band: 'light',
+      heading: 'Life at Vichitbhan Construction',
+      body: [
+        'Beyond the job site and the ledgers, VCB is a team that shows up for each other — company parties, seasonal gatherings, and the everyday moments that make a construction company feel like more than a construction company.',
+        'These are some of those moments.'
+      ]
+    },
+    { type: 'trackrecord',
+      heading: 'New Year Party 2019',
+      subheading: 'Costumes, awards, and a company-wide celebration to close out the year.',
+      slides: [
+        { image: EMBEDDED_IMAGES.meetTeamNyp2019Award, caption: 'New Year Party 2019' },
+        { image: EMBEDDED_IMAGES.meetTeamNypAwardStage, caption: 'Best Dressed Award' },
+        { image: EMBEDDED_IMAGES.meetTeamPartyGroup1, caption: 'Company Costume Party' }
+      ]
+    },
+    { type: 'trackrecord',
+      heading: 'Company Celebration',
+      subheading: 'More moments from company gatherings over the years.',
+      slides: [
+        { image: EMBEDDED_IMAGES.meetTeamPartyCandid1, caption: 'Company Celebration' },
+        { image: EMBEDDED_IMAGES.meetTeamPartyCandid2, caption: 'Company Celebration' },
+        { image: EMBEDDED_IMAGES.meetTeamPartyCandid3, caption: 'Company Celebration' },
+        { image: EMBEDDED_IMAGES.meetTeamPartyCandid4, caption: 'Company Celebration' }
+      ]
+    },
+    { type: 'trackrecord',
+      heading: 'Christmas Gathering',
+      subheading: 'Seasonal get-togethers with the wider VCB team.',
+      slides: [
+        { image: EMBEDDED_IMAGES.meetTeamChristmas2023a, caption: 'Christmas Gathering 2023' },
+        { image: EMBEDDED_IMAGES.meetTeamChristmas2023b, caption: 'Christmas Gathering 2023' },
+        { image: EMBEDDED_IMAGES.meetTeamChristmasGroup, caption: 'Christmas Gathering' }
+      ]
+    }
+  ]
+};
+
+/* ---------------- LIFE ON SITE ---------------- */
+PAGES['life-on-site'] = {
+  hero: { eyebrow: 'On the Ground', title: 'Life on Site' },
+  sections: [
+    { type: 'text', body: ['Site operations are carried out in a structured and controlled environment, with a focus on safety, coordination, and adherence to defined work processes.'] },
+    { type: 'gallery', heading: 'Safety Talk', body: 'Each workday begins with a safety briefing to highlight potential risks, review ongoing activities, and reinforce site safety requirements. This ensures all personnel are aware of current site conditions, hazards, and control measures before work begins. Safety talks also provide an opportunity to address recent incidents, clarify procedures, and maintain a high level of safety awareness.', images: [EMBEDDED_IMAGES.losSafetyReal1, EMBEDDED_IMAGES.losSafetyReal2] },
+    { type: 'gallery', heading: 'Tool Box Talk', body: 'Toolbox talks are conducted regularly to review specific tasks and operational details relevant to the work being carried out. These sessions focus on correct methods, equipment usage, and coordination between teams. They ensure that all personnel understand their responsibilities and any task-specific risks before execution.', images: [EMBEDDED_IMAGES.losToolboxReal1, EMBEDDED_IMAGES.losTeamWorkReal] },
+    { type: 'gallery', heading: 'Site Training', body: 'On-site training is provided to ensure personnel are equipped with the necessary knowledge and skills to perform their duties effectively. This includes training on equipment, procedures, and safety practices. Continuous training helps maintain consistency in work quality and ensures compliance with company standards and regulatory requirements.', images: [EMBEDDED_IMAGES.losTrainingReal1, EMBEDDED_IMAGES.losTrainingReal2] },
+    { type: 'gallery', heading: 'House Keeping', body: 'Housekeeping is maintained throughout the site to ensure a clean, organized, and safe working environment. Proper storage of materials, clear access routes, and regular removal of waste help reduce hazards and improve operational efficiency. Good housekeeping practices are essential to minimizing risks and maintaining site discipline.', images: [EMBEDDED_IMAGES.losHousekeepingReal1, EMBEDDED_IMAGES.losHousekeepingReal2] },
+    { type: 'gallery', heading: 'Work in Process', body: 'All work activities are carried out in accordance with established procedures and project plans. Defined processes ensure consistency in execution, proper documentation, and alignment with cost and schedule requirements. Adherence to these processes supports quality control, accountability, and efficient resource utilization.', images: [EMBEDDED_IMAGES.losWorkInProcessReal1, EMBEDDED_IMAGES.losWorkInProcessReal2] },
+    /* Navigation Lock / Power House Unit / Spillway were each their own
+       single-image gallery section — with only one image in the grid it
+       always filled the whole row, stretching a landscape jobsite photo
+       edge to edge ("pancake" look). Merged into one "Site Facilities"
+       gallery so the grid actually has enough tiles to lay out 4 per row,
+       each labeled with its own caption instead of a shared heading. */
+    { type: 'gallery', heading: 'Site Facilities', images: [
+      { image: EMBEDDED_IMAGES.losNavigationLockReal, caption: 'Navigation Lock' },
+      { image: EMBEDDED_IMAGES.losPowerHouseReal, caption: 'Power House Unit' },
+      { image: EMBEDDED_IMAGES.losSpillway, caption: 'Spillway' }
+    ] },
+    { type: 'gallery', heading: 'Team Work', body: 'Site operations require coordination across multiple teams. Collaboration is at the heart of our success. We rely on each other’s strengths, communicate openly, and celebrate the achievements we build together.', images: [EMBEDDED_IMAGES.losToolboxReal2] }
+  ],
+  closing: { label: 'Return to Onboarding', page: 'home' }
+};
+
+/* ---------------- ADMIN CHECKLIST OVERRIDES ---------------- */
+/* Layers admin edits (see the Checklist Content sheet, Code.gs) on top of
+   the hardcoded checklist baseline just built above — every PAGES entry
+   is already fully constructed by this point, so this walks it once and
+   mutates in place. Runs unconditionally at load (window.CHECKLIST_OVERRIDES
+   is always injected by Index.html, empty object `{}` when nothing's been
+   edited yet — see doGet in Code.gs), so a never-touched deploy behaves
+   identically to before this feature existed.
+   Three things an override can do to an EXISTING hardcoded item (matched
+   by itemId — see it()/itemId() above):
+     - text/level override: replace displayed text and/or junior-vs-senior
+       visibility, in place, without moving it.
+     - deleted: true — remove it from its block's items array entirely.
+   ...plus adding entirely NEW items (an id with no hardcoded counterpart,
+   which requires the override to also carry pageKey + blockIndex to say
+   where it belongs — see saveChecklistItem in Code.gs), appended to that
+   block's items array. `order` (when present, on either existing or new
+   items) determines final position within the block; items without an
+   explicit order keep their original relative order and sort before any
+   ordered items. */
+function applyChecklistOverrides(overrides) {
+  if (!overrides) return;
+
+  // Pass 1: apply text/level/deleted edits to items already in PAGES, tracking which override ids matched something.
+  var matchedIds = {};
+  Object.keys(PAGES).forEach(function (pageKey) {
+    (PAGES[pageKey].sections || []).forEach(function (sec) {
+      if (sec.type !== 'checklist') return;
+      sec.items = sec.items.filter(function (item) {
+        var id = itemId(item);
+        var ov = id && overrides[id];
+        if (!ov) return true;
+        matchedIds[id] = true;
+        if (ov.deleted) return false;
+        if (ov.text) item.text = ov.text;
+        if (ov.level) item.level = ov.level;
+        if (ov.order !== undefined) item._order = ov.order;
+        return true;
+      });
+    });
+  });
+
+  // Pass 2: any override id that didn't match an existing item is a brand new admin-added item.
+  Object.keys(overrides).forEach(function (id) {
+    if (matchedIds[id]) return;
+    var ov = overrides[id];
+    if (ov.deleted || !ov.pageKey || ov.blockIndex === undefined || !ov.text) return;
+    var page = PAGES[ov.pageKey];
+    var sec = page && (page.sections || [])[ov.blockIndex];
+    if (!sec || sec.type !== 'checklist') return;
+    var newItem = it(id, ov.text, { level: ov.level || 'junior' });
+    if (ov.order !== undefined) newItem._order = ov.order;
+    sec.items.push(newItem);
+  });
+
+  /* Pass 3: re-sort any block that received an explicit _order on at least
+     one item — untouched blocks keep their hardcoded order exactly (no
+     sort call at all, so array order is guaranteed stable regardless of
+     engine). Items with no explicit order default to (their own index *
+     1000) rather than their raw index — an admin's explicit order is a
+     small integer (0, 1, 2, ...), so without this gap an explicit order:0
+     on a NEW or moved item would tie with the item already sitting at
+     index 0 (whose default would also be 0), and tie-breaking behavior on
+     a tie is not guaranteed consistent across JS engines. The 1000x gap
+     means any explicit single/double-digit order value unambiguously
+     wins its intended position relative to every un-ordered item. */
+  Object.keys(PAGES).forEach(function (pageKey) {
+    (PAGES[pageKey].sections || []).forEach(function (sec) {
+      if (sec.type !== 'checklist') return;
+      if (!sec.items.some(function (item) { return item && item._order !== undefined; })) return;
+      sec.items.forEach(function (item, i) { if (item._order === undefined) item._order = i * 1000; });
+      sec.items.sort(function (a, b) { return a._order - b._order; });
+    });
+  });
+}
+applyChecklistOverrides(typeof window !== 'undefined' ? window.CHECKLIST_OVERRIDES : null);
+
+</script>

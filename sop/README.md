@@ -1,58 +1,176 @@
-# VCB-MANGO ERP SOP — React port
+# VCB-MANGO ERP — SOP Web App
 
-A pixel-faithful React rebuild of the VCB-MANGO ERP Standard Operating Procedure
-web app. It mirrors the canonical app (`../index.html` + `../apps-script/Code.gs`)
-screen-for-screen: **Process Flows** (33 swimlane diagrams), **Case Studies**
-(31 scenarios), and **Reports** (21-row table), with full TH/EN i18n, light/dark
-themes, mobile single-pane navigation, search, an admin edit flow, and the
-settings panel.
+เว็บแอปคู่มือปฏิบัติงาน (SOP) สำหรับพนักงานทุกคนที่ใช้งานระบบ VCB-MANGO ERP
+อ่านง่าย ค้นหาได้ กรองตามโมดูล และพิมพ์เป็นเอกสารได้
 
-Self-contained and deployable to Vercel on its own. See **PORT_NOTES.md** for the
-canonical→React file mapping and the re-sync workflow.
+## 📂 โครงสร้าง repo · Repository layout
 
-## Stack
+โค้ดแบ่งเป็น 2 folder หลักตามภาษาและบทบาท:
 
-- Vite + React 18 + TypeScript (strict)
-- No UI library — original CSS reused **verbatim** (`src/styles.css`)
-- Typed **mock** data layer mirroring the GAS/Express REST contract
-  (`src/lib/api.ts`), seeded from `src/data/sop.json` + the 33 bundled flows
+| Folder | คืออะไร | สถานะ |
+|---|---|---|
+| **[`ORIGINAL CODE/`](ORIGINAL%20CODE/)** | **แอปตัวจริงที่ใช้งานอยู่** — Google Apps Script · **JavaScript** ล้วน ไม่มีขั้นตอน compile<br>backend = `Code.js` · frontend = `index.html` | 🟢 **Production** |
+| **[`FOR DEPLOYMENT TEAM/`](FOR%20DEPLOYMENT%20TEAM/)** | **ตัวที่เตรียมไว้ให้ทีม deploy** — **React 18 + TypeScript** (Vite)<br>frontend = `src/` · backend = `src/lib/api.ts` (ยัง mock) | ⚪ ยังไม่ได้ deploy |
 
-## Develop
+### เอกสารอยู่กับ stack ที่มันอธิบาย
+
+เอกสารทุกไฟล์ถูกย้ายเข้าไปอยู่ใน folder ของ stack ที่มันพูดถึง:
+
+| เอกสาร | อยู่ที่ | เพราะ |
+|---|---|---|
+| `SETUP.md` | `ORIGINAL CODE/` | ขั้นตอน deploy ด้วย `clasp` — เป็นเรื่องของ Apps Script ล้วน |
+| `DESIGN.md` | `ORIGINAL CODE/` | ระบุเองว่า *"everything below is client-side in `index.html`"* |
+| `DATABASES.md` | `ORIGINAL CODE/` | อธิบาย Google Doc ที่เป็น store ของ Apps Script |
+| `PROJECT_SUMMARY.md` | `ORIGINAL CODE/` | สรุปสถาปัตยกรรมของแอปตัวจริง |
+| `DATABASE_*.sql` | `ORIGINAL CODE/` | ข้อมูลที่ export จาก Doc ผ่าน parser ของ `Code.js` |
+| `PORT_NOTES.md` | `FOR DEPLOYMENT TEAM/` | บันทึกการ sync ของ React port |
+
+**เหลือที่ root แค่ 2 ไฟล์:**
+
+| ไฟล์ | เพราะ |
+|---|---|
+| `README.md` | GitHub แสดงหน้าแรกอัตโนมัติ — ต้องอยู่ที่ root เท่านั้น |
+| `CHANGELOG.md` | ไล่ตาม **หมายเลข deployment ของ Apps Script** (@116, @115, …) และมีบันทึกของ React ซ้อนอยู่ **ข้างใน** entry เดียวกัน 14 จุด · แยกไม่ได้โดยไม่ทำให้ timeline พัง |
+
+นอกจากนี้ในเครื่องจะเห็นอีก 3 ไฟล์ที่ **ไม่ได้อยู่ใน GitHub** (gitignore ไว้แล้ว)
+— Windows/Google Drive สร้างเองอัตโนมัติ ลบแล้วมันก็สร้างใหม่:
+`desktop.ini` (Drive ตั้งไอคอนโฟลเดอร์) · `SOP Web App.url` (shortcut) ·
+`VCB-MANGO ERP SOP Web App.gscript` (ตัวชี้ไปยัง Apps Script project ซึ่งในไฟล์
+เขียนไว้เองว่า “DO NOT EDIT”)
+
+> ⚠ **แก้ของจริงต้องแก้ที่ [`ORIGINAL CODE/`](ORIGINAL%20CODE/)**
+> ผู้ใช้งานทุกคนเห็นแอปจาก folder นั้น · `FOR DEPLOYMENT TEAM/` เป็น port ที่ sync
+> ตามทีหลังด้วยมือ และตามหลังอยู่เสมอ — เช็ค sync marker ใน
+> `FOR DEPLOYMENT TEAM/PORT_NOTES.md` ก่อนสรุปว่าฟีเจอร์ไหนมีแล้ว
+>
+> แต่ละ folder มี `README.md` ของตัวเองอธิบายวิธีรัน/deploy
+
+---
+
+## 🚀 React app — `FOR DEPLOYMENT TEAM/`, ยังไม่ live
+
+React 18 + TypeScript (strict) + Vite · รีบิลด์ UI เดิมทั้งหมดให้เหมือนของจริง
+ทุกหน้าจอ — Process Flows, Case Studies, Reports, TH/EN, light/dark, mobile
+
+> คำสั่งทั้งหมดในหัวข้อนี้ต้องรันจากใน `FOR DEPLOYMENT TEAM/`
+
+### Quick start
 
 ```bash
+cd "FOR DEPLOYMENT TEAM"
 npm install
 npm run dev          # http://localhost:5173
-npm run typecheck    # tsc --noEmit (strict)
-npm run build        # tsc -b && vite build  → dist/
-npm run preview      # serve the production build
+npm run build        # → dist/  (static SPA)
 ```
 
-## Deploy to Vercel
+### Frontend / backend
 
-Static SPA — Framework preset **Vite**, build `npm run build`, output `dist`.
-The whole app ships client-side from the bundled mock data; no server required.
+แอปนี้ตอนนี้เป็น **frontend อย่างเดียว** — ยังไม่มี server จริง
+`src/lib/api.ts` เป็น **mock ที่ type ครบ** อ่าน/เขียนสำเนา `src/data/sop.json`
+ในหน่วยความจำ แก้ได้เหมือนจริงแต่หายเมื่อรีโหลด · ตั้งใจให้เป็นแบบนี้ เพื่อให้
+รีวิวและ deploy เป็น static site ได้ก่อนที่จะมี backend
 
-## Wire the real backend (optional)
+| Layer | อยู่ที่ | สถานะ |
+|---|---|---|
+| **Frontend** | `src/` — components, store, styles, icons | ✅ ครบ |
+| **Backend** | `src/lib/api.ts` (mock) | ⚠️ ยัง mock — ต่อของจริงได้โดยแก้ไฟล์เดียว |
 
-The mock in `src/lib/api.ts` mirrors three endpoints exactly:
+mock เลียนแบบ contract ของ `google.script.run` แบบตรงตัว ดังนั้นเปลี่ยนไปใช้
+`fetch` กับ backend จริงคือแก้แค่ `src/lib/api.ts` ไฟล์เดียว
 
-| function                 | endpoint            |
-|--------------------------|---------------------|
-| `getSopDataForClient()`  | `GET  /api/data`    |
-| `syncFromDoc()`          | `POST /api/sync`    |
-| `editScenario(payload)`  | `POST /api/scenario`|
+> **เคยมี Express/TypeScript backend อยู่ใน repo นี้ — ลบออกแล้ว 2026-08-30**
+> มันเกิดก่อน React port, ไม่มีอะไร import มันเลย, และ `index.html` ของมันตาม
+> production อยู่ 8 build การเก็บไว้มีแต่จะทำให้มีคน deploy ผิดตัว
+> ถ้าอยากได้กลับมาเป็นจุดตั้งต้น: `git show 0a6be92:"for deploy team/src/server.ts"`
 
-Replace those three with `fetch` calls and add a Vite dev proxy to the Express
-server (`../src/server.ts`, default `:3000`) to run against live data.
+## 📁 ตำแหน่งโครงการ
+โครงการนี้อยู่ที่:
+`E:\WORK\08 CLAUDE CODE\SOP Web App`
 
-## Layout
+(`E:` คือไดรฟ์ Google Drive File Stream — โฟลเดอร์นี้จึงสำรองขึ้น Drive อัตโนมัติ) ใช้โฟลเดอร์นี้เป็นที่ตั้งในการเรียกใช้ `clasp` และการทำงานกับไฟล์ในเครื่องของคุณ
 
+## 🔗 เปิดใช้งาน
+**<https://script.google.com/macros/s/AKfycby8FFhiGqjn2tSYaj8LjIPMHwBtkQk66hed7sq1q_tCFd7XhHeHef1_NTuv7qzJDIi8Dg/exec>**
+
+เปิดได้ทั้งบนคอมพิวเตอร์และมือถือ · ต้องลงชื่อเข้าใช้ด้วยบัญชี Google · บุ๊กมาร์กไว้ใช้ได้เลย
+
+## เมนูหลัก 3 ส่วน (แถบด้านซ้าย)
+1. **ผังกระบวนการ (Process Flows)** — แผนผังขั้นตอนการทำงาน 33 ผัง แบบ swim‑lane (BD, PR/PO, IC, Billing, OF, AP, AR, FA, GL และการปิดงบ) เลือกดูตามหมวดได้ · เป็นหน้าเริ่มต้นเมื่อเปิดแอป
+2. **กรณีศึกษา (Case Studies)** — กรณีการใช้งานจริง 31 กรณี แยกตามโมดูล (PO, IC, AP, FA, PM, OF, GL, AR, BD, SE) แต่ละกรณีบอก "เมื่อไหร่ใช้" + ขั้นตอนทีละข้อ + อ้างอิงคู่มือ
+3. **วิธีเรียก Report** — ตารางวิธีเรียกรายงานสำคัญ 17 รายการ พร้อมเมนูที่ใช้
+
+> กดที่ชื่อหมวดบนสุดเพื่อ "ดูทั้งหมด" และเปิดเมนูย่อยตามโมดูล (กดซ้ำเพื่อยุบ)
+
+## ฟีเจอร์อื่น ๆ
+- **ค้นหา** — พิมพ์คำ เช่น "น้ำมัน", "Advance", "PO", "เช็ค", "โอนเงิน"
+- **แชร์ลิงก์** — ทั้งกรณีศึกษาและผังกระบวนการมีปุ่ม **แชร์** ที่หัวเรื่อง กดแล้วจะคัดลอกลิงก์ตรงไปยังกรณี/ผังนั้น ๆ ให้ทันที — ส่งให้คนอื่นแล้วเปิดแล้วเจอหน้านั้นเลย ไม่ต้องไล่หาเอง
+- **โหมดมืด / ภาษา** — สลับสว่าง‑มืด และไทย‑อังกฤษ ได้ที่ปุ่ม **ตั้งค่า (เฟือง)** มุมขวาบน
+- **ติดต่อผู้พัฒนา** — ที่เมนูตั้งค่า มีอีเมลแบบ **กดเพื่อคัดลอก** (ไม่เปิดโปรแกรมอีเมล)
+- **พิมพ์ได้** — กด `Ctrl/Cmd + P` กางทุกกรณีออกเป็นเอกสารพิมพ์เต็ม
+
+## แหล่งเนื้อหา (Source of truth)
+**เว็บแอปคือแหล่งข้อมูลหลัก (single source of truth)** ตั้งแต่กรกฎาคม 2569 เป็นต้นมา:
+- **กรณีศึกษา (Case Studies) + วิธีเรียก Report** — แก้ไข/เพิ่ม/ลบได้ **ในเว็บแอปเท่านั้น** (ดูหัวข้อถัดไป) ทุกการแก้ไขจะถูกบันทึกสำรองไปยัง **Google Doc** โดยอัตโนมัติ แต่ **เว็บแอปจะไม่อ่านข้อมูลกลับจาก Doc อีกต่อไป** — การแก้ Doc โดยตรงจะไม่ปรากฏในเว็บแอป
+- **ผังกระบวนการ (Process Flows)** — เป็นข้อมูลในโค้ด (`SOP_FLOWS` ใน `index.html`) **ไม่ได้อยู่ใน Doc** เพราะแทบไม่เปลี่ยน การแก้ผัง = แก้โค้ดแล้ว deploy (ดู `ORIGINAL CODE/PROJECT_SUMMARY.md` §14)
+
+📄 **VCB-MANGO ERP Standard Operating Procedure (SOP) 2569** (สำเนาสำรอง อ่านอย่างเดียว) — <https://docs.google.com/document/d/1emolyExkvNIIEAp-8jWqM3laDF_H6c0v8qVuwHheJxo/edit>
+
+## แก้ไข / เพิ่มเนื้อหา SOP
+**แก้ไขผ่านเว็บแอปเท่านั้น** (การแก้ Google Doc โดยตรงจะไม่ถูกดึงเข้าเว็บแอปอีกต่อไป — Doc เป็นแค่สำเนาสำรอง)
+
+> ใช้ได้เฉพาะบัญชีที่อยู่ใน admin list เท่านั้น (ดูหัวข้อ "เพิ่มผู้แก้ไข" ด้านล่าง)
+
+1. เปิดเว็บแอป → ลงชื่อเข้าใช้ → จะเห็นป้าย **Admin** (ไอคอนโล่) ที่แถบด้านบน
+2. **แก้กรณีเดิม:** ไปที่ **กรณีศึกษา** → คลิกกรณีที่ต้องการแก้ → กดปุ่ม **แก้ไข · Edit** ที่หัวกรณีฝั่งขวา — หน้าต่างแก้ไขจะเปิด **เต็มจอ** (ทุกช่องอยู่ในหน้าเดียว ไม่ต้องเลื่อน) ในหน้าต่างนี้ยังเปลี่ยนโมดูล เพิ่ม "หมวดเพิ่มเติม" (แท็กให้กรณีนี้ไปโผล่ในโมดูลอื่นด้วย) สลับตำแหน่งกับอีกกรณี (Swap) หรือลบกรณีนี้ทิ้งได้
+3. **เพิ่มกรณีใหม่:** กดปุ่ม **+ เพิ่มกรณีใหม่** ที่หัวรายการกรณีศึกษา
+4. แก้ฟิลด์ที่ต้องการ → กด **บันทึก / Save** — การเปลี่ยนแปลงมีผลทันทีในเว็บแอป และถูกบันทึกสำรองไปยัง Google Doc โดยอัตโนมัติในขั้นตอนเดียวกัน
+
+> หมายเหตุ: ปุ่มแก้ไขในเว็บใช้ได้กับ **กรณีศึกษา** เท่านั้น — ส่วน **ผังกระบวนการ** ต้องแก้ในโค้ด
+
+### ไฟล์แนบ (เอกสารที่เกี่ยวข้อง)
+ไฟล์แนบคือลิงก์ไปยังไฟล์ใน Google Drive (เช่น ผังกระบวนการ PDF) ที่จะแสดงในหน้ารายละเอียดกรณี
+
+> **การแสดงผลขึ้นกับความกว้างหน้าจอ** — บนจอกว้าง (เกิน 1600px) จะแสดงเป็นการ์ดพร้อมภาพตัวอย่างอยู่ด้านขวาของเนื้อหา · บนจอที่แคบกว่านั้น (เช่น iPad) จะย้ายไปอยู่ใต้เนื้อหาเป็นแถบปุ่มเล็กๆ แสดงเฉพาะชื่อไฟล์ กดเปิดได้เหมือนกัน — เพื่อไม่ให้เบียดพื้นที่อ่านเนื้อหา
+
+- ในหน้าต่างแก้ไข ช่อง **ไฟล์แนบ** จะมีหนึ่งแถวต่อหนึ่งไฟล์ — ช่อง **ชื่อไฟล์** และช่อง **ลิงก์** กดปุ่ม **+ เพิ่มไฟล์แนบ** เพื่อเพิ่มแถวใหม่ กดปุ่ม **×** เพื่อลบ
+- **วางลิงก์ Drive แล้วชื่อไฟล์จะเติมให้อัตโนมัติ** (ตัดนามสกุลไฟล์ออกให้) — แก้ไขชื่อได้ตามต้องการ
+- ระบบ **จะไม่แก้ชื่อที่พิมพ์เองหรือชื่อที่บันทึกไว้แล้ว** การเติมอัตโนมัติทำงานเฉพาะกับช่องชื่อที่ยังว่างเท่านั้น
+- ถ้าเว้นชื่อไว้ว่าง จะแสดงคำว่า **"เอกสารแนบ"** แทนชื่อไฟล์ (ระบบตั้งใจไม่แสดงลิงก์ยาวๆ เป็นชื่อ) — ถ้าเห็นคำนี้ในกรณีเก่า แปลว่ายังไม่ได้ตั้งชื่อไฟล์นั้น เปิดแก้ไขแล้วพิมพ์ชื่อได้เลย
+- ไฟล์ต้องตั้งค่าแชร์ให้ผู้ที่มีลิงก์เปิดดูได้ ไม่เช่นนั้นภาพตัวอย่างจะไม่ขึ้น (จะแสดงเป็นไอคอนไฟล์ทั่วไปแทน) · ลิงก์ยังกดเปิดได้ตามปกติ
+
+### รูปแบบขั้นตอน (Steps)
+- หนึ่งบรรทัด = หนึ่งขั้นตอน
+- บรรทัดที่ขึ้นต้นด้วย `» ` (ใช้สัญลักษณ์ `»` แล้วเว้นวรรค) จะกลายเป็น **หัวข้อย่อย** ใต้ขั้นตอนก่อนหน้า (ไม่ใส่เลขลำดับ)
+
+ตัวอย่าง:
 ```
-src/
-  App.tsx                 three-pane shell + modals
-  store.tsx               useStore() — state + handlers (mirror of index.html `state`)
-  styles.css              VERBATIM extract of index.html <style>
-  data/   types · config (i18n/modules) · flows (33) · sop.json
-  lib/    api (mock) · icons
-  components/  TopBar · Sidebar · ListPane · DetailPane · FlowDiagram · EditModal · SettingsModal
+1. เปิดหน้าจอ PO → New Document
+2. เลือก Supplier
+» กรณีเป็น Supplier ใหม่ ให้กดปุ่ม + เพื่อสร้าง
+» ตรวจสอบเลขที่ผู้เสียภาษีก่อน
+3. กรอกรายการสินค้า
 ```
+
+## เพิ่มผู้แก้ไข (Admin)
+ตอนนี้ผู้ที่แก้เนื้อหาผ่านปุ่มในเว็บได้คือ `c.chavananand@vcb-con.com` คนเดียว
+
+ถ้าจะเพิ่มผู้ดูแลคนใหม่ ติดต่อผู้พัฒนาเพื่ออัปเดต `ADMIN_EMAILS` ใน `Code.js` แล้วทำ redeploy
+(ผู้ที่ไม่อยู่ใน list ก็ยังเปิดดูเว็บแอปได้ปกติ แต่จะไม่เห็นปุ่มแก้ไข — ใช้วิธี A แทนได้)
+
+## ไฟล์ในโปรเจกต์
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `index.html` | หน้าเว็บทั้งหมด (UI + ดีไซน์ + ฝั่งผู้ใช้) — รวมข้อมูล **ผังกระบวนการ** (`SOP_FLOWS`), ระบบไอคอน SVG, เมนู, เวอร์ชัน/changelog |
+| `Code.js` | โค้ดฝั่งเซิร์ฟเวอร์ Apps Script (สร้าง/แก้ไข/สลับ/ลบกรณีศึกษา, เขียนสำรองลง Doc, จัดสไตล์ Doc, ตรวจสิทธิ์ admin) |
+| `appsscript.json` | การตั้งค่า Apps Script / web app |
+| `CHANGELOG.md` (root) · `ORIGINAL CODE/PROJECT_SUMMARY.md`, `SETUP.md`, `DESIGN.md` | คู่มือสำหรับนักพัฒนา (ภาพรวมทางเทคนิค, สถานะปัจจุบัน, ขั้นตอน deploy, มาตรฐาน UI) |
+| `ORIGINAL CODE/DATABASE_SCHEMA.sql`, `DATABASE_DATA.sql` | ไฟล์ส่งออกข้อมูลปัจจุบันเป็น PostgreSQL (โครงตาราง + ข้อมูลจริงทั้งหมด) สำหรับส่งต่อให้ทีมพัฒนาไปใช้กับระบบใหม่ |
+| `flows-preview.html`, `_gen_preview.js` | สำหรับนักพัฒนาเท่านั้น — พรีวิวผังกระบวนการในเบราว์เซอร์โดยไม่ต้อง deploy (ไม่ถูก push ขึ้นระบบ) |
+| `.clasp.json`, `.claspignore` | การตั้งค่าเครื่องมือ clasp (ใช้ตอน push โค้ดเท่านั้น) |
+
+## หมายเหตุสำคัญ
+- **กรณีที่ 18 (Machine Overhaul):** ยังต้องกำหนดมูลค่าขั้นต่ำที่ชัดเจน แทน `xxx ล้าน` ในเอกสารต้นทาง
+- SOP นี้ถือเป็นนโยบายบริษัทที่มีผลบังคับใช้หลังได้รับอนุมัติจากผู้บริหาร
+
+---
+ที่มา: VCB-MANGO ERP Standard Operating Procedure v1.0 (Revised) · อ้างอิง ERP Manual 14.3.68

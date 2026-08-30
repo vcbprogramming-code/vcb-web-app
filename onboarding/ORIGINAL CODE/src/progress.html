@@ -1,0 +1,1809 @@
+<script>
+/* ============================================================
+   Onboarding checklist progress: employee identification,
+   task completion state, backend sync, toast celebrations.
+   ============================================================ */
+
+var EMPLOYEE_NAME = null;
+var EMPLOYEE_DEPARTMENT = null;
+var PROGRESS_CACHE = {};   // taskId -> true
+var PROGRESS_LOADED = false;
+var PROGRESS_LOAD_PROMISE = null;
+
+/* Departments a new employee can belong to — one only. Prefix matches the
+   page-key namespace used by each department's phase pages (see content.html). */
+/* headOfDept mirrors the "lead" name on each department's card in
+   content.html's deptgrid — duplicated here (rather than reached for
+   across files) so the completion certificate's signature block (see
+   buildCompletionCertificateHtml) can print who that signature line
+   belongs to without threading PAGES data through. */
+/* landingPage is each department's deptLanding() page key (Meet Your
+   Supervisor / Department Overview / etc.) — mostly "<id>-team" but
+   property breaks that pattern ("property-asset-management", matching its
+   PAGES key in content.html), so it's spelled out explicitly here rather
+   than derived from id/prefix by string surgery. Used by the phase-trail's
+   "Back to Team" link (see renderPhaseTrail in app.html). */
+var DEPARTMENTS = [
+  { id: 'accounting', label: 'Accounting Team', shortLabel: 'Accounting', prefix: 'accounting-', landingPage: 'accounting-team', headOfDept: 'Mrs. Wanpen Yamploy, Head of Accounting' },
+  { id: 'finance', label: 'Finance Team', shortLabel: 'Finance', prefix: 'finance-', landingPage: 'finance-team', headOfDept: 'Mr. Vivich Chavananand, Head of Finance' },
+  { id: 'procurement', label: 'Procurement Team', shortLabel: 'Procurement', prefix: 'procurement-', landingPage: 'procurement-team', headOfDept: 'Mrs. Thongthip Chavananand, Head of Procurement' },
+  { id: 'property', label: 'Property & Asset Management', shortLabel: 'Property', prefix: 'property-', landingPage: 'property-asset-management', headOfDept: 'Mr. Watcharit Chavananand, Head of Asset Management' },
+  { id: 'engineering', label: 'Engineering Team', shortLabel: 'Engineering', prefix: 'engineering-', landingPage: 'engineering-team', headOfDept: 'Mr. Vivat Chavananand, Head of Engineering' }
+];
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function getEmployeeName() {
+  if (EMPLOYEE_NAME) return EMPLOYEE_NAME;
+  try { EMPLOYEE_NAME = localStorage.getItem('vcb-employee-name') || null; } catch (e) {}
+  return EMPLOYEE_NAME;
+}
+
+function setEmployeeName(name) {
+  EMPLOYEE_NAME = name;
+  try { localStorage.setItem('vcb-employee-name', name); } catch (e) {}
+}
+
+function getEmployeeDepartment() {
+  if (EMPLOYEE_DEPARTMENT) return EMPLOYEE_DEPARTMENT;
+  try { EMPLOYEE_DEPARTMENT = localStorage.getItem('vcb-employee-department') || null; } catch (e) {}
+  return EMPLOYEE_DEPARTMENT;
+}
+
+function setEmployeeDepartment(deptId) {
+  EMPLOYEE_DEPARTMENT = deptId;
+  try { localStorage.setItem('vcb-employee-department', deptId); } catch (e) {}
+}
+
+/* Junior/Senior track — chosen once on the department landing page (see
+   deptLanding's level picker in content.html) and applies for that whole
+   department's checklists. Defaults to 'junior' (the baseline task set)
+   whenever nothing has been chosen yet, rather than null, so every piece of
+   code that filters items by level (renderSectionContent, getPageTaskIds,
+   the completion certificate) can compare against it unconditionally. */
+var EMPLOYEE_LEVEL = null;
+function getEmployeeLevel() {
+  if (EMPLOYEE_LEVEL) return EMPLOYEE_LEVEL;
+  try { EMPLOYEE_LEVEL = localStorage.getItem('vcb-employee-level') || 'junior'; } catch (e) { EMPLOYEE_LEVEL = 'junior'; }
+  return EMPLOYEE_LEVEL;
+}
+function setEmployeeLevel(level) {
+  EMPLOYEE_LEVEL = level;
+  try { localStorage.setItem('vcb-employee-level', level); } catch (e) {}
+}
+/* An item is visible to the current employee unless it's tagged senior-only
+   (see sr()/itemLevel in content.html) and the employee is on the Junior
+   track — Senior sees everything, Junior sees only the untagged baseline. */
+function isItemVisible(item) {
+  return itemLevel(item) !== 'senior' || getEmployeeLevel() === 'senior';
+}
+
+/* Reverse lookup: a checklist item's own permanent id (see it()/itemId() in
+   content.html) -> the pageKey of the phase page it lives on. Task ids no
+   longer embed their pageKey the way the old "pageKey::section::item"
+   scheme did (a stable id can't encode its own current location without
+   reintroducing the exact fragility it exists to avoid — an item's page
+   never changes today, but nothing should assume that going forward), so
+   anything that needs "which phase page does this task belong to" (locking,
+   department inference) looks it up here instead of parsing the id. Built
+   once and cached, same pattern as TASK_IDS_CACHE_BY_DEPT_LEVEL further
+   down. */
+var PAGE_KEY_BY_TASK_ID_CACHE = null;
+function getPageKeyByTaskId() {
+  if (PAGE_KEY_BY_TASK_ID_CACHE) return PAGE_KEY_BY_TASK_ID_CACHE;
+  var map = {};
+  Object.keys(PAGES).forEach(function (pageKey) {
+    (PAGES[pageKey].sections || []).forEach(function (sec) {
+      if (sec.type !== 'checklist') return;
+      sec.items.forEach(function (item) {
+        var id = itemId(item);
+        if (id) map[id] = pageKey;
+      });
+    });
+  });
+  PAGE_KEY_BY_TASK_ID_CACHE = map;
+  return map;
+}
+function pageKeyFromTaskId(taskId) {
+  return getPageKeyByTaskId()[taskId] || null;
+}
+
+/* All 8 pre-boarding document IDs (see content.html's Required Documents
+   doclist) — used to know when that step of the journey is fully done.
+   Each document's completion is tracked as taskId "doc::<docId>" through the
+   same PROGRESS_CACHE/setTaskDone path as department checklist tasks, so it
+   rides the same Sheet-backed persistence rather than a separate mechanism. */
+var REQUIRED_DOC_IDS = [
+  'employment-contract', 'application-form', 'nda', 'pdpa-consent',
+  'pdpa-policy', 'anti-corruption', 'reporting-form', 'tax-form'
+];
+
+function isDocDone(docId) {
+  return !!PROGRESS_CACHE['doc::' + docId];
+}
+
+function areRequiredDocsComplete() {
+  return REQUIRED_DOC_IDS.every(isDocDone);
+}
+
+/* Human-readable titles of whichever required documents aren't done yet —
+   looked up from PAGES['required-documents']'s own doclist (content.html)
+   rather than a second hardcoded id->title map that could drift out of
+   sync with it. Used by the Department Selection gate (see the dept-card
+   click handler in app.html) to tell the employee exactly what's still
+   missing instead of just refusing the click. */
+function getMissingRequiredDocTitles() {
+  var docsSection = ((PAGES['required-documents'] || {}).sections || []).filter(function (s) { return s.type === 'doclist'; })[0];
+  var docs = (docsSection && docsSection.docs) || [];
+  return docs.filter(function (d) { return !isDocDone(d.id); }).map(function (d) { return d.title; });
+}
+
+/* Manual "Complete" checkbox on a document card — same optimistic-update +
+   backend-sync pattern as toggleTask, but scoped to a single doc task id. */
+function toggleDocTask(taskId, docId, checkboxEl) {
+  ensureEmployeeNamed(function (name) {
+    var newState = !isDocDone(docId);
+    PROGRESS_CACHE[taskId] = newState;
+    checkboxEl.checked = newState;
+    updateDocCardUI(docId);
+    if (newState) showRewardToast();
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      syncTaskDone(name, taskId, newState, checkboxEl, function () {
+        updateDocCardUI(docId);
+      });
+    }
+  });
+}
+
+/* Upload flow: opens a hidden file input, reads the chosen file as base64,
+   sends it to Code.gs (uploadRequiredDocument) which saves it to Drive and
+   marks the doc task done server-side, then reflects that locally. */
+function triggerDocUpload(docId) {
+  ensureEmployeeNamed(function (name) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      if (file) handleDocFileSelected(docId, file);
+    });
+    input.click();
+  });
+}
+
+/* Apps Script's google.script.run payload ceiling is ~50MB, and base64
+   inflates a file by ~33%, so the real limit is well under that. 10MB is a
+   comfortable margin that still accommodates a phone photo of a document.
+   Checked BEFORE reading the file: previously there was no size check at
+   all on either side, so an oversized scan failed the RPC and showed
+   "Upload failed. Please try again." — advice that could never work, since
+   retrying the same file failed identically every time. */
+var MAX_DOC_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function handleDocFileSelected(docId, file) {
+  var btn = document.querySelector('.doc-upload-btn[data-doc-id="' + docId + '"]');
+  if (file.size > MAX_DOC_UPLOAD_BYTES) {
+    alert(t('That file is too large (limit 10MB). Please upload a smaller scan or photo.'));
+    return;
+  }
+  if (file.size === 0) {
+    alert(t('That file is empty. Please choose a different file.'));
+    return;
+  }
+  if (btn) btn.classList.add('is-uploading');
+  var reader = new FileReader();
+  /* Previously unhandled: a FileReader failure left the button stuck in
+     is-uploading forever with no error and no way back short of a reload. */
+  reader.onerror = function () {
+    if (btn) btn.classList.remove('is-uploading');
+    alert(t('Could not read that file. Please try a different one.'));
+  };
+  reader.onload = function () {
+    var base64 = String(reader.result).split(',')[1] || '';
+    var name = getEmployeeName();
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          PROGRESS_CACHE['doc::' + docId] = true;
+          /* The server returns { fileUrl, fileName } and this used to
+             discard it entirely — so the employee got no confirmation of
+             WHAT had been received, and no way to check it. Remember it so
+             updateDocCardUI can show a link to the actual file. */
+          if (res && res.fileUrl) setUploadedDocInfo(docId, res);
+          if (btn) btn.classList.remove('is-uploading');
+          updateDocCardUI(docId);
+          showRewardToast();
+        })
+        .withFailureHandler(function (err) {
+          if (btn) btn.classList.remove('is-uploading');
+          /* Surface the server's actual reason (e.g. the file-type
+             rejection) rather than a blanket "try again" that gives the
+             employee nothing to act on. */
+          var msg = err && err.message ? String(err.message) : '';
+          alert(msg ? t('Upload failed') + ': ' + msg : t('Upload failed. Please try again.'));
+        })
+        .uploadRequiredDocument(name, docId, file.name, file.type, base64);
+    } else {
+      /* No Apps Script backend available (e.g. local preview) — still let
+         the employee mark progress locally so the flow is testable. */
+      PROGRESS_CACHE['doc::' + docId] = true;
+      if (btn) btn.classList.remove('is-uploading');
+      updateDocCardUI(docId);
+      showRewardToast();
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Refreshes both progress displays that live outside the checklist/doc card
+   itself — the sidebar stepper and the "Your Onboarding Progress" bar under
+   the hero. Called after every task/doc toggle so both stay live instead of
+   only updating on the next full page navigation. */
+function refreshProgressDisplays() {
+  var sidebarPanel = document.getElementById('sidebar-progress');
+  if (sidebarPanel) renderSidebarProgress(sidebarPanel);
+  var progressWidget = document.getElementById('overall-progress-widget');
+  if (progressWidget) renderOverallProgress(progressWidget);
+}
+
+/* Uploaded-file receipts, keyed per employee so switching names doesn't
+   surface someone else's uploads. localStorage-only, deliberately: the
+   authoritative copy is the file in Drive, and this is just a convenience
+   receipt so the employee can confirm and open what they sent. A cleared
+   browser loses the link, not the file. Wrapped in try/catch to match how
+   every other localStorage access in this file degrades. */
+function uploadedDocsKey() {
+  return 'vcb-uploaded-docs::' + normalizeNameForKey(getEmployeeName() || '');
+}
+function normalizeNameForKey(n) {
+  return String(n || '').trim().toLowerCase();
+}
+function getUploadedDocs() {
+  try { return JSON.parse(localStorage.getItem(uploadedDocsKey()) || '{}'); } catch (e) { return {}; }
+}
+function setUploadedDocInfo(docId, info) {
+  try {
+    var all = getUploadedDocs();
+    all[docId] = { fileUrl: info.fileUrl, fileName: info.fileName };
+    localStorage.setItem(uploadedDocsKey(), JSON.stringify(all));
+  } catch (e) {}
+}
+
+function updateDocCardUI(docId) {
+  var card = document.querySelector('[data-doc-card="' + docId + '"]');
+  if (!card) return;
+  var done = isDocDone(docId);
+  card.classList.toggle('is-done', done);
+  var checkbox = card.querySelector('[data-doc-task-id]');
+  if (checkbox) checkbox.checked = done;
+
+  var slot = card.querySelector('[data-doc-uploaded="' + docId + '"]');
+  if (slot) {
+    var info = getUploadedDocs()[docId];
+    slot.innerHTML = info && info.fileUrl
+      ? '<span class="doc-uploaded-label">' + esc(t('You uploaded')) + ':</span> ' +
+        '<a href="' + esc(info.fileUrl) + '" target="_blank" rel="noopener">' +
+          esc(info.fileName || t('View file')) +
+        '</a> ' +
+        '<span class="doc-uploaded-hint">' + esc(t('(uploading again replaces this)')) + '</span>'
+      : '';
+  }
+  refreshProgressDisplays();
+}
+
+function hasVisitedHome() {
+  try { return localStorage.getItem('vcb-visited-home') === '1'; } catch (e) { return false; }
+}
+
+function markHomeVisited() {
+  try { localStorage.setItem('vcb-visited-home', '1'); } catch (e) {}
+}
+
+/* Infers the department from a taskId via its page (see pageKeyFromTaskId
+   above) — pageKey is always prefixed with the department slug, e.g.
+   "accounting-day-1-30". */
+function departmentFromTaskId(taskId) {
+  if (!taskId) return null;
+  var pageKey = pageKeyFromTaskId(taskId);
+  if (!pageKey) return null;
+  var match = DEPARTMENTS.filter(function (d) { return pageKey.indexOf(d.prefix) === 0; })[0];
+  return match ? match.id : null;
+}
+
+/* Rename flow. Reached from Settings → "Change my name" (Index.html).
+   The point is correcting a typo — and a typo'd name has usually already
+   accumulated progress rows under it, so this MUST carry those rows over
+   server-side (renameEmployee in Code.gs) rather than just rewriting
+   localStorage, which would silently orphan them and present the employee
+   with an empty checklist. */
+function promptToChangeName() {
+  var current = getEmployeeName() || '';
+  var overlay = document.createElement('div');
+  overlay.className = 'name-modal-overlay';
+  overlay.innerHTML =
+    '<div class="name-modal" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">' +
+      '<h3 id="rename-modal-title">' + esc(t('Change my name')) + '</h3>' +
+      '<p>' + esc(t('Correct a misspelling. Your saved progress moves with you.')) + '</p>' +
+      '<label class="sr-only" for="rename-modal-input">' + esc(t('Your full name')) + '</label>' +
+      '<input type="text" id="rename-modal-input" class="name-modal-input" value="' + esc(current) + '">' +
+      '<div class="name-modal-actions">' +
+        '<button type="button" class="name-modal-btn name-modal-btn-secondary" id="rename-modal-cancel">' + esc(t('Cancel')) + '</button>' +
+        '<button type="button" class="name-modal-btn" id="rename-modal-submit">' + esc(t('Save')) + '</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var input = overlay.querySelector('#rename-modal-input');
+  input.focus();
+  input.select();
+
+  function close() {
+    if (overlay.parentNode) document.body.removeChild(overlay);
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  /* Registered and removed as a matched pair regardless of HOW the modal
+     closes. The older modals in this file only removed this listener
+     inside the Escape branch itself, so closing via the scrim or a button
+     leaked one document-level listener per open. */
+  document.addEventListener('keydown', onKey);
+
+  function submit() {
+    var next = input.value.trim();
+    if (!next) { input.focus(); return; }
+    if (next === current) { close(); return; }
+    var btn = overlay.querySelector('#rename-modal-submit');
+    btn.disabled = true;
+    btn.textContent = t('Saving…');
+    function finish() {
+      setEmployeeName(next);
+      close();
+      showToast('Name updated.', 'celebrate');
+      if (typeof window.rerenderCurrentPage === 'function') window.rerenderCurrentPage();
+      refreshProgressDisplays();
+    }
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(finish)
+        .withFailureHandler(function () {
+          btn.disabled = false;
+          btn.textContent = t('Save');
+          showSaveFailedToast('Could not update your name. Please try again.');
+        })
+        .renameEmployee(current, next);
+    } else {
+      finish();
+    }
+  }
+  overlay.querySelector('#rename-modal-submit').addEventListener('click', submit);
+  overlay.querySelector('#rename-modal-cancel').addEventListener('click', close);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+}
+
+function promptForEmployeeName(onDone, knownDeptId) {
+  var overlay = document.createElement('div');
+  overlay.className = 'name-modal-overlay';
+  var deptOptions = (knownDeptId ? '' : '<option value="" disabled selected>' + esc(t('Select your department')) + '</option>') +
+    DEPARTMENTS.map(function (d) {
+      var selected = d.id === knownDeptId ? ' selected' : '';
+      return '<option value="' + d.id + '"' + selected + '>' + esc(t(d.label)) + '</option>';
+    }).join('');
+  overlay.innerHTML =
+    /* aria-labelledby gives the dialog an accessible name (it announced as
+       an unnamed dialog before), and the inputs get real labels — they
+       previously had only placeholders, which are not accessible names. */
+    '<div class="name-modal" role="dialog" aria-modal="true" aria-labelledby="name-modal-title">' +
+      '<h3 id="name-modal-title">' + esc(t('Welcome! What is your name?')) + '</h3>' +
+      '<p>' + esc(t('We use this to save your onboarding checklist progress.')) + '</p>' +
+      '<label class="sr-only" for="name-modal-input">' + esc(t('Your full name')) + '</label>' +
+      '<input type="text" id="name-modal-input" class="name-modal-input" placeholder="' + esc(t('Your full name')) + '">' +
+      '<label class="sr-only" for="name-modal-dept">' + esc(t('Select your department')) + '</label>' +
+      '<select id="name-modal-dept" class="name-modal-input"' + (knownDeptId ? ' disabled' : '') + '>' + deptOptions + '</select>' +
+      (knownDeptId ? '<input type="hidden" id="name-modal-dept-locked" value="' + esc(knownDeptId) + '">' : '') +
+      '<button type="button" class="name-modal-btn" id="name-modal-submit">' + esc(t('Start Onboarding')) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var input = overlay.querySelector('#name-modal-input');
+  var deptSelect = overlay.querySelector('#name-modal-dept');
+  input.focus();
+  function close() {
+    if (overlay.parentNode) document.body.removeChild(overlay);
+  }
+  function submit() {
+    var val = input.value.trim();
+    var dept = knownDeptId || deptSelect.value;
+    if (!val) { input.focus(); return; }
+    if (!dept) { deptSelect.focus(); return; }
+    setEmployeeName(val);
+    setEmployeeDepartment(dept);
+    close();
+    if (onDone) onDone(val);
+  }
+  overlay.querySelector('#name-modal-submit').addEventListener('click', submit);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  deptSelect.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+/* taskId is optional — when present and its page maps to a known department,
+   the modal pre-fills and locks that department instead of asking again. */
+function ensureEmployeeIdentified(callback, taskId) {
+  var name = getEmployeeName();
+  var dept = getEmployeeDepartment();
+  if (name && dept) { callback(name); return; }
+  promptForEmployeeName(callback, departmentFromTaskId(taskId));
+}
+
+/* Lighter gate for pre-boarding actions (document upload/tick) that happen
+   before Department Selection in the journey — only needs a name, since
+   requiring a department this early would force that step out of order. */
+function promptForNameOnly(onDone) {
+  var overlay = document.createElement('div');
+  overlay.className = 'name-modal-overlay';
+  overlay.innerHTML =
+    '<div class="name-modal" role="dialog" aria-modal="true">' +
+      '<h3>' + esc(t('Welcome! What is your name?')) + '</h3>' +
+      '<p>' + esc(t('We use this to save your onboarding checklist progress.')) + '</p>' +
+      '<input type="text" id="name-only-modal-input" class="name-modal-input" placeholder="' + esc(t('Your full name')) + '">' +
+      '<button type="button" class="name-modal-btn" id="name-only-modal-submit">' + esc(t('Continue')) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var input = overlay.querySelector('#name-only-modal-input');
+  input.focus();
+  function close() {
+    if (overlay.parentNode) document.body.removeChild(overlay);
+  }
+  function submit() {
+    var val = input.value.trim();
+    if (!val) { input.focus(); return; }
+    setEmployeeName(val);
+    close();
+    if (onDone) onDone(val);
+  }
+  overlay.querySelector('#name-only-modal-submit').addEventListener('click', submit);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+function ensureEmployeeNamed(callback) {
+  var name = getEmployeeName();
+  if (name) { callback(name); return; }
+  promptForNameOnly(callback);
+}
+
+function loadProgress(callback) {
+  if (PROGRESS_LOADED) { callback(PROGRESS_CACHE); return; }
+  var name = getEmployeeName();
+  if (!name) { callback({}); return; }
+  if (typeof google === 'undefined' || !google.script || !google.script.run) {
+    PROGRESS_LOADED = true;
+    callback(PROGRESS_CACHE);
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function (result) {
+      PROGRESS_CACHE = result || {};
+      PROGRESS_LOADED = true;
+      callback(PROGRESS_CACHE);
+    })
+    .withFailureHandler(function () {
+      /* Do NOT set PROGRESS_LOADED here. This used to mark the load
+         "done" and hand back the empty cache, which rendered a transient
+         network failure as a fully-unchecked checklist — visually
+         identical to a genuinely new employee, with no error shown. An
+         employee then re-ticking boxes was writing on top of saved state
+         they couldn't see, and because the flag was set, it never
+         retried for the life of the page. Leaving the flag false means
+         the next navigation genuinely retries. */
+      showSaveFailedToast('Could not load your saved progress. Any ticks shown may be incomplete — please reload before continuing.');
+      callback(PROGRESS_CACHE);
+    })
+    .getProgress(name);
+}
+
+function isTaskDone(taskId) {
+  return !!PROGRESS_CACHE[taskId];
+}
+
+/* True once the employee has at least one completed task in their current department. */
+function hasStartedCurrentDepartment() {
+  var dept = getEmployeeDepartment();
+  if (!dept) return false;
+  var ids = getDepartmentTaskIds(dept);
+  return ids.some(function (id) { return PROGRESS_CACHE[id]; });
+}
+
+function promptDepartmentSwitchConfirm(fromDeptId, toDeptId, onConfirm) {
+  var fromLabel = (DEPARTMENTS.filter(function (d) { return d.id === fromDeptId; })[0] || {}).label || fromDeptId;
+  var toLabel = (DEPARTMENTS.filter(function (d) { return d.id === toDeptId; })[0] || {}).label || toDeptId;
+  var overlay = document.createElement('div');
+  overlay.className = 'name-modal-overlay';
+  overlay.innerHTML =
+    '<div class="name-modal" role="dialog" aria-modal="true">' +
+      '<h3>' + esc(t('Switch department?')) + '</h3>' +
+      '<p>' + esc(t('You already have progress in')) + ' <strong>' + esc(t(fromLabel)) + '</strong>. ' +
+        esc(t('Starting tasks in')) + ' <strong>' + esc(t(toLabel)) + '</strong> ' +
+        esc(t('will permanently delete all your saved progress in')) + ' ' + esc(t(fromLabel)) + '. ' +
+        esc(t('An employee can only be onboarding in one department at a time.')) + '</p>' +
+      '<button type="button" class="name-modal-btn" id="switch-confirm-btn">' + esc(t('Delete progress and switch')) + '</button>' +
+      '<button type="button" class="name-modal-btn-secondary" id="switch-cancel-btn">' + esc(t('Stay in')) + ' ' + esc(t(fromLabel)) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() {
+    if (overlay.parentNode) document.body.removeChild(overlay);
+  }
+  overlay.querySelector('#switch-confirm-btn').addEventListener('click', function () {
+    close();
+    onConfirm();
+  });
+  overlay.querySelector('#switch-cancel-btn').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+/* Blocks Department Selection (and, by the same lock chain, every phase
+   behind it — see isPhasePageUnlocked above) until Required Documents is
+   actually complete, and tells the employee exactly which ones are still
+   missing rather than just silently refusing the click. Called from the
+   dept-card click handler in app.html BEFORE selectDepartment/navigate run,
+   so an incomplete employee never actually lands on a department page at
+   all — same "hard lock from the first step" the phase pages already get
+   via isPhasePageUnlocked, now applied one step earlier in the chain. */
+function promptRequiredDocsIncomplete(missingTitles) {
+  var overlay = document.createElement('div');
+  overlay.className = 'name-modal-overlay';
+  var listHtml = '<ul class="missing-docs-list">' + missingTitles.map(function (title) {
+    return '<li>' + esc(t(title)) + '</li>';
+  }).join('') + '</ul>';
+  overlay.innerHTML =
+    '<div class="name-modal" role="dialog" aria-modal="true">' +
+      '<h3>' + esc(t('Finish Required Documents first')) + '</h3>' +
+      '<p>' + esc(t('Choosing a department is locked until every required document is marked complete. Still missing:')) + '</p>' +
+      listHtml +
+      '<button type="button" class="name-modal-btn" id="missing-docs-goto-btn">' + esc(t('Go to Required Documents')) + '</button>' +
+      '<button type="button" class="name-modal-btn-secondary" id="missing-docs-close-btn">' + esc(t('Close')) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  function close() {
+    if (overlay.parentNode) document.body.removeChild(overlay);
+  }
+  overlay.querySelector('#missing-docs-goto-btn').addEventListener('click', function () {
+    close();
+    if (typeof navigate === 'function') navigate('required-documents', true, 'required-documents');
+  });
+  overlay.querySelector('#missing-docs-close-btn').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  });
+}
+
+function switchDepartment(fromDeptId, toDeptId, onSwitched) {
+  var name = getEmployeeName();
+  var fromDept = DEPARTMENTS.filter(function (d) { return d.id === fromDeptId; })[0];
+  var ids = getDepartmentTaskIds(fromDeptId);
+  ids.forEach(function (id) { delete PROGRESS_CACHE[id]; });
+  setEmployeeDepartment(toDeptId);
+  if (typeof google !== 'undefined' && google.script && google.script.run && fromDept) {
+    google.script.run
+      .withFailureHandler(function () {
+        /* Local state is already cleared, so the employee can carry on in
+           their new department either way — but the old department's rows
+           are still on the sheet and WILL come back on the next load, so
+           this can't stay silent the way it used to be. */
+        showSaveFailedToast('Could not clear your previous department’s saved progress. It may reappear — please tell HR.');
+      })
+      .clearDepartmentProgress(name, [fromDept.prefix]);
+  }
+  if (onSwitched) onSwitched();
+}
+
+/* Called when the employee clicks a department tile on the Department
+   Selection grid — completes that stepper step immediately rather than
+   waiting for their first checklist task click inside the department. */
+function selectDepartment(deptId) {
+  var currentDept = getEmployeeDepartment();
+  if (currentDept === deptId) return;
+  if (currentDept && hasStartedCurrentDepartment()) {
+    promptDepartmentSwitchConfirm(currentDept, deptId, function () {
+      switchDepartment(currentDept, deptId, function () {
+        refreshProgressDisplays();
+      });
+    });
+    return;
+  }
+  setEmployeeDepartment(deptId);
+  refreshProgressDisplays();
+}
+
+function toggleTask(taskId, checkboxEl) {
+  ensureEmployeeIdentified(function (name) {
+    var taskDept = departmentFromTaskId(taskId);
+    var currentDept = getEmployeeDepartment();
+    if (taskDept && currentDept && taskDept !== currentDept && hasStartedCurrentDepartment()) {
+      checkboxEl.checked = isTaskDone(taskId);
+      promptDepartmentSwitchConfirm(currentDept, taskDept, function () {
+        switchDepartment(currentDept, taskDept, function () {
+          performToggle(taskId, checkboxEl, name);
+        });
+      });
+      return;
+    }
+    if (taskDept && currentDept && taskDept !== currentDept) {
+      setEmployeeDepartment(taskDept);
+    }
+    performToggle(taskId, checkboxEl, name);
+  }, taskId);
+}
+
+/* Saves a task's done/not-done state to the backend, retrying once before
+   giving up — a single transient failure (brief network blip, momentary
+   quota hiccup) shouldn't leave an employee's checked-off box silently
+   unsaved with no indication anything went wrong. The UI is already
+   optimistic (caller has flipped the checkbox before this runs), so on
+   final failure this reverts PROGRESS_CACHE + the checkbox back to
+   whatever was actually last confirmed saved and tells the employee via
+   toast — better to visibly un-check something than let them believe a
+   task is recorded when their eventual printed 90-day form won't reflect
+   it. onReverted lets each call site re-sync whatever UI it separately
+   derived from the optimistic state (group progress, celebration checks). */
+function syncTaskDone(name, taskId, newState, checkboxEl, onReverted) {
+  function attempt(isRetry) {
+    google.script.run
+      .withSuccessHandler(function () {})
+      .withFailureHandler(function () {
+        if (!isRetry) { attempt(true); return; }
+        PROGRESS_CACHE[taskId] = !newState;
+        if (checkboxEl) checkboxEl.checked = !newState;
+        showSaveFailedToast();
+        if (onReverted) onReverted();
+      })
+      .setTaskDone(name, taskId, newState);
+  }
+  attempt(false);
+}
+
+function performToggle(taskId, checkboxEl, name) {
+  if (!isPhaseUnlocked(taskId)) {
+    checkboxEl.checked = isTaskDone(taskId);
+    return;
+  }
+  /* Snapshotted before PROGRESS_CACHE is mutated below — updateChecklistUI
+     runs after the mutation, so it can never see a "before" state on its own
+     and would otherwise never detect the moment onboarding just finished. */
+  var wasOnboardingComplete = isEmployeeOnboardingComplete();
+  var togglePageKey = pageKeyFromTaskId(taskId);
+  var wasPhaseComplete = togglePageKey ? isPagePhaseComplete(togglePageKey) : true;
+  var newState = !isTaskDone(taskId);
+  PROGRESS_CACHE[taskId] = newState;
+  checkboxEl.checked = newState;
+  updateChecklistUI(checkboxEl, wasOnboardingComplete, wasPhaseComplete);
+  if (newState) showRewardToast();
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    syncTaskDone(name, taskId, newState, checkboxEl, function () {
+      /* On revert, pass the CURRENT (post-revert) states as the "was"
+         values so no celebration re-fires for a save that ultimately
+         failed. */
+      updateChecklistUI(checkboxEl, isEmployeeOnboardingComplete(),
+        togglePageKey ? isPagePhaseComplete(togglePageKey) : true);
+    });
+  }
+}
+
+function updateChecklistUI(checkboxEl, wasOnboardingComplete, wasPhaseComplete) {
+  var item = checkboxEl.closest('.check-item');
+  if (item) item.classList.toggle('done', checkboxEl.checked);
+  var group = checkboxEl.closest('.checklist-group');
+  refreshProgressDisplays();
+  /* Repaint the bottom phase trail on every toggle, not just on navigation.
+     It was rendered once by renderPage, so the next phase's pill stayed
+     visibly locked even after the employee finished everything that unlocks
+     it — the state only caught up if they happened to navigate away and
+     back. */
+  if (typeof window.refreshPhaseTrail === 'function') window.refreshPhaseTrail();
+
+  var nowOnboardingComplete = isEmployeeOnboardingComplete();
+  if (nowOnboardingComplete && !wasOnboardingComplete && checkboxEl.checked) {
+    celebrateOnboardingComplete();
+    if (!group) return;
+    refreshGroupProgress(group);
+    return;
+  }
+  if (!group) return;
+  var wasComplete = group.classList.contains('is-complete');
+  refreshGroupProgress(group);
+  var nowComplete = group.classList.contains('is-complete');
+
+  /* Phase completion outranks section completion: finishing the phase's
+     LAST section completes both at once, and two overlays would stack. The
+     phase card is the more useful of the two, so it wins. */
+  var pageKey = getCurrentChecklistPageKey(checkboxEl);
+  if (pageKey && checkboxEl.checked && !wasPhaseComplete && isPagePhaseComplete(pageKey)) {
+    celebratePhaseComplete(pageKey);
+    return;
+  }
+  if (nowComplete && !wasComplete && checkboxEl.checked) {
+    celebrateSectionComplete(group);
+  }
+}
+
+/* The page key a checklist checkbox belongs to, derived from its own task id
+   rather than the URL — a stable id carries no pageKey in its own string
+   (see pageKeyFromTaskId), and reading the URL would break if this is ever
+   called during a navigation. */
+function getCurrentChecklistPageKey(checkboxEl) {
+  var taskId = checkboxEl.getAttribute('data-task-id');
+  return taskId ? pageKeyFromTaskId(taskId) : null;
+}
+
+function refreshGroupProgress(group) {
+  var boxes = group.querySelectorAll('.check-item input[type="checkbox"]');
+  var total = boxes.length, done = 0;
+  boxes.forEach(function (b) { if (b.checked) done++; });
+  var bar = group.querySelector('.progress-bar-fill');
+  var label = group.querySelector('.progress-bar-label');
+  var pct = total ? Math.round((done / total) * 100) : 0;
+  if (bar) bar.style.width = pct + '%';
+  if (label) label.textContent = done + ' / ' + total + ' ' + t('complete');
+  group.classList.toggle('is-complete', total > 0 && done === total);
+}
+
+/* Full-screen milestone card shown when a whole checklist section (Required Reading,
+   Knowledge Requirements, or Required Outputs) is completed by the user's own action —
+   not replayed when a finished page is simply revisited. */
+function celebrateSectionComplete(group) {
+  var heading = group.previousElementSibling;
+  while (heading && heading.tagName !== 'H2') heading = heading.previousElementSibling;
+  var sectionName = heading ? heading.textContent : t('Section');
+
+  var page = group.closest('#main-content') ? document.querySelector('.hero h1') : null;
+  var phaseName = page ? page.textContent : '';
+
+  var overlay = document.createElement('div');
+  overlay.className = 'milestone-overlay';
+  overlay.innerHTML =
+    '<div class="milestone-card">' +
+      '<div class="milestone-badge">' + icon('check') + '</div>' +
+      '<div class="milestone-eyebrow">' + esc(t('Section Complete')) + '</div>' +
+      '<h3>' + esc(sectionName) + '</h3>' +
+      (phaseName ? '<p class="milestone-sub">' + esc(phaseName) + '</p>' : '') +
+      '<button type="button" class="name-modal-btn" id="milestone-continue">' + esc(t('Continue')) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function () { overlay.classList.add('show'); });
+
+  function close() {
+    overlay.classList.remove('show');
+    setTimeout(function () { if (overlay.parentNode) document.body.removeChild(overlay); }, 200);
+  }
+  overlay.querySelector('#milestone-continue').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  setTimeout(close, 3200);
+}
+
+/* Shown when every task in the CURRENT phase is done — the milestone that
+   sat unmarked between "one section complete" (celebrateSectionComplete,
+   fires 3x per phase) and "all 90 days complete" (celebrateOnboardingComplete,
+   fires once ever). Finishing a phase is the moment an employee actually
+   becomes able to move on, and nothing previously said so: the last section
+   popup looked identical to the two before it, and the phase trail at the
+   bottom still showed the next phase locked until a navigation re-rendered it.
+
+   Deliberately NOT a clone of celebrateSectionComplete's visual treatment —
+   it names the phase just finished, states the unlock in words, and offers a
+   direct button to the next phase rather than a bare "Continue", so the
+   employee doesn't have to work out where to go next. Suppressed when this
+   phase completion is also the whole-program completion, since
+   celebrateOnboardingComplete already owns that moment and two stacked
+   overlays would fight. */
+function celebratePhaseComplete(pageKey) {
+  var page = PAGES[pageKey] || {};
+  var phaseName = (page.hero && page.hero.title) ? page.hero.title : t('This phase');
+  var next = page.nextPhase && page.nextPhase.page ? page.nextPhase.page : null;
+  var nextPage = next ? PAGES[next] : null;
+  var nextLabel = (nextPage && nextPage.hero && nextPage.hero.title) ? nextPage.hero.title : '';
+
+  var overlay = document.createElement('div');
+  overlay.className = 'milestone-overlay';
+  overlay.innerHTML =
+    '<div class="milestone-card phase-complete-card">' +
+      '<div class="milestone-badge">' + icon('check') + '</div>' +
+      '<div class="milestone-eyebrow">' + esc(t('Phase Complete')) + '</div>' +
+      '<h3>' + esc(t(phaseName)) + '</h3>' +
+      '<p class="milestone-sub">' +
+        esc(t('You can now proceed to the next phase.')) +
+      '</p>' +
+      (next
+        ? '<button type="button" class="name-modal-btn" id="phase-next">' +
+            esc(nextLabel ? t('Start') + ' ' + t(nextLabel) : t('Go to next phase')) +
+          '</button>' +
+          '<button type="button" class="name-modal-btn-secondary" id="phase-stay">' + esc(t('Stay on this page')) + '</button>'
+        : '<button type="button" class="name-modal-btn" id="phase-stay">' + esc(t('Continue')) + '</button>') +
+    '</div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function () { overlay.classList.add('show'); });
+
+  function close() {
+    overlay.classList.remove('show');
+    setTimeout(function () { if (overlay.parentNode) document.body.removeChild(overlay); }, 200);
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onKey);
+
+  var nextBtn = overlay.querySelector('#phase-next');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function () {
+      close();
+      /* navigate() is exposed on window by app.html's IIFE — see the
+         include-order note in docs/KNOWN_ISSUES.md. */
+      if (typeof window.navigate === 'function') window.navigate(next);
+      else window.location.search = '?page=' + encodeURIComponent(next);
+    });
+  }
+  var stayBtn = overlay.querySelector('#phase-stay');
+  if (stayBtn) stayBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  /* No auto-dismiss timer, unlike celebrateSectionComplete's 3200ms: this
+     card asks the employee to make a choice (move on, or stay), so it waits
+     for them rather than vanishing mid-decision. */
+}
+
+/* One-time celebration for finishing the entire 90-day program — deliberately
+   bigger and slower than the per-section milestone (confetti burst, longer
+   on-screen time, warmer copy) since this is the actual finish line after
+   weeks of tedious checklist work, not just one more completed sub-task. */
+function celebrateOnboardingComplete() {
+  var dept = getEmployeeDepartment();
+  var deptLabel = (DEPARTMENTS.filter(function (d) { return d.id === dept; })[0] || {}).label || '';
+  var name = getEmployeeName() || '';
+
+  var overlay = document.createElement('div');
+  overlay.className = 'milestone-overlay completion-overlay';
+  overlay.innerHTML =
+    '<canvas class="confetti-canvas"></canvas>' +
+    '<div class="milestone-card completion-card">' +
+      '<div class="milestone-badge completion-badge">' + icon('celebrate') + '</div>' +
+      '<div class="milestone-eyebrow">' + esc(t('90 Days Complete')) + '</div>' +
+      '<h3>' + esc(t('Welcome, officially, to the team!')) + '</h3>' +
+      '<p class="milestone-sub completion-sub">' +
+        esc(t('You’ve completed the full 90-day onboarding program')) +
+        (deptLabel ? ' — ' + esc(t(deptLabel)) : '') + '. ' +
+        esc(t('Every checklist, every document, every phase — that took real persistence. We’re glad to have you with us for the long run.')) +
+      '</p>' +
+      '<button type="button" class="name-modal-btn" id="completion-print">' + esc(t('Print Completion Form')) + '</button>' +
+      '<button type="button" class="name-modal-btn-secondary" id="completion-continue">' + esc(t('Continue')) + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  requestAnimationFrame(function () { overlay.classList.add('show'); });
+  runConfetti(overlay.querySelector('.confetti-canvas'));
+
+  /* Continue used to close the popup and reveal Meet Our Team / Life on
+     Site / Return to Portal IN PLACE on whatever page the employee
+     happened to be on (revealGatedSectionsForCurrentPage, an async
+     placeholder-swap — see app.html/KNOWN_ISSUES.md) — replaced with a
+     real navigation to a dedicated completion page per explicit request,
+     after that reveal mechanism went through five rounds of real bugs
+     across earlier sessions and still sometimes didn't appear right
+     away. window.navigate (app.html) is a normal page navigation — same
+     one every [data-link] click already goes through — so there's no
+     separate "did the content actually land" state to track here
+     anymore; the completion page renders its own content synchronously,
+     like any other page. */
+  function close() {
+    overlay.classList.remove('show');
+    setTimeout(function () { if (overlay.parentNode) document.body.removeChild(overlay); }, 250);
+    if (typeof window.navigate === 'function') {
+      window.navigate('completion');
+    }
+  }
+  overlay.querySelector('#completion-print').addEventListener('click', openCompletionCertificate);
+  overlay.querySelector('#completion-continue').addEventListener('click', close);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  /* No auto-dismiss timer — unlike the section milestone, this one waits for
+     the employee to close it themselves so the moment isn't rushed. */
+}
+
+/* Printable completion form — one table row per task (every required
+   document, plus every phase's Reading/Knowledge/Outputs items), each with
+   a completion checkmark (they're only reachable here because
+   isEmployeeOnboardingComplete() gated the button that opens this) and a
+   blank 1-5 rating scale for the department head to circle by hand, plus a
+   signature line beneath so the printed page can double as the physical
+   sign-off/performance record HR files after the 90 days. Ratings are
+   pen-and-paper (circle a number), not form inputs — this is meant to be
+   printed and signed, not filled in on-screen. Opened in a new tab/window
+   (not an in-page modal) so window.print() only prints this content —
+   printing the app underneath would include the sidebar, hero banner, and
+   everything else on whatever page triggered it. */
+function buildCompletionCertificateHtml() {
+  var name = getEmployeeName() || '';
+  var deptId = getEmployeeDepartment();
+  var dept = DEPARTMENTS.filter(function (d) { return d.id === deptId; })[0] || {};
+  var chain = deptId ? getDepartmentPhaseChain(deptId) : [];
+  var today = new Date();
+  var dateStr = today.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+  var ratingDotsHtml = [1, 2, 3, 4, 5].map(function (n) { return '<span class="cert-rating-dot">' + n + '</span>'; }).join('');
+  var ratingCellHtml = '<td class="cert-rating">' + ratingDotsHtml + '</td>';
+
+  /* Page 2 categories — general attitude / working-relationship qualities,
+     not tied to any specific phase or task, so this is a fixed list rather
+     than derived from PAGES/chain like page 1's rows are. */
+  var ATTITUDE_CATEGORIES = [
+    'Attitude & Discipline',
+    'Teamwork & Cooperation',
+    'Communication',
+    'Initiative & Ownership',
+    'Reliability & Punctuality',
+    'Adaptability'
+  ];
+
+  /* Required Documents are pass/fail (signed or not) — rating them 1-5
+     doesn't mean anything, so those rows render without the rating cell.
+     Every other task (Reading/Knowledge/Outputs items) is actual on-the-job
+     performance, so it keeps the rating column. Senior-only items (see
+     sr() in content.html) are skipped entirely for a Junior-track employee
+     — same isItemVisible rule the on-screen checklist and progress
+     tracking already use — so the printed form only asks a department head
+     to rate tasks that employee was actually required to complete; a
+     Senior's certificate includes them, tagged so they're visibly extra
+     rather than blending into the baseline rows. */
+  function taskRowsHtml(items, withRating) {
+    return items.filter(isItemVisible).map(function (item) {
+      var isSenior = itemLevel(item) === 'senior';
+      var label = esc(t(itemText(item))) + (isSenior ? ' <span class="cert-senior-badge">' + esc(t('Senior')) + '</span>' : '');
+      var taskCell = '<td class="cert-task' + (isSenior ? ' cert-senior-task' : '') + '"' + (withRating ? '' : ' colspan="2"') + '><span class="cert-check">&#10003;</span>' + label + '</td>';
+      return '<tr>' + taskCell + (withRating ? ratingCellHtml : '') + '</tr>';
+    }).join('');
+  }
+  function sectionHeaderRow(label) {
+    return '<tr class="cert-section-row"><td colspan="2">' + esc(t(label)) + '</td></tr>';
+  }
+  /* The "RATING 1-5" label sits directly above the rating circles column
+     on the subsection banner itself (Knowledge Requirements / Required
+     Outputs) instead of a page-wide "Task / Rating" header banner — rating
+     only ever applies to some sections, never the whole form, so there's
+     no single banner that's accurate for every row underneath it. */
+  var ratingBadgeHtml = '<span class="cert-rating-badge">' + esc(t('RATING 1–5')) + '</span>';
+  function subsectionHeaderRow(label, hasRating) {
+    return '<tr class="cert-subsection-row"><td colspan="2">' +
+      '<span class="cert-subsection-label">' + esc(t(label)) + '</span>' +
+      (hasRating ? ratingBadgeHtml : '') +
+    '</td></tr>';
+  }
+
+  /* Each phase's rows are grouped into their own <tbody class="cert-phase-
+     group"> (see the @media print rule above) so the browser treats that
+     whole group as one unit when deciding where to break across pages,
+     instead of breaking wherever it runs out of vertical space mid-group —
+     which was splitting a phase's section banner from its own rows across
+     the page boundary. */
+  function tbodyGroup(innerHtml) {
+    return '<tbody class="cert-phase-group">' + innerHtml + '</tbody>';
+  }
+
+  var tableBodies = '';
+
+  chain.forEach(function (pageKey) {
+    var page = PAGES[pageKey];
+    if (!page) return;
+    var phaseTitle = (page.hero && (page.hero.eyebrow || page.hero.title)) || pageKey;
+    var phaseRows = sectionHeaderRow(phaseTitle);
+    (page.sections || []).filter(function (s) { return s.type === 'checklist'; }).forEach(function (sec) {
+      /* Required Reading is left off the certificate entirely (not just
+         unrated) — whether someone actually read the material is already
+         proven (or not) by whether they could produce Required Outputs;
+         a separate "did they read it" line is redundant with that and
+         nobody can verify it independently anyway. Detected via sectionId
+         (see PHASE_BLOCK_ANCHORS in content.html) rather than matching on
+         heading text, which could drift out of sync with a translated or
+         reworded heading. Knowledge Requirements and Required Outputs are
+         the two sections that stay, both rated. */
+      if (sec.sectionId === 'phase-reading') return;
+      phaseRows += subsectionHeaderRow(sec.heading, true);
+      phaseRows += taskRowsHtml(sec.items, true);
+    });
+    tableBodies += tbodyGroup(phaseRows);
+  });
+
+  return '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<title>' + esc(t('Onboarding Completion Form')) + '</title>' +
+    '<style>' +
+      '*{box-sizing:border-box;}' +
+      'body{font-family:\'Segoe UI\',Arial,Helvetica,sans-serif;color:#1a1a2e;max-width:860px;margin:0 auto 32px;padding:0 24px;background:#fff;}' +
+      '.cert-letterhead{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:3px solid #0a1440;margin-bottom:16px;}' +
+      '.cert-letterhead img{height:48px;width:auto;}' +
+      '.cert-letterhead-text{line-height:1.3;}' +
+      '.cert-company{font-size:14px;font-weight:700;color:#0a1440;letter-spacing:.02em;}' +
+      /* The company name, "90-Day Onboarding" and "Completion Form" used to
+         repeat across three separate lines (letterhead sub-text, <h1>, and
+         a subtitle) — collapsed into one line here so the phrase appears
+         exactly once. */
+      '.cert-company-sub{font-size:15px;font-weight:700;color:#3a5bff;letter-spacing:.01em;margin-top:2px;}' +
+      '.cert-meta{display:flex;flex-wrap:wrap;gap:8px 28px;background:#eef1fb;border:1px solid #dde2f5;border-radius:10px;padding:11px 16px;margin-bottom:14px;font-size:11.5px;}' +
+      '.cert-meta-item{display:flex;flex-direction:column;}' +
+      '.cert-meta-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#666f9c;margin-bottom:2px;}' +
+      '.cert-meta-value{font-weight:600;color:#1a1a2e;}' +
+      /* table-layout:fixed + explicit <col> widths (see the <colgroup> in
+         the table markup below) is what actually makes the "RATING 1-5"
+         label line up above the circles — without it, .cert-rating's
+         width:220px is only ever a hint the browser's automatic table
+         layout can ignore depending on the other column's content width,
+         while .cert-rating-badge (rendered via flex, inside a colspan=2
+         cell that doesn't participate in that same column-width
+         calculation) used an unrelated 220px of its own. Two different
+         layout systems computing "220px" independently drifted apart —
+         fixed layout with real <col> widths puts both under one shared
+         grid instead. */
+      /* Page 1 (systematic/skills — Knowledge Requirements + Required
+         Outputs per phase) is tuned tight: smaller base font, thinner row
+         padding, smaller rating dots. Leaves enough headroom on a normal
+         Letter/A4 page for a modest amount of future growth (e.g. a phase
+         picking up a 4th objective) without spilling onto a second page —
+         it's a fit budget, not a guarantee against unlimited future
+         additions; a large enough increase in content will still push rows
+         onto an extra printed page no matter how tight the CSS is. */
+      'table.cert-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:10.5px;margin-bottom:8px;border:1px solid #e4e7f4;border-radius:10px;overflow:hidden;}' +
+      '.cert-table td{border-bottom:1px solid #edf0fa;padding:3.5px 10px;vertical-align:middle;}' +
+      '.cert-table tbody tr:nth-child(even):not(.cert-section-row):not(.cert-subsection-row) td{background:#f8f9fd;}' +
+      '.cert-section-row td{background:#3a5bff;color:#fff;font-weight:700;font-size:10.5px;padding:5px 10px;}' +
+      /* Subsection banner (Required Reading / Knowledge Requirements /
+         Required Outputs): only the ones that actually carry a rating get
+         the "RATING 1-5" label. Its cell still spans both real <col>s
+         (colspan=2) but is now split into two inline-block halves sized to
+         match those same <col> widths exactly, so the label centers over
+         the same pixels the circles occupy in the rows below. */
+      '.cert-subsection-row td{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#3a5bff;font-weight:700;border-bottom:none;padding:5px 0 2px;background:#fff;}' +
+      '.cert-subsection-label{display:inline-block;width:calc(100% - 220px);vertical-align:middle;padding:0 10px;box-sizing:border-box;}' +
+      '.cert-rating-badge{display:inline-block;width:220px;vertical-align:middle;text-align:center;font-size:8px;font-weight:700;letter-spacing:.03em;color:#8a93b8;text-transform:none;}' +
+      '.cert-check{display:inline-block;width:16px;color:#16a34a;font-weight:700;}' +
+      /* Senior-only extra tasks (see sr() in content.html) printed on a
+         Senior employee's certificate — same amber color-coding as the
+         on-screen checklist (.senior-badge in styles.html), so the
+         department head reviewing/rating the printed form can tell at a
+         glance which rows are the baseline everyone does vs the extra
+         tasks specific to the Senior track. */
+      '.cert-senior-task{border-left:3px solid #a15c00;}' +
+      '.cert-senior-badge{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#ffdcb0;color:#a15c00;font-size:7.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;vertical-align:middle;}' +
+      '.cert-rating{white-space:nowrap;text-align:center;width:220px;}' +
+      '.cert-rating-dot{' +
+        'display:inline-flex;align-items:center;justify-content:center;' +
+        'width:17px;height:17px;margin:0 2.5px;border:1.5px solid #9aa5d4;border-radius:50%;font-size:9px;color:#3a5bff;font-weight:600;' +
+      '}' +
+      '.cert-sign{margin-top:32px;display:flex;gap:60px;flex-wrap:wrap;}' +
+      '.cert-sign-block{flex:1 1 260px;}' +
+      '.cert-sign-line{border-bottom:1.5px solid #1a1a2e;height:36px;margin-bottom:6px;}' +
+      '.cert-sign-label{font-size:11px;color:#444;}' +
+      '.cert-footer{margin-top:22px;padding-top:10px;border-top:1px solid #e4e7f4;font-size:9.5px;color:#9aa0b4;text-align:center;}' +
+      /* Page 2 — Attitude & Working Relationships: general, freeform
+         qualities rather than the task-by-task table on page 1. Each
+         category still uses the same rating-dot look as page 1 for visual
+         consistency, but sits in a plain stacked list (no table) since there
+         are no per-task rows here — just a fixed list of soft-skill
+         categories, followed by a large blank comments area, with the
+         signatures pinned at the very bottom of this page (per the brief:
+         page 1 stays purely systematic/skills, page 2 is people-skills and
+         carries the sign-off). */
+      '.cert-page-break{page-break-before:always;}' +
+      '.cert-page2-title{font-size:14px;font-weight:700;color:#0a1440;margin:4px 0 3px;}' +
+      '.cert-page2-sub{font-size:11px;color:#666f9c;margin-bottom:16px;}' +
+      /* justify-content:space-between here used to spread EVERY child
+         (label + all 5 individual rating-dot spans) across the row's full
+         width, since flex treats each one as its own item — the same 5
+         dots that pack into a tight, centered 220px-wide cluster on page 1
+         (see .cert-rating) landed at completely different x-positions on
+         this page as a result, not aligned with each other or with
+         anything above. Fixed by wrapping the dots in their own
+         .cert-attitude-rating span (width:220px, same as .cert-rating) so
+         flex only ever sees two items — label, ratings-block — and the
+         numbers land at the exact same offsets as page 1.
+         The row's OWN padding (14px each side) then shifts that 220px
+         block inward relative to page 1's table, which has no equivalent
+         padding of its own on the .cert-rating cell (.cert-table td uses
+         10px) — a uniform 14px left/right offset confirmed by direct
+         measurement, not just a rounding difference. Negative margins
+         here cancel exactly that padding back out on the rating column
+         only (not the label, which doesn't need to align to anything),
+         so both columns' numbers land at identical pixel x-positions on
+         both pages. */
+      '.cert-attitude-row{display:flex;align-items:center;gap:16px;padding:10px 14px;border:1px solid #e4e7f4;border-radius:10px;margin-bottom:8px;}' +
+      '.cert-attitude-row:nth-child(even){background:#f8f9fd;}' +
+      '.cert-attitude-label{font-size:12px;font-weight:600;color:#1a1a2e;flex:1;}' +
+      '.cert-attitude-rating{white-space:nowrap;text-align:center;width:220px;flex:none;margin-right:-14px;}' +
+      '.cert-comments{margin-top:18px;}' +
+      '.cert-comments-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#666f9c;font-weight:700;margin-bottom:6px;}' +
+      /* Ruled blank lines (not a bordered box) so it reads as "write here",
+         and flex-grows to soak up whatever vertical space page 1's tighter
+         table doesn't need, per the brief's "plenty of room for other
+         abstract qualities" — the exact line count isn't load-bearing, just
+         enough that the page doesn't look sparse above the signatures. */
+      '.cert-comments-line{border-bottom:1px solid #d7dbef;height:26px;}' +
+      '.cert-page2-sign{margin-top:28px;}' +
+      '@media print{' +
+        'body{margin:0;padding:0 16px;}' +
+        '.cert-letterhead{padding-top:8px;}' +
+        /* Each phase's rows (section banner + Knowledge Requirements +
+           Required Outputs) are grouped into their own <tbody> (see
+           tbodyGroup below) so page-break-inside:avoid can apply to the
+           whole group at once — without this, the browser splits wherever
+           it runs out of room on the page, which was cutting a section
+           banner away from its own rows (a banner alone at the bottom of
+           one page, its rows starting fresh on the next). Falls back to
+           allowing a break between whole phase groups (auto on the table
+           itself) when a group genuinely can't fit on the remaining page. */
+        'table.cert-table{page-break-inside:auto;border-radius:0;}' +
+        'tr{page-break-inside:avoid;}' +
+        'tbody.cert-phase-group{page-break-inside:avoid;}' +
+        '.cert-section-row{-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+        '.cert-attitude-row{-webkit-print-color-adjust:exact;print-color-adjust:exact;page-break-inside:avoid;}' +
+      '}' +
+    '</style></head><body>' +
+    '<div class="cert-letterhead">' +
+      '<img src="' + EMBEDDED_IMAGES.vcbCompanyLogo + '" alt="Vichitbhan Construction">' +
+      '<div class="cert-letterhead-text">' +
+        '<div class="cert-company">' + esc(t('Vichitbhan Construction Co., Ltd.')) + '</div>' +
+        '<div class="cert-company-sub">' + esc(t('90-Day Onboarding Completion Form')) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="cert-meta">' +
+      '<div class="cert-meta-item"><span class="cert-meta-label">' + esc(t('Employee')) + '</span><span class="cert-meta-value">' + esc(name) + '</span></div>' +
+      '<div class="cert-meta-item"><span class="cert-meta-label">' + esc(t('Department')) + '</span><span class="cert-meta-value">' + esc(t(dept.label || '')) + '</span></div>' +
+      '<div class="cert-meta-item"><span class="cert-meta-label">' + esc(t('Date')) + '</span><span class="cert-meta-value">' + esc(dateStr) + '</span></div>' +
+    '</div>' +
+    '<table class="cert-table"><colgroup><col><col style="width:220px"></colgroup>' + tableBodies + '</table>' +
+    /* Page 2 — Attitude & Working Relationships. Everything systematic/
+       task-based lives on page 1 above; this page is general people-skills
+       comments only, with the sign-off pinned at its bottom (not page 1's),
+       leaving the space above the signatures free for the department head's
+       written remarks. */
+    '<div class="cert-page-break">' +
+      '<div class="cert-letterhead">' +
+        '<img src="' + EMBEDDED_IMAGES.vcbCompanyLogo + '" alt="Vichitbhan Construction">' +
+        '<div class="cert-letterhead-text">' +
+          '<div class="cert-company">' + esc(t('Vichitbhan Construction Co., Ltd.')) + '</div>' +
+          '<div class="cert-company-sub">' + esc(t('90-Day Onboarding Completion Form')) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cert-page2-title">' + esc(t('Attitude & Working Relationships')) + '</div>' +
+      '<div class="cert-page2-sub">' + esc(t('General assessment of conduct, teamwork, and interpersonal qualities during the 90-day period.')) + '</div>' +
+      ATTITUDE_CATEGORIES.map(function (label) {
+        return '<div class="cert-attitude-row">' +
+          '<span class="cert-attitude-label">' + esc(t(label)) + '</span>' +
+          '<span class="cert-attitude-rating">' + ratingDotsHtml + '</span>' +
+        '</div>';
+      }).join('') +
+      '<div class="cert-comments">' +
+        '<div class="cert-comments-label">' + esc(t('General Comments')) + '</div>' +
+        Array(6).fill('<div class="cert-comments-line"></div>').join('') +
+      '</div>' +
+      '<div class="cert-sign cert-page2-sign">' +
+        '<div class="cert-sign-block">' +
+          '<div class="cert-sign-line"></div>' +
+          '<div class="cert-sign-label">' + esc(t('Employee Signature')) + ' — ' + esc(name) + '</div>' +
+        '</div>' +
+        '<div class="cert-sign-block">' +
+          '<div class="cert-sign-line"></div>' +
+          '<div class="cert-sign-label">' + esc(t('Head of Department Signature')) + (dept.headOfDept ? ' — ' + esc(t(dept.headOfDept)) : '') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cert-footer">' + esc(t('Vichitbhan Construction Co., Ltd. — Generated')) + ' ' + esc(dateStr) + '</div>' +
+    '</div>' +
+    '</body></html>';
+}
+
+function openCompletionCertificate() {
+  /* Opened as a real separate popup WINDOW (explicit width/height/left/top
+     features), not a new tab — window.open('', '_blank') with no features
+     opens as a tab in the SAME browser window in most browsers, and the
+     native print dialog that win.print() triggers below then blocks
+     interaction with the entire browser window (every tab, including the
+     portal tab that opened it) until the print dialog is dismissed —
+     reported as the whole portal "freezing" after clicking Print until
+     the print tab is closed first. A genuinely separate window's print
+     dialog only blocks that one window, leaving the portal's own window
+     fully interactive the whole time. */
+  var features = 'width=900,height=1000,left=100,top=60,menubar=no,toolbar=no,location=no,status=no';
+  var win = window.open('', '_blank', features);
+  if (!win) { alert(t('Please allow popups to print the completion form.')); return; }
+  win.document.open();
+  win.document.write(buildCompletionCertificateHtml());
+  win.document.close();
+  win.focus();
+  /* Slight delay so the popup's own layout/fonts settle before the print
+     dialog captures it — printing immediately on write can occasionally
+     grab a blank/partial first paint in some browsers. */
+  setTimeout(function () { win.print(); }, 300);
+}
+
+/* Lightweight canvas confetti burst — no external library, respects
+   prefers-reduced-motion by skipping the animation (still shows the static card). */
+function runConfetti(canvas) {
+  if (!canvas) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var ctx = canvas.getContext('2d');
+  var colors = ['#4fd1ff', '#7ee8ff', '#3a5bff', '#5b7cff', '#ffffff'];
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var pieces = [];
+  var count = 140;
+  for (var i = 0; i < count; i++) {
+    pieces.push({
+      x: Math.random() * canvas.width,
+      y: -20 - Math.random() * canvas.height * 0.5,
+      w: 6 + Math.random() * 6,
+      h: 8 + Math.random() * 8,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      speedY: 2 + Math.random() * 3,
+      speedX: (Math.random() - 0.5) * 2,
+      rotation: Math.random() * 360,
+      spin: (Math.random() - 0.5) * 8
+    });
+  }
+
+  var start = null;
+  var duration = 4200;
+  function frame(ts) {
+    if (!start) start = ts;
+    var elapsed = ts - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(function (p) {
+      p.x += p.speedX;
+      p.y += p.speedY;
+      p.rotation += p.spin;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    if (elapsed < duration) {
+      requestAnimationFrame(frame);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      window.removeEventListener('resize', resize);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* Shared bottom-of-screen pill toast — originally built for the reward
+   messages below, generalized so the same lightweight, auto-dismissing
+   affordance can carry any short message + icon (see showLockedToast,
+   which reuses this for "this task is locked" instead of adding a second,
+   near-identical DOM element/CSS block just for a different message). */
+var toastTimer = null;
+function showToast(message, iconName) {
+  var toast = document.getElementById('reward-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'reward-toast';
+    /* The toast is the ONLY channel for a failed save (showSaveFailedToast)
+       and for the locked-item explanation (showLockedToast). Without a live
+       region both are silent to screen-reader users — a save failure would
+       pass with no indication at all. role="status" (polite) rather than
+       alert, so a celebration toast doesn't interrupt mid-sentence; the
+       failure cases are still announced as soon as the user is idle. */
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+  }
+  /* is-warning styles this red instead of the default dark pill (see
+     .reward-toast.is-warning, styles.html) — a save failure shouldn't look
+     identical to a celebration toast, since an employee glancing at the
+     bottom of the screen needs to tell "nice work!" apart from "this
+     didn't save" at a glance. */
+  toast.className = 'reward-toast' + (iconName === 'warning' ? ' is-warning' : '');
+  toast.innerHTML = '<span class="reward-toast-icon icon">' + icon(iconName) + '</span> ' + esc(t(message));
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
+}
+function showRewardToast() {
+  var messages = [
+    'Nice work!', 'Great job!', 'Keep it up!', 'Well done!', 'You’re on track!'
+  ];
+  showToast(messages[Math.floor(Math.random() * messages.length)], 'celebrate');
+}
+/* 3200ms (vs the reward toast's 2200ms), same reasoning as
+   showLockedToast below — a save-failure message needs an extra beat to
+   actually read, not just register as a flash. */
+function showSaveFailedToast(message) {
+  showToast(message || 'Could not save — please try again.', 'warning');
+  clearTimeout(toastTimer);
+  var toast = document.getElementById('reward-toast');
+  toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 3200);
+}
+/* Everything looked equally clickable whether a phase/task was actually
+   reachable or not, with nothing telling the employee WHY a click did
+   nothing (see isPhasePageUnlocked above for the underlying rule) — this
+   is the explicit "why" the disabled/dimmed state alone didn't provide.
+   3200ms (vs the reward toast's 2200ms) since this message is a little
+   longer and worth an extra beat to actually read. */
+function showLockedToast() {
+  showToast('Complete the previous phase before starting this one.', 'lock');
+  clearTimeout(toastTimer);
+  var toast = document.getElementById('reward-toast');
+  toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 3200);
+}
+
+/* Counts every checklist task belonging to one department (static per department, computed once).
+   A new employee belongs to exactly one department, so overall progress is scoped to it —
+   never averaged across all departments' checklists. */
+/* Cached PER LEVEL, not just per department — a Junior and a Senior
+   employee in the same department don't have the same real task list
+   (see isItemVisible below), so the same cache key for both silently
+   served whichever level's result got computed and cached first to
+   every later caller regardless of their own actual level. */
+var TASK_IDS_CACHE_BY_DEPT_LEVEL = {};
+function getDepartmentTaskIds(deptId) {
+  /* Senior-only items (see sr()/itemLevel in content.html) were
+     previously included unconditionally here, unlike getPageTaskIds
+     (below), which already filters to isItemVisible — a Junior employee
+     who finished everything they were actually required to do (and whom
+     isEmployeeOnboardingComplete() correctly reports as complete) still
+     saw a stuck-below-100% "27 / 36 tasks complete" on the overall
+     progress bar, because the denominator here kept counting Senior-only
+     tasks they were never asked to complete. Filtering to isItemVisible
+     here too makes this match the same completion definition used
+     everywhere else in this file. */
+  var level = getEmployeeLevel();
+  var cacheKey = deptId + '::' + level;
+  if (TASK_IDS_CACHE_BY_DEPT_LEVEL[cacheKey]) return TASK_IDS_CACHE_BY_DEPT_LEVEL[cacheKey];
+  var dept = DEPARTMENTS.filter(function (d) { return d.id === deptId; })[0];
+  var ids = [];
+  if (dept) {
+    Object.keys(PAGES).forEach(function (pageKey) {
+      if (pageKey.indexOf(dept.prefix) !== 0) return;
+      var page = PAGES[pageKey];
+      (page.sections || []).forEach(function (sec) {
+        if (sec.type === 'checklist') {
+          sec.items.forEach(function (item) { if (isItemVisible(item)) ids.push(itemId(item)); });
+        }
+      });
+    });
+  }
+  TASK_IDS_CACHE_BY_DEPT_LEVEL[cacheKey] = ids;
+  return ids;
+}
+
+/* Maps a phase page key to the page key that must be fully completed first
+   (built from PAGES' own nextPhase links, so Day 1-30 -> 31-60 -> 61-90 order
+   is derived from content.html rather than hardcoded here). */
+var PREV_PHASE_CACHE = null;
+function getPrevPhaseMap() {
+  if (PREV_PHASE_CACHE) return PREV_PHASE_CACHE;
+  var map = {};
+  Object.keys(PAGES).forEach(function (pageKey) {
+    var next = PAGES[pageKey].nextPhase;
+    if (next && next.page) map[next.page] = pageKey;
+  });
+  PREV_PHASE_CACHE = map;
+  return map;
+}
+
+/* Task ids come from each item's own permanent id (see it()/itemId() in
+   content.html), not from its position in sec.items — an admin reordering,
+   inserting, or deleting checklist items (see the admin editor) can never
+   silently repoint an employee's already-saved checkmark at a different
+   task the way a positional index would. Only items visible at the
+   employee's current level are included in the returned list, which is
+   what makes phase/block completion (isPageBlockComplete/isPagePhaseComplete
+   below) require just the Junior baseline for a Junior employee, and the
+   full set for Senior. */
+function getPageTaskIds(pageKey) {
+  var page = PAGES[pageKey];
+  var ids = [];
+  if (!page) return ids;
+  (page.sections || []).forEach(function (sec) {
+    if (sec.type === 'checklist') {
+      sec.items.forEach(function (item) { if (isItemVisible(item)) ids.push(itemId(item)); });
+    }
+  });
+  return ids;
+}
+
+/* Task ids scoped to one checklist block (Required Reading / Knowledge
+   Requirements / Required Outputs) instead of the whole page — used to
+   drive the sidebar stepper's per-subsection sub-rows (see
+   getJourneySteps below), which need Reading/Knowledge/Outputs to each
+   show their own done state rather than only the phase's overall state. */
+function getPageBlockTaskIds(pageKey, blockIndex) {
+  var page = PAGES[pageKey];
+  var ids = [];
+  if (!page) return ids;
+  var sec = (page.sections || [])[blockIndex];
+  if (sec && sec.type === 'checklist') {
+    sec.items.forEach(function (item) { if (isItemVisible(item)) ids.push(itemId(item)); });
+  }
+  return ids;
+}
+function isPageBlockComplete(pageKey, blockIndex) {
+  var ids = getPageBlockTaskIds(pageKey, blockIndex);
+  if (!ids.length) return true;
+  return ids.every(function (id) { return PROGRESS_CACHE[id]; });
+}
+
+function isPagePhaseComplete(pageKey) {
+  var ids = getPageTaskIds(pageKey);
+  if (!ids.length) return true;
+  return ids.every(function (id) { return PROGRESS_CACHE[id]; });
+}
+
+/* Every phase page can be VIEWED freely once Required Documents is done —
+   an employee can read ahead to Day 61-90 material, or revisit Day 1-30,
+   without hitting a wall (see the phaselinks/phase-trail rendering in
+   app.html, which no longer gates the link itself on this function).
+   Completing a phase's tasks, however, is still sequential: this only
+   returns true for the first phase in a department's chain, or a later
+   phase whose immediately-previous phase is fully complete. Reintroduced
+   after the earlier "freely navigable" change was found to let an
+   employee check off Day 61-90 tasks before finishing Day 1-30 — the
+   fix here is checkbox-level (see isPhaseUnlocked/performToggle below and
+   the check-item lock state in app.html), not page-level, so browsing
+   ahead still works. */
+function isPhasePageUnlocked(pageKey) {
+  if (!areRequiredDocsComplete()) return false;
+  var prev = getPrevPhaseMap()[pageKey];
+  if (!prev) return true;
+  return isPagePhaseComplete(prev) && isPhasePageUnlocked(prev);
+}
+
+function isPhaseUnlocked(taskId) {
+  var pageKey = pageKeyFromTaskId(taskId);
+  return pageKey ? isPhasePageUnlocked(pageKey) : true;
+}
+
+/* Renders the persistent "your progress" bar in the page shell (visible on
+   every page, not just Home) — stays hidden until the employee has selected
+   a department (pre-boarding has no department context yet). Stays visible
+   at 100% once the 90-day program is complete rather than disappearing, so
+   the employee still sees confirmation of where they landed. */
+/* onSettled (optional) is called once this widget's async content has
+   actually landed in the DOM — this widget sits above the fold on every
+   phase/department page, so inserting it late (after loadProgress resolves)
+   can shift page layout enough to trigger the browser's native scroll
+   anchoring, which compensates by scrolling the page down to keep whatever
+   was near the viewport in the same visual position. That's what made
+   picking a department appear to "jump down" past the hero straight to the
+   level picker/phase links instead of landing at the true top — the initial
+   scrollTo(0,0) was correct at the moment it ran, then this widget's later
+   insertion silently moved things under it. See renderPage in app.html,
+   which passes forceScroll as onSettled. */
+function renderOverallProgress(targetEl, onSettled) {
+  var name = getEmployeeName();
+  var dept = getEmployeeDepartment();
+  if (!name || !dept) {
+    targetEl.innerHTML = '';
+    return;
+  }
+  var deptLabel = (DEPARTMENTS.filter(function (d) { return d.id === dept; })[0] || {}).label || dept;
+  loadProgress(function (cache) {
+    var allIds = getDepartmentTaskIds(dept);
+    var done = 0;
+    allIds.forEach(function (id) { if (cache[id]) done++; });
+    var pct = allIds.length ? Math.round((done / allIds.length) * 100) : 0;
+    targetEl.innerHTML =
+      '<div class="overall-progress">' +
+        '<div class="overall-progress-head">' +
+          '<span>' + esc(t('Your Onboarding Progress')) + ' — ' + esc(name) + ' (' + esc(t(deptLabel)) + ')</span>' +
+          '<span>' + pct + '%</span>' +
+        '</div>' +
+        '<div class="progress-bar-track"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="overall-progress-sub">' + done + ' / ' + allIds.length + ' ' + esc(t('tasks complete in your department')) + '</div>' +
+      '</div>';
+    if (onSettled) onSettled();
+  });
+}
+
+/* Full ordered phase chain (Day 1-30 -> 31-60 -> 61-90) for whichever phase
+   page the employee is CURRENTLY looking at, regardless of which one that
+   is — walks backward via getPrevPhaseMap and forward via nextPhase from
+   pageKey itself, rather than assuming the chain always starts from Phase 1
+   the way getDepartmentPhaseChain(deptId) does. Used by the bottom-of-page
+   phase trail (see renderPhaseTrail in app.html), which needs to show all
+   3 phases with the one actually being viewed marked "current" even if the
+   employee is revisiting an already-completed earlier phase. Returns []
+   for a pageKey that isn't part of any phase chain (e.g. Home). */
+function getFullPhaseChain(pageKey) {
+  if (!pageKey || !PAGES[pageKey]) return [];
+  var chain = [pageKey];
+  var prev = getPrevPhaseMap()[pageKey];
+  while (prev) { chain.unshift(prev); prev = getPrevPhaseMap()[prev]; }
+  var cur = PAGES[pageKey];
+  var next = cur && cur.nextPhase ? cur.nextPhase.page : null;
+  while (next) { chain.push(next); cur = PAGES[next]; next = cur && cur.nextPhase ? cur.nextPhase.page : null; }
+  return chain;
+}
+
+/* Finds the department's ordered phase page keys (Day 1-30 -> 31-60 -> 61-90)
+   by walking nextPhase links starting from that department's first phase page.
+   Restricted to "-day-" pages so the department's plain landing page (e.g.
+   "accounting-team", which shares the same prefix but isn't a phase and has
+   no checklist) never gets mistaken for the first phase. */
+function getDepartmentPhaseChain(deptId) {
+  var dept = DEPARTMENTS.filter(function (d) { return d.id === deptId; })[0];
+  if (!dept) return [];
+  var first = Object.keys(PAGES).filter(function (k) {
+    return k.indexOf(dept.prefix) === 0 && k.indexOf('-day-') !== -1 && !getPrevPhaseMap()[k];
+  })[0];
+  var chain = [];
+  var cur = first;
+  while (cur) {
+    chain.push(cur);
+    var next = PAGES[cur] && PAGES[cur].nextPhase;
+    cur = next ? next.page : null;
+  }
+  return chain;
+}
+
+/* True once the employee has a department and every phase page in that
+   department's chain (Day 1-30, 31-60, 61-90) is fully checked off. Gates
+   Home-page content (Meet Our Team / Life on Site) that should only appear
+   after the 90-day program is actually finished. */
+function isEmployeeOnboardingComplete() {
+  var dept = getEmployeeDepartment();
+  if (!dept) return false;
+  var chain = getDepartmentPhaseChain(dept);
+  if (!chain.length) return false;
+  return chain.every(function (pageKey) { return isPagePhaseComplete(pageKey); });
+}
+
+/* Builds the whole-journey step list: Pre-boarding -> Required Documents ->
+   Department Selection -> [department's 3 phases] -> Completion. Unlike
+   getDepartmentPhaseChain (department phases only), this covers the entire
+   90-day journey end to end, in the order the employee actually moves
+   through it, for the vertical stepper that replaces the old flat nav list. */
+function getJourneySteps() {
+  var dept = getEmployeeDepartment();
+  var steps = [
+    /* alwaysUnlocked: true on these three — Home, and both halves of the
+       Required Documents page, are freely browsable regardless of
+       progress (there's nothing to gate before pre-boarding even starts).
+       Department Selection itself still can't actually be COMPLETED
+       without finishing Required Documents (see the dept-card click
+       handler in app.html, which blocks with a popup), but simply viewing
+       that section of the page was never the thing worth locking. */
+    { id: 'pre-boarding', label: 'Pre-boarding', page: 'home', done: hasVisitedHome(), alwaysUnlocked: true },
+    /* Required Documents / Department Selection moved off Home onto their
+       own page ('required-documents' — see content.html) when Pre-boarding
+       was split out to end at Company Structure; both anchors still exist
+       on that page (sectionId is unchanged), just the page key changed. */
+    { id: 'required-docs', label: 'Required Documents', page: 'required-documents', anchor: 'required-documents', done: areRequiredDocsComplete(), alwaysUnlocked: true },
+    { id: 'dept-selection', label: 'Department Selection', page: 'required-documents', anchor: 'department-selection', done: !!dept, alwaysUnlocked: true }
+  ];
+  var deptEntry = dept ? DEPARTMENTS.filter(function (d) { return d.id === dept; })[0] : null;
+  var deptShort = deptEntry ? deptEntry.shortLabel : null;
+  var dayRanges = ['Day 1–30', 'Day 31–60', 'Day 61–90'];
+  var chain = dept ? getDepartmentPhaseChain(dept) : [null, null, null];
+  /* Each phase's own 3 checklist blocks (Required Reading, Knowledge
+     Requirements, Required Outputs — see PHASE_BLOCK_ANCHORS in
+     content.html) surfaced as sub-rows under that phase's stepper row,
+     abbreviated to Reading/Knowledge/Outputs so the sidebar stays scannable.
+     Each carries its own done state and anchor so the sidebar can show
+     (and deep-link to) finer-grained progress than just the whole phase. */
+  var subLabels = ['Reading', 'Knowledge', 'Outputs'];
+  chain.slice(0, 3).forEach(function (pageKey, i) {
+    var subSteps = pageKey ? subLabels.map(function (label, bi) {
+      return { label: label, anchor: PHASE_BLOCK_ANCHORS[bi], done: isPageBlockComplete(pageKey, bi) };
+    }) : [];
+    steps.push({
+      id: 'phase-' + i,
+      /* deptShort/dayRange translated and joined separately at render time
+         (see renderSidebarProgress) — e.g. "Accounting" + "Day 1–30" ->
+         "Accounting Day 1–30", matching the requested "Accounting Day 1 to
+         30" naming instead of a generic "30 Days" label with the department
+         shown as a separate sub-line. */
+      label: null,
+      deptShort: deptShort,
+      dayRange: dayRanges[i],
+      page: pageKey,
+      done: pageKey ? isPagePhaseComplete(pageKey) : false,
+      subSteps: subSteps,
+      /* Phases are independently reachable/completable in any order now —
+         reaching a department at all already required finishing Required
+         Documents (the one real gate, enforced when picking the
+         department), so every phase page below that point is unlocked. See
+         isPhasePageUnlocked in this file for the underlying rule. */
+      alwaysUnlocked: true
+    });
+  });
+  /* Completion links to the dedicated PAGES['completion'] page (content.html)
+     — a real page now, not an anchor into the department's own Day 61-90
+     page pointing at an in-place gated reveal (the old behavior; see
+     KNOWN_ISSUES.md for the bug history that motivated replacing it).
+     Print Completion Form and the Meet Our Team / Life on Site cards live
+     there and only there now. */
+  steps.push({
+    id: 'completion', label: 'Completion',
+    page: 'completion',
+    done: isEmployeeOnboardingComplete(),
+    /* Clicking through early is harmless — PAGES['completion']'s own gate
+       (renderPage, app.html) shows a plain "not finished yet" message
+       until isEmployeeOnboardingComplete() is genuinely true, so there's
+       no real content to jump ahead of here; only whether the sidebar
+       LINK is clickable is being relaxed, matching every phase step
+       above it. */
+    alwaysUnlocked: true
+  });
+  return steps;
+}
+
+/* Vertical journey stepper — replaces the old flat clickable nav list.
+   Each step shows done/current/locked state with a connecting line. Steps
+   are no longer forced into strict sequential order (an employee can jump
+   straight to a later phase without finishing earlier ones first, per
+   explicit request) — a step is unlocked if it's done, marked
+   alwaysUnlocked (see getJourneySteps above; true for every step except
+   nothing at this point, since the only real remaining lock is Required
+   Documents -> Department Selection, enforced elsewhere), or is the very
+   next not-yet-done step (kept as a fallback "current" indicator so the
+   stepper still visually suggests where to go next, without preventing
+   anything else from being clicked). */
+function renderSidebarProgress(targetEl) {
+  if (!targetEl) return;
+  loadProgress(function () {
+    var steps = getJourneySteps();
+    var firstNotDone = steps.findIndex(function (s) { return !s.done; });
+    /* Same lookup as app.html's own private currentPage() — duplicated
+       here (rather than exposed cross-file for one read) since it's a
+       one-line read of the real page URL, not app state. Needed so the
+       Completion step can still show as "current" once the employee is
+       actually ON that page — previously, once every step (including
+       Completion itself) was done, firstNotDone was -1 and NOTHING in the
+       whole stepper showed as current anymore, reported directly ("it
+       should show where the user is currently at"). Every other step
+       already derives "current" purely from progress state (the next
+       not-yet-done item) — Completion is the one step that's still
+       meaningfully "current" even after being marked done, since visiting
+       it is itself the last real action in the journey. */
+    var actualCurrentPage = new URLSearchParams(location.search).get('page') || (typeof window !== 'undefined' && window.INITIAL_PAGE) || 'home';
+    var rows = steps.map(function (s, i) {
+      var unlocked = s.done || s.alwaysUnlocked || i === firstNotDone;
+      var isOnCompletionPage = s.id === 'completion' && actualCurrentPage === 'completion';
+      var state = isOnCompletionPage ? 'done completion-done current' :
+        s.done ? (s.id === 'completion' ? 'done completion-done' : 'done') :
+        (i === firstNotDone ? 'current' : (unlocked ? '' : 'locked'));
+      var dotContent = s.done ? icon('check') : String(i + 1);
+      var clickable = unlocked && s.page;
+      var tag = clickable ? 'a' : 'div';
+      var hash = s.anchor ? '#' + s.anchor : '';
+      var attrs = clickable ?
+        ' href="?page=' + encodeURIComponent(s.page) + hash + '" data-link="' + s.page + '"' +
+        (s.anchor ? ' data-anchor="' + s.anchor + '"' : '') : '';
+      var stepLabel = s.label != null ? t(s.label) :
+        (s.deptShort ? t(s.deptShort) + ' ' : '') + t(s.dayRange);
+      var labelHtml = '<span class="stepper-label">' + esc(stepLabel) + '</span>';
+      /* Reading/Knowledge/Outputs sub-rows — only meaningful once the phase
+         itself is reachable (unlocked), same gating as the phase row's own
+         link. Each sub-row deep-links to its own checklist block via the
+         anchor stamped on that block's sectionId (see PHASE_BLOCK_ANCHORS
+         in content.html), so clicking "Reading" jumps straight to Required
+         Reading instead of just the top of the phase page. Rendered inside
+         the same .stepper-item wrapper as the row itself (not as a
+         following sibling) so .stepper-line — which spans the wrapper's
+         full height via top/bottom — keeps running continuously through
+         the sub-rows down to the next phase's dot, instead of stopping
+         short at the row's own bottom edge. */
+      var subStepsHtml = '';
+      if (unlocked && s.subSteps && s.subSteps.length) {
+        subStepsHtml = '<div class="stepper-substeps">' + s.subSteps.map(function (sub) {
+          var subHash = '#' + sub.anchor;
+          return '<a class="stepper-substep' + (sub.done ? ' done' : '') + '" href="?page=' + encodeURIComponent(s.page) + subHash + '" data-link="' + s.page + '" data-anchor="' + sub.anchor + '">' +
+            '<span class="stepper-substep-dot">' + (sub.done ? icon('check') : '') + '</span>' +
+            '<span class="stepper-substep-label">' + esc(t(sub.label)) + '</span>' +
+          '</a>';
+        }).join('') + '</div>';
+      }
+      var rowHtml = '<' + tag + ' class="stepper-row ' + state + '"' + attrs + '>' +
+        '<span class="stepper-dot">' + dotContent + '</span>' +
+        labelHtml +
+      '</' + tag + '>';
+      var itemClass = 'stepper-item' + (i === steps.length - 1 ? ' last' : '') + (s.done ? ' done' : '') + (s.done && s.id === 'completion' ? ' completion-done' : '');
+      return '<div class="' + itemClass + '">' +
+        '<span class="stepper-line"></span>' + rowHtml + subStepsHtml +
+      '</div>';
+    }).join('');
+    targetEl.innerHTML = '<div class="stepper">' + rows + '</div>';
+  });
+}
+
+/* Shows a small inline notice above the checklists explaining why they're
+   locked. Reintroduced sequential-phase locking (see isPhasePageUnlocked
+   above) means a phase can now be locked for two different reasons — either
+   Required Documents isn't done (can't happen in practice, since Department
+   Selection itself is already gated on that), or the immediately-previous
+   phase isn't finished yet — so the message picks between them instead of
+   always blaming Required Documents. The page is still fully readable while
+   locked; only the checkboxes are disabled (see initChecklists below, which
+   also renders a per-checklist-group note — see 'checklist' in app.html —
+   so this banner and that note say the same thing via the same wording,
+   just at different scopes: one per page, one per checklist block). */
+function renderPhaseLockNotice(container, locked, pageKey) {
+  var existing = container.querySelector('.phase-lock-notice');
+  if (existing) existing.remove();
+  if (!locked) return;
+  var reason = (pageKey && !areRequiredDocsComplete()) ?
+    t('Complete all Required Documents to unlock this phase.') :
+    t('Complete the previous phase to unlock these tasks. You can still read everything below.');
+  var notice = document.createElement('div');
+  notice.className = 'phase-lock-notice section-inner-narrow';
+  notice.innerHTML = '<span class="phase-lock-icon">' + icon('lock') + '</span> ' + esc(reason);
+  var firstGroup = container.querySelector('.checklist-group');
+  if (firstGroup && firstGroup.parentNode) {
+    firstGroup.parentNode.insertBefore(notice, firstGroup);
+  }
+}
+
+/* Called after a page render to wire up checklist interactivity and load saved state. */
+/* onSettled (optional) — see renderOverallProgress above for why this
+   matters: renderPhaseLockNotice can insert a whole banner into the page
+   once progress has loaded, which (like every other async post-render
+   insertion on this page) can shift layout enough to move the scroll
+   position the initial forceScroll() landed on. Passed through from
+   renderPage in app.html, called after this async work actually lands. */
+function initChecklists(container, onSettled) {
+  var groups = container.querySelectorAll('.checklist-group');
+  if (!groups.length) { if (onSettled) onSettled(); return; }
+  loadProgress(function () {
+    var pageKey = null;
+    var firstBox = container.querySelector('.check-item input[type="checkbox"]');
+    if (firstBox) pageKey = pageKeyFromTaskId(firstBox.getAttribute('data-task-id'));
+    var unlocked = pageKey ? isPhasePageUnlocked(pageKey) : true;
+
+    groups.forEach(function (group) {
+      group.querySelectorAll('.check-item input[type="checkbox"]').forEach(function (box) {
+        box.checked = isTaskDone(box.getAttribute('data-task-id'));
+        box.disabled = !unlocked;
+        var item = box.closest('.check-item');
+        if (item) {
+          item.classList.toggle('done', box.checked);
+          item.classList.toggle('locked', !unlocked);
+        }
+      });
+      refreshGroupProgress(group);
+    });
+
+    renderPhaseLockNotice(container, !unlocked, pageKey);
+    if (onSettled) onSettled();
+  });
+}
+
+/* Reflects saved doc-completion state on the Required Documents cards once
+   progress has loaded — same load-then-paint pattern as initChecklists,
+   including the same onSettled re-scroll reasoning (this is the page where
+   "Continue to Required Documents" was landing scrolled past the doc cards
+   down at Department Selection — this async update, previously untracked
+   by forceScroll, was the missing piece). */
+function initDocCards(container, onSettled) {
+  var cards = container.querySelectorAll('[data-doc-card]');
+  if (!cards.length) { if (onSettled) onSettled(); return; }
+  loadProgress(function () {
+    cards.forEach(function (card) {
+      updateDocCardUI(card.getAttribute('data-doc-card'));
+    });
+    if (onSettled) onSettled();
+  });
+}
+</script>

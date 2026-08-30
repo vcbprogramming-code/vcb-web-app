@@ -1,74 +1,47 @@
 # VCB Meeting Minutes
 
-ระบบบันทึกการประชุมของกลุ่มวิจิตรภัณฑ์ก่อสร้าง — เก็บรายงานการประชุมไว้ในที่เดียว
-ค้นหาได้ และควบคุมสิทธิ์การเข้าถึงรายโครงการ
+A web app for the VCB / CVE construction projects that stores meeting minutes
+in one searchable, access-controlled place.
 
-**🔗 เปิดใช้งาน:**
+## Open the app
+
+**🔗 Live URL**
 https://script.google.com/macros/s/AKfycbxJN7olKBYqGHlaWXiVOI41fh8oZJ9lRstXZAj1DFVeiynyvfBf48xaKX5p4D19rUnr/exec
 
-*(ใช้ลิงก์รูปแบบนี้เท่านั้น อย่าใช้แบบ `/a/vcb-con.com/` เพราะ Google จะ redirect
-แล้วทำให้ query string เช่น `?meeting=` หรือ `?project=` หายไป)*
+*(Use this exact form, not the `/a/vcb-con.com/` Workspace-scoped variant — that form routes through Google's own account redirector, which can drop query-string params like `?meeting=` or `?project=` and land on the homepage instead. See [CHANGELOG.md](CHANGELOG.md)'s 2026-08-15 entry.)*
 
----
+(also available as the shortcut **`VCB Meeting Minutes — Open App.url`** in this folder.)
 
-## โครงสร้างโฟลเดอร์
+## Who can use it
 
-แยกเป็น **2 โฟลเดอร์หลัก** แบบเดียวกับ HR Work Log ในโปรเจกต์นี้
+**Reading** needs no sign-in, but what is readable depends on the project:
 
-| โฟลเดอร์ | คืออะไร | สถานะ |
-|---|---|---|
-| [`for deploy team/`](for%20deploy%20team/) | **Google Apps Script ที่ deploy จริง** — 8 ไฟล์ที่ `clasp push` ส่งขึ้นไป | 🟢 **รันอยู่จริง** `@220` |
-| [`original script/`](original%20script/) | **โค้ดต้นฉบับ React + TypeScript** สำหรับนักพัฒนาอ่าน/ต่อยอด | 🟡 preview, mock data |
+- **🔓 Public projects** — anyone who opens the link reads every visible
+  meeting in them. Any email address, any domain, no account needed.
+- **🔒 Locked projects** — readable only by admins, editors, and the specific
+  email addresses named on that project. A locked project is *not* open to
+  all `@vcb-con.com` staff; it is a named guest list.
 
-### ⚠️ อ่านก่อนแก้ไข
+**Editing** always needs a sign-in — Google Sign-In, or an email + 4-digit
+PIN as a fallback. Editors can edit content in any project; only admins
+manage access, projects, and hidden/pinned status.
 
-**ระบบที่พนักงานใช้อยู่คือ [`for deploy team/`](for%20deploy%20team/)** ไม่ใช่ React
-ถ้าจะแก้ให้มีผลกับผู้ใช้จริง ต้องแก้ที่โฟลเดอร์นั้น
+Both are managed in **Settings → 🔐 Project access** (admins only). See
+[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for the full access model.
 
-`original script/` เป็น React port ที่ใช้ mock data (`src/api/mock.ts`)
-แก้แล้ว **ไม่มีผล** กับระบบที่ใช้งานอยู่ และข้อมูลจะหายเมื่อ refresh
+## How content gets in
 
-**ทิศทางการ sync:** `for deploy team/` คือแหล่งความจริงเสมอ — แก้ที่นั่นก่อน
-แล้วค่อย sync มาที่ `original script/` ไม่ใช่ทางกลับกัน
+Admins and editors add/edit meetings directly in-app ("＋ New meeting" / "✎ Edit here"). A private Google Sheet is the app's own database — **the Sheet is the single source of truth** (Google Docs are no longer read from). Fathom and Transkriptor recordings can also arrive automatically via webhook into their own inbox queues, for an admin to file into a project.
 
----
+## Devices
 
-## สิทธิ์การเข้าถึง
+Desktop, tablet and phone. The meeting document is a real A4 sheet, so on a
+narrower screen it is scaled to fit rather than cropped; on a tablet in
+portrait the meeting list moves behind a ☰ toggle to leave the page room to
+be read.
 
-**การอ่าน** ไม่ต้องล็อกอิน แต่เห็นได้แค่ไหนขึ้นกับโครงการ:
+## More detail
 
-- **🔓 Public** — ใครก็ตามที่เปิดลิงก์อ่านได้ทุกการประชุมในโครงการนั้น
-  ไม่ต้องล็อกอิน ไม่จำกัดโดเมนอีเมล
-- **🔒 Locked** — อ่านได้เฉพาะ admin, editor และ **อีเมลที่ระบุไว้เฉพาะเจาะจง**
-  โครงการที่ล็อกไว้ **ไม่ได้**เปิดให้พนักงาน `@vcb-con.com` ทุกคน
-  แต่เป็นรายชื่อที่กำหนดเอง
-
-**การแก้ไข** ต้องล็อกอินเสมอ — Google Sign-In หรืออีเมล + PIN 4 หลัก
-Editor แก้เนื้อหาได้ทุกโครงการ ส่วน admin จัดการสิทธิ์/โครงการ/สถานะซ่อน-ปักหมุดได้
-
-จัดการทั้งหมดที่ **ตั้งค่า → 🔐 Project access** (เฉพาะ admin)
-
----
-
-## ข้อมูลระบบ
-
-| | |
-|---|---|
-| **Script ID** | `1Ozxm34TQ4tIdwyr4dPPImwIeuGJpj9B53Zb0hl30MnR8tdeawb7KE6vf` |
-| **Deployment ID** | `AKfycbxJN7olKBYqGHlaWXiVOI41fh8oZJ9lRstXZAj1DFVeiynyvfBf48xaKX5p4D19rUnr` |
-| **เวอร์ชันล่าสุด** | `@220` |
-| **ฐานข้อมูล** | Google Sheet ส่วนตัว (สคริปต์เข้าถึงแทนเจ้าของ) |
-
----
-
-## เอกสาร
-
-| เอกสาร | เนื้อหา |
-|---|---|
-| [`for deploy team/README.md`](for%20deploy%20team/README.md) | วิธี deploy, ไฟล์แต่ละตัวทำอะไร, จุดที่พลาดบ่อย |
-| [`for deploy team/PAGINATION.md`](for%20deploy%20team/PAGINATION.md) | **อ่านก่อนแก้เรื่องการแสดงผล/พิมพ์/ตัวแก้ไขเอกสาร** |
-| [`original script/README.md`](original%20script/README.md) | วิธีรัน React, โครงสร้างไฟล์ |
-| [`original script/PORT_NOTES.md`](original%20script/PORT_NOTES.md) | ตารางเทียบ GAS↔React + สิ่งที่ยังไม่ port |
-
-เอกสารสถาปัตยกรรมและ CHANGELOG ฉบับเต็มอยู่ในโฟลเดอร์ต้นทางของ Apps Script
-(`PROJECT_SUMMARY.md`, `CHANGELOG.md`) ซึ่งไม่ได้ mirror มาที่นี่
+See [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for architecture, deployment notes, and how to maintain it.
+Before changing anything about how the document is displayed, printed or
+edited, read [PAGINATION.md](PAGINATION.md).

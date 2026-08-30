@@ -1,0 +1,393 @@
+/* Org chart tree — CSS Grid/flexbox layout with border-based tree guides,
+   not the original app's hand-measured getBoundingClientRect() connector
+   lines (see TreeNode.tsx's comment for why this port deliberately took a
+   different technical approach here while keeping the exact same data/
+   structure). Guides are drawn with plain borders on .tree-row's children
+   — they reflow automatically on any re-render, unlike the original's
+   imperative re-measure-after-every-change technique. */
+
+.org-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.org-view-toggle button {
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.org-view-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.tree-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tree-node-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.tree-node-btn:disabled {
+  cursor: default;
+}
+
+.tree-node-meta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.tree-node-offsite {
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+/* The tree guide: a vertical stem down from the parent, then a shared
+   horizontal bar across however many children there are (border-top on
+   the row), then a vertical drop into each child — three plain CSS
+   borders instead of measured absolute-positioned divs. */
+.tree-children {
+  position: relative;
+  padding-top: 20px;
+  margin-top: 4px;
+}
+
+.tree-children::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 20px;
+  border-left: 2px solid var(--tree-line);
+}
+
+.tree-row {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  padding-top: 20px;
+}
+
+.tree-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 0;
+  border-top: 2px solid var(--tree-line);
+}
+
+.tree-row > * {
+  position: relative;
+  padding-top: 20px;
+}
+
+.tree-row > *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 20px;
+  border-left: 2px solid var(--tree-line);
+}
+
+.person-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  max-width: 500px;
+  margin-top: 8px;
+}
+
+.person-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.person-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pill-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  text-align: left;
+}
+
+.person-avatar {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.person-name {
+  font-size: 0.78rem;
+}
+
+.person-role {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  padding: 4px 8px;
+}
+
+/* ---------- Project cards (matrix layout) ---------- */
+.project-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.project-pm-tag {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--pill-bg);
+  border: 1px solid var(--card-border-hover);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.project-groups {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.project-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.project-group-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.project-group-admin .project-group-label {
+  color: var(--accent);
+}
+
+.project-matrix-divider {
+  align-self: stretch;
+  width: 0;
+  border-left: 1px dashed var(--card-border-hover);
+}
+
+.project-dept {
+  background: var(--pill-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 6px 8px 8px;
+  margin-bottom: 6px;
+}
+
+.project-dept-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+/* ---------- Group Structure ---------- */
+.group-structure-frame {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.group-structure-label {
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  margin-bottom: 16px;
+}
+
+.group-shareholders {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.group-shareholder-box {
+  background: var(--pill-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 700;
+}
+
+.group-family-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 24px;
+}
+
+.group-entity-parent {
+  background: var(--card);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 380px;
+}
+
+.group-family-hover {
+  position: relative;
+}
+
+.group-family-btn {
+  background: var(--pill-bg);
+  border: 1px dashed var(--card-border-hover);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: default;
+}
+
+.group-family-tooltip {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  width: 220px;
+  font-size: 0.78rem;
+  box-shadow: var(--shadow-card-hover);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s;
+  z-index: 5;
+}
+
+.group-family-hover:hover .group-family-tooltip,
+.group-family-hover:focus-within .group-family-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.group-structure-branches {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.group-branch {
+  flex: 1;
+  min-width: 260px;
+}
+
+.group-branch-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.group-entity-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.group-entity-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 14px;
+  flex: 1 1 200px;
+}
+
+.group-jv-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.group-jv-card {
+  background: var(--pill-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.group-jv-code {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.group-jv-parents {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 780px) {
+  .tree-row {
+    flex-direction: column;
+    align-items: center;
+  }
+  .tree-row::before,
+  .tree-row > *::before {
+    display: none;
+  }
+  .project-groups {
+    flex-direction: column;
+  }
+  .project-matrix-divider {
+    display: none;
+  }
+}

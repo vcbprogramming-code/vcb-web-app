@@ -1,0 +1,2601 @@
+<style>
+  /* ---------- theme tokens (ported from VCB Connect) ---------- */
+  :root,
+  :root[data-theme="light"] {
+    --bg-0: #eef1f8;
+    --bg-1: #f7f8fc;
+    --sidebar-0: #0a1440;
+    --sidebar-1: #101c56;
+    --sidebar-text: #c7cdf0;
+    --sidebar-text-dim: #8992c4;
+    --sidebar-active: #1b2a72;
+    --accent: #3a5bff;
+    --accent-2: #5b7cff;
+    --accent-soft: rgba(58, 91, 255, 0.35);
+    --accent-glow: rgba(58, 91, 255, 0.55);
+    --text: #171b2e;
+    --text-dim: #666f9c;
+    --card: #ffffff;
+    --card-border: #e4e7f4;
+    --card-border-hover: #c3caf2;
+    --topbar-bg: rgba(255, 255, 255, 0.85);
+    --shadow-card: 0 1px 2px rgba(23, 27, 46, .04), 0 8px 24px rgba(23, 27, 46, .06);
+    --shadow-card-hover: 0 4px 10px rgba(23, 27, 46, .06), 0 16px 36px rgba(23, 27, 46, .10);
+    --pill-bg: #eef1fb;
+    --status-good: #16a34a;
+    --status-good-soft: #bdedd0;
+    --status-warn-soft: #ffdcb0;
+    /* Zone color system (org chart avatars — see .org-zone-* below):
+       blue (--accent, default) = Head Office, amber (--status-warn-soft) =
+       off-site/Project Sites, this = site Administration. Deliberately a
+       DIFFERENT green from --status-good/--status-good-soft, which this
+       app already uses everywhere else for "done/complete" (checklist
+       progress, the stepper) — reusing that exact color for "this person
+       is an Admin" would misread as a completion signal wherever an
+       Admin avatar happens to sit near real progress UI. */
+    --zone-admin: #0d9488;
+    --zone-admin-soft: #ccfbf1;
+    --tree-line: #9aa3d1;
+    color-scheme: light;
+
+    /* legacy tokens still referenced by section styles below — mapped onto the new palette */
+    --navy: var(--sidebar-0);
+    --navy-dark: var(--sidebar-0);
+    --gold: var(--accent);
+    --gold-light: var(--accent-2);
+    --teal: var(--accent);
+    --teal-dark: var(--accent-2);
+    --bg: var(--bg-0);
+    --panel: var(--pill-bg);
+    --ink: var(--text);
+    --ink-soft: var(--text-dim);
+    --border: var(--card-border);
+    --radius: 14px;
+    --maxw: 1520px;
+    --sidebar-w: 274px;
+  }
+  :root[data-theme="dark"] {
+    --bg-0: #02050d;
+    --bg-1: #061029;
+    --sidebar-0: #05070f;
+    --sidebar-1: #0a0f22;
+    --sidebar-text: #c9d6f0;
+    --sidebar-text-dim: #7686b3;
+    --sidebar-active: #16214a;
+    --accent: #4fd1ff;
+    --accent-2: #7ee8ff;
+    --accent-soft: rgba(79, 209, 255, 0.45);
+    --accent-glow: rgba(79, 209, 255, 0.75);
+    --text: #e6f3ff;
+    --text-dim: #93acce;
+    --card: rgba(15, 24, 48, 0.75);
+    --card-border: rgba(79, 209, 255, 0.16);
+    --card-border-hover: rgba(126, 232, 255, 0.5);
+    --topbar-bg: rgba(6, 12, 28, 0.85);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+    --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, .35), 0 16px 40px rgba(0, 0, 0, .4);
+    --pill-bg: rgba(79, 209, 255, 0.08);
+    --status-good: #34d399;
+    --status-good-soft: rgba(52, 211, 153, 0.22);
+    --status-warn-soft: rgba(255, 176, 74, 0.22);
+    --zone-admin: #2dd4bf;
+    --zone-admin-soft: rgba(45, 212, 191, 0.22);
+    --tree-line: rgba(147, 172, 206, 0.6);
+    color-scheme: dark;
+
+    --navy: var(--sidebar-0);
+    --navy-dark: var(--sidebar-0);
+    --gold: var(--accent);
+    --gold-light: var(--accent-2);
+    --teal: var(--accent);
+    --teal-dark: var(--accent-2);
+    --bg: var(--bg-0);
+    --panel: var(--pill-bg);
+    --ink: var(--text);
+    --ink-soft: var(--text-dim);
+    --border: var(--card-border);
+  }
+
+  * { box-sizing: border-box; }
+  /* Apps Script always serves this page inside Google's own sandboxed
+     iframe wrapper (script.google.com/.../exec), which we can't reach or
+     restyle from here. width:100% + overflow-x:hidden + no inherited
+     rounding gap from min-height:100vh (using height:100% instead, tied
+     to the iframe's own exact box) is a defensive measure against a thin
+     background sliver appearing along an edge — closes it in the cases
+     that ARE under our control (our own box sizing), though a gap coming
+     from Google's outer wrapper itself is not something CSS here can fix. */
+  html, body {
+    /* height:100% (rather than min-height) combined with overflow-x:hidden
+       makes body its own clipped scroll container: on a phone the document
+       is pinned to exactly one viewport and the page cannot scroll at all,
+       so everything below the fold is unreachable. min-height alone lets
+       the document grow to its content and scroll normally. */
+    margin: 0; padding: 0; width: 100%; min-height: 100vh;
+    overflow-x: hidden;
+    background: var(--bg-0);
+    color: var(--text);
+    font-family: 'Inter', 'Noto Sans Thai', 'Leelawadee UI', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+    transition: background-color .15s, color .15s;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+
+  .skip-link {
+    position: absolute; left: -999px; top: 0;
+    background: var(--accent); color: #fff; padding: 8px 14px; z-index: 999;
+  }
+  .skip-link:focus { left: 8px; top: 8px; }
+
+  /* ---------- app shell: fixed sidebar + full-width content ---------- */
+  .shell { display: flex; min-height: 100vh; }
+
+  /* ---------- sidebar ---------- */
+  aside.sidebar {
+    flex: 0 0 var(--sidebar-w); width: var(--sidebar-w);
+    background: linear-gradient(180deg, var(--sidebar-1), var(--sidebar-0));
+    color: var(--sidebar-text);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  .sidebar-close {
+    display: none;
+    align-items: center; justify-content: center;
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: none; color: #cfd5e0;
+    cursor: pointer; padding: 6px;
+    z-index: 2;
+  }
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 12px;
+    padding: 22px 20px 18px;
+  }
+  .sidebar-brand-name {
+    font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: .06em;
+    font-size: 13px; color: #fff; line-height: 1.2; display: block;
+  }
+  .sidebar-brand-sub {
+    font-size: 10px; letter-spacing: .1em; color: var(--sidebar-text-dim);
+    margin-top: 3px; display: block;
+  }
+
+  /* ---------- vertical journey stepper (replaces the flat nav list) ---------- */
+  /* Whole 90-day journey as one linear path — Pre-boarding, Required Documents,
+     Department Selection, the 3 phases, Completion — each node connected by a
+     continuous line running top to bottom so the employee can see exactly
+     where they are at a glance, not just what pages exist. */
+  .sidebar-progress { flex: 1; padding: 10px 8px 20px; overflow-y: auto; }
+  .stepper { display: flex; flex-direction: column; }
+  /* Wraps one phase's stepper-row plus its Reading/Knowledge/Outputs
+     sub-rows (if any). The connecting line lives here, not on
+     .stepper-row, so it spans the wrapper's full height — row + sub-rows
+     — and keeps running continuously down to the next item's dot instead
+     of stopping short at the row's own bottom edge. */
+  .stepper-item { position: relative; }
+  .stepper-item.last .stepper-line { display: none; }
+  .stepper-row {
+    position: relative; display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 10px 10px 4px; text-decoration: none; color: var(--sidebar-text-dim);
+    border-radius: 8px; cursor: default;
+  }
+  .stepper-item:not(:last-child) { padding-bottom: 12px; }
+  a.stepper-row { cursor: pointer; }
+  a.stepper-row:hover { background: rgba(255,255,255,.05); }
+  /* left must equal .stepper-row's own left padding (4px, see above) plus
+     half the dot's width (26px / 2 = 13px), minus half this line's own
+     width (2px / 2 = 1px) — i.e. the dot's true horizontal CENTER, not a
+     separately eyeballed value. This was off by a few px (previously
+     19px against the dot's real 16px center), which read as the line
+     joining the dot slightly off-axis instead of running straight through
+     its middle — reported directly ("the lines... are not centered from
+     the circle"). 4 + 13 - 1 = 16. */
+  .stepper-line {
+    position: absolute; left: 16px; top: 28px; bottom: -12px; width: 2px;
+    background: rgba(255,255,255,.12);
+  }
+  .stepper-item.done .stepper-line { background: var(--status-good); }
+  .stepper-dot {
+    position: relative; z-index: 1; flex: none;
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    background: rgba(255,255,255,.08); color: var(--sidebar-text-dim);
+    border: 2px solid rgba(255,255,255,.12);
+  }
+  .stepper-row.done .stepper-dot { background: var(--status-good); border-color: var(--status-good); color: #05070f; }
+  .stepper-row.done .stepper-dot .icon { width: 13px; height: 13px; }
+  .stepper-row.current .stepper-dot { background: var(--accent); border-color: var(--accent-2); color: #fff; }
+  .stepper-label {
+    padding-top: 3px; font-size: 13px; line-height: 1.35;
+  }
+  .stepper-row.current { color: #fff; }
+  .stepper-row.current .stepper-label { font-weight: 700; }
+  .stepper-row.done .stepper-label { color: var(--sidebar-text); }
+
+  /* Completion IS a real clickable link now (it navigates to the dedicated
+     PAGES['completion'] page, see getJourneySteps in progress.html) —
+     still gold instead of the regular green "done" so it visually reads
+     as "you finished" rather than blending in as just one more completed
+     step. .current stacks on top of .completion-done (see
+     renderSidebarProgress) while the employee is actually ON that page —
+     specificity-wise this rule still wins over .stepper-row.current's own
+     blue dot color (same specificity, declared later), so the gold
+     "you're finished" read stays intact even while also marked current. */
+  .stepper-row.completion-done .stepper-dot { background: #d4a72c; border-color: #d4a72c; color: #05070f; }
+  .stepper-item.completion-done .stepper-line { background: #d4a72c; }
+  .stepper-row.completion-done .stepper-label { color: #e8c766; font-weight: 700; }
+
+  /* Reading / Knowledge / Outputs sub-rows under a phase's stepper row —
+     abbreviated labels for each of that phase's 3 checklist blocks (see
+     getJourneySteps in progress.html), smaller and indented past the main
+     dot column so they read as detail nested under the phase, not peers
+     of it. Each is independently clickable/deep-linkable once the phase
+     itself is unlocked. */
+  .stepper-substeps {
+    display: flex; flex-direction: column; gap: 2px;
+    margin: 6px 0 0 38px; position: relative; z-index: 1;
+  }
+  .stepper-substep {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px; border-radius: 6px; text-decoration: none;
+    color: var(--sidebar-text-dim); font-size: 11.5px;
+  }
+  .stepper-substep:hover { background: rgba(255,255,255,.05); color: var(--sidebar-text); }
+  .stepper-substep-dot {
+    flex: none; width: 14px; height: 14px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+  }
+  .stepper-substep-dot .icon { width: 9px; height: 9px; }
+  .stepper-substep.done .stepper-substep-dot { background: var(--status-good); border-color: var(--status-good); color: #05070f; }
+  .stepper-substep.done { color: var(--sidebar-text); }
+
+  .menu-toggle {
+    display: none;
+    align-items: center; justify-content: center;
+    position: fixed; top: 14px; left: 14px; z-index: 120;
+    background: var(--sidebar-0); border: 1px solid rgba(255,255,255,0.2); color: #fff;
+    border-radius: 8px; padding: 9px; cursor: pointer;
+  }
+
+  .sidebar-scrim { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 99; }
+
+  .sidebar-foot {
+    padding: 14px 20px 18px; font-size: 10.5px; letter-spacing: .06em;
+    color: var(--sidebar-text-dim); border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  @media (max-width: 980px) {
+    .menu-toggle { display: flex; }
+    aside.sidebar {
+      /* The desktop entry fade (.sidebar { animation: app-enter ... both })
+         animates `transform` and uses fill-mode `both`, so its final
+         `transform: none` keeps winning over the translateX below for as
+         long as it applies — pinning the drawer on-screen at x:0, covering
+         the content, with no way to dismiss it. A running animation's
+         value beats a plain declaration, so this must be cancelled rather
+         than overridden. The fade is a desktop nicety anyway; the drawer
+         has its own slide transition. */
+      animation: none;
+      transform: translateX(-100%); transition: transform .2s ease;
+      box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+    }
+    aside.sidebar.open { transform: translateX(0); }
+    .sidebar-close { display: flex; }
+    .sidebar-scrim.open { display: block; }
+    .main { margin-left: 0 !important; }
+
+    /* Cap the drawer to the phone's width. Uses percentages, NOT vw: this
+       app is served inside the Apps Script sandbox iframe, where vw units
+       resolve against a viewport that does not reliably match the visible
+       frame, and an earlier attempt using min(86vw, 320px) mis-sized here
+       even though it measured correctly in a local harness. max-width in %
+       resolves against the containing block, which is correct in both. */
+    /* The sidebar is position:fixed with an explicit width:var(--sidebar-w),
+       so a max-width alone does not shrink it — the width itself has to be
+       overridden. Percentages resolve against the viewport for a fixed
+       element, which is what we want, and unlike vw they behave correctly
+       inside the Apps Script sandbox iframe. */
+    aside.sidebar { width: 86%; flex-basis: 86%; max-width: 320px; }
+
+    /* .menu-toggle is position:fixed at z-index 120 — ABOVE the sidebar's
+       z-index 100 — so without this it stays painted on top of the opened
+       drawer, overlapping the brand name (there is already a .sidebar-close
+       inside the drawer for closing it). */
+    body.nav-open .menu-toggle { display: none; }
+
+    /* NOTE: do NOT add `body.nav-open { overflow: hidden }` here as a
+       scroll lock. `html, body` are set to height:100% near the top of this
+       file, so overflow:hidden on body clips the whole document to a single
+       viewport — the page renders blank/frozen rather than merely locked,
+       and it does not restore reliably. This was tried once and reverted
+       after it broke the live app on mobile. */
+
+    /* Group Structure: the base rule pins each segment to min-width:456px
+       (deliberately — it prevents a wrap that previously drew "disjointed"
+       connector lines, see the comment above that rule). Two segments plus
+       the gap is ~950px, so between 481px and 980px they could not sit
+       side by side; flex-wrap let them wrap to separate lines at squeezed
+       widths (~342px each at 768px), which is the very wrap that rule
+       exists to prevent. Stacking them explicitly at full width instead
+       keeps each segment whole and its connectors correct.
+       (Measured, not inferred: an earlier version of this comment claimed
+       the overflow was clipped and unreachable via html/body's
+       overflow-x:hidden. Rendering it showed the segments wrapped and
+       shrank instead — no clipping. Verify layout claims here by
+       measuring, per the discipline in docs/KNOWN_ISSUES.md.) */
+    .group-structure-branches { flex-direction: column; }
+    .group-structure-branches .org-segment { min-width: 0; width: 100%; }
+  }
+
+  /* ---------- main column ---------- */
+  .main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; margin-left: var(--sidebar-w); }
+
+  /* ---------- settings button ---------- */
+  /* Positioned inside the hero banner's own top-right corner with equal
+     inset from the top and the side. The hero now sits flush against
+     .main's edges (see .hero below), so the inset is just the banner's
+     own 20px padding from its top-right corner.
+     .settings-wrap-floating.settings-wrap (both classes on one selector) so
+     this beats the plain .settings-wrap{position:relative} rule below
+     regardless of source order — two classes outrank one in specificity. */
+  .settings-wrap.settings-wrap-floating {
+    position: absolute; top: 20px; right: 20px; z-index: 20;
+  }
+  .icon-btn {
+    background: var(--pill-bg); border: 1px solid var(--card-border); color: var(--text-dim);
+    width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--card-border-hover); }
+
+  /* ---------- settings dropdown ---------- */
+  .settings-wrap { position: relative; }
+  .settings-menu {
+    display: none;
+    position: absolute; top: calc(100% + 8px); right: 0; width: 240px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 14px;
+    box-shadow: var(--shadow-card-hover); padding: 8px; z-index: 30;
+  }
+  .settings-menu.open { display: block; }
+  .settings-section {
+    padding: 8px 10px 4px; font-size: 10.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 10px 8px; }
+  .settings-divider { height: 1px; background: var(--card-border); margin: 6px 4px; }
+  /* Entry point into the admin checklist editor (?page=admin) — plain
+     navigation link styled to match the rest of the settings menu, not a
+     toggle like language/theme above it, so it's deliberately NOT inside
+     its own .settings-row (which is a flex row meant for paired
+     controls). Always visible to anyone who opens Settings (explicit
+     choice over hiding it behind a secret trigger) — the password gate on
+     the admin page itself is the actual access control, this is just
+     navigation. */
+  .settings-admin-link {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px;
+    color: var(--text-dim); font-size: 12.5px; font-weight: 600; text-decoration: none;
+    transition: background .15s, color .15s;
+  }
+  .settings-admin-link:hover { background: var(--pill-bg); color: var(--accent); }
+  .settings-admin-link .icon { width: 15px; height: 15px; flex: none; }
+  .seg { display: flex; background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 9px; padding: 2px; gap: 2px; }
+  .seg-btn {
+    display: flex; align-items: center; gap: 6px; justify-content: center;
+    border: none; background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600;
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; font-family: inherit;
+    transition: background .15s ease, color .15s ease;
+  }
+  .seg-btn.active { background: var(--card); color: var(--accent); box-shadow: var(--shadow-card); }
+  .seg-btn .icon { width: 14px; height: 14px; }
+
+  /* ---------- shared icon sizing ---------- */
+  /* icon() always renders <svg class="icon">; size context-specific instances
+     via the icon's own wrapper element, not by adding size classes to the svg. */
+  .icon { width: 18px; height: 18px; flex: none; display: block; }
+  .icon-btn .icon { width: 17px; height: 17px; }
+  .dept-icon-svg { width: 40px; height: 40px; color: var(--accent); }
+  .milestone-badge .icon { width: 30px; height: 30px; color: #fff; }
+  .stepper-dot .icon { width: 13px; height: 13px; }
+
+  .phase-lock-icon { display: inline-flex; }
+  .phase-lock-icon .icon { width: 16px; height: 16px; color: var(--text-dim); }
+  .doc-icon { display: inline-flex; }
+  .doc-icon .icon { width: 18px; height: 18px; color: var(--accent); }
+  .placeholder-icon { display: inline-flex; }
+  .placeholder-icon .icon { width: 28px; height: 28px; color: var(--text-dim); }
+  .reward-toast-icon { display: inline-flex; margin-right: 4px; vertical-align: middle; }
+  .reward-toast-icon .icon { width: 16px; height: 16px; }
+
+  /* ---------- content column: full-width, efficient use of space ---------- */
+
+  main#main-content { flex: 1; padding: 0 0 40px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative; min-height: 260px;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    color: #fff;
+    background: linear-gradient(rgba(5,7,15,0.65), rgba(5,7,15,0.65)), var(--sidebar-0) center/cover no-repeat;
+    padding: 48px 32px; margin: 0 0 24px;
+  }
+  .hero.has-photo { background-image: linear-gradient(rgba(5,7,15,0.55), rgba(5,7,15,0.55)), var(--hero-photo); background-size: cover; background-position: center; }
+  .hero-inner { max-width: 900px; }
+  .hero-eyebrow { text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem; color: var(--accent-2); font-weight: 700; margin-bottom: 10px; }
+  .hero h1 { font-family: 'Orbitron', sans-serif; font-size: 2.1rem; margin: 0 0 14px; color: #fff; line-height: 1.3; font-weight: 700; }
+  .hero .subtitle { font-size: 1.05rem; color: #fff; font-weight: 600; margin: -6px 0 14px; }
+  .hero .lead { font-size: 1rem; color: #dfe6ff; max-width: 760px; line-height: 1.6; margin: 0 auto; }
+  .hero .note {
+    /* Always a near-white card regardless of theme, so its text must
+       always be dark too — using var(--text) here was the bug: in dark
+       mode --text is near-white (#e6f3ff), landing near-white text on a
+       near-white background and making it almost unreadable. */
+    margin: 14px auto 0; font-size: 0.9rem; color: #171b2e;
+    background: rgba(255,255,255,0.96); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 8px;
+    max-width: 760px; text-align: left; box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  }
+  .hero .cta {
+    display: inline-block; margin-top: 20px;
+    background: var(--accent); color: #fff; font-weight: 700;
+    padding: 12px 26px; border-radius: 999px; font-size: 0.92rem;
+    box-shadow: 0 6px 16px var(--accent-soft);
+  }
+  .hero .cta:hover { filter: brightness(1.08); }
+
+
+  .overall-progress-wrap:not(:empty) { margin: 14px 28px 24px; }
+  .overall-progress {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 20px 24px; text-align: left;
+  }
+  .overall-progress-head { display: flex; justify-content: space-between; align-items: baseline; color: var(--text); font-weight: 700; font-size: 0.95rem; margin-bottom: 10px; }
+  .overall-progress .progress-bar-track { background: var(--pill-bg); }
+  .overall-progress-sub { color: var(--text-dim); font-size: 0.8rem; margin-top: 6px; }
+  .overall-progress p { color: var(--text-dim); margin: 0 0 12px; text-align: center; }
+  .overall-progress-btn { max-width: 220px; margin: 0 auto; display: block; }
+
+  /* ---------- Sections: full-width, efficient grid use ---------- */
+  section.block { margin: 0; padding: 8px 28px 28px; scroll-margin-top: 84px; }
+  section.block.centered { text-align: center; }
+  /* Milestone band: used for the single highest-stakes decision in
+     pre-boarding (Department Selection) — needs to visually outweigh a
+     plain content section, not blend into the page background. */
+  section.block.band-teal {
+    background: linear-gradient(180deg, var(--accent-soft), transparent 65%);
+    border-top: 1px solid var(--card-border);
+    border-bottom: 1px solid var(--card-border);
+    padding-top: 72px; padding-bottom: 80px; margin: 8px 0;
+    min-height: 90vh; display: flex; align-items: center;
+  }
+  section.block.band-teal .section-inner { width: 100%; }
+  /* Light-touch band for the Completion page's feature grid — same soft
+     accent wash as band-teal so the "you're done" moment doesn't read as
+     flat gray-on-white, but without the full-viewport hero treatment
+     (min-height/huge padding) that band-teal uses for the Department
+     Selection decision moment; this section is a lower-stakes coda, not
+     another milestone choice. */
+  section.block.band-completion {
+    background: linear-gradient(180deg, var(--accent-soft), transparent 80%);
+    border-top: 1px solid var(--card-border);
+    padding-top: 40px; padding-bottom: 44px; margin: 8px 0 0;
+  }
+  .section-eyebrow {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent); margin-bottom: 8px; text-align: center;
+  }
+  section.block.band-teal h2 { font-size: 2rem; }
+  section.block h2 {
+    font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: var(--text); margin: 0 0 12px; font-weight: 700;
+  }
+  section.block.centered h2 { text-align: center; }
+  section.block .subheading { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 16px; }
+  section.block p { line-height: 1.7; color: var(--text); font-size: 0.97rem; }
+  .section-inner { width: 100%; max-width: var(--maxw); margin: 0 auto; }
+  .section-inner-narrow { max-width: 760px; margin: 0 auto; }
+
+  .quote-card {
+    max-width: 760px; margin: 0 auto; padding: 24px;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
+  .quote-portrait { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; margin: 0 auto 16px; border: 3px solid var(--accent-2); }
+  .quote-card blockquote { margin: 0; font-style: italic; font-size: 1.05rem; line-height: 1.7; color: var(--text); }
+  .quote-card cite { display: block; margin-top: 14px; font-style: normal; font-weight: 700; color: var(--text); }
+
+  .values-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; max-width: var(--maxw); margin: 0 auto; }
+  .value-icon { width: 96px; height: 96px; margin: 0 auto 14px; object-fit: contain; display: block; }
+  .value-card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 20px; text-align: center;
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .value-card:hover { box-shadow: var(--shadow-card-hover); border-color: var(--card-border-hover); }
+  .value-card h3 { margin: 0 0 8px; color: var(--text); font-size: 1.1rem; font-weight: 700; }
+  .value-card p { font-size: 0.85rem; margin: 0 0 8px; color: var(--text-dim); }
+  .value-card ul { margin: 0 0 8px; padding: 0; list-style: none; text-align: center; }
+  .value-card ul li { font-size: 0.85rem; color: var(--text); margin-bottom: 4px; line-height: 1.5; }
+  .value-card .footer-note { font-size: 0.85rem; font-weight: 400; color: var(--text); margin: 0; }
+  @media (max-width: 1100px) { .values-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .values-grid { grid-template-columns: 1fr; } }
+
+  .feature-card {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 24px;
+    max-width: var(--maxw); margin: 0 auto;
+  }
+  /* Base .feature-link — used standalone (e.g. "View Orientation Schedule",
+     rendered as a plain <p><a> outside any .feature-card/.feature-tile) as
+     well as inside those two containers, which override it below with a
+     lighter underline treatment that fits their card context better. Without
+     this base rule the standalone case had NO styling of its own at all and
+     inherited the surrounding muted body-text color — reading as plain gray
+     text, not a clickable link, despite being an important CTA. Styled as a
+     filled pill button (matching .next-phase) so it reads as clearly
+     actionable rather than a plain inline hyperlink. */
+  .feature-link {
+    display: inline-flex; align-items: center; gap: 8px; width: fit-content;
+    padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 0.9rem;
+    background: var(--accent); color: #fff; transition: filter .15s;
+  }
+  .feature-link:hover { filter: brightness(1.08); }
+  .feature-card .feature-text { text-align: center; }
+  .feature-card .feature-text h3 { margin: 10px 0; color: var(--text); font-weight: 700; font-size: 1.2rem; }
+  .feature-card .feature-text p { margin: 0 0 10px; font-size: 0.9rem; color: var(--text-dim); }
+  .feature-card .feature-link {
+    display: inline-block; width: auto; padding: 0; border-radius: 0;
+    background: none; color: var(--accent); font-weight: 600; font-size: 0.9rem;
+    border-bottom: 1px solid var(--accent); padding-bottom: 1px;
+  }
+  .feature-card img.content-image { border-radius: 12px; }
+  @media (max-width: 780px) { .feature-card { grid-template-columns: 1fr; } }
+  /* No photo (e.g. Company Structure — a conceptual link, not a photo
+     moment): collapse the two-column grid to one centered column instead
+     of leaving a blank second cell / stretching a mismatched image into
+     it. */
+  .feature-card.no-image {
+    grid-template-columns: 1fr; max-width: 640px; text-align: center;
+  }
+  .feature-card.no-image .feature-text h3 { font-size: 1.4rem; margin-top: 0; }
+
+  /* Whole-app entrance animation on first load. Pure CSS, no JS involved —
+     GAS inlines the entire document (all includes + scripts) as one blob
+     before the browser paints anything, so a JS-driven class removal (the
+     previous approach here) had no real "before paint" / "after paint" gap
+     to animate across and could resolve before the browser ever rendered
+     the pre-animation frame. A @keyframes animation that starts on element
+     paint has no such race: the browser always honors it regardless of how
+     fast or slow script execution around it is.
+     Sidebar leads, main content follows once the sidebar's motion is mostly
+     settled (rather than both starting together), and each top-level block
+     inside #app (hero, then each rendered section in turn) is staggered
+     after that so the page reads as one continuous cascade instead of a
+     single flat block fading in all at once. */
+  @keyframes app-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  .sidebar { animation: app-enter .55s ease both; }
+  .settings-wrap { animation: app-enter .55s ease both; animation-delay: .1s; }
+  /* #app's content is rebuilt on every page navigation (see renderPage in
+     app.html), not just first load — .app-enter is removed and re-added by
+     JS on each render (with a forced reflow in between) so the animation
+     replays every time instead of only once. Each direct child (.hero, each
+     .block section) gets its own staggered delay via nth-child so they
+     cascade one after another; capped at 8 explicit steps with a shared
+     fallback delay after that so a page with many sections doesn't end up
+     with the last ones absurdly delayed. */
+  #app.app-enter > * { animation: app-enter .5s ease both; animation-delay: .16s; }
+  #app.app-enter > *:nth-child(1) { animation-delay: .16s; }
+  #app.app-enter > *:nth-child(2) { animation-delay: .24s; }
+  #app.app-enter > *:nth-child(3) { animation-delay: .32s; }
+  #app.app-enter > *:nth-child(4) { animation-delay: .40s; }
+  #app.app-enter > *:nth-child(5) { animation-delay: .48s; }
+  #app.app-enter > *:nth-child(6) { animation-delay: .56s; }
+  #app.app-enter > *:nth-child(7) { animation-delay: .64s; }
+  #app.app-enter > *:nth-child(n+8) { animation-delay: .7s; }
+  @media (prefers-reduced-motion: reduce) {
+    /* This kills the ENTRY ANIMATION only. `.sidebar` must NOT get
+       `transform: none !important` here: below 980px the mobile drawer is
+       positioned off-screen with `transform: translateX(-100%)`, and an
+       !important override cancels that positioning outright — leaving the
+       drawer stuck open over the content, unclosable, on any phone with
+       "Reduce Motion" enabled. The animation-suppression intent is served
+       by `animation`/`opacity` alone; the drawer's own slide transition is
+       already handled by the reduced-motion rule further down this file. */
+    .sidebar, .settings-wrap, #app.app-enter > * { animation: none !important; opacity: 1 !important; }
+    .settings-wrap, #app.app-enter > * { transform: none !important; }
+  }
+
+  /* Two feature tiles side by side (image on top, text below), e.g. Meet Our
+     Team / Life on Site on the Completion page — instead of stretching to
+     the page's full content width (var(--maxw), 1520px), which read as
+     oversized/stray with only two tiles in the row. 920px keeps each tile a
+     sensible card width (~450px) and keeps the pair visually centered and
+     symmetrical rather than spanning edge to edge. */
+  .feature-grid {
+    display: grid; grid-template-columns: repeat(var(--feature-grid-cols, 2), 1fr); gap: 20px;
+    max-width: 920px; margin: 0 auto;
+  }
+  .feature-tile {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); overflow: hidden;
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .feature-tile:hover { box-shadow: var(--shadow-card-hover); border-color: var(--card-border-hover); }
+  .feature-tile img.content-image { border-radius: 0; max-height: 260px; }
+  .feature-tile-text { text-align: center; padding: 18px 20px 22px; }
+  .feature-tile-text h3 { margin: 0 0 10px; color: var(--text); font-weight: 700; font-size: 1.15rem; }
+  .feature-tile-text p { margin: 0 0 10px; font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
+  /* No-photo tile (e.g. a "Your Documents" utility card in a photo-led
+     grid) — an icon badge stands in for the missing image instead of
+     leaving a blank top section or stretching an unrelated photo in. */
+  .feature-tile-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; margin: 28px auto 0; border-radius: 50%;
+    background: var(--pill-bg); color: var(--accent);
+  }
+  .feature-tile-icon .icon { width: 26px; height: 26px; }
+  .feature-tile.no-image .feature-tile-text { padding-top: 14px; }
+  /* Overrides the base .feature-link pill (filled background, white text —
+     see .feature-link above) back down to a plain underlined link for this
+     card context, matching .feature-card .feature-link's own reset just
+     below. background was missing here specifically: the base rule's
+     background:var(--accent) survived untouched while only color got
+     overridden to var(--accent) too, so the button rendered as
+     accent-on-accent — text and background the exact same blue, invisible
+     regardless of theme or language (confirmed via computed styles: both
+     color and background-color resolved to the identical rgb value). */
+  .feature-tile-text .feature-link {
+    display: inline-block; width: auto; padding: 0; border-radius: 0;
+    background: none; font-weight: 600; color: var(--accent);
+    border-bottom: 1px solid var(--accent); padding-bottom: 1px; font-size: 0.9rem;
+  }
+  @media (max-width: 980px) { .feature-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+  @media (max-width: 780px) { .feature-grid { grid-template-columns: 1fr !important; } }
+
+  .external-cta-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+  .external-cta-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 0.92rem;
+    padding: 13px 26px; border-radius: 999px; box-shadow: 0 6px 16px var(--accent-soft);
+    transition: filter .15s ease; border: none; cursor: pointer; font-family: inherit;
+  }
+  .external-cta-btn:hover { filter: brightness(1.08); }
+  .external-cta-btn .icon { width: 16px; height: 16px; }
+  .external-cta-btn.secondary {
+    background: transparent; color: var(--accent); box-shadow: none;
+    border: 1px solid var(--card-border);
+  }
+  .external-cta-btn.secondary:hover { filter: none; border-color: var(--card-border-hover); }
+
+  .content-image { width: 100%; max-height: 420px; border-radius: 12px; border: 1px solid var(--card-border); object-fit: cover; }
+  /* Square-ish (not a short fixed height) — a short fixed height on a wide
+     grid column is what gave a single landscape jobsite photo the
+     "pancake" look when it was the only image in its own gallery section
+     (stretched edge to edge, barely any height). object-fit:cover crops
+     to fill the square without stretching, same as before. */
+  .gallery-grid .content-image { aspect-ratio: 1 / 1; height: auto; min-height: 0; max-height: none; }
+  .erp-flow-photo { max-height: 480px; object-fit: contain; background: #fff; padding: 8px; border-radius: 12px; }
+
+  /* ---------- Rotating carousel ---------- */
+  /* Shows --carousel-visible slides side by side (3 on desktop — see
+     CAROUSEL_VISIBLE_COUNT in app.html) instead of one full-bleed image at
+     a time. .carousel-viewport clips to exactly that many slide-widths;
+     .carousel-track is a flex row of ALL slides that slides left/right by
+     one slide-width per step via translateX (see initCarousels). Each
+     .carousel-slide is sized to 100/--carousel-visible % so exactly
+     --carousel-visible of them ever fit in the viewport at once.
+     .carousel-static (<= --carousel-visible slides total, e.g. exactly the
+     3 Track Record photos) skips the viewport/clipping/controls entirely
+     and just lays the slides out in a plain row — nothing to scroll to. */
+  .carousel {
+    position: relative; max-width: var(--maxw); margin: 0 auto;
+  }
+  .carousel-viewport { overflow: hidden; border-radius: var(--radius); }
+  .carousel-track {
+    display: flex; transition: transform .5s ease;
+  }
+  .carousel-static .carousel-track { gap: 12px; }
+  .carousel-slide {
+    position: relative; flex: 0 0 calc(100% / var(--carousel-visible));
+    height: 260px; overflow: hidden;
+  }
+  .carousel-static .carousel-slide {
+    border-radius: var(--radius); box-shadow: var(--shadow-card);
+    background: var(--card); border: 1px solid var(--card-border);
+  }
+  .carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .carousel-caption {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px;
+    background: linear-gradient(0deg, rgba(2,5,13,0.75), transparent);
+    color: #fff; font-weight: 600; font-size: 0.85rem;
+  }
+  .carousel-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(2,5,13,0.5); border: 1px solid rgba(255,255,255,0.25); color: #fff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: background .15s ease; z-index: 2;
+  }
+  .carousel-arrow:hover { background: rgba(2,5,13,0.72); }
+  .carousel-arrow.next { right: 14px; }
+  @media (max-width: 720px) {
+    .carousel-slide { flex-basis: 100%; height: 220px; }
+    .carousel:not(.carousel-static) { --carousel-visible: 1 !important; }
+  }
+  @media (prefers-reduced-motion: reduce) { .carousel-track { transition: none; } }
+
+  /* ---------- ERP flow diagram ---------- */
+  .erp-diagram { background: var(--sidebar-0); border-radius: var(--radius); padding: 20px; margin-top: 16px; overflow-x: auto; }
+  .erp-diagram-title { color: var(--accent-2); font-weight: 700; font-size: 0.95rem; text-align: center; margin-bottom: 16px; letter-spacing: 0.02em; }
+  .erp-grid { display: flex; flex-direction: column; gap: 8px; min-width: 720px; }
+  .erp-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .erp-node { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 8px 6px; text-align: center; color: #dfe3ec; }
+  .erp-node-label { font-size: 0.72rem; font-weight: 700; line-height: 1.25; }
+  .erp-node-tag { font-size: 0.6rem; color: #9aa4c0; margin-top: 3px; }
+  .erp-empty { background: none; border: none; }
+  .erp-node.erp-highlight { background: var(--accent); border-color: var(--accent-2); color: #fff; box-shadow: 0 0 0 2px var(--accent-soft); }
+  .erp-node.erp-highlight .erp-node-tag { color: rgba(255,255,255,0.85); }
+  @media (max-width: 720px) { .erp-row { grid-template-columns: repeat(3, 1fr); } }
+
+  .placeholder-box {
+    background: var(--pill-bg); border: 2px dashed var(--card-border); border-radius: var(--radius);
+    min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 0.85rem; gap: 8px; text-align: center; padding: 12px;
+  }
+
+  ul.plain-list { padding-left: 20px; text-align: left; display: inline-block; }
+  ul.plain-list li { margin-bottom: 8px; line-height: 1.6; font-size: 0.95rem; }
+  .list-intro { margin-bottom: 10px; }
+  .list-footer {
+    margin-top: 14px; font-weight: 600; color: var(--text); font-size: 0.95rem; font-style: italic;
+    background: var(--card); border: 1px solid var(--card-border); border-left: 4px solid var(--accent);
+    padding: 14px 18px; border-radius: var(--radius); box-shadow: var(--shadow-card);
+  }
+
+  .doclist-intro { margin-bottom: 14px; color: var(--text-dim); }
+  /* 4-column document grid, each card stacking: open-link row + a completion
+     row (upload button and/or manual tick) so progress is visible per document
+     rather than only inferred from having clicked the placeholder link. */
+  /* 2 columns x 4 rows for the 8 required documents — a single full-width
+     column made each card far wider than its (short, 1-2 line) title and
+     description needed, leaving a lot of dead horizontal space. */
+  .doc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: var(--maxw); margin: 0 auto; }
+  @media (max-width: 720px) { .doc-grid { grid-template-columns: 1fr; } }
+
+  .doc-card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    box-shadow: var(--shadow-card); overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .doc-card:hover { border-color: var(--card-border-hover); box-shadow: var(--shadow-card-hover); }
+  .doc-card.is-done { border-color: var(--status-good); }
+  /* text-align:left is explicit, not the default, because .doclist's parent
+     section is .centered (text-align:center) by default — without
+     overriding it here, .doc-title/.doc-desc inherited that centering while
+     .doc-icon stayed pinned to the left edge by the flex layout, so each
+     card's title started at a different x-position depending on how long
+     that title's text was (a short one-line title looked roughly centered,
+     a longer one that wrapped looked ragged) instead of every title
+     starting at the same left edge next to the icon. */
+  .doc-link {
+    display: flex; align-items: flex-start; gap: 10px; text-align: left;
+    padding: 18px 20px; font-weight: 600; font-size: 0.92rem; color: var(--text);
+  }
+  .doc-link-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .doc-desc { font-weight: 400; font-size: 0.82rem; line-height: 1.5; color: var(--text-dim); }
+  .doc-arrow { margin-left: auto; color: var(--accent); flex: none; }
+
+  /* Standalone placeholder link (e.g. "View Orientation Schedule") used
+     outside a .doc-card — needs its own contained, centered card look,
+     since .doc-link alone has no background/border of its own anymore. */
+  .doc-link-standalone {
+    display: flex; align-items: center; gap: 10px;
+    max-width: 420px; margin: 14px auto 0;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 14px 18px; font-weight: 600; font-size: 0.88rem; color: var(--text);
+    box-shadow: var(--shadow-card);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .doc-link-standalone:hover { border-color: var(--card-border-hover); box-shadow: var(--shadow-card-hover); }
+  .doc-link-standalone .doc-arrow { margin-left: auto; color: var(--accent); flex: none; }
+  .doc-card-status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 16px 20px; border-top: 1px solid var(--card-border);
+    background: var(--pill-bg);
+  }
+  .doc-check {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-size: 0.78rem; color: var(--text-dim); user-select: none;
+  }
+  .doc-check input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--status-good); cursor: pointer; }
+  /* Download sits between Complete and Upload — same pill-button look as
+     Upload, but margin-left:auto stays on Upload alone (the last button in
+     the row) so it's the one that gets pushed to the far right; Download
+     just flows inline next to it. */
+  .doc-download-btn, .doc-upload-btn {
+    display: flex; align-items: center; gap: 5px;
+    background: none; border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 5px 10px; font-size: 0.75rem; font-weight: 600; color: var(--text-dim); cursor: pointer;
+    font-family: inherit; transition: border-color .15s, color .15s;
+  }
+  .doc-upload-btn { margin-left: auto; }
+  .doc-download-btn:hover, .doc-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .doc-download-btn .icon, .doc-upload-btn .icon { width: 13px; height: 13px; }
+  .doc-upload-btn.is-uploading { opacity: 0.6; pointer-events: none; }
+  .doc-card.is-done .doc-check { color: var(--status-good); font-weight: 600; }
+
+  .deptgrid-intro {
+    max-width: 680px; margin: 0 auto 40px; text-align: center;
+    color: var(--text-dim); font-size: 1.02rem; line-height: 1.7;
+  }
+  /* All 5 stay on one row — narrower columns than a 3-across layout, but
+     each card still carries a number badge, description, "Led by" line,
+     focus line, and CTA, just stacked more tightly than before. */
+  .dept-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px;
+    max-width: var(--maxw); margin: 0 auto;
+  }
+  .dept-card {
+    position: relative; display: flex; flex-direction: column; background: var(--card);
+    border: 1px solid var(--card-border); border-radius: var(--radius); overflow: hidden;
+    text-align: center; height: 100%;
+    box-shadow: var(--shadow-card); transition: box-shadow .18s, border-color .18s, transform .18s;
+  }
+  .dept-card:hover { box-shadow: var(--shadow-card-hover); border-color: var(--accent); transform: translateY(-4px); }
+  .dept-card-num {
+    position: absolute; top: 10px; left: 12px; font-family: 'Orbitron', sans-serif;
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; color: var(--text-dim); opacity: 0.55;
+  }
+  .dept-card-icon {
+    display: flex; align-items: center; justify-content: center; width: 100%; height: 118px; flex: none;
+    font-size: 2.2rem; background: var(--pill-bg);
+  }
+  .dept-card-icon .dept-icon-svg { width: 46px; height: 46px; }
+  .dept-card-label {
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 700;
+    font-size: 0.9rem; line-height: 1.3; padding: 13px 10px; white-space: normal; word-break: break-word;
+  }
+  .dept-card:hover .dept-card-label { filter: brightness(1.08); }
+  .dept-card-desc {
+    padding: 13px 14px 4px; font-size: 0.76rem; line-height: 1.5; color: var(--text-dim);
+  }
+  .dept-card-meta {
+    flex: 1; display: flex; flex-direction: column; gap: 8px;
+    margin: 12px 14px 0; padding-top: 12px; border-top: 1px solid var(--card-border);
+    text-align: left;
+  }
+  .dept-card-lead, .dept-card-focus {
+    display: flex; flex-direction: column; gap: 2px; font-size: 0.72rem; color: var(--text); line-height: 1.35;
+  }
+  .dept-card-lead-label, .dept-card-focus-label {
+    font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent);
+  }
+  .dept-card-cta {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    margin: 14px 14px 16px; padding: 9px 10px; border-radius: 999px;
+    background: var(--pill-bg); color: var(--accent); font-weight: 700; font-size: 0.7rem;
+    transition: background .18s, color .18s;
+  }
+  .dept-card-cta .icon { width: 12px; height: 12px; }
+  .dept-card:hover .dept-card-cta { background: var(--accent); color: #fff; }
+  .deptgrid-footer {
+    max-width: 680px; margin: 36px auto 0; text-align: center;
+    color: var(--text-dim); font-size: 0.85rem; font-style: italic; line-height: 1.6;
+  }
+  @media (max-width: 1300px) { .dept-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 780px) { .dept-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .dept-grid { grid-template-columns: 1fr; } }
+
+  .phase-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px;
+    max-width: var(--maxw); margin: 0 auto;
+  }
+  .phase-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--card); border: 1px solid var(--card-border); border-left: 4px solid var(--accent);
+    border-radius: 12px; padding: 18px; font-weight: 700; color: var(--text); font-size: 0.95rem;
+    box-shadow: var(--shadow-card);
+  }
+  a.phase-card:hover { border-left-color: var(--accent-2); box-shadow: var(--shadow-card-hover); }
+  /* Phase by phase (see 'phaselinks' in app.html): .done (already
+     completed) gets a green check, .current (unlocked, the one to do now)
+     is the normal clickable look above, .locked (its prerequisite phase
+     isn't done yet) is dimmed with a lock icon — but still a real link, so
+     it can always be opened and read; only that phase's own checkboxes are
+     disabled once you're on the page (see .check-item.locked below). */
+  .phase-card.done { border-left-color: var(--status-good); }
+  .phase-card.done .phase-card-icon { color: var(--status-good); }
+  .phase-card.locked {
+    background: var(--pill-bg); border-left-color: var(--card-border); color: var(--text-dim);
+    box-shadow: none;
+  }
+  .phase-card.locked .phase-card-icon { color: var(--text-dim); }
+  .phase-card-icon .icon { width: 18px; height: 18px; display: block; }
+  /* .current — the phase page actually being viewed right now (see
+     renderPhaseTrail in app.html), distinct from .done (finished, possibly
+     including the one you're currently revisiting) and plain unlocked
+     (reachable but not where you are). Filled with the accent color rather
+     than just an outline so "you are here" reads at a glance in a row where
+     every other state is a light card. */
+  .phase-card.current {
+    background: var(--accent); border-left-color: var(--accent); color: #fff; cursor: default;
+  }
+
+  /* .next-up — the phase that just became reachable because the one being
+     viewed was completed (see renderPhaseTrail in app.html). It sits
+     between .locked (can't go yet) and plain unlocked (could go, no
+     particular reason to), and marks the single most useful action on the
+     page at that moment. Accent-tinted outline + soft glow rather than a
+     solid fill, so it reads as "open, go here" without competing with
+     .current's solid "you are here". */
+  .phase-card.next-up {
+    border-color: var(--accent); border-left-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card);
+  }
+  a.phase-card.next-up:hover {
+    border-left-color: var(--accent-2);
+    box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card-hover);
+  }
+  .phase-card-nextup {
+    margin-left: auto; font-size: 0.68rem; font-weight: 800;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  /* The pulse draws the eye to a state that appears mid-page, without a
+     navigation to signal the change. Runs a few times and stops rather than
+     looping forever — a permanently animating element is a distraction to
+     read past, and this only needs to catch attention once. */
+  @media (prefers-reduced-motion: no-preference) {
+    .phase-card.next-up { animation: next-up-pulse 1.6s ease-out 3; }
+  }
+  @keyframes next-up-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card); }
+    50% { box-shadow: 0 0 0 7px var(--accent-soft), var(--shadow-card); }
+  }
+
+  /* Phase trail — the same phase-card/phase-grid look reused at the bottom
+     of every phase page (see renderPhaseTrail in app.html) instead of the
+     old two-link Back/Next pair, so all 3 phases (not just the adjacent
+     ones) are always visible and color-coded. Full-width/same size as the
+     department landing page's own phaselinks section (explicit request:
+     the two should look the same, not one shrunk down) — .phase-trail-grid
+     no longer overrides .phase-grid's own sizing, just adds the top spacing
+     needed for sitting inside the page-end .closing-line band. */
+  /* align-self:stretch on the .phase-grid overrides .closing-line's own
+     align-items:center, which otherwise shrinks its flex CHILDREN (this
+     .phase-grid included — .closing-line and .phase-trail-row are the same
+     element, not nested, so this class combo IS the flex container, and
+     .phase-grid is what needs stretching, not it) to their content width.
+     .phase-grid has its own max-width already (see .phase-grid above) so
+     this doesn't make it unbounded, just lets it actually reach that width
+     instead of collapsing to however wide its 3 cards happen to need. */
+  .phase-trail-row { padding-top: 24px; }
+  .phase-trail-row .phase-grid { align-self: stretch; width: 100%; }
+  /* "Back to Team" link above the phase pills (see renderPhaseTrail) — the
+     only way back to a department's Meet Your Supervisor / Department
+     Overview content from a phase page now that the level picker (and thus
+     any reason to keep a link there) moved off that landing page. */
+  .back-to-team-link {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px;
+    font-size: 0.85rem; font-weight: 600; color: var(--text-dim); transition: color .15s;
+  }
+  .back-to-team-link:hover { color: var(--accent); }
+
+  /* .next-phase — still used by the "You have completed all three phases"
+     closing link at the end of a department's final phase (data.closing.page
+     in renderPage, app.html), separate from the phase trail above. */
+  .next-phase {
+    display: flex; width: fit-content; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 0.9rem;
+    background: var(--accent); color: #fff;
+  }
+  .next-phase:hover { filter: brightness(1.08); }
+
+  .team-group { margin-bottom: 26px; }
+  .team-group h2 { font-size: 1.1rem; }
+  .team-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 14px; }
+
+  /* Flip card: .team-member is the 3D stage (perspective), the two
+     .team-member-face children are absolutely stacked and rotated opposite
+     ways so exactly one is ever facing the viewer. Hover/focus flips it for
+     mouse/keyboard users; .flipped (toggled by app.html's tap handler)
+     covers touch devices, which have no hover state to trigger this at all. */
+  .team-member {
+    position: relative; perspective: 800px; cursor: pointer;
+    border-radius: 12px; outline: none; height: 148px;
+  }
+  .team-member-face {
+    position: absolute; inset: 0; backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 14px; text-align: center; box-shadow: var(--shadow-card);
+    transition: transform .5s cubic-bezier(.4,.2,.2,1), border-color .18s, box-shadow .18s;
+  }
+  .team-member-front { position: relative; transform: rotateY(0deg); }
+  .team-member-back { transform: rotateY(180deg); }
+  .team-member:hover .team-member-face,
+  .team-member:focus-visible .team-member-face,
+  .team-member.flipped .team-member-face {
+    box-shadow: var(--shadow-card-hover); border-color: var(--accent);
+  }
+  .team-member:hover .team-member-front,
+  .team-member:focus-visible .team-member-front,
+  .team-member.flipped .team-member-front { transform: rotateY(-180deg); }
+  .team-member:hover .team-member-back,
+  .team-member:focus-visible .team-member-back,
+  .team-member.flipped .team-member-back { transform: rotateY(0deg); }
+  .team-member-name {
+    font-size: 0.88rem; font-weight: 600; color: var(--text); line-height: 1.3;
+  }
+  .team-avatar {
+    width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;
+    flex: none;
+  }
+  /* Slight hue variety across the grid so it doesn't read as one flat block
+     of identical blue circles — cycles through 4 subtly different gradients. */
+  .team-member:nth-of-type(4n+2) .team-avatar { background: linear-gradient(135deg, var(--accent-2), #7c9bff); }
+  .team-member:nth-of-type(4n+3) .team-avatar { background: linear-gradient(135deg, #5b7cff, var(--accent)); }
+  .team-member:nth-of-type(4n+4) .team-avatar { background: linear-gradient(135deg, #4f6bef, var(--accent-2)); }
+  .team-member-back {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent;
+  }
+  .team-member-role {
+    font-size: 0.78rem; font-weight: 600; color: #fff; line-height: 1.45;
+  }
+  @media (prefers-reduced-motion: reduce) { .team-member-face { transition: none; } }
+
+  /* ---------- Interactive org chart (Meet Our Team) ----------
+     A real tree, matching the company's actual chart: Leadership sits alone
+     at the top center, a trunk line runs down to a horizontal bar, which
+     branches into two clearly separated bands — Departments, then Project
+     Managers — each with its own tinted background so the segments read as
+     distinct zones (mirrors the HQ/site color-coding in the source chart).
+
+     Every node still expands via the same gradual inline drill-down as
+     before — nothing pops or swaps, everything grows in place via
+     max-height transitions (see initOrgChart in app.html):
+       1. All nodes sit in their row by default (Leadership on its own row,
+          departments and PM each in their own row within their segment).
+       2. Click a node -> its people list slides open directly beneath that
+          button; other nodes stay exactly where they are.
+       3. Click a person -> their role text slides open beneath their name,
+          and .org-chart gains .focused, which fades out every OTHER node
+          (the opened one stays put) so attention narrows to just them.
+     A "Back to All Teams" control (hidden until .focused) collapses
+     everything and restores the full tree. */
+  /* Org Chart / Group Structure toggle (see the 'orgchart' case in
+     renderSectionContent, app.html) — both panels render into the DOM at
+     once; .org-view-active picks which one is visible, everything else
+     stays display:none rather than being torn down/rebuilt on switch. */
+  .org-view-toggle-wrap { display: flex; justify-content: center; margin-bottom: 28px; }
+  /* Bigger + symmetrical — explicit request. Equal-width buttons (not
+     each sized to its own text) so "Org Chart" and "Group Structure"
+     read as two equal options, not a short button next to a long one. */
+  .org-view-toggle { padding: 4px; gap: 4px; border-radius: 12px; }
+  .org-view-toggle .seg-btn {
+    min-width: 160px; padding: 12px 22px; font-size: 0.92rem; border-radius: 9px;
+  }
+  [data-org-view-panel] { display: none; }
+  [data-org-view-panel].org-view-active { display: block; }
+
+  /* zoom (not transform: scale) shrinks the ENTIRE Company Structure
+     section — every panel, font, icon, padding, and gap at once — while
+     keeping normal document flow and click hit-testing accurate (a
+     transform:scale-based approach visually shrinks but leaves the
+     original, larger layout box for click/hover/measurement purposes,
+     which would silently break renderOrgConnectors' own getBoundingClientRect
+     math throughout this view). Added once the Org Chart view switched to
+     fully-expanded-by-default (see initOrgChart, app.html) — showing every
+     team/person at once made the un-scaled page require far more side-to-
+     side/up-down navigation than a click-to-expand version ever did;
+     explicit request to make everything smaller-but-still-readable rather
+     than leave it that tall/wide. Applies to both Org Chart and Group
+     Structure views, since they share this same .org-chart wrapper. */
+  /* max-width: none + negative side margins matching section.block's own
+     28px side padding — a standard "full-bleed breakout" so this chart
+     uses the ENTIRE available width of .main (viewport minus sidebar),
+     not the shared --maxw content cap (1520px, but the real limiter on
+     an ordinary window is .main's own narrower width) every other
+     section respects. Explicit request: no horizontal scrollbar on
+     either the Org Chart or Group Structure view, ever — every card in
+     Head Office's row (Engineering through Administration, including
+     Asset Management's own wider two-branch state) must fit without one,
+     which the shared narrower content width couldn't guarantee no matter
+     how much individual card sizes got tuned. */
+  .org-chart { max-width: none; width: calc(100% + 56px); margin: 0 -28px; zoom: 0.66; }
+  .org-back-btn {
+    display: none; align-items: center; gap: 6px; margin: 0 auto 18px;
+    background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 999px;
+    padding: 8px 16px; font-size: 0.82rem; font-weight: 700; color: var(--text-dim);
+    cursor: pointer; font-family: inherit; transition: border-color .15s, color .15s;
+  }
+  .org-chart.focused .org-back-btn { display: inline-flex; }
+  .org-back-btn:hover { border-color: var(--card-border-hover); color: var(--accent); }
+  .org-back-btn .icon { width: 14px; height: 14px; }
+
+  .org-tree { display: flex; flex-direction: column; align-items: center; }
+  .org-tree-top { display: flex; justify-content: center; }
+  /* Paints the 28px run directly below Leadership. A prior version of this
+     rule set background:none here on the theory that .org-tree-branches::before
+     (below) would cover this SAME span as one merged element spanning the
+     full 28+28 — that was wrong: ::before is `top:0` relative to
+     .org-tree-branches' OWN box, which starts only after this trunk's 28px
+     already ends, so it can never reach backward to paint over this box.
+     The result was a real, empty 28px gap with nothing drawn in it at all
+     — reported directly ("does not start from the bottom part of the
+     leadership panel... leaves a gap"). Restored to a plain painted stub,
+     the same shape Head Office/Project Sites' own analogous connectors
+     use. Group Structure still overrides this back to background:none for
+     its own view (see .group-structure-frame .org-tree-trunk below) since
+     ITS trunk is drawn by a separate JS-measured element instead. */
+  .org-tree-trunk { width: 2px; height: 28px; background: var(--tree-line); }
+  /* Head Office and Project Sites stack vertically here (.org-segment is
+     plain block-level, no flex/grid — they are NOT side by side), so there
+     is only ever ONE branch point below Leadership, not a left/right fork.
+     A full-width horizontal bar (8%-92% of the page) used to sit here
+     regardless, with only a single center drop under it — visually
+     implying a fork to two things that don't actually exist side by side,
+     while the wide bar itself connected to nothing at its own left/right
+     ends. Replaced with a short, centered drop matching the same visual
+     language as every other connector in this tree (a plain short stub,
+     not an oversized bar), running straight from Leadership above into
+     Head Office's own top edge below. */
+  .org-tree-branches { position: relative; width: 100%; padding-top: 28px; }
+  /* Continues the trunk line from .org-tree-trunk (above) down into Head
+     Office's/Project Sites' own top edge. A prior version tried merging
+     this with .org-tree-trunk into one 56px element to fix a doubled-line
+     artifact at their seam — that broke worse (a real 28px GAP, see
+     .org-tree-trunk's own comment), so this is back to its original
+     28px/paints-its-own-span shape. The doubled-line-at-the-seam concern
+     this was chasing is addressed differently now (both this and
+     .org-tree-trunk paint the exact same --tree-line color at the exact
+     same centered x, and .org-chart's zoom is applied to the whole
+     ancestor tree uniformly, not per-element, so both scale together
+     without drifting apart at their shared boundary). */
+  .org-tree-branches::before {
+    content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 28px;
+    background: var(--tree-line); transform: translateX(-50%); z-index: 0;
+  }
+
+  .org-segment {
+    position: relative; z-index: 1;
+    border-radius: var(--radius); padding: 24px 20px; margin-bottom: 18px;
+  }
+  /* Drops from this segment's own top edge down to the horizontal branch
+     bar (see .org-branch-bar / renderOrgConnectors in app.html) — every
+     segment gets this independently (Head Office AND Project Sites).
+     Stops at 58px: segment padding-top (24px) + .org-segment-label's own
+     line-height/margin-bottom. */
+  .org-segment::before {
+    content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 58px;
+    background: var(--tree-line); transform: translateX(-50%); z-index: 0;
+    pointer-events: none;
+  }
+  .org-segment-departments { background: var(--accent-soft); }
+  .org-segment-pm { background: var(--status-warn-soft); }
+  .org-segment-pm .org-segment-label { color: #a15c00; }
+  /* Leadership's own outer segment (see orgLeadershipNodeHtml, app.html) —
+     a neutral wash rather than reusing --accent-soft (Head Office, right
+     below it in the tree) or --status-good-soft (already used INSIDE this
+     same segment, for the Board of Directors/Advisors row) — picking
+     either would either clash with a sibling segment's own color or with
+     this segment's own internal tier coloring. */
+  .org-segment-leadership { background: var(--pill-bg); }
+  /* .org-segment::before (above) unconditionally draws a drop from EVERY
+     .org-segment's own top edge, on the assumption there's always
+     something above it to connect from (true for Head Office/Project
+     Sites, which sit below Leadership in the tree). Leadership is now
+     also an .org-segment (see the restructure in orgLeadershipNodeHtml,
+     app.html) but sits at the very TOP of the tree with nothing above
+     it — so this same rule was drawing a stray line poking out of
+     Leadership's own top edge into empty space, reported directly ("a
+     line up downwards onto it... why is it the highest one"). Disabled
+     here the same way Group Structure already disables it for its own
+     segments (see .group-structure-frame .org-segment::before further
+     down) — Leadership needs no lead-in drop at all, it has nothing to
+     connect to above it. */
+  .org-segment-leadership::before { content: none; }
+  /* .org-segment's own margin-bottom:18px (base rule above) exists to
+     separate Head Office from Project Sites when they stack — Leadership
+     never had that gap as a plain .org-team, and introducing it here left
+     an unaccounted-for 15px break between Leadership's own box and
+     .org-tree-trunk right below it (that trunk's height, plus
+     .org-tree-branches::before further down, were both sized assuming
+     Leadership's box ended flush against them, not 18px above) — the
+     reported "disconnected" line. Zeroed out since Leadership has no
+     later segment stacked directly beneath IT specifically (Head Office
+     is reached via the trunk/branches connector, not by simple document
+     flow stacking) — nothing needs that spacing here. */
+  .org-segment-leadership { margin-bottom: 0; }
+  .org-segment-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--accent); text-align: center; margin-bottom: 14px;
+  }
+  /* Head Office's label doubles as an "expand all departments" button
+     (see [data-org-expand-all] in initOrgChart) — reset native <button>
+     chrome so it stays visually identical to the plain .org-segment-label
+     div used elsewhere (e.g. Project Managers), plus a chevron that flips
+     when everything underneath is expanded. */
+  .org-segment-label-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; background: none; border: none; font: inherit; cursor: pointer;
+    padding: 0;
+  }
+  .org-segment-label-btn::after {
+    content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    transform: rotate(45deg); margin-top: -3px; transition: transform .2s ease;
+  }
+  .org-segment-label-btn.is-expanded::after { transform: rotate(-135deg); margin-top: 2px; }
+
+  /* Connects the segment label ("HEAD OFFICE" / "PROJECT SITES") down to
+     EVERY team card as an explicit right-angle elbow — a horizontal branch
+     bar spanning from the leftmost to the rightmost card, with a short
+     vertical drop from that bar into each individual card — matching a
+     real org-chart/subway-map connector, not a row of independent short
+     ticks that only look aligned when nothing has shifted. Several
+     "independent per-card stem" approaches were tried before this and
+     each one turned out to only be verifiable by trusting that a stem's
+     own top edge lined up with the row's own top edge — correct in
+     isolation, but what actually reads as "connected" is a single
+     continuous line with a visible corner, which isolated stems can never
+     produce even when perfectly positioned. Built as real DOM elements by
+     renderOrgConnectors (see app.html), positioned by measured pixel
+     offsets — .org-branch-bar (horizontal) and .org-branch-drop (one per
+     card, vertical) — appended into .org-team-row itself, both behind the
+     cards (z-index 0). Re-run once on initial render and again on resize
+     (rows no longer wrap — see .org-team-row below — so card positions
+     never shift from expand/collapse, only from a width change). */
+  .org-team-row {
+    position: relative; display: flex; justify-content: center; align-items: flex-start;
+    gap: 16px; overflow-x: auto; overflow-y: hidden; padding-top: 18px;
+    scrollbar-width: thin; scrollbar-color: var(--card-border-hover) transparent;
+  }
+  .org-team-row::-webkit-scrollbar { height: 6px; }
+  .org-team-row::-webkit-scrollbar-track { background: transparent; }
+  .org-team-row::-webkit-scrollbar-thumb { background: var(--card-border-hover); border-radius: 999px; }
+  /* Project Sites specifically (not Head Office, which keeps its original
+     horizontal-scroll shelf) wraps into rows instead of scrolling side to
+     side — explicit request: opened project panels (each ~20 people, far
+     taller than a Head Office card) reading better stacked 2-3 per line
+     than requiring a horizontal scrollbar to see a panel opened off to the
+     side. Safe now that renderOrgConnectors re-runs on every expand/collapse
+     (see refreshConnectors in app.html) rather than only on load/resize —
+     its bar/drop logic already groups cards into lines by offsetTop
+     specifically to support more than one wrapped row, so wrapping here
+     doesn't need any connector-side change. */
+  .org-segment-pm .org-team-row {
+    flex-wrap: wrap; justify-content: center; overflow-x: visible;
+  }
+  .org-branch-bar, .org-branch-drop {
+    position: absolute; background: var(--tree-line); z-index: 0; pointer-events: none;
+  }
+  /* justify-content:center only centers content that's narrower than the
+     row — once cards overflow into the horizontal scrollbar, flexbox left-
+     aligns instead (nothing to center against), which is correct: a
+     scrollable row reads as a shelf, not something that needs centering. */
+  .org-team {
+    position: relative; display: flex; flex-direction: column; width: 190px; flex: none;
+    transition: opacity .3s ease, transform .3s ease;
+  }
+  .org-team > * { position: relative; z-index: 1; }
+  /* Leadership sits in .org-tree-top, directly under .org-tree-trunk, not
+     inside .org-team-row alongside the other teams. */
+  .org-leadership { width: 980px; max-width: 100%; }
+  .org-chart.focused .org-team:not(.open) { opacity: 0; transform: scale(0.96); pointer-events: none; position: absolute; }
+  .org-team-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 14px 20px; cursor: pointer;
+    box-shadow: var(--shadow-card); transition: box-shadow .18s, border-color .18s;
+    font-family: inherit;
+  }
+  .org-team-btn:hover, .org-team-btn:focus-visible { box-shadow: var(--shadow-card-hover); border-color: var(--accent); }
+  .org-team.open .org-team-btn { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--card) 70%); }
+  .org-team-label { font-weight: 700; font-size: 0.92rem; color: var(--text); }
+  .org-team-count {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--accent);
+  }
+
+  /* Group Structure view (see renderGroupStructureHtml, app.html).
+     Reuses the same visual vocabulary as .dept-card (Department Selection)
+     rather than the flat bordered boxes this section started with — icon
+     header band, gradient name strip, hover lift — so it reads as part of
+     the same design system instead of a separate, plainer component. */
+
+  /* .group-structure-frame draws a visible border around the WHOLE tree
+     (Vichitbhan + Subsidiaries + Joint Ventures together) — a soft gradient
+     wash + rounded frame matching --radius, not a hard 2px rectangle, so
+     the "Vichitbhan Group" name reads as enclosing everything beneath it
+     as one group rather than just labeling the top card. */
+  .group-structure-frame {
+    position: relative;
+    background: linear-gradient(180deg, var(--pill-bg), transparent 65%);
+    border: 1px solid var(--card-border); border-radius: calc(var(--radius) + 6px);
+    padding: 28px 24px 24px; width: 100%;
+  }
+  /* The shareholder-to-Vichitbhan-to-Subsidiaries run used to be FOUR
+     separately positioned pieces — .group-shareholder-connector (CSS),
+     .org-tree-trunk (CSS), a JS-measured segment fork, and a JS-measured
+     lead-in — each independently rounded to its own nearest pixel. Even
+     with every individual measurement correct, 3-4 independent rounding
+     boundaries stacked in one visually-continuous run is exactly what
+     produced the reported "rigid"/kinked line: not really one line, but
+     several short ones lined up to LOOK like one. Both CSS pieces below
+     keep their layout height (so nothing else shifts) but lose their own
+     background — renderOrgConnectors (app.html) now draws the entire
+     shareholder-tier-to-branches run as ONE absolutely positioned element,
+     measured once, in this frame's own coordinate space. One element
+     cannot kink against itself. */
+  /* .org-tree-trunk's base rule (above) paints its own line again (Org
+     Chart's Leadership-to-Head-Office run needs that) — Group Structure
+     still needs it invisible here, since renderGroupStructureTrunk draws
+     this view's own shareholder-to-Vichitbhan run as one JS-measured
+     element instead (see the comment above); this box's real height is
+     still needed for correct layout spacing, just not its own paint. */
+  .group-structure-frame .group-shareholder-connector,
+  .group-structure-frame .org-tree-trunk { background: none; }
+  .group-name-label {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    text-align: center; font-family: 'Orbitron', sans-serif;
+    font-size: 0.74rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.14em; color: var(--accent); margin-bottom: 20px;
+  }
+  .group-name-label::before, .group-name-label::after {
+    content: ''; flex: 1; max-width: 80px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--card-border-hover));
+  }
+  .group-name-label::after { background: linear-gradient(90deg, var(--card-border-hover), transparent); }
+
+  /* Shareholder tier — who OWNS Vichitbhan, sitting ABOVE the parent card
+     (see renderShareholderTierHtml, app.html), matching a real ownership-
+     chart reference the user provided: boxes with ownership %, connector
+     lines merging into one line feeding down into Vichitbhan below. */
+  .group-shareholder-tier { display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
+  .group-shareholder-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .group-shareholder-box {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 140px; background: var(--pill-bg); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 10px 14px;
+  }
+  .group-shareholder-label { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+  .group-shareholder-label sup { font-size: 0.7em; color: var(--text-dim); }
+  .group-shareholder-pct { font-family: 'Orbitron', sans-serif; font-size: 0.78rem; font-weight: 600; color: var(--accent); }
+  /* New Investor — styled distinctly (amber/warn, matching the reference
+     chart's own orange callout box for this same not-yet-finalized
+     entity), so it visually reads as "different in kind" from the other
+     two confirmed shareholders, not just another item in the row. */
+  .group-shareholder-highlight {
+    background: var(--status-warn-soft); border-color: transparent;
+  }
+  .group-shareholder-highlight .group-shareholder-label,
+  .group-shareholder-highlight .group-shareholder-pct { color: #a15c00; }
+  .group-shareholder-connector { width: 2px; height: 22px; background: var(--tree-line); }
+  .group-shareholder-note {
+    font-size: 0.72rem; font-style: italic; color: #a15c00; text-align: center;
+    max-width: 260px; margin-top: -4px; margin-bottom: 4px;
+  }
+
+  .group-structure-tree { width: 100%; }
+  /* Connects the segment label ("SUBSIDIARIES" / "JOINT VENTURES") down to
+     EVERY stem individually, as a real measured elbow connector — same
+     .org-branch-bar/.org-branch-drop mechanism used for Head Office/
+     Project Sites (see renderOrgConnectors in app.html), not a CSS-only
+     bar assumed to line up with each stem. A pure-CSS version was tried
+     first (one central drop + one wide horizontal bar both fixed at the
+     row's own top:0) and consistently left a real gap: the row has
+     padding-top:18px so its CONTENT (the stems) starts 18px below the
+     row's top edge, but the bar/drop were drawn at that top edge itself
+     with nothing spanning the 18px between them and where the stems
+     actually begin — and even where the center drop did reach, the outer
+     cards (V&K, VN, VC, etc.) had no drop of their own reaching them at
+     all, just a horizontal bar floating disconnected above their tops.
+     renderOrgConnectors solves both: it measures each stem's REAL
+     offsetTop/offsetLeft after render and draws the bar/drops to match
+     exactly, the same fix already verified working for the org chart
+     above. .group-entity-row/.group-jv-row register as connector targets
+     the same way .org-team-row does — see the querySelector list in
+     renderOrgConnectors. */
+  .group-entity-row, .group-jv-row { position: relative; padding-top: 18px; }
+  /* align-items: stretch (the flex default, but explicit here since
+     .group-jv-row overrides it below) makes every .group-stem-item in
+     the row match the tallest one's height — paired with .group-entity-
+     card's own height:100% (see below), this is what keeps sibling cards
+     the same size regardless of how many lines their own description
+     text wraps to, rather than each card sizing independently to its own
+     content and leaving shorter descriptions with a visibly shorter
+     card. Previously align-items:flex-start, which is exactly why CVE's
+     2-line description and CVN Development's 1-line one produced
+     different card heights. */
+  .group-entity-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+  /* Per-entity stem: a line + a small always-visible label ("Subsidiary" /
+     "Joint Venture") sitting above each individual card, not just a shared
+     heading over the whole row — explicit request: "a line for each one...
+     visible on each line", and the line needs to visibly attach down into
+     the card "like a tree", not float above it with a gap.
+     Built as ONE continuous line spanning the full stem height, positioned
+     behind everything (.group-stem-line, absolute, z-index 0) running from
+     the top of the stem straight down to the card's top edge with zero
+     gap — the label sits ON TOP of that line with its own solid background
+     patch (matching whichever panel color it's on) so the line reads as
+     passing behind the text rather than stopping at it. Uses --tree-line, a
+     dedicated always-visible neutral — --card-border/--card-border-hover
+     are tuned as barely-there hairlines for card edges and were nearly
+     invisible here, especially in light mode. */
+  .group-stem-item { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
+  .group-stem-line {
+    content: ''; position: absolute; top: 0; left: 50%; width: 2px; bottom: 0;
+    background: var(--tree-line); transform: translateX(-50%); z-index: 0;
+  }
+  .group-stem-label {
+    position: relative; z-index: 1;
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); white-space: nowrap;
+    background: var(--pill-bg); padding: 2px 8px; border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .group-stem-item > .group-entity-card,
+  .group-stem-item > .org-team { position: relative; z-index: 1; }
+  /* Label patch background matches whichever panel the stem sits on
+     (Subsidiaries = --accent-soft tinted panel, Joint Ventures =
+     --status-warn-soft tinted panel — see .org-segment-departments /
+     .org-segment-pm above) instead of the generic --pill-bg default, so
+     the patch blends into its panel rather than reading as a mismatched
+     gray chip floating on a colored background. */
+  .org-segment-departments .group-stem-label { background: var(--card); }
+  .org-segment-pm .group-stem-label { background: var(--card); }
+  /* Subsidiaries and Joint Ventures side by side on ONE row, not stacked
+     top-to-bottom the way the org chart's own Head Office/Project Sites
+     segments are (.org-segment's plain block-level stacking, reused as-is
+     there) — explicit request: same horizontal plane, left and right.
+     This container also carries .org-tree-branches (see the markup in
+     renderGroupStructureHtml, app.html) to inherit the trunk's own
+     top-padding/spacing — but NOT .org-tree-branches::before, which draws
+     a single center drop meant for a single-column stack (Head Office
+     directly below Project Sites). With two panels side by side instead,
+     that single drop lands in the gap BETWEEN them, reaching neither —
+     disabled here so renderOrgConnectors (app.html) can draw a real
+     two-way branch to each panel's own top-center instead, the same
+     measured-elbow approach already used inside each panel for its own
+     row of cards. */
+  .group-structure-branches {
+    display: flex; align-items: stretch; gap: 20px; flex-wrap: wrap; position: relative;
+    padding: 12px; margin: -12px; border-radius: calc(var(--radius) + 10px);
+    /* Faint accent ring wrapping both Subsidiaries + Joint Ventures panels
+       together, reinforcing (at the container level, not just the
+       connector lines) that this whole region — everything under VCB —
+       is the employee's actual scope. Deliberately soft (thin border, no
+       fill) so it doesn't compete with the two panels' own --accent-soft/
+       --status-warn-soft backgrounds, just frames them as one unit. */
+    border: 1px solid var(--accent-soft);
+  }
+  .group-structure-branches::before { content: none; }
+  /* .org-segment::before (a fixed-height CSS drop from a segment's own top
+     edge down to its row) was previously hardcoded to 52px here to
+     approximate where Subsidiaries/Joint Ventures' row-level connector
+     (renderOrgConnectors, app.html) picks up — two independently-guessed
+     numbers (a CSS px value centered on the SEGMENT's own box, and a JS
+     measurement centered on the ROW's own, narrower box) that happened to
+     mostly line up but wasn't guaranteed to, and visibly kinked where they
+     met. renderOrgConnectors now draws this same lead-in itself, measured
+     directly off the row (see the .group-entity-row/.group-jv-row branch
+     in that function) so it can't drift out of sync with the row's own
+     bar/drops the way the CSS version could — disabled here entirely so
+     the two don't double up. Scoped to .group-structure-frame specifically
+     so this can never affect the org chart's own (correct, untouched)
+     .org-segment, which still uses its original CSS ::before. */
+  .group-structure-frame .org-segment::before { content: none; }
+  /* min-width guarantees room for 2 side-by-side .group-entity-card/
+     .group-stem-item (200px each, see below) + the row's own 16px gap +
+     this segment's own 24px 20px padding = 456px — below that,
+     flex-wrap:wrap on .group-entity-row/.group-jv-row (see below) kicks
+     in and drops the second card onto its own line. That's a legitimate
+     fallback for a genuinely narrow viewport, but Subsidiaries currently
+     only ever has 2 entities, so on any ordinary-width screen it should
+     never need to wrap — flex-basis alone (the previous 300px) doesn't
+     prevent shrinking below that if the two segments' combined 300px+300px
+     basis is more than the row has room for; min-width does, by refusing
+     to shrink past it regardless of basis or available space. Without
+     this, the two entities could silently wrap to separate lines at
+     ordinary desktop widths or simply via browser zoom (which shrinks the
+     effective CSS-pixel viewport the same way a narrower window does),
+     which is what produced the previously-reported "disjointed" connector
+     — a real 2-line wrap, correctly drawn as two lines, just not the
+     side-by-side layout this view is designed around. */
+  .group-structure-branches .org-segment { flex: 1 1 300px; min-width: 456px; margin-bottom: 0; }
+
+  /* Entity card: icon band (tinted, matching .dept-card-icon) + name +
+     optional description — not a plain bordered rectangle. Subsidiary
+     cards are static (nothing to expand); the parent card gets the
+     accent-gradient treatment .dept-card-label uses, since it's the one
+     entity in this view that's genuinely the "lead" element. */
+  .group-entity-card {
+    display: flex; flex-direction: column; width: 200px; max-width: 100%;
+    /* flex: 1 (not just width) lets the card grow to fill whatever extra
+       vertical space .group-entity-row's align-items:stretch (see above)
+       gives its parent .group-stem-item — a shorter one-line description
+       (e.g. CVN Development) otherwise leaves its card shorter than a
+       sibling with a wrapped 2-line description (e.g. CVE), even with the
+       row itself stretched, since nothing was telling the card to consume
+       that space rather than just sit at its own natural content height
+       inside it. */
+    flex: 1 0 auto;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); overflow: hidden; text-align: center;
+    box-shadow: var(--shadow-card); transition: box-shadow .18s, border-color .18s, transform .18s;
+  }
+  .group-entity-card:hover { box-shadow: var(--shadow-card-hover); border-color: var(--card-border-hover); transform: translateY(-2px); }
+  .group-entity-icon {
+    display: flex; align-items: center; justify-content: center; height: 56px; flex: none;
+    background: var(--pill-bg); color: var(--accent);
+  }
+  .group-entity-icon .icon { width: 24px; height: 24px; }
+  /* flex: 1 so the body (not the fixed-height icon band above it) is what
+     absorbs the card's flex: 1 0 auto growth (see .group-entity-card) —
+     keeps the icon band a consistent 56px on every card regardless of how
+     tall the card ends up, with the extra space landing as breathing room
+     around the description text instead. */
+  .group-entity-body { flex: 1; padding: 12px 14px 14px; }
+  .group-entity-label { display: block; font-weight: 700; font-size: 0.9rem; color: var(--text); line-height: 1.3; }
+  .group-entity-sub { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
+
+  .group-entity-parent {
+    position: relative; z-index: 1;
+    width: 380px; box-shadow: var(--shadow-card-hover);
+    border-color: var(--accent); border-width: 1.5px;
+  }
+  .group-entity-parent .group-entity-icon {
+    height: 64px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+  }
+  /* The icon's own .dept-icon-svg class sets color: var(--accent) directly
+     (see icons.html/styles.html base rule) — two classes on the element
+     itself beats the ancestor-scoped .group-entity-icon{color:#fff} above
+     by specificity, so the icon was still rendering var(--accent) (dark
+     blue) on top of this band's own dark blue gradient background,
+     effectively invisible. Must target .dept-icon-svg explicitly to win. */
+  .group-entity-parent .group-entity-icon .icon,
+  .group-entity-parent .group-entity-icon .dept-icon-svg { width: 28px; height: 28px; color: #fff; }
+  .group-entity-parent .group-entity-label { font-size: 1rem; }
+
+  /* Family-owned sibling companies (VPO, Chavananand Holding) flanking VCB
+     in .org-tree-top — see groupFamilyCompanyCardHtml/renderGroupStructureHtml
+     in app.html. gap/align-items on the row itself (not a new rule, this
+     just documents why the existing .org-tree-top {display:flex;
+     justify-content:center} is enough): three flex children of
+     symmetric-by-construction width (VPO/Holding both use the same
+     .group-entity-card base 200px, VCB's own .group-entity-parent is a
+     fixed 300px) centered together is what keeps VCB landing at the
+     row's — and therefore the frame's — true horizontal center, which
+     renderGroupStructureTrunk's own trunk-anchoring depends on. */
+  /* align-items: flex-start (not stretch) — VPO/Chavananand Holding are
+     now collapsed to just their name by default (see
+     groupFamilyCompanyCardHtml, app.html), deliberately much smaller than
+     VCB's own always-expanded paragraph, so VCB reads as clearly primary
+     next to two visually minor sibling cards rather than three
+     equal-weight boxes. Their own two collapsed heights still match each
+     other exactly (both are the SAME .org-team-btn markup with no
+     variable-length content when collapsed), which is the only equality
+     that actually matters here. */
+  .group-structure-top { gap: 32px; align-items: flex-start; }
+  /* Wraps VPO/Holding/VCB's cards identically (see groupFamilyCompanyCardHtml/
+     renderGroupStructureHtml, app.html) — no caption text underneath (a
+     written-out "not affiliated with VCB" note was tried and explicitly
+     rejected), just the card itself; the dashed connector
+     (.group-family-connector below) is the only thing distinguishing
+     VPO/Holding's line from VCB's own solid trunk. padding-top reserves
+     room above the card for that connector to visibly enter it from
+     above rather than touching the row's very top edge. */
+  .group-family-slot { display: flex; flex-direction: column; align-items: center; padding-top: 26px; width: 200px; max-width: 100%; }
+  /* VCB's own slot needs to be as wide as its card (380px, see
+     .group-entity-parent) — the shared 200px .group-family-slot width
+     above (sized for VPO/Holding's smaller collapsed cards) was capping
+     .group-entity-parent's child width down to 200px despite its own
+     width:380px rule, since a flex item can't exceed a width-constrained
+     parent without an explicit override. */
+  .group-family-slot-parent { width: 380px; }
+  /* VPO/Chavananand Holding: plain hover tooltip, no click/expand state
+     (changed from the earlier click-to-expand .org-team version per
+     explicit request — hover only, fade in/out, nothing to click).
+     .group-family-hover is the hover/focus scope; .group-family-tooltip is
+     positioned absolutely so it never affects layout/card height, and its
+     visibility is pure CSS (opacity + visibility, no JS) so it can't get
+     out of sync with any click state the way the old expand panel could. */
+  .group-family-hover { position: relative; width: 100%; }
+  .group-family-hover:focus { outline: none; }
+  /* Same visual shape .org-team-btn uses elsewhere in this chart (card,
+     border, shadow, hover lift) reproduced directly since this is now a
+     plain div, not an .org-team-btn <button> — overridden only for the
+     icon (.group-entity-icon's own fixed 56px band doesn't fit inside a
+     button padded the normal .org-team-btn way, so it's shrunk to an
+     inline glyph instead, matching how .group-jv-btn's handshake icon
+     sits beside its own label rather than above it in its own band). */
+  /* Muted on purpose — explicit client request to make it unmistakable
+     that employees work for VCB specifically, not these two family-owned
+     but otherwise unrelated companies. Grey icon/border/label instead of
+     the accent blue every other card in this tree uses (subsidiaries,
+     JVs, VCB itself all read var(--accent) somewhere in their resting
+     state) is what visually pushes these two into the background —
+     hovering still lifts the shadow slightly (still discoverable, still
+     legible) but stays grey, never switching to accent, so even mid-
+     interaction it doesn't compete with VCB's own branch for attention. */
+  .group-family-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 12px 16px; opacity: 0.72;
+    box-shadow: var(--shadow-card); transition: box-shadow .18s, border-color .18s, opacity .18s;
+  }
+  .group-family-hover:hover .group-family-btn, .group-family-hover:focus-visible .group-family-btn {
+    box-shadow: var(--shadow-card-hover); opacity: 0.92;
+  }
+  .group-family-btn .group-entity-icon {
+    height: auto; width: 28px; background: none; color: var(--text-dim); margin: 0 auto;
+  }
+  .group-family-btn .group-entity-icon .icon { width: 22px; height: 22px; }
+  .group-family-btn .org-team-label { font-weight: 700; font-size: 0.82rem; color: var(--text-dim); text-align: center; }
+  /* Positioned above the card, centered, fading in/out on hover/focus —
+     never affects the card's own box, so VPO/Holding's collapsed height
+     (and therefore renderGroupStructureTrunk's connector-drop anchor,
+     which measures .group-family-btn, not this tooltip) stays fixed
+     whether the tooltip is showing or not. */
+  .group-family-tooltip {
+    position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%) translateY(4px);
+    width: 240px; max-width: 60vw;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    box-shadow: var(--shadow-card-hover); padding: 10px 12px;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease, visibility 0s linear .16s;
+    z-index: 5;
+  }
+  .group-family-hover:hover .group-family-tooltip,
+  .group-family-hover:focus-visible .group-family-tooltip,
+  .group-family-hover:focus-within .group-family-tooltip {
+    opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
+    transition: opacity .16s ease, transform .16s ease, visibility 0s linear;
+  }
+  .group-family-tooltip .group-entity-sub {
+    display: block; font-size: 0.76rem; color: var(--text-dim); line-height: 1.5; text-align: center;
+  }
+  /* Every connector line in this whole tree — VCB's own trunk, the
+     Subsidiaries/Joint Ventures fork and everything inside those two
+     panels, the shared Chavananand Family fork bar, and VPO/Holding's own
+     drops — now renders with the exact same color/weight as the base
+     .org-branch-bar/.org-branch-drop rule (var(--tree-line), styles.html).
+     .group-scope-line previously recolored VCB's own branch accent-blue
+     with a glow, and .group-family-connector previously used a different
+     muted color (var(--card-border)) at reduced opacity — two more
+     "special" line treatments alongside the base one, which is exactly
+     what read as inconsistent ("some lines are darker and bolder than the
+     others... use the same code for the lines"). The ONE remaining
+     intentional difference is dashed vs solid (still drawn as a
+     repeating-linear-gradient background, not CSS border-style, since
+     these are plain absolutely-positioned divs — see
+     renderGroupStructureTrunk, app.html) — VPO/Holding dashed, everything
+     else solid, both using the identical --tree-line color/opacity. */
+  .group-family-connector {
+    background: repeating-linear-gradient(to bottom, var(--tree-line) 0, var(--tree-line) 5px, transparent 5px, transparent 10px) !important;
+  }
+
+  /* Joint venture cards — click-to-expand (see groupJvCardHtml, app.html),
+     reusing the org chart's own .org-team/.org-team-btn mechanism. An
+     always-visible ownership-chart version (parent boxes + connector lines,
+     no click) was tried in between and explicitly reverted back to
+     click-to-expand; a plain icon-card version before THAT was also
+     rejected as "bland" — so this is deliberately just clean typography, no
+     icon, no parent names, until clicked. auto-fit + a shared min width
+     keeps 4 cards in a clean 2x2 (or one row on wide screens) instead of
+     the 4th wrapping alone underneath 3. */
+  .group-jv-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px 100px; width: 100%; max-width: 500px; margin: 0 auto;
+  }
+  /* A grid column's own gap (14px) leaves each card touching its column's
+     full width right up to the gutter — fine collapsed, but an expanded
+     card's parent-chip content (see .group-jv-parents-inner) then sits
+     right beside the vertical trunk line running down the grid's center
+     (drawn in renderOrgConnectors/app.html, the line joining the top row's
+     bar to the bottom row's), reading as if the line cuts through the
+     card. A first attempt narrowed the card to 190px inside its ~230px
+     column, expecting the leftover column space to read as a gap — it
+     didn't; the trunk line still sits only ~22px from the card's own
+     edge, well inside its border/shadow's visual footprint, so it still
+     read as touching. Actually fixed by widening the grid's own COLUMN
+     gap (the row's `gap` shorthand is row-gap column-gap — 64px between
+     columns, unchanged 14px between the two stacked rows) so there is
+     real, unmistakable open space between the two columns regardless of
+     which card is expanded, rather than relying on how much of a
+     narrowed card's own column width happens to be left over. */
+  .group-jv-row .group-stem-item { width: 100%; max-width: 165px; margin: 0 auto; }
+  .group-jv-team { width: 100%; }
+  .group-jv-btn { flex-direction: row; justify-content: center; gap: 8px; padding: 14px 16px; }
+  /* Sized up from the default 16px icon slot — this icon carries real
+     detail (two buildings, individual clasped fingers, see icons.html)
+     that needs more room to stay legible than a simple abstract shape did. */
+  .group-jv-icon { display: inline-flex; color: var(--text-dim); flex: none; }
+  .group-jv-icon .icon { width: 24px; height: 24px; display: block; }
+  .org-team.open .group-jv-icon { color: var(--accent); }
+  /* .org-team-people-inner (base rule, above) sets flex-direction: column —
+     same specificity (one class each) as this rule, so whichever is
+     declared LATER in the file wins regardless of which one "should" win
+     conceptually. That silently stacked the parent-company chips full
+     width, one per row, instead of the intended inline "A + B" pair —
+     .group-jv-team .group-jv-parents-inner (two classes) makes this
+     unambiguous rather than depending on staying below the base rule. */
+  .group-jv-team .group-jv-parents-inner {
+    flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px;
+    max-width: 220px; margin: 0 auto;
+  }
+  .group-jv-parent-chip {
+    background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 6px 10px; font-size: 0.76rem; font-weight: 600; color: var(--text);
+    text-align: center;
+  }
+  .group-jv-plus { font-size: 0.85rem; font-weight: 700; color: var(--text-dim); }
+
+  /* People list: collapsed to 0 height, JS sets an explicit px max-height
+     (from the -inner wrapper's real scrollHeight) to animate open, since
+     max-height:none/auto can't be transitioned directly. */
+  .org-team-people { max-height: 0; overflow: hidden; width: 100%; transition: max-height .35s ease; }
+  .org-team-people-inner { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+
+  /* Asset Management's two branches (Inventory & Land Assets, Sai-5
+     Maintenance Unit — see orgTeamBranchesNodeHtml, app.html). Two
+     earlier versions were explicitly corrected (see that function's own
+     comment for the full history): nesting one branch under the other
+     read as a false reporting line; making Asset Management a permanent
+     always-expanded label broke the "same size as every sibling
+     department" row. Asset Management is now a completely ordinary
+     .org-team card — collapsed, no width/flex override at all, it sizes
+     exactly like Engineering/Accounting/every other department (190px,
+     see the base .org-team rule) — and its two branches only exist side
+     by side INSIDE its own .org-team-people panel once opened, exactly
+     like a Head Office department's normal member list, just laid out as
+     a row instead of a column.
+     .org-dept-fork.open widens ONLY while open, same idea as Project
+     Sites' own opened project cards growing to fit their content — but a
+     first attempt at 340px (with 140px-min branches) pushed the total
+     Head Office row (6 normal 190px-ish cards + this one + 6 gaps) past
+     the row's own available width, forcing exactly the horizontal
+     scrollbar this row is meant to never need and clipping Engineering/
+     Administration off both ends. Measured directly: at 1400px viewport
+     the row has ~1265px to work with, and 6 siblings + gaps already use
+     ~1032px of it, leaving only ~230px of real headroom for this one
+     card to grow into — so both this width AND the branch cards' own
+     min-width are capped tighter than the first attempt, specifically to
+     stay inside that measured budget rather than picking a size that
+     merely "looked reasonable" and re-triggering the same scrollbar. */
+  /* Several attempts chased ZERO horizontal scroll on the Head Office row
+     by shrinking this card and its two branches further and further —
+     each fix genuinely worked, but by the time the branches were narrow
+     enough to guarantee no scroll, their text was wrapping mid-word
+     ("Invent-ory & Land-Asset-s"), unreadable. Head Office's row has
+     ALWAYS horizontally scrolled once its cards don't all fit (see
+     .org-team-row's own "original horizontal-scroll shelf" comment,
+     styles.html) — true even before Asset Management had branches at
+     all, for the same 7-cards-in-a-fixed-width reason. So this settles
+     on a WIDTH (240px) generous enough for both branch labels to read
+     normally, accepting that opening Asset Management may need the same
+     pre-existing shelf-scroll the row already had, rather than forcing
+     an even-narrower card just to avoid scrolling and making the branch
+     content illegible to get there. */
+  .org-dept-fork.open { width: 400px; }
+  .org-dept-fork-branches { position: relative; flex-direction: row; flex-wrap: nowrap; gap: 10px; }
+  /* A branch with its own physical location (see b.location, content.html
+     — e.g. Vehicles & Machinery's Sai-5 site) renders wrapped in an extra
+     .org-dept-branch-site box (app.html) instead of sitting directly
+     under this row — THAT wrapper is now the direct flex child needing
+     the width rules, with the plain .org-team selector still covering
+     any branch with no location wrapper. */
+  .org-dept-fork-branches > .org-team,
+  .org-dept-fork-branches > .org-dept-branch-site { flex: 1 1 0; min-width: 185px; }
+  /* Same technique already used for Project Sites' own cards (see
+     .org-project .org-team-label below, min-height reserving 2 lines of
+     title regardless of whether the label wraps) — "Inventory & Land
+     Assets" is long enough to wrap across this narrow a card while
+     "Sai-5 Maintenance Unit" doesn't (or vice versa depending on exact
+     width), which left the two branch headers visibly different heights
+     even though both cards are otherwise the same width — explicit
+     request: same size regardless of the label text inside. Sized for
+     this label's own smaller font-size (0.92rem, same as the base
+     .org-team-label), not the project-card variant's value, since these
+     use the standard label size, not the shrunk-for-project-grid one. */
+  .org-dept-fork-branches .org-team-label { min-height: calc(0.92rem * 1.3 * 2); display: flex; align-items: center; justify-content: center; }
+  /* Zone color system — blue (default, --accent) = Head Office, amber
+     (--status-warn-soft) = off-site/Project Sites, green (--zone-admin) =
+     site Administration (see orgPersonHtml/orgAdminPersonHtml, app.html)
+     — explicit request so an employee can tell at a glance which "world"
+     a person belongs to without reading every card. Sai-5 (this branch)
+     gets the off-site amber treatment on its own card border/label,
+     matching Project Sites' own segment color — organizationally Asset
+     Management, physically distinct — without needing caption text, the
+     same established pattern already used for Group Structure's family
+     companies (line/color conveys it, not words). Applied to the
+     branch's own card border/label only — its expanded people list
+     keeps the normal card style, this isn't meant to reread as a
+     completely different department, just a visually distinct branch of
+     the same one; the PEOPLE inside get their own avatar color via
+     .org-zone-offsite (below), independent of this card-level accent. */
+  .org-dept-branch-offsite .org-team-btn { border-color: var(--status-warn-soft); }
+  .org-dept-branch-offsite .org-team-label { color: #a15c00; }
+  .org-dept-branch-offsite.open .org-team-btn { background: linear-gradient(180deg, var(--status-warn-soft), var(--card) 70%); }
+  /* Wraps a branch that has its own physical site (see b.location,
+     content.html — Vehicles & Machinery / Sai-5) in a distinct outer
+     frame, separate from the amber team-color already on the card
+     itself: explicit request for "its own frame around it to signify
+     that it's a different location" — a visual cue independent of, and
+     in addition to, the off-site zone color, since color alone was
+     conveying "different team category" while this specifically marks
+     "different physical place." A light dashed border (not solid, not
+     filled) reads as a boundary/enclosure without competing with the
+     branch card's own solid border for attention. The location name
+     itself sits below as a small caption, not inside the clickable team
+     name (see this function's own comment for why that distinction
+     matters here specifically). */
+  .org-dept-branch-site {
+    display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+    padding: 6px; border: 1px dashed var(--status-warn-soft); border-radius: calc(var(--radius) + 4px);
+  }
+  .org-dept-branch-site-label {
+    text-align: center; font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #a15c00;
+  }
+
+  /* A project's own expanded panel — ALWAYS the side-by-side layout now
+     (2026-08 correction: two earlier rounds had this conditional on the
+     org chart's .focused state, showing a plain vertical stack by
+     default and only going side-by-side when a project was clicked in
+     isolation — explicit follow-up request to drop that distinction
+     entirely and make the side-by-side layout the one and only default,
+     since both views showed the same content anyway). The Project
+     Manager header sits full width on top; Site Operations and Site
+     Administration (.org-project-groups, the wrapper around both) sit
+     side by side beneath it: Operations LEFT, Administration RIGHT,
+     dashed VERTICAL divider between them. Matches the matrix-reporting
+     chart the client provided: the PM heads the WHOLE project (both
+     branches), Site Operations additionally runs through the normal
+     Engineering Team chain of command, Site Administration additionally
+     reports to Head Office instead (see .org-project-admin-uplink below)
+     — the two columns read as separate branches under one shared head. */
+  .org-project-group { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; width: 100%; flex: 1 1 0; min-width: 0; }
+  /* Wraps JUST the two groups (not the PM header) — .org-project-lead
+     stays outside it, full-width/on-top, while this wrapper alone goes
+     side by side. */
+  .org-project-groups { display: flex; flex-direction: row; align-items: flex-start; gap: 12px; width: 100%; }
+  .org-project-dept {
+    background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 6px 8px 8px;
+  }
+  /* Gap between stacked people within one department card (lead + staff,
+     see dept.staff in content.html) — needed once a department card could
+     hold more than one person; previously always exactly one, no gap
+     required. */
+  .org-project-dept .org-person + .org-person { margin-top: 4px; }
+  .org-project-dept-label {
+    font-size: 0.62rem; font-weight: 700; color: var(--text-dim); margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  /* The Project Manager themself (project.lead) — a full-width header
+     ABOVE both groups in every layout, not nested inside Site Operations
+     (2026-08 correction — an earlier draft nested them there, which read
+     as Administration not ultimately answering to the PM at all). The PM
+     heads the entire project, both branches, so they sit outside/above
+     the group split entirely. border-bottom separates them from the
+     groups below without implying they're just another group. */
+  .org-project-lead {
+    position: relative; padding: 10px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .org-project-lead .org-person { flex: 1; }
+  /* Small role tag next to the PM's name — identifies the role without
+     replacing the name as the primary label, consistent with every other
+     lead in this chart being shown by name first (see orgAdminPersonHtml's
+     "Reports to X" tag for the same "small tag alongside the real
+     content" pattern already established here). */
+  .org-project-pm-tag {
+    flex: none; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.04em;
+    color: var(--accent); background: var(--pill-bg); border: 1px solid var(--card-border-hover);
+    border-radius: 999px; padding: 2px 8px;
+  }
+  /* Collapsed AND opened (default layout), every project card is the same
+     width — kept equal specifically so none of the 6 looks bigger/smaller
+     than its neighbors (Sai-5 Maintenance Unit's longer title used to
+     force a 2-line header while the others stayed 1-line, see
+     .org-team-label below for that fix) — but that width now STRETCHES to
+     fill the row's full available space (flex: 1, replacing a flat 190px)
+     rather than staying fixed. min-width keeps cards from getting too
+     narrow to read if the row is ever narrower than 6*190px (e.g. a
+     smaller viewport/browser zoom) — flex-wrap on the row
+     (.org-segment-pm .org-team-row) still handles genuinely-too-narrow
+     cases by dropping extra cards to a second line, same as before. */
+  /* max-width caps how far a card can stretch — without it, a card left
+     alone on a wrapped line (e.g. the 6th project dropping to its own
+     line on a narrower viewport, since 5 fit on the line above but not 6)
+     would grow to fill that ENTIRE line by itself, ballooning to 4-5x its
+     siblings' width — worse than the original cramped-but-uniform look.
+     320px is roughly what each of 6 cards gets when comfortably spread
+     across the page's ~1520px content width, so normal (all-6-on-one-line)
+     layouts are unaffected by this cap; it only kicks in for the
+     lone-wrapped-card case. */
+  .org-project { width: 190px; flex: 1 1 190px; min-width: 190px; max-width: 320px; }
+  /* Wider once opened — the side-by-side Operations/Administration columns
+     need more room for a readable department card than the collapsed
+     190px allows. Applies to every opened project uniformly now (2026-08
+     correction — used to be scoped to .org-chart.focused only, back when
+     the side-by-side layout was solo-view-only; now it's the one and only
+     expanded layout, so every open project gets it, whether or not others
+     are also open at the same time). */
+  .org-project.open { width: 380px; flex: 1 1 380px; min-width: 340px; max-width: 480px; }
+  /* "Sai-5 Maintenance Unit" is long enough to wrap to 2 lines while every
+     other project's 1-2 word title stays on one — left alone, that made
+     its header card visibly taller than its 5 siblings even though every
+     project card is otherwise sized identically (see .org-project above).
+     min-height reserves the same 2-line title space on every project
+     header regardless of whether its own title actually needs it, so a
+     short 1-line title just centers within that reserved height instead
+     of leaving a shorter box — matches the "all cards the same size"
+     request. Sized for this label's own font-size/line-height (0.92rem /
+     default ~1.3), not a hardcoded guess. */
+  .org-project .org-team-label { min-height: calc(0.92rem * 1.3 * 2); display: flex; align-items: center; justify-content: center; }
+  /* Smaller person card specifically inside a project's department cards
+     (not Head Office's own department lists, which keep their original
+     size) — the 28px avatar/0.78rem name at full size left little
+     breathing room once each department card also carries its own label
+     line above the person button. */
+  .org-project-dept .org-person-btn { padding: 5px 6px; gap: 5px; border-radius: 8px; }
+  .org-project-dept .org-member-avatar { width: 20px; height: 20px; font-size: 0.5rem; }
+  .org-project-dept .org-member-name { font-size: 0.66rem; line-height: 1.2; }
+  .org-project-lead .org-person-btn { padding: 6px 7px; gap: 6px; border-radius: 9px; }
+  .org-project-lead .org-member-avatar { width: 22px; height: 22px; font-size: 0.52rem; }
+  .org-project-lead .org-member-name { font-size: 0.7rem; line-height: 1.2; }
+
+  .org-project-group-label {
+    font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); margin-bottom: 4px;
+  }
+  /* position: relative — the positioning context for .org-project-admin-
+     uplink (below). Both groups begin at the SAME Y (Operations and
+     Administration are flex siblings starting together), so the uplink
+     can anchor directly here with top:0 and
+     needs no computed/guessed offset to reach "the top of this group" —
+     that IS this element's own top. (An earlier draft tried to route the
+     line past this group, past the PM header, all the way to the outer
+     card edge — reverted per explicit request after `.org-team-people`'s
+     load-bearing `overflow:hidden` (needed for the expand/collapse
+     animation shared by every team card, not just projects) turned out
+     to clip anything positioned above ITS top, silently rendering a much
+     shorter line than the CSS declared. Reaching further would mean
+     restructuring the PM header out of that shared animated container —
+     out of scope for a decorative connector.) */
+  .org-project-admin-group { position: relative; }
+  .org-project-admin-group .org-project-group-label { color: var(--accent); }
+  /* The matrix line itself — dashed, VERTICAL, full height of the taller
+     column (stretch, not the row's own align-items default). A plain div
+     rather than a border on one of the two groups so its position/height
+     is independent of which group happens to be taller. (2026-08
+     correction — this used to also serve a horizontal-divider role for a
+     separate "default stacked" layout that no longer exists; now it only
+     ever needs to be the vertical version.) */
+  .org-project-matrix-divider {
+    align-self: stretch; width: 0; height: auto; border-left: 1px dashed var(--card-border-hover);
+  }
+  /* A short dashed line rising from the Administration group's own top
+     edge — visibly "reaching up and off" toward the PM/Head Office rather
+     than dead-ending mid-panel. Anchored to .org-project-admin-group
+     itself (position:relative set on that class above) via a plain
+     top:0, no computed/guessed offset needed: Operations and
+     Administration are flex siblings that both begin at the exact same
+     Y, so "the top of this group" already IS the row's shared starting
+     point.
+     Deliberately does NOT reach all the way to the outer CARD edge, past
+     the PM header — that was the first goal, but .org-team-people (the
+     expand/collapse panel wrapping this whole thing) has a load-bearing
+     `overflow: hidden` needed for its max-height animation, shared by
+     every team card in this chart, not just projects — anything
+     positioned ABOVE that panel's own top edge gets silently clipped, no
+     console warning, just a shorter rendered line than the CSS declared
+     (caught only by comparing getComputedStyle's declared height against
+     the ELEMENT's actual getBoundingClientRect() height in the Playwright
+     harness — they disagreed). Reaching further would mean restructuring
+     the PM header to live outside that shared animated panel — out of
+     scope for a decorative connector; confirmed via explicit request to
+     accept this smaller scope instead. */
+  .org-project-admin-uplink {
+    display: block; position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 10px; border-left: 1px dashed var(--accent); z-index: 1;
+  }
+  /* Small tag under an admin member's role text, naming which HQ
+     department their function actually reports to (see orgAdminPersonHtml,
+     app.html) — the concrete "who do they answer to" detail the matrix
+     structure is meant to surface, shown only when opened (same
+     .org-person-role-inner panel every member's role text already lives
+     in), not cluttering the collapsed card. */
+  .org-member-hq-tag {
+    display: block; margin-top: 3px; font-size: 0.66rem; font-weight: 700;
+    color: var(--zone-admin); text-transform: uppercase; letter-spacing: 0.03em;
+  }
+
+  .org-person { width: 100%; }
+  .org-person-btn {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 8px 10px; cursor: pointer; font-family: inherit; transition: border-color .15s;
+  }
+  .org-person-btn:hover, .org-person-btn:focus-visible { border-color: var(--accent); }
+  .org-person.open .org-person-btn { border-color: var(--accent); }
+  .org-member-avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.62rem;
+  }
+  .org-member-name { font-size: 0.78rem; font-weight: 600; color: var(--text); line-height: 1.3; }
+
+  /* Zone color system (see orgPersonHtml/orgAdminPersonHtml, app.html) —
+     blue is the .org-member-avatar default above (Head Office/Leadership/
+     Group Structure, nothing to override); .org-zone-offsite (amber) and
+     .org-zone-admin (green/teal) recolor just the avatar gradient for
+     Project Sites operations and site Administration respectively, an
+     explicit request so an employee can tell at a glance which "world" a
+     person belongs to without reading every card. Amber reuses
+     --status-warn-soft's hue family (matching Project Sites' own segment
+     tint and Sai-5's own branch color) rather than introducing a second
+     amber token. */
+  .org-zone-offsite .org-member-avatar { background: linear-gradient(135deg, #f0a02f, #ffb84a); }
+  .org-zone-admin .org-member-avatar { background: linear-gradient(135deg, var(--zone-admin), #14b8a6); }
+
+  /* Role text: same collapsed-to-0/expand-to-measured-height mechanic as
+     .org-team-people, one level deeper. */
+  .org-person-role { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+  .org-person-role-inner { padding: 8px 10px 2px 38px; }
+  .org-member-role { font-size: 0.74rem; color: var(--text-dim); line-height: 1.45; }
+
+  /* Leadership's expanded panel: Board of Directors + Board Advisors share
+     one green-backed row (.org-leadership-row) — their headings sit side
+     by side on top (.org-leadership-row-headings), and all 6 people (4
+     directors + 2 advisors) sit in one shared 6-column grid underneath
+     (.org-leadership-people-grid, further down), so they read as one row
+     of panels rather than two separate groups. Everything below that row
+     (Managing Director, Assistant Managing Directors) is wrapped in
+     .org-leadership-tiers, sharing the same blue backdrop as the Head
+     Office segment further down the tree — the color signals "this tier
+     reports into that tier", distinct from the board above it. A short
+     connecting line still runs from the row down into the tiers box, and
+     from each level to the next within it, so it still reads as one
+     continuous tree even collapsed inside the Leadership node's own
+     panel. */
+  .org-leadership-levels { gap: 18px; }
+  .org-leadership-row {
+    width: 100%; position: relative; padding: 16px 12px;
+    background: var(--status-good-soft); border-radius: var(--radius);
+  }
+  .org-leadership-row::after {
+    content: ''; position: absolute; top: 100%; left: 50%; width: 2px; height: 18px;
+    background: var(--card-border); transform: translateX(-50%);
+  }
+  .org-leadership-row-headings {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; width: 100%;
+  }
+  .org-leadership-row-headings .org-leadership-level-heading { flex: 1 1 200px; max-width: 260px; }
+  .org-leadership-tiers {
+    background: var(--accent-soft); border-radius: var(--radius);
+    padding: 12px 12px 6px;
+  }
+  .org-leadership-level { display: flex; flex-direction: column; align-items: center; }
+  .org-leadership-level.has-connector { padding-top: 18px; position: relative; }
+  .org-leadership-level.has-connector::before {
+    content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 18px;
+    background: var(--card-border); transform: translateX(-50%);
+  }
+  .org-leadership-level-heading {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--accent); margin-bottom: 8px; text-align: center;
+  }
+  /* Board of Directors (4) + Board Advisors (2) render as one CSS grid
+     with a fixed 6-column template — deliberately grid, not a flex-wrap
+     row: flexbox's wrap algorithm previously interleaved the two groups'
+     cards unpredictably across lines depending on available width. A grid
+     with an explicit column count keeps every card in strict source order
+     (all 4 directors, then both advisors) even when it wraps to fewer
+     columns on narrow screens, because grid auto-placement fills
+     left-to-right/top-to-bottom in DOM order rather than flex's
+     content-driven line-breaking. */
+  .org-leadership-people-grid {
+    display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 8px; width: 100%;
+  }
+  .org-leadership-people-grid .org-person { width: 100%; }
+
+  /* Managing Director / Assistant Managing Directors tiers (rendered via
+     orgLeadershipLevelHtml, reusing the generic .org-person markup) — a
+     compact side-by-side grid, same idea as the board's row above, NOT
+     the plain vertical full-width stack .org-person defaults to elsewhere
+     (that default is right for a flat department member list, but reads
+     as an odd stretched-out block here). Track size is capped at 260px
+     (not 1fr) specifically so a single card (Managing Director) can't
+     stretch to fill the whole row — auto-fit only creates as many 200-260px
+     tracks as fit, and justify-content:center centers however many of
+     them exist (1 for the MD, 2 for the Assistants). */
+  .org-leadership-level-people {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 260px)); gap: 8px; width: 100%; justify-content: center;
+  }
+  .org-leadership-level-people .org-person { width: 100%; }
+
+  @media (max-width: 860px) {
+    /* Below the leadership panel's own 760px width, 6 columns get too
+       cramped to read — step down to 3 columns (2 rows: 3 directors,
+       then the 4th director + both advisors), still strict DOM order. */
+    .org-leadership-people-grid { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    /* :not(.org-leadership) is load-bearing. The Leadership panel carries
+       BOTH classes (`class="org-team org-leadership"`, see renderOrgChart in
+       app.html), so this 260px cap — intended for the small Head Office /
+       Project Site team cards — also squashed Leadership down to 260px while
+       the surrounding chart laid out at ~838px, leaving it a narrow column
+       next to full-width siblings.
+
+       Note this media query tests the REAL viewport (360px), but .org-chart
+       is `zoom: 0.42` at that width, so the chart's internal layout box is
+       ~838px — the two disagree by design, and any px cap written here lands
+       far smaller than it looks. Leadership keeps its own sizing from
+       `.org-leadership { width: 980px; max-width: 100% }` instead. */
+    .org-team:not(.org-leadership) { width: 100%; max-width: 260px; }
+    /* Leadership's base `width: 980px` is wider than .org-tree's own layout
+       box at these widths, which made it (and .org-tree-top above it)
+       overflow past the chart's right edge. Fill the tree instead of
+       asserting a fixed px width — but .org-tree-top is a shrink-to-fit
+       flex container, so its own width must be stretched too or a
+       `width: 100%` child just inherits the collapsed size. */
+    .org-tree-top { align-self: stretch; }
+    .org-segment-leadership { flex: 1; }
+    .org-leadership { width: 100%; }
+    .org-leadership-people-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .org-team-people, .org-person-role, .org-team { transition: none; }
+  }
+
+  /* 4 columns on a typical desktop width, stepping down responsively
+     rather than a fixed count — auto-fit with a ~200-260px track naturally
+     lands on 4 across most content widths without a hard-coded column
+     count. Square aspect ratio for every gallery image is set on
+     .gallery-grid .content-image itself (see above), which fixed the
+     "pancake" look a single wide landscape photo got when it was the only
+     image in its own gallery section. Track max is a fixed 260px, NOT 1fr
+     — with 1fr, a section with only 1-2 images (fewer than fit per row)
+     had that single track absorb ALL the container's leftover width, and
+     combined with aspect-ratio:1/1 that turned one photo into an
+     enormous square taller than the screen (e.g. Team Work, which has
+     only 1 image). A fixed max keeps every tile the same size regardless
+     of how many images are in a given gallery. */
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 260px)); justify-content: center; gap: 12px; margin-top: 12px; }
+  .gallery-grid .placeholder-box { min-height: 120px; }
+  .gallery-tile { display: flex; flex-direction: column; gap: 6px; }
+  .gallery-tile-caption { font-size: 0.85rem; font-weight: 600; color: var(--text); text-align: center; }
+
+  .closing-line {
+    margin: 30px 28px 0; padding: 24px 0 0; border-top: 1px solid var(--card-border);
+    font-size: 0.98rem; color: var(--text-dim); text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .closing-line p { max-width: 640px; margin: 0 auto 16px; }
+
+  /* ---------- Interactive checklist + progress ---------- */
+  .checklist-group {
+    text-align: left; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow-card);
+  }
+
+  /* Junior/Senior track picker on a department landing page (see the
+     'levelpicker' section type in content.html/app.html). Reuses the same
+     card + .seg/.seg-btn segmented-control look as .checklist-group and the
+     settings-panel language/theme toggles, so it reads as part of the same
+     visual system rather than a one-off control. */
+  .level-picker {
+    text-align: center; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 24px 28px; box-shadow: var(--shadow-card);
+  }
+  .level-picker-intro { color: var(--text-dim); font-size: 0.9rem; margin: 0 0 14px; }
+  .level-picker-seg { display: inline-flex; margin: 0 auto; }
+  .level-picker-seg .seg-btn { padding: 8px 28px; font-size: 0.9rem; }
+  .progress-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .progress-bar-track { flex: 1; height: 8px; border-radius: 999px; background: var(--pill-bg); overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width .3s ease; }
+  .progress-bar-label { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); white-space: nowrap; }
+
+  ul.check-list { list-style: none; padding: 0; margin: 0; }
+  .check-item { margin-bottom: 14px; }
+  .check-item label {
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+    background: var(--pill-bg); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 16px 18px; transition: background .15s, border-color .15s;
+  }
+  .check-item label:hover { border-color: var(--card-border-hover); }
+  .check-item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 1px; flex: none; accent-color: var(--accent); cursor: pointer; }
+  .check-item-text { font-size: 0.95rem; line-height: 1.5; color: var(--text); }
+  .check-item.done label { background: var(--accent-soft); border-color: var(--accent-2); }
+  .check-item.done .check-item-text { color: var(--text-dim); text-decoration: line-through; }
+  .check-item.locked label { opacity: 0.55; cursor: not-allowed; }
+  .check-item.locked input[type="checkbox"] { cursor: not-allowed; }
+  /* Senior-only extra tasks (see sr() in content.html) — only ever rendered
+     at all once the employee is on the Senior track (Junior never sees
+     these rows, see the 'checklist' case in app.html), so this is purely
+     about making them visually distinct from the shared baseline tasks
+     within a Senior employee's own list, using the same warm amber already
+     used for the Project Managers org-chart segment elsewhere in this file. */
+  .check-item.senior-task label { border-left: 3px solid #a15c00; }
+  .senior-badge {
+    display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+    background: var(--status-warn-soft); color: #a15c00; font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle;
+  }
+  .check-item.done.senior-task label { border-left-color: var(--accent-2); }
+
+  .phase-lock-notice {
+    display: flex; align-items: center; gap: 10px; margin: 0 auto 18px;
+    background: var(--pill-bg); border: 1px dashed var(--card-border); border-radius: 10px;
+    padding: 12px 16px; font-size: 0.88rem; color: var(--text-dim);
+  }
+
+  /* ---------- Modals (name capture, department switch) ---------- */
+  .name-modal-overlay {
+    position: fixed; inset: 0; background: rgba(2,5,13,0.65); z-index: 300;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .name-modal {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    padding: 28px; max-width: 400px; width: 100%; text-align: center; box-shadow: var(--shadow-card-hover);
+  }
+  .name-modal h3 { margin: 0 0 8px; color: var(--text); font-size: 1.2rem; }
+  .name-modal p { margin: 0 0 18px; color: var(--text-dim); font-size: 0.9rem; }
+  .name-modal-input {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--card-border); border-radius: 10px;
+    font-size: 0.95rem; margin-bottom: 14px; background: var(--bg-0); color: var(--text); font-family: inherit;
+  }
+  select.name-modal-input { cursor: pointer; }
+  select.name-modal-input:disabled { cursor: default; opacity: 1; background: var(--pill-bg); color: var(--text); -webkit-appearance: none; appearance: none; }
+  /* Visually hidden but still announced — for labels that would be
+     redundant on screen (the field's purpose is obvious from the modal
+     heading) but which inputs need in order to have an accessible name.
+     Not display:none, which would remove it from the accessibility tree. */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* Cancel/Save row in the rename modal. */
+  .name-modal-actions { display: flex; gap: 10px; }
+  .name-modal-actions .name-modal-btn { flex: 1; margin-top: 4px; }
+
+  /* "You uploaded: <file>" receipt under a required-document card. */
+  .doc-uploaded:empty { display: none; }
+  .doc-uploaded {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--card-border);
+    font-size: 0.82rem; color: var(--text-dim);
+    word-break: break-word;
+  }
+  .doc-uploaded-label { font-weight: 600; }
+  .doc-uploaded a { color: var(--accent); text-decoration: underline; }
+  .doc-uploaded-hint { opacity: .75; }
+
+  .name-modal-btn {
+    display: block; width: 100%; padding: 11px; border: none; border-radius: 999px;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 0.92rem; cursor: pointer;
+    margin: 0 auto; text-align: center;
+  }
+  .name-modal-btn:hover { filter: brightness(1.08); }
+  .name-modal-btn-secondary {
+    display: block; width: 100%; padding: 11px; margin: 10px auto 0; border: 1px solid var(--card-border); border-radius: 999px;
+    background: transparent; color: var(--text-dim); font-weight: 600; font-size: 0.88rem; cursor: pointer; text-align: center;
+  }
+  /* Missing-document list inside promptRequiredDocsIncomplete (progress.html) */
+  .missing-docs-list {
+    text-align: left; margin: 0 0 18px; padding: 0; list-style: none;
+  }
+  .missing-docs-list li {
+    padding: 8px 12px; margin-bottom: 6px; border-radius: 8px;
+    background: var(--pill-bg); color: var(--text); font-size: 0.85rem; font-weight: 600;
+  }
+  .name-modal-btn-secondary:hover { border-color: var(--card-border-hover); color: var(--text); }
+
+  /* ---------- Section-complete milestone overlay ---------- */
+  .milestone-overlay {
+    position: fixed; inset: 0; background: rgba(2,5,13,0.7); z-index: 350;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .milestone-overlay.show { opacity: 1; }
+  .milestone-card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
+    padding: 36px 32px; max-width: 380px; width: 100%; text-align: center; box-shadow: var(--shadow-card-hover);
+    transform: scale(0.9) translateY(10px); transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+  }
+  .milestone-overlay.show .milestone-card { transform: scale(1) translateY(0); }
+  .milestone-badge {
+    width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; font-size: 1.8rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .milestone-eyebrow { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 6px; }
+  .milestone-card h3 { margin: 0 0 6px; color: var(--text); font-size: 1.25rem; font-family: 'Orbitron', sans-serif; }
+  .milestone-sub { margin: 0 0 20px; color: var(--text-dim); font-size: 0.85rem; }
+  .milestone-card .name-modal-btn { margin-top: 4px; max-width: 220px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .milestone-overlay, .milestone-card { transition: none; }
+  }
+
+  /* ---------- Full 90-day completion celebration (bigger, lingers longer) ---------- */
+  .confetti-canvas {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 351;
+  }
+  .completion-card {
+    max-width: 460px; padding: 44px 36px; position: relative; z-index: 352;
+  }
+  .completion-badge {
+    width: 76px; height: 76px; font-size: 2.1rem;
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+  .completion-card h3 { font-size: 1.5rem; text-wrap: balance; }
+  .completion-sub { font-size: 0.92rem; line-height: 1.7; margin-bottom: 26px; }
+  .completion-card .name-modal-btn { max-width: 240px; }
+
+  /* ---------- Reward toast ---------- */
+  .reward-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--sidebar-0); color: #fff; padding: 12px 22px; border-radius: 999px;
+    font-weight: 700; font-size: 0.9rem; box-shadow: var(--shadow-card-hover);
+    opacity: 0; z-index: 400; transition: opacity .25s, transform .25s;
+    pointer-events: none;
+  }
+  .reward-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* Save-failure variant — visually distinct (red, not the default dark
+     pill) so it can't be mistaken for a celebration toast at a glance. */
+  .reward-toast.is-warning { background: #dc2626; }
+
+  /* ---------- Footer ---------- */
+  footer.site-footer {
+    background: transparent; color: var(--text-dim); padding: 24px 28px; margin-top: 20px;
+    border-top: 1px solid var(--card-border);
+  }
+  .footer-inner {
+    max-width: var(--maxw); margin: 0 auto; display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; font-size: 0.8rem;
+  }
+  .footer-inner a { color: var(--text-dim); }
+  .footer-inner a:hover { color: var(--accent); }
+
+  /* ---------- Admin checklist editor (?page=admin, see admin.html) ---------- */
+  .admin-gate {
+    min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .admin-gate-card {
+    max-width: 360px; width: 100%; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 28px; text-align: center;
+  }
+  .admin-gate-card h1 { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; margin: 0 0 10px; color: var(--text); }
+  .admin-gate-card p { color: var(--text-dim); font-size: 0.88rem; margin: 0 0 18px; }
+  .admin-gate-error { color: #d9534f !important; }
+  #admin-gate-form { display: flex; flex-direction: column; gap: 10px; }
+  #admin-gate-input {
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--card-border);
+    background: var(--bg-1); color: var(--text); font-size: 0.92rem; font-family: inherit;
+  }
+  #admin-gate-form button {
+    padding: 10px 14px; border-radius: 10px; border: none; background: var(--accent); color: #fff;
+    font-weight: 700; font-size: 0.9rem; cursor: pointer; font-family: inherit; transition: filter .15s;
+  }
+  #admin-gate-form button:hover { filter: brightness(1.08); }
+  #admin-gate-form button:disabled { opacity: 0.6; cursor: default; }
+
+  .admin-shell { max-width: var(--maxw); margin: 0 auto; padding: 24px 28px 60px; }
+  .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .admin-header h1 { font-family: 'Orbitron', sans-serif; font-size: 1.3rem; color: var(--text); margin: 0; }
+  .admin-exit-link { font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+  .admin-exit-link:hover { text-decoration: underline; }
+
+  /* Three nav rows (Department / Phase / Section) are visually a
+     hierarchy — department chosen first, phase and section both scoped
+     underneath it — but as identical pill buttons at the same weight
+     (the first version shipped) that hierarchy wasn't readable at a
+     glance. Wrapped in one bordered card with a divider under the
+     department row, a small uppercase label per row, and two visually
+     distinct tab styles (.admin-tab-main for departments, bigger/bolder;
+     .admin-tab-sub for phase+section, smaller and quieter) so the eye
+     reads "department, then within it phase, then within it section"
+     without needing to parse three identical-looking rows. */
+  .admin-nav {
+    margin-bottom: 20px; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 16px 16px 14px;
+  }
+  .admin-nav-group { display: flex; flex-direction: column; gap: 8px; }
+  .admin-nav-group + .admin-nav-group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--card-border); }
+  .admin-nav-label {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .admin-nav-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .admin-tab {
+    border-radius: 999px; border: 1px solid var(--card-border); background: var(--pill-bg);
+    color: var(--text-dim); cursor: pointer; font-family: inherit;
+    transition: border-color .15s, color .15s, background .15s, box-shadow .15s;
+  }
+  .admin-tab:hover { border-color: var(--card-border-hover); color: var(--text); }
+  .admin-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .admin-tab-main { padding: 9px 16px; font-size: 0.86rem; font-weight: 700; }
+  .admin-tab-main.active { box-shadow: 0 2px 8px var(--accent-soft); }
+  .admin-tab-sub { padding: 6px 12px; font-size: 0.78rem; font-weight: 600; background: none; }
+  .admin-tab-sub.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .admin-item-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .admin-item-row {
+    display: flex; align-items: flex-start; gap: 14px; background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 14px; box-shadow: var(--shadow-card); transition: border-color .15s, box-shadow .15s;
+  }
+  .admin-item-row:hover { border-color: var(--card-border-hover); box-shadow: var(--shadow-card-hover); }
+  .admin-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .admin-item-text {
+    width: 100%; resize: vertical; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--card-border);
+    background: var(--bg-1); color: var(--text); font-size: 0.88rem; font-family: inherit; line-height: 1.5;
+    transition: border-color .15s;
+  }
+  .admin-item-text:focus { outline: none; border-color: var(--accent); }
+  .admin-item-senior { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-dim); cursor: pointer; width: fit-content; }
+  .admin-item-actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; flex: none; width: 96px; }
+  .admin-item-move-pair { display: flex; gap: 6px; }
+  .admin-item-move-pair button { flex: 1; }
+  .admin-item-actions button {
+    padding: 6px 8px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--pill-bg);
+    color: var(--text); font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .admin-item-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .admin-item-actions button:disabled { opacity: 0.35; cursor: default; }
+  .admin-save-btn { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+  .admin-save-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .admin-delete-btn:hover:not(:disabled) { border-color: #d9534f !important; color: #d9534f !important; }
+  .admin-item-status { font-size: 0.72rem; font-weight: 600; text-align: center; min-height: 1em; }
+  .admin-item-status-ok { color: var(--status-good); }
+  .admin-item-status-error { color: #d9534f; }
+
+  .admin-add-btn {
+    padding: 10px 18px; border-radius: 999px; border: 1px dashed var(--card-border-hover); background: none;
+    color: var(--accent); font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+    transition: background .15s;
+  }
+  .admin-add-btn:hover { background: var(--pill-bg); }
+  .admin-loading { color: var(--text-dim); font-size: 0.88rem; }
+
+  /* ---------- Phone-width pass (<=480px) ----------
+     Everything above this point was tuned for tablet/small-laptop widths
+     (980/860/780/720/640/560px breakpoints) — below 480px those rules
+     leave content sized for a ~700px-wide viewport crammed into a
+     360-414px one (iPhone SE/12/13 mini and typical Android widths). This
+     block follows the same plain-override pattern already used throughout
+     this file (grid-template-columns swaps, padding/font-size reduction)
+     rather than introducing a new methodology. The sidebar needs no changes
+     in THIS block — it is sized in the max-width:980px block near the top,
+     which caps the drawer at min(86vw, 320px). (That comment previously
+     claimed the drawer was already "full-viewport-width" below 980px; it
+     was not — it stayed a fixed 274px at every breakpoint, covering ~76%
+     of a 360px phone with the fixed hamburger sitting over the brand.) */
+  @media (max-width: 480px) {
+    /* ---- shell / hero ---- */
+    .menu-toggle { top: 10px; left: 10px; padding: 8px; }
+    .settings-wrap.settings-wrap-floating { top: 12px; right: 12px; }
+    .hero { min-height: 0; padding: 60px 18px 32px; margin-bottom: 16px; }
+    .hero h1 { font-size: 1.5rem; margin-bottom: 10px; }
+    .hero .subtitle { font-size: 0.92rem; }
+    .hero .lead { font-size: 0.9rem; }
+    .hero .cta { width: 100%; text-align: center; padding: 12px 18px; }
+    .overall-progress-wrap:not(:empty) { margin: 10px 14px 18px; }
+    .overall-progress { padding: 16px 16px; }
+
+    /* ---- sections / general content ---- */
+    section.block { padding: 8px 16px 22px; }
+    section.block.band-teal { padding-top: 44px; padding-bottom: 48px; min-height: 0; }
+    section.block.band-teal h2 { font-size: 1.4rem; }
+    section.block h2 { font-size: 1.1rem; }
+    .closing-line { margin: 24px 16px 0; padding: 20px 0 0; }
+
+    /* ---- quote / values ---- */
+    .quote-card { padding: 18px; }
+    .quote-portrait { width: 64px; height: 64px; }
+    .value-card { padding: 16px; }
+
+    /* ---- feature card / tiles ---- */
+    .feature-card { padding: 16px; gap: 16px; }
+    .feature-grid { gap: 14px; }
+    .feature-tile-text { padding: 14px 16px 18px; }
+
+    /* ---- carousel ---- */
+    .carousel-slide { height: 180px; }
+    .carousel-arrow { width: 34px; height: 34px; }
+
+    /* ---- document grid / cards ---- */
+    .doc-link { padding: 14px 16px; }
+    .doc-card-status { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+    .doc-upload-btn { margin-left: 0; }
+    .doc-download-btn, .doc-upload-btn { flex: 1 1 auto; justify-content: center; }
+
+    /* ---- department selection grid ---- */
+    .deptgrid-intro { margin-bottom: 24px; font-size: 0.92rem; }
+    .dept-card-icon { height: 90px; }
+    .dept-card-icon .dept-icon-svg { width: 38px; height: 38px; }
+
+    /* ---- phase grid / trail ---- */
+    .phase-grid { grid-template-columns: 1fr; }
+    .phase-card { padding: 14px; }
+
+    /* ---- team members / org chart / group structure ----
+       The connector-line rendering itself (renderOrgConnectors,
+       renderGroupStructureTrunk in app.html) is left untouched per
+       instructions — these are CSS-only size/spacing reductions of the
+       same elements it already measures, so its offsetTop/offsetLeft
+       reads still land on the same boxes, just smaller ones. .org-chart
+       already fully mitigates narrow widths via `zoom`, shrinking the
+       ENTIRE tree (and everything inside it, connectors included)
+       uniformly — a lower zoom here is the same technique already in use
+       at the base rule, not a new one. */
+    .team-members { grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; }
+    .team-member { height: 130px; }
+    .org-chart { zoom: 0.5; }
+    .org-view-toggle .seg-btn { min-width: 0; flex: 1; padding: 10px 12px; font-size: 0.84rem; }
+    /* superseded by the 980px rule above — kept so this block still reads
+       as the phone's complete org-chart pass */
+    .group-structure-branches .org-segment { min-width: 0; }
+    .group-jv-row { gap: 14px 40px; }
+
+    /* ---- checklist / progress ---- */
+    .checklist-group { padding: 18px; }
+    .check-item label { padding: 13px 14px; }
+    .level-picker { padding: 18px; }
+    .level-picker-seg { display: flex; width: 100%; }
+    .level-picker-seg .seg-btn { flex: 1; padding: 8px 10px; }
+
+    /* ---- modals ---- */
+    .name-modal { padding: 22px; }
+    .milestone-card { padding: 26px 20px; }
+    .completion-card { padding: 30px 20px; }
+
+    /* ---- footer ---- */
+    footer.site-footer { padding: 18px 16px; }
+    .footer-inner { justify-content: center; text-align: center; }
+
+    /* ---- admin editor ---- */
+    .admin-shell { padding: 16px 14px 40px; }
+    .admin-header { flex-wrap: wrap; gap: 8px; }
+    .admin-header h1 { font-size: 1.1rem; }
+    .admin-nav { padding: 14px 12px 12px; }
+    .admin-item-row { flex-direction: column; padding: 12px; }
+    .admin-item-actions { flex-direction: row; width: 100%; flex-wrap: wrap; }
+    .admin-item-move-pair { flex: 1 1 auto; }
+    .admin-item-actions button { flex: 1 1 auto; }
+    .admin-item-status { flex: 1 1 100%; text-align: left; }
+  }
+
+  /* ---------- Narrow-phone pass (<=380px) ----------
+     Only where the 480px pass above still leaves things tight on the
+     smallest common Android/iPhone widths (360-375px) — deliberately a
+     short list, not a repeat of the whole 480px block, since most regions
+     above already fit comfortably by 375px. */
+  @media (max-width: 380px) {
+    .hero h1 { font-size: 1.32rem; }
+    .sidebar-brand-name { font-size: 12px; }
+    .dept-card-icon { height: 76px; }
+    .org-chart { zoom: 0.42; }
+    .team-members { grid-template-columns: repeat(auto-fill, minmax(112px,1fr)); }
+    .admin-tab-main { padding: 8px 12px; font-size: 0.8rem; }
+    .admin-tab-sub { padding: 5px 10px; font-size: 0.74rem; }
+  }
+</style>

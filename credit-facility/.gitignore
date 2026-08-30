@@ -1,9 +1,12 @@
-node_modules/
-dist/
-*.local
-.vite/
+# clasp credentials — NEVER commit (contains OAuth tokens)
+.clasprc.json
+~/.clasprc.json
 
-# OS / Google Drive noise
+# Local backups / dependencies
+remote_backup/
+node_modules/
+
+# Windows / OS noise
 desktop.ini
 Thumbs.db
 .DS_Store

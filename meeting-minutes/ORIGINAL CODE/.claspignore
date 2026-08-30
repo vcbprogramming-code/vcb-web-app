@@ -1,0 +1,25 @@
+# Files clasp must NOT push to the live Apps Script deployment.
+# When this file exists it is the COMPLETE ignore list (clasp adds no defaults),
+# so it deliberately lists ONLY non-source paths — every Apps Script .js/.html/.json
+# at the project root stays pushable.
+
+# The nested React replica is a standalone web app, not Apps Script source.
+meeting-minutes-react/**
+**/meeting-minutes-react/**
+
+# One-off diagnostic, run by hand from the Apps Script editor when needed.
+# Not part of the app; kept out of the live deployment.
+Diagnose.js
+
+# Dev-only layout checks (plain Node scripts, not Apps Script source).
+tools/**
+**/tools/**
+
+# Dependency / build junk, wherever it appears.
+**/node_modules/**
+**/dist/**
+
+# Stray git worktrees (background-agent scratch checkouts) — stale copies of
+# the same filenames that would otherwise collide with the real source at push time.
+.claude/worktrees/**
+**/.claude/worktrees/**

@@ -1,6 +1,6 @@
 # HR Work Log Web App — Architecture & Session Notes
 
-> This document covers **only the HR Work Log app** (`google-apps-script/` + `react-app/`). This monorepo folder also contains several unrelated apps (`backend/`/`frontend/`
+> This document covers **only the HR Work Log app** (`ORIGINAL CODE/` + `FOR DEPLOYMENT TEAM/`). This monorepo folder also contains several unrelated apps (`backend/`/`frontend/`
 > = a separate E-Memo/Credit-Facility/Onboarding system, `sop/`, `portal/`, `meeting-minutes/`,
 > `credit-facility/`, `System Operating Map/`, etc.) — their own docs (`README.md`,
 > `เอกสารสรุปฟังก์ชันระบบ.md`) describe **that other system**, not this one. Do not conflate them.
@@ -20,25 +20,25 @@ Editor: `https://script.google.com/d/13GL834YDPhar_j-IZTT_f4mDYPUDMJELPIh2XzWHJr
 >
 > | โฟลเดอร์ | คืออะไร | สถานะ |
 > |---|---|---|
-> | **`google-apps-script/`** | `Code.gs`, `History.gs`, `appsscript.json`, `.claspignore` | ✅ **ระบบที่ใช้งานจริง** |
-> | **`react-app/`** | React/TypeScript preview (mock data) | ตัวอย่าง UI |
+> | **`ORIGINAL CODE/`** | `Code.gs`, `History.gs`, `appsscript.json`, `.claspignore` | ✅ **ระบบที่ใช้งานจริง** |
+> | **`FOR DEPLOYMENT TEAM/`** | React/TypeScript preview (mock data) | ตัวอย่าง UI |
 >
 > **เรื่อง frontend/backend ที่มักเข้าใจผิด:** โครงสร้างนี้ *ไม่มี* โฟลเดอร์
 > `frontend/` `backend/` แยกกัน เพราะ Apps Script ไม่ได้ทำงานแบบนั้น — ทั้งสอง
 > ส่วนอยู่ใน `Code.gs` ไฟล์เดียว (ฟังก์ชัน `api_*` คือ backend ส่วน
-> `PAGE_HTML_` template literal คือ frontend ทั้งหมด) ส่วน `react-app/` มีแค่
+> `PAGE_HTML_` template literal คือ frontend ทั้งหมด) ส่วน `FOR DEPLOYMENT TEAM/` มีแค่
 > frontend และใช้ `src/mock.ts` แทน backend
 >
 > `.clasp.json` (ไม่อยู่ใน git — เป็นไฟล์เฉพาะเครื่อง) ตั้ง `rootDir` ชี้ไปที่
-> `google-apps-script/` และยังคงรัน `clasp push` / `clasp deploy`
+> `ORIGINAL CODE/` และยังคงรัน `clasp push` / `clasp deploy`
 > จาก**โฟลเดอร์แม่**เหมือนเดิม
 >
 > **หมายเหตุ:** ข้อความในหัวข้อ §2, §2A, §2B ด้านล่างเป็นบันทึกย้อนหลังที่เขียนไว้
 > *ก่อน* การจัดโครงสร้างนี้ จึงยังอ้างถึง `Code.gs` และ `hr-worklog/` ที่ระดับ root
 > ตั้งใจไม่แก้ เพื่อให้บันทึกตรงกับสิ่งที่เกิดขึ้นจริง ณ เวลานั้น — เมื่ออ่านให้เติม
-> path ใหม่เอาเอง (`google-apps-script/Code.gs`, `react-app/`)
+> path ใหม่เอาเอง (`ORIGINAL CODE/Code.gs`, `FOR DEPLOYMENT TEAM/`)
 >
-> **ลบออกไปแล้ว (2026-08-30):** `react-app/` เดิมที่ root (70MB — `src/` มีแค่
+> **ลบออกไปแล้ว (2026-08-30):** `FOR DEPLOYMENT TEAM/` เดิมที่ root (70MB — `src/` มีแค่
 > `desktop.ini` ไม่มีโค้ด), `_data/`, `_legacy_live_clasp/`, `_scripts/` — ทั้งหมด
 > ว่างเปล่าและไม่ได้ track ใน git
 >
@@ -86,7 +86,7 @@ leave hub, against a stateful mock). `src/i18n_data.ts` is **auto-extracted from
 do not hand-edit it; re-extract when the `T` dictionary changes. Verify with
 `npm run typecheck` and `npm run build` in `hr-worklog/`.
 
-> `react-app/` at the repo root is **not** this mirror — its `src/` is empty (a stray `dist/`
+> `FOR DEPLOYMENT TEAM/` at the repo root is **not** this mirror — its `src/` is empty (a stray `dist/`
 > and `node_modules/` only) and it is untracked. The live mirror is `hr-worklog/`.
 
 ---
@@ -580,15 +580,15 @@ across redeploys. `clasp deploy` without `-i` creates a **new** deployment (new 
 unless intentionally creating a second, separate deployment.
 
 **Where things live:**
-- `google-apps-script/Code.gs` — everything (server + entire client app in `PAGE_HTML_`)
-- `google-apps-script/History.gs` — static embedded historical data for one-time import
+- `ORIGINAL CODE/Code.gs` — everything (server + entire client app in `PAGE_HTML_`)
+- `ORIGINAL CODE/History.gs` — static embedded historical data for one-time import
 - `appsscript.json` — manifest (now also has an `executionApi: {access:"MYSELF"}` block added
   this session for `clasp run` diagnostics — harmless, doesn't affect the web app deployment)
-- `google-apps-script/.claspignore` — allowlist scoping `clasp push` to just the three files above
-- `react-app/` — React mirror (mock data, UI preview only, no live backend).
+- `ORIGINAL CODE/.claspignore` — allowlist scoping `clasp push` to just the three files above
+- `FOR DEPLOYMENT TEAM/` — React mirror (mock data, UI preview only, no live backend).
   `npm run typecheck` / `npm run build` from that folder. `src/i18n_data.ts` is auto-extracted
   from `Code.gs` — re-extract rather than hand-editing.
-- `react-app/` — **not** the mirror: empty `src/`, untracked, ignore it.
+- `FOR DEPLOYMENT TEAM/` — **not** the mirror: empty `src/`, untracked, ignore it.
 
 **Regenerating demo data** (Apps Script editor only — deliberately not reachable from the app):
 run `REGEN_DEMO_MONTH(year, month)`, **one month per run**. Three months across eight sites in a

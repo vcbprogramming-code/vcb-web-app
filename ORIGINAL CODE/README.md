@@ -1,9 +1,9 @@
-# google-apps-script — ระบบที่ใช้งานจริง (Production)
+# ORIGINAL CODE — ระบบที่ใช้งานจริง (Production)
 
 โค้ดในโฟลเดอร์นี้คือ **ระบบที่พนักงานใช้งานจริง** ของแอป HR Daily Work Log
 (`บันทึกการทำงานรายวัน`) — เป็นสิ่งเดียวที่ `clasp push` ส่งขึ้น Google Apps Script
 
-> คู่ของโฟลเดอร์นี้คือ [`../react-app/`](../react-app/) ซึ่งเป็น **ตัวอย่าง UI
+> คู่ของโฟลเดอร์นี้คือ [`../FOR DEPLOYMENT TEAM/`](../FOR DEPLOYMENT TEAM/) ซึ่งเป็น **ตัวอย่าง UI
 > ด้วย React/TypeScript** ไว้อ้างอิงและส่งต่อให้นักพัฒนา — ไม่ใช่ระบบจริง
 
 ---
@@ -46,7 +46,7 @@ Code.gs  (~604 KB)
 ## วิธี Deploy
 
 รันจาก **โฟลเดอร์แม่** (`HR Work Log Web App/`) ไม่ใช่จากในโฟลเดอร์นี้ —
-`.clasp.json` อยู่ที่โฟลเดอร์แม่ และตั้ง `rootDir` ชี้มาที่ `google-apps-script/`
+`.clasp.json` อยู่ที่โฟลเดอร์แม่ และตั้ง `rootDir` ชี้มาที่ `ORIGINAL CODE/`
 
 ```
 clasp push
@@ -99,9 +99,9 @@ migration เพราะผู้ใช้จะค้างที่ "กำ�
 
 ---
 
-## เทียบกับ `../react-app/`
+## เทียบกับ `../FOR DEPLOYMENT TEAM/`
 
-|  | `google-apps-script/` (นี่) | `../react-app/` |
+|  | `ORIGINAL CODE/` (นี่) | `../FOR DEPLOYMENT TEAM/` |
 |---|---|---|
 | สถานะ | ✅ **ระบบจริงที่ใช้งานอยู่** | ตัวอย่าง UI |
 | ภาษา | Google Apps Script (`.gs`) | TypeScript + React |
@@ -110,7 +110,7 @@ migration เพราะผู้ใช้จะค้างที่ "กำ�
 | Deploy | Google Apps Script | Vercel (ถ้าต้องการ) |
 | แหล่งความจริง | ✅ **ตัวนี้คือต้นทาง** | ตามหลัง — sync มาจาก `Code.gs` |
 
-**ทิศทาง:** แก้ที่ `Code.gs` ก่อนเสมอ แล้วค่อย sync ไป `react-app/`
+**ทิศทาง:** แก้ที่ `Code.gs` ก่อนเสมอ แล้วค่อย sync ไป `FOR DEPLOYMENT TEAM/`
 ไม่ใช่ทางกลับกัน
 
 ---

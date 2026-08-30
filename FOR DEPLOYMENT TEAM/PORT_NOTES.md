@@ -1,7 +1,7 @@
 # PORT_NOTES — React mirror of the Google Apps Script app
 
 This folder is a **downstream replica** of the canonical Google Apps Script
-project (`../google-apps-script/Code.gs`). The GAS app is the source of truth; this React app mirrors
+project (`../ORIGINAL CODE/Code.gs`). The GAS app is the source of truth; this React app mirrors
 it. When `Code.gs` changes, re-sync this folder (diff → update only what changed →
 re-extract the CSS + `T` dictionary verbatim → bump the row below).
 
@@ -9,7 +9,7 @@ re-extract the CSS + `T` dictionary verbatim → bump the row below).
 
 | Field | Value |
 |---|---|
-| GAS source | `../google-apps-script/Code.gs` |
+| GAS source | `../ORIGINAL CODE/Code.gs` |
 | Size at sync | 603,790 bytes |
 | GAS mtime at sync | 2026-08-20 |
 | Deployed version referenced | `@54` |

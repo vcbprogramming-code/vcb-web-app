@@ -1,12 +1,12 @@
-# react-app — ตัวอย่าง UI ด้วย React + TypeScript
+# FOR DEPLOYMENT TEAM — ตัวอย่าง UI ด้วย React + TypeScript
 
 > **⚠️ นี่ไม่ใช่ระบบที่ใช้งานจริง** — ระบบจริงอยู่ที่
-> [`../google-apps-script/`](../google-apps-script/) โฟลเดอร์นี้ใช้ mock data
+> [`../ORIGINAL CODE/`](../ORIGINAL CODE/) โฟลเดอร์นี้ใช้ mock data
 > ไม่มี backend และข้อมูลที่แก้จะหายเมื่อ refresh
 
 
 A React + TypeScript replica of the Google Apps Script app in the parent folder
-(`../google-apps-script/Code.gs`). It mirrors the live UI pixel-for-pixel (the CSS is extracted
+(`../ORIGINAL CODE/Code.gs`). It mirrors the live UI pixel-for-pixel (the CSS is extracted
 verbatim) with a typed mock data layer, so it runs with **no backend**.
 
 > This folder is a **downstream mirror** of the canonical GAS project. See
@@ -33,7 +33,7 @@ npm run preview     # serve the production build
 This subfolder is self-contained and deploys on its own.
 
 - **Vercel dashboard:** New Project → import the repo → set **Root Directory** to
-  `react-app` → Framework preset **Vite** → deploy. (Build `npm run build`,
+  `FOR DEPLOYMENT TEAM` → Framework preset **Vite** → deploy. (Build `npm run build`,
   output `dist`.)
 - **Vercel CLI:** from this folder, `vercel` (or `vercel --prod`).
 
@@ -69,11 +69,11 @@ src/
 
 ## สถาปัตยกรรม — ทำไมที่นี่ถึงไม่มีโฟลเดอร์ backend
 
-โฟลเดอร์นี้มีเฉพาะ **frontend** เท่านั้น ซึ่งต่างจาก `../google-apps-script/`
+โฟลเดอร์นี้มีเฉพาะ **frontend** เท่านั้น ซึ่งต่างจาก `../ORIGINAL CODE/`
 ที่รวม frontend กับ backend ไว้ในไฟล์เดียว:
 
 ```
-../google-apps-script/Code.gs        react-app/  (โฟลเดอร์นี้)
+../ORIGINAL CODE/Code.gs        FOR DEPLOYMENT TEAM/  (นี่)
 ├── backend  (api_* , Sheets)   ⟷    ├── ❌ ไม่มี backend
 └── frontend (PAGE_HTML_)             │       ใช้ src/mock.ts แทน
                                       └── frontend (src/*.tsx)
@@ -91,7 +91,7 @@ src/
 
 ## กฎการ sync
 
-`../google-apps-script/Code.gs` คือแหล่งความจริง โฟลเดอร์นี้ตามหลังเสมอ
+`../ORIGINAL CODE/Code.gs` คือแหล่งความจริง โฟลเดอร์นี้ตามหลังเสมอ
 
 ไฟล์ 3 ตัวนี้ **ดึงอัตโนมัติจาก `Code.gs` — ห้ามแก้ด้วยมือ**:
 

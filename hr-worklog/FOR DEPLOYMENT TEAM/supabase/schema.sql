@@ -68,11 +68,9 @@ returns boolean language sql security definer set search_path = public stable as
   select public.is_hr_admin() or (public.my_site() is not null and public.my_site() = p_site);
 $$;
 
-grant execute on function public.my_role()            to authenticated;
-grant execute on function public.my_site()            to authenticated;
-create or replace function public.is_hr_admin() returns boolean language sql
-  security definer set search_path = public stable as $$ select public.my_role() = 'admin'; $$;
-grant execute on function public.is_hr_admin()        to authenticated;
+grant execute on function public.my_role()             to authenticated;
+grant execute on function public.my_site()             to authenticated;
+grant execute on function public.is_hr_admin()         to authenticated;
 grant execute on function public.can_access_site(text) to authenticated;
 
 -- ------------------------------------------------------------ reference data --
@@ -186,6 +184,21 @@ create index if not exists hr_audit_at_idx on public.audit_log(at desc);
 
 -- Replaces the wide per-(site, month) tabs. One row per employee per day per
 -- period. `period` is 'am' or 'pm' — the sheet's AM block and appended PM block.
+-- NOTE ON SHAPE: the sheet has one `Note N` column per DAY, shared by the AM and
+-- PM values (writeWideCells_ writes 'AM', 'PM' and 'note' as three separate
+-- fields of one day). So the note belongs to the day, not to a period — keeping
+-- it on work_entries would let AM and PM disagree about the same note. It lives
+-- in work_days below.
+create table if not exists public.work_days (
+  eid        text not null references public.employees(eid) on delete cascade,
+  entry_date date not null,
+  site_key   text not null references public.sites(key),
+  note       text,
+  updated_at timestamptz not null default now(),
+  updated_by text,
+  primary key (eid, entry_date)
+);
+
 create table if not exists public.work_entries (
   id         bigint generated always as identity primary key,
   eid        text not null references public.employees(eid) on delete cascade,
@@ -194,7 +207,6 @@ create table if not exists public.work_entries (
   period     text not null check (period in ('am','pm')),
   -- The activity code written in the cell (e.g. 'A-1'), matching MasterIndex.
   value      text,
-  note       text,
   updated_at timestamptz not null default now(),
   updated_by text,
   unique (eid, entry_date, period)
@@ -202,6 +214,68 @@ create table if not exists public.work_entries (
 
 create index if not exists work_entries_site_date_idx on public.work_entries(site_key, entry_date);
 create index if not exists work_entries_eid_date_idx  on public.work_entries(eid, entry_date);
+create index if not exists work_days_site_date_idx    on public.work_days(site_key, entry_date);
+
+-- ------------------------------------------------- the edit window rules ----
+--
+-- api_saveCells enforces two time rules that the sheet layout could not:
+--   * nobody may fill more than ONE DAY AHEAD  (so a month cannot be
+--     pre-filled before it happens) — applies to everyone, admins included
+--   * non-admins may not edit further back than LOCK_DAYS (default 3)
+-- Those live in JavaScript today, which means anything talking to the database
+-- directly bypasses them. Here they are triggers, so they hold for every path.
+
+create or replace function public.entry_window_ok(p_date date)
+returns boolean language sql security definer set search_path = public stable as $$
+  select p_date <= (current_date + 1)
+     and (public.is_hr_admin()
+          or p_date >= (current_date - coalesce(
+               (select value::int from public.config where key = 'LOCK_DAYS'), 3)));
+$$;
+
+grant execute on function public.entry_window_ok(date) to authenticated;
+
+create or replace function public.enforce_entry_window()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not public.entry_window_ok(new.entry_date) then
+    raise exception
+      'Entry date % is outside the editable window (max 1 day ahead; % days back for non-admins).',
+      new.entry_date,
+      coalesce((select value from public.config where key = 'LOCK_DAYS'), '3')
+      using errcode = '42501';
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists work_entries_window on public.work_entries;
+create trigger work_entries_window before insert or update on public.work_entries
+  for each row execute function public.enforce_entry_window();
+
+drop trigger if exists work_days_window on public.work_days;
+create trigger work_days_window before insert or update on public.work_days
+  for each row execute function public.enforce_entry_window();
+
+-- Keep site_key honest: an entry must sit on the employee's own site, or the
+-- roster and the entries can drift apart silently.
+create or replace function public.enforce_entry_site()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare emp_site text;
+begin
+  select e.site_key into emp_site from public.employees e where e.eid = new.eid;
+  if emp_site is not null and new.site_key is distinct from emp_site then
+    raise exception 'Employee % belongs to site %, not %.', new.eid, emp_site, new.site_key
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists work_entries_site on public.work_entries;
+create trigger work_entries_site before insert or update on public.work_entries
+  for each row execute function public.enforce_entry_site();
 
 -- ------------------------------------------------------- row level security --
 
@@ -215,6 +289,7 @@ alter table public.migrations     enable row level security;
 alter table public.leave_requests enable row level security;
 alter table public.audit_log      enable row level security;
 alter table public.work_entries   enable row level security;
+alter table public.work_days      enable row level security;
 
 -- Reference data: readable by any signed-in user, writable by admins only.
 do $$
@@ -245,6 +320,43 @@ create policy "work entries readable within site" on public.work_entries
 create policy "work entries writable within site" on public.work_entries
   for all to authenticated
   using (public.can_access_site(site_key)) with check (public.can_access_site(site_key));
+
+create policy "work days readable within site" on public.work_days
+  for select to authenticated using (public.can_access_site(site_key));
+create policy "work days writable within site" on public.work_days
+  for all to authenticated
+  using (public.can_access_site(site_key)) with check (public.can_access_site(site_key));
+
+-- Every value change is audited, exactly as writeWideCells_ does today — it
+-- pushes an AuditLog row per changed AM/PM cell with the old and new value.
+-- Doing it in a trigger means a direct API call is audited too, not just edits
+-- that went through the app.
+create or replace function public.audit_work_entry()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare emp_name text;
+begin
+  if tg_op = 'UPDATE' and new.value is not distinct from old.value then
+    return new;   -- nothing actually changed
+  end if;
+  select e.name into emp_name from public.employees e where e.eid = new.eid;
+  insert into public.audit_log (email, site, year, month, eid, emp_name, day, field, old_val, new_val)
+  values (
+    coalesce(auth.jwt() ->> 'email', ''), new.site_key,
+    extract(year  from new.entry_date)::int,
+    extract(month from new.entry_date)::int,
+    new.eid, emp_name,
+    extract(day   from new.entry_date)::int,
+    upper(new.period),
+    case when tg_op = 'UPDATE' then old.value else null end,
+    new.value
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists work_entries_audit on public.work_entries;
+create trigger work_entries_audit after insert or update on public.work_entries
+  for each row execute function public.audit_work_entry();
 
 -- Leave requests: staff see their own site's; only managers/admins decide.
 create policy "leave readable within site" on public.leave_requests

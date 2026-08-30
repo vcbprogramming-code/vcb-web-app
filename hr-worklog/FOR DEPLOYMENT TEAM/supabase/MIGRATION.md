@@ -37,9 +37,14 @@ tab, for each employee row, for each day 1–31, emit up to two rows.
 ```
 tab "สำนักงานใหญ่ · 2569-08", employee E123, day 5
   AM 5 = 'A-1', Note 5 = 'ตรวจงาน', PM 5 = 'B-2'
-    → (E123, 2026-08-05, 'am', 'A-1', 'ตรวจงาน')
-    → (E123, 2026-08-05, 'pm', 'B-2', null)
+    → work_entries (E123, 2026-08-05, 'am', 'A-1')
+    → work_entries (E123, 2026-08-05, 'pm', 'B-2')
+    → work_days    (E123, 2026-08-05, note = 'ตรวจงาน')
 ```
+
+Note the split: `Note N` is ONE column per day in the sheet, shared by AM and
+PM, so it goes to `work_days` — one row per employee per day. Putting it on
+`work_entries` would create two copies that could disagree.
 
 Notes for whoever writes the import script:
 
@@ -119,8 +124,16 @@ are not ported at all:
   `exportCostIndexXlsx`)
 - the leave-request workflow and its pending badge
 - employee site-migration (`openMigrateEmp`)
-- audit logging on every field change
 - cost indexing and OT handling
+
+Audit logging is the one exception — `schema.sql` now writes an `audit_log` row
+from a trigger on every value change, so that behaviour survives the move for
+free and applies even to a direct API call.
+
+The two edit-window rules are also enforced in the database now (no filling more
+than one day ahead; non-admins locked out beyond `LOCK_DAYS`, default 3). In the
+Apps Script app those live only in `api_saveCells`, so anything talking to the
+data directly bypasses them.
 
 Each needs rebuilding against Postgres. That is the real scope of this
 migration, and it is why this app should go last.

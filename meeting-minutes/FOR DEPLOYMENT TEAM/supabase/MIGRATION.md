@@ -83,6 +83,35 @@ Column renames to apply while importing:
 | `visible` / `pinned` | same | `'TRUE'` → `true`, `''` → `false` |
 | `attendees` / `attachments` / `comments` | same | already JSON strings → `jsonb` |
 
+### Is every document backed up?
+
+Yes, and it already is today — worth knowing before the move, because the same
+guarantee has to survive it.
+
+`saveContent_()` calls `snapshotVersion_()` **before** overwriting, storing the
+previous body to the `Versions` sheet with a timestamp, title and date label.
+Nothing is pruned, so the full edit history of every meeting is retained. That
+applies equally to:
+
+- meetings that arrived from **Fathom or Transkriptor** — the imported
+  transcript is preserved the moment anyone edits it
+- meetings **created directly in the app** — identical path, identical
+  protection
+
+This schema keeps that: the `versions` table is the same idea, and the
+`minutes_guard` trigger means the snapshot cannot be skipped by a client that
+forgets to ask for one.
+
+Two things to get right when you cut over:
+
+1. **Import `Versions` too** (step 3 above). Skipping it imports current content
+   with no history — the loss is invisible until someone needs to recover.
+2. **Keep writing snapshots.** If the new client updates `minutes.content_html`
+   without inserting into `versions`, history silently stops accumulating. The
+   safest form is a trigger, as SOP's schema does — see
+   `sop_snapshot_before_update()` in
+   `../../../sop/FOR DEPLOYMENT TEAM/supabase/schema.sql`.
+
 **The meeting body needs care.** In the sheet the content is not in the row — it
 is stored separately by `saveContent_()`. In this schema it is the
 `minutes.content_html` column, so the import has to fetch each meeting's content

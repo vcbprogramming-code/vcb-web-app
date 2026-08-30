@@ -104,9 +104,9 @@ create policy "sop versions readable by editors" on public.sop_versions
 --        insert into public.sop_document (id, data) values (1, '<json>'::jsonb);
 --   3. Enable Supabase Auth → Google, restricted to your workspace domain.
 --
--- NOTE: the Google Doc (SOP_DOC_ID) is a ONE-WAY MIRROR, not the source.
--- Code.js is explicit: "editing the Doc directly no longer has any effect on
--- what the app shows... There is no sync-from-Doc entry point anymore."
--- Content is authored in the app; the Doc and the Drive JSON snapshots are
--- backups. After migration, sop_document holds the content and sop_versions
--- replaces those snapshots. See MIGRATION.md.
+-- NOTE ON THE GOOGLE DOC (SOP_DOC_ID). It is a LIVE ONE-WAY MIRROR: every save
+-- in the app writes into it, so it stays current — but editing the Doc does not
+-- flow back ("no sync-from-Doc entry point anymore"). After migration,
+-- sop_document holds the content and sop_versions snapshots every change.
+-- Decide deliberately whether to keep writing the Doc mirror; if it silently
+-- stops it goes stale while still looking authoritative. See MIGRATION.md.

@@ -80,6 +80,29 @@ Notes for whoever writes the import script:
 This is the step most likely to lose or misplace data. Verify it before anything
 else.
 
+### Does one row per entry get unwieldy?
+
+A fair worry, since this is filled every day for every project. The numbers say
+no. At roughly 345 employees across the eight sites and ~22 working days a
+month:
+
+| | rows |
+|---|---|
+| per month | 7,600 – 15,200 |
+| per year | 91,000 – 182,000 |
+| after ten years | ~1.8 million |
+
+Postgres treats that as small. The indexes on `(site_key, entry_date)` and
+`(eid, entry_date)` mean loading one site's month costs the same in year ten as
+in year one, because it seeks straight to those rows instead of scanning.
+
+The wide tab exists precisely *because* a spreadsheet cannot do this — 98
+columns is the workaround, and it costs a hard 31-day ceiling plus columns whose
+meaning depends on their position. Nobody browses the raw table either: the app
+builds the same month grid from these rows. What changes is that questions the
+wide layout made painful — one employee's whole year, mandays by site, activity
+totals across projects — become one query instead of reading across twelve tabs.
+
 ## Steps
 
 ### 1. Create the Supabase project

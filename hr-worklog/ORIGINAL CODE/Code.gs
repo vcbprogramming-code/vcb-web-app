@@ -8041,3 +8041,72 @@ function api_exportMandayReport(year, month){
       data:Utilities.base64Encode(resp.getBlob().getBytes()) };
   } finally { try{ DriveApp.getFileById(tempId).setTrashed(true); }catch(e){} }
 }
+
+/* ============================================================================
+   CLEAN SLATE — wipe entry data, keep the database itself
+   ============================================================================
+   Run once from the Apps Script editor: Run > resetEntryData.
+
+   WHAT IT DOES
+     Deletes every wide monthly tab (the daily entries), every _legacy_ tab left
+     behind by the old long-format migration, and the two long-format tabs
+     themselves. Clears AuditLog, LeaveRequests and Migrations. Then rebuilds
+     the empty structure.
+
+   WHAT IT DOES NOT TOUCH — deliberately
+     * The spreadsheet itself. Same file, same id, same Drive location, so
+       DB_ID / DB_ID_OVERRIDE_ stay valid and nothing needs repointing. This is
+       the whole point: no hunting for "the real database" afterwards.
+     * Config, Sites, Teams, Employees, Users, MasterIndex, CostIndex — the
+       roster and reference data you would only have to re-enter.
+
+   SAFETY
+     Requires the confirmation phrase, so it cannot fire by accident. Logs a
+     count of what it removed. There is no undo beyond Drive's own version
+     history (File > Version history in the spreadsheet), so check that first if
+     you are unsure.
+   ========================================================================== */
+function resetEntryData(){
+  return resetEntryData_('');
+}
+
+function resetEntryData_(confirmPhrase){
+  var REQUIRED = 'YES WIPE ENTRIES';
+  if (confirmPhrase !== REQUIRED) {
+    throw new Error(
+      'Refusing to wipe. This deletes every daily entry in the HR Work Log.\n' +
+      'If that is what you want, run:  resetEntryData_("' + REQUIRED + '")\n' +
+      'Reference data (Sites, Employees, MasterIndex, …) is kept either way.'
+    );
+  }
+
+  var ss = ss_();
+  var report = { wideTabs: 0, legacyTabs: 0, longFormatTabs: 0, clearedSheets: [] };
+
+  // 1. Every per-(site, month) wide tab, plus anything left by the old migration.
+  ss.getSheets().forEach(function(sh){
+    var name = sh.getName();
+    if (parseWideTabName_(name)) { ss.deleteSheet(sh); report.wideTabs++; return; }
+    if (name.indexOf('_legacy_') === 0) { ss.deleteSheet(sh); report.legacyTabs++; return; }
+    if (name === LEGACY.SUP || name === LEGACY.OP) { ss.deleteSheet(sh); report.longFormatTabs++; }
+  });
+
+  // 2. Transactional history — headers kept, rows dropped.
+  [SHEETS.AUDIT, SHEETS.LEAVE, SHEETS.MIG].forEach(function(name){
+    var sh = ss.getSheetByName(name);
+    if (sh && sh.getLastRow() > 1) {
+      sh.deleteRows(2, sh.getLastRow() - 1);
+      report.clearedSheets.push(name);
+    }
+  });
+
+  // 3. Drop cached state so the app does not serve rows that no longer exist.
+  try { CacheService.getUserCache().removeAll([]); } catch(e){}
+  SS_CACHE_ = null;
+
+  // 4. Rebuild the empty structure (creates missing sheets, re-seeds the roster).
+  SETUP();
+
+  Logger.log('resetEntryData: ' + JSON.stringify(report));
+  return report;
+}

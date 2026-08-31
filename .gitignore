@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+.vercel
 
 # Environment / secrets — never commit
 .env

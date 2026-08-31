@@ -23,7 +23,5 @@ approving a new drawdown.
 
 ## Notes
 
-Signing in is required for the whole app; write access is limited to managers.
-
 Some figures are derived rather than stored — used credit comes from the ledger
 entries unless a manager deliberately pins it to a fixed number.

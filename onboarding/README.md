@@ -22,6 +22,3 @@ of the first three months.
 
 An orientation aid, not an HR monitoring tool. Progress is there to help the new
 hire keep their place, not to report on them.
-
-Identity is by name rather than an account, so a hire can start immediately
-without waiting for a login to be issued.

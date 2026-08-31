@@ -19,8 +19,6 @@ who is responsible at each one.
 
 ## Notes
 
-Reading requires no sign-in; editing does.
-
 A copy of the manual is also written out to a Google Doc as each change is
 saved, so there is always a readable version outside the app. That copy is
 one-way — editing the Doc does not change what the app shows.

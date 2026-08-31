@@ -25,9 +25,5 @@ coverage, workload and cost by activity.
 
 ## Notes
 
-The whole app is open — there is no login. Anyone with the link can read and
-write any site. This is deliberate: site staff share devices and an account step
-was judged more likely to stop the log being filled in than to protect it.
-
 Every change is recorded with what it was before, so an edit can always be
 traced.

@@ -16,7 +16,6 @@ interface the team browses day to day.
   number issued for them
 - **Approval and signature** — approvers act from the record, and a signed
   PDF is produced per memo
-- **Sign-in gated** — the register is not public
 
 ## Notes
 

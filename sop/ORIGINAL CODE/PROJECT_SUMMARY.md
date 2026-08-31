@@ -6,7 +6,7 @@
 > - **[CHANGELOG.md](../CHANGELOG.md)** — *current state* (overwrite the top block) + milestones. **Start here to see where things stand.**
 > - **[SETUP.md](SETUP.md)** — build/deploy/preview workflow.
 > - **[DESIGN.md](DESIGN.md)** — UI conventions (icons, tokens, nav, flow-data shape).
-> - **[README.md](README.md)** — Thai end‑user guide (features/navigation).
+> - **[../README.md](../README.md)** — what the app is and does.
 > - **PROJECT_SUMMARY.md** (this file) — the plain‑language technical summary.
 > Maintenance rule: most edits are tiny — don't log each one. Overwrite the CHANGELOG *state* block; add a milestone only when a real feature/polish pass lands; touch README/DESIGN/SUMMARY only when behavior/structure/a convention changes.
 

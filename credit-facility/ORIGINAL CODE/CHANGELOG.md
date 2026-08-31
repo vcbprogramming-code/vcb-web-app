@@ -185,4 +185,4 @@ Settings-modal sizing/gear tweaks.
 ### 2026-05-31 — Initial commit _(v98)_
 VCB Credit Facility web app at its then-deployed state: Apps Script backend (`Code.js`),
 seed data (`Seed.js`), single-file UI (`index.html`), manifest, and docs. See
-[../README.md](../README.md) / [SETUP.md](SETUP.md) for backend architecture, data model, and deploy workflow.
+[../README.md](../README.md) (what the app does) / [SETUP.md](SETUP.md) for backend architecture, data model, and deploy workflow.

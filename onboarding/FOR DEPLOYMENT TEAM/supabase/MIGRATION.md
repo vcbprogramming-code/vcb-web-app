@@ -4,8 +4,20 @@ Status: **furthest along of the seven.** Unlike the others, this React app is
 not a mock — `src/lib/useProgress.ts`, `useChecklistOverrides.ts`,
 `useDocUpload.ts` and `pages/AdminPage.tsx` already query Supabase for real.
 
-The setup steps live in `../README.md` (env vars, `schema.sql`, `npm run dev`).
-This file records only what is left and what to watch.
+## Running it
+
+```sh
+cp .env.example .env    # then fill in your Supabase project's URL + anon key
+npm install
+npm run dev
+```
+
+Then run `schema.sql` once in your Supabase project's SQL Editor — it creates
+the `employees`, `progress` and `checklist_overrides` tables, the storage bucket
+for required documents, and the row level security policies.
+
+The client throws at startup if the two env vars are missing, rather than
+letting every query fail with a vague network error.
 
 ## Why this one is different
 

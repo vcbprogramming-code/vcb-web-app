@@ -64,10 +64,11 @@ before changing anything.
    recently.
 2. **`<module>/FOR DEPLOYMENT TEAM/PORT_NOTES.md`** — what the React port covers
    and what it does not.
-3. **`<module>/FOR DEPLOYMENT TEAM/supabase/MIGRATION.md`** — the plan for
-   moving that app off Apps Script.
-4. **`<module>/ORIGINAL CODE/`** — the live app's own README, CHANGELOG and
-   design notes, where they exist.
+3. **`<module>/FOR DEPLOYMENT TEAM/supabase/schema.sql`** — the Postgres schema
+   that would replace that app's Google Sheet, with the app-specific traps
+   noted inline.
+4. **`<module>/ORIGINAL CODE/`** — the live app's own PROJECT_SUMMARY, SETUP,
+   CHANGELOG and design notes, where they exist.
 
 ## Working on the live apps
 
@@ -125,8 +126,8 @@ When in doubt, read what the code does, not what the column is called.
 ## The migration
 
 The intent is to leave Apps Script for React + Supabase. Groundwork is done —
-each module has a Postgres schema derived from its live Sheet, a Supabase
-client, and a migration guide.
+each module has a Postgres schema derived from its live Sheet, and a Supabase
+client.
 
 **Nothing is connected.** No Supabase project exists, no data has been imported,
 and every React app still runs on mock data.

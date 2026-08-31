@@ -131,7 +131,7 @@ apps remain the live system.
 
 | Module | Schema | Note |
 |---|---|---|
-| credit-facility | ✅ + `MIGRATION.md` | the pilot — 9 tables |
+| credit-facility | ✅ | the pilot — 9 tables |
 | meeting-minutes | ✅ | 3-tier access (public / locked / guest) reproduced in RLS |
 | hr-worklog | ✅ | wide monthly tabs normalised to one row per entry |
 | sop | ✅ | one jsonb document + versions; no spreadsheet today |

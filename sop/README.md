@@ -25,6 +25,15 @@ Everyone reads. Writing a procedure — adding, rewording or renumbering — is 
 Roles are still being rolled out, so what you see today is not the finished
 access model.
 
+## Data
+
+No spreadsheet. The manual is one JSON document held in the app's own script
+properties, with a fast cache in front of it.
+
+The flow-diagram PDFs live in a fixed Drive folder, addressed by id. Never look
+that folder up by name and never create one — an earlier version did, missed,
+and left a stray duplicate that had to be cleaned up by hand.
+
 ## Notes
 
 A copy of the manual is also written out to a Google Doc as each change is

@@ -17,6 +17,14 @@ interface the team browses day to day.
 - **Approval and signature** — approvers act from the record, and a signed
   PDF is produced per memo
 
+## Data
+
+One Google Sheet, `VCB Document Control — Master`
+(`1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s`), found via the script property
+`MASTER_SHEET_ID`, with one tab per project plus a discussion tab. A dated
+backup sheet is kept deliberately as a restore point, and each memo generates a
+Doc and PDF filed into its project folder.
+
 ## Notes
 
 **This app is maintained by an external developer.** It is kept here so the rest

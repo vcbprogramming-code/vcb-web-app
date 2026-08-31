@@ -30,6 +30,20 @@ recorded against the request.
 Roles are still being rolled out, so what you see today is not the finished
 access model.
 
+## Data
+
+One Google Sheet, `VCB Credit Facility Master`
+(`1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8`), found via the script property
+`MASTER_SHEET_ID`. Tabs: Facilities, Transactions, Requests, Limits,
+CostCategories, CategoryCaps, CashPlan.
+
+It is the only database the app reads or writes. Export creates a temporary
+sheet and trashes it immediately.
+
+If the stored id will not open the app **fails loudly** rather than creating a
+blank replacement — hardening added after a 2026-07-01 incident where a silent
+reseed orphaned a month of data.
+
 ## Notes
 
 Some figures are derived rather than stored — used credit comes from the ledger

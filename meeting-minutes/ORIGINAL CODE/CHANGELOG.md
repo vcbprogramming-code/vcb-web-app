@@ -9,7 +9,7 @@
 - **DB hardening (2026-07-04):** `getDb_` no longer silently recreates a blank database on a
   transient open failure — it now throws loudly (mirrors the Credit Facility reseed-incident fix). The live DB
   (`1ouYa11i…`) was verified to already sit in this app's folder — no relocation needed; the new self-file-to-
-  `VCB App Data` step is only a safety net for fresh re-creates. See [DATABASES.md](DATABASES.md) and
+  `VCB App Data` step is only a safety net for fresh re-creates. See the Data section of [../README.md](../README.md) and
   [ARCHITECTURE_STANDARD.md](../ARCHITECTURE_STANDARD.md).
 
 <!-- HISTORY: milestones only. One line per real feature/polish pass, not per deploy. -->

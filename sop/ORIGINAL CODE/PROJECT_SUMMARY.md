@@ -20,16 +20,8 @@ This project lives in:
 
 ---
 
-## 1. What this is
-A **Google Apps Script web app** that turns the company's policy document — *VCB‑MANGO ERP Standard Operating Procedure v1.0 (Revised)* — into a clean, searchable, mobile‑friendly portal so every staff member can find the right procedure quickly. The source of truth is the Google Doc; the web app is a live rendering of it.
-
-- **Audience:** all `@vcb-con.com` staff (and anyone else with the link) who use the VCB‑MANGO ERP system.
-- **Coverage:** three top‑level branches —
-  1. **Process Flows (ผังกระบวนการ)** — 33 swim‑lane workflow diagrams (BD, PR/PO, IC, Billing, OF, AP, AR, FA, GL + period‑close), rendered natively in HTML/SVG. **Bundled in `index.html`** as the `SOP_FLOWS` data array — *not* from the Doc.
-  2. **Case Studies (กรณีศึกษา)** — the Doc's ~31 real‑world scenarios across modules (PO, IC, AP, FA, PM, OF, GL, AR, BD, SE), grouped by module, with per‑module running numbers (e.g. `PO‑3`) and optional multi‑module tags. **Written from the app, backed up to the Doc.**
-  3. **Reports (วิธีเรียก Report)** — a ~21‑row reference table of how to pull common reports. **From the Doc.**
-- **Languages:** Thai content (verbatim from the Doc), English module codes and titles alongside.
-- **Content sources — one‑way as of 2026‑07:** Case Studies + Reports live in the Google Doc, but the flow is now **app → Doc only**. Admins create/edit/swap/delete cases *in the app*; each action writes the corresponding row(s) back to the Doc as a backup copy. The app **never reads the Doc back** into itself — there is no auto‑sync trigger and no "Sync" button anymore. Process Flows remain static data in `index.html` (`SOP_FLOWS`, bundled, never touches the Doc). See §4 and §15.
+> What the app is and does: see [../README.md](../README.md).
+> This file is the implementation detail behind it.
 
 ## 2. Live URLs
 | | |

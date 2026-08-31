@@ -28,6 +28,21 @@ projects they can see allow.
 Roles are still being rolled out, so what you see today is not the finished
 access model.
 
+## Data
+
+One Google Sheet, `VCB Meeting Minutes — Database`
+(`1ouYa11iXkwi3tZiL6yKMy742c9nnh7ACQf0j_tRCCfs`), found via the script property
+`MINUTES_DB_SPREADSHEET_ID`. Tabs: Minutes (one row per meeting), Content
+(bodies, chunked because a cell has a size limit), Versions, AUDIT_LOG,
+FATHOM_RAW_LOG.
+
+**Every edit is recoverable.** Saving snapshots the previous body into Versions
+first, and nothing is ever pruned — so both imported transcripts and meetings
+written in the app keep their full history.
+
+If the stored id will not open the app fails loudly rather than creating a blank
+replacement.
+
 ## Notes
 
 A recording can belong to more than one project: it stays in its inbox and is

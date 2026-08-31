@@ -39,7 +39,7 @@
   Drive metadata to already live inside this app's folder — no relocation needed. The loose file at `E:\` root
   was the **blank orphan** from the 2026-07-01 reseed incident; it's been archived to
   `_ARCHIVE - orphan & backup sheets…`. `setupMaster_` now also `moveTo()`s any *freshly created* DB into a
-  `VCB App Data` folder as a safety net. See [DATABASES.md](DATABASES.md) and the cross-app
+  `VCB App Data` folder as a safety net. See the Data section of [../README.md](../README.md) and the cross-app
   [ARCHITECTURE_STANDARD.md](../../ARCHITECTURE_STANDARD.md).
 - **T-bar P/N-sale redesign (@159–172):** default section order = deduction first, then P/N ค่างาน, then
   P/N Workdone. Income section is now an OBJECT model (`planIncomeCalc`): ค่างาน mode = MIN(80% work, work−60%

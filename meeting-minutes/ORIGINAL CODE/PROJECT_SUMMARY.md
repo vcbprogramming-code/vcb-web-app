@@ -4,11 +4,8 @@
 
 ---
 
-## What it is
-
-A Google Apps Script web app that stores and serves meeting minutes through a
-searchable web interface. Hosted entirely inside the `vcb-con.com` Google
-Workspace — no external servers, no hosting bills.
+> What the app is and does: see [../README.md](../README.md).
+> This file is the implementation detail behind it.
 
 ## Architecture
 
@@ -179,7 +176,7 @@ recordings pending admin filing.
 - `README.md` — quick overview
 - `PROJECT_SUMMARY.md` — this file
 - `CHANGELOG.md` — current state + dated history of real feature/polish passes
-- `DATABASES.md` — Sheet DB details
+- Sheet DB details are in [../README.md](../README.md)
 
 **Shortcut:**
 - `VCB Meeting Minutes — Open App.url` — opens the live app

@@ -33,15 +33,48 @@ served from the same file, so the split cannot exist.
 | App | Script id | Data store |
 |---|---|---|
 | Portal | `1nHl05hM…0b0j5` | none — static link list |
-| Credit Facility | `183uDd0f…AVIqW` | Sheet via ScriptProp `MASTER_SHEET_ID` |
+| Credit Facility | `183uDd0f…AVIqW` | Sheet `1AP5bJBw…Tp-YnE8` (ScriptProp `MASTER_SHEET_ID`) |
 | System Map | `1fHG0p18…G1EUO` | none — static renderer |
 | SOP | `1oiWdc-1…8PVeY` | Google **Doc** `1emolyEx…HheJxo` + ScriptProperties (chunked) |
 | HR Work Log | `13GL834Y…0gxVzu` | Sheet `1lyn78vJ…CAgEn-A` (`DB_ID` + `DB_ID_OVERRIDE_`) |
-| Meeting Minutes | `1Ozxm34T…7KE6vf` | Sheet via ScriptProp; attachments in Drive folder `1EPGohkA…j5zuJR` |
+| Meeting Minutes | `1Ozxm34T…7KE6vf` | Sheet `1ouYa11i…tRCCfs` (ScriptProp `MINUTES_DB_SPREADSHEET_ID`); attachments in Drive folder `1EPGohkA…j5zuJR` |
 | Onboarding | `15EUqN1-…9EmLHa` | Sheet `1H5d-BwY…uhmfW0k` (ScriptProp `PROGRESS_SS_ID`) |
-| E-Memo | `1TVYyTD7…GY92Op` | handed to an external developer — not maintained here |
+| E-Memo | `1TVYyTD7…GY92Op` | Sheet `1PYXXfMs…riGHPa1s` (ScriptProp `MASTER_SHEET_ID`) — handed to an external developer, not maintained here |
 
 Portal and System Map hold no data, so they cannot have a "missing database".
+
+### Where each database actually lives
+
+Full ids, so nobody has to go hunting again. Every one was opened and confirmed
+alive on 2026-08-31.
+
+| App | Spreadsheet / Doc | Full id |
+|---|---|---|
+| HR Work Log | HR Work Log — Database | `1lyn78vJ2xKBhMJUs7LxTXI9kB49or6uxVRH_CAgEn-A` |
+| Onboarding | VCB Onboarding Portal — Progress Data | `1H5d-BwYADdUMix_BjzzWgSo5tFNrgPCYr9nhuhmfW0k` |
+| Meeting Minutes | VCB Meeting Minutes — Database | `1ouYa11iXkwi3tZiL6yKMy742c9nnh7ACQf0j_tRCCfs` |
+| E-Memo | VCB Document Control — Master | `1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s` |
+| Credit Facility | VCB Credit Facility Master | `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` |
+| SOP | VCB-MANGO ERP SOP 2569 (a **Doc**, not a Sheet) | `1emolyExkvNIIEAp-8jWqM3laDF_H6c0v8qVuwHheJxo` |
+
+**Five of the six ids appear in no source file.** They live in that app's Script
+Properties — Apps Script editor → ⚙️ Project Settings → Script Properties, at
+the bottom of the page. No API can read them, so this table is the only place
+outside Google where they are written down. Keep it current.
+
+To check one yourself, paste the id after
+`https://docs.google.com/spreadsheets/d/` (or `/document/d/` for the SOP Doc).
+If it opens, the pointer is good.
+
+Two ids in the code no longer resolve, and neither matters: `SEED_FILE_ID` in HR
+Work Log (read once by SETUP — the code catches the failure and starts empty,
+and the roster is hardcoded in `FULL_ROSTER` anyway), and E-Memo's
+`STAGING_SHEET_ID` / `HTML_FILE_ID` (that app belongs to the external developer
+now).
+
+The apps also report this themselves: each throws an error naming the missing id
+rather than quietly building a blank replacement, so if a database ever does go
+missing, opening the app tells you which one.
 
 ## The rules
 

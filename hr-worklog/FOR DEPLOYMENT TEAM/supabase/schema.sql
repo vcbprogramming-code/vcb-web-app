@@ -17,8 +17,27 @@
 -- Here it is normalised to ONE ROW PER (employee, date, task slot) in
 -- work_entries. Everything the wide tab could express is still expressible, the
 -- 31-day limit disappears, and per-day queries stop being column arithmetic.
--- The import step in MIGRATION.md does that pivot; it is the only place where
--- the migration is not a straight copy, so verify it carefully.
+-- IMPORTING THE EXISTING DATA — the only step that is not a straight copy.
+-- Each wide tab has to be pivoted: for every employee row, for every day 1-31,
+-- emit up to two work_entries rows plus one work_days row for the shared note.
+-- Four things silently corrupt that if missed:
+--
+--   * Tab names are Buddhist-era. "2569-08" is Gregorian 2026-08 (subtract 543,
+--     see parseWideTabName_). Getting this wrong files a whole month under the
+--     wrong year and nothing complains.
+--   * A blank cell means NO entry, not an entry with a blank value. Writing
+--     rows for blanks inflates every count and every manday total.
+--   * Days 29-31 do not exist in every month. Skip those columns for shorter
+--     months rather than creating impossible dates.
+--   * site_key comes from the tab name, via the reverse of siteSheetMap_().
+--
+-- Check row counts against a hand-count of one known month, for at least two
+-- sites, before trusting the import.
+--
+-- Also check for "_legacy_<siteName>" tabs first. The app was migrated from an
+-- older long format by migrateToWideFormat_(), which renamed the old tabs
+-- rather than deleting them. Any that survive hold history this pivot will not
+-- see.
 --
 -- SECURITY MODEL
 -- The Apps Script app resolves the caller with Session.getActiveUser() and

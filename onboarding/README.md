@@ -18,6 +18,15 @@ of the first three months.
 - **Admin editor** — HR can reword or add checklist items without touching code
 - **Completion celebration** when the 90 days are finished
 
+## Access
+
+New hires work through their own checklist. Editing the checklist content
+itself — the wording, the items, what each department sees — is for **HR
+admins**.
+
+Roles are still being rolled out, so what you see today is not the finished
+access model.
+
 ## Notes
 
 An orientation aid, not an HR monitoring tool. Progress is there to help the new

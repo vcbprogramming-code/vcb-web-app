@@ -17,6 +17,14 @@ who is responsible at each one.
 - **Editing in the app** — procedures are written and renumbered here, with
   every version kept so a change can be undone
 
+## Access
+
+Everyone reads. Writing a procedure — adding, rewording or renumbering — is for
+**editors**.
+
+Roles are still being rolled out, so what you see today is not the finished
+access model.
+
 ## Notes
 
 A copy of the manual is also written out to a Google Doc as each change is

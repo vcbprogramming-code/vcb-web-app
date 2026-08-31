@@ -21,6 +21,15 @@ approving a new drawdown.
   what actually happened
 - **Audit log** — every change kept with what it was before
 
+## Access
+
+Everyone with access can read. Approving a request, changing a limit or editing
+the ledger is restricted to **managers** — the decision and who made it are
+recorded against the request.
+
+Roles are still being rolled out, so what you see today is not the finished
+access model.
+
 ## Notes
 
 Some figures are derived rather than stored — used credit comes from the ledger

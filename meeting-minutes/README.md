@@ -9,9 +9,8 @@ until someone files them into a project.
 ## What it does
 
 - **Minutes by project** — each recurring meeting stream keeps its own list
-- **Three tiers of access** — a public project is readable by anyone with the
-  link and no sign-in; a locked project only by admins, editors and the people
-  named on it; editing always requires signing in
+- **Per-project visibility** — a project is either open to everyone, or locked
+  to a named list of people
 - **Automatic transcript intake** — finished recordings from Fathom and
   Transkriptor become draft entries, admin-only until tagged into a project
 - **Attachments** — PDFs, slides and documents kept per meeting
@@ -19,6 +18,15 @@ until someone files them into a project.
 - **Edit history** — every previous version of every meeting is kept, so any
   change can be reviewed or recovered
 - **PDF export** — page breaks match what you see on screen
+
+## Access
+
+Three roles. **Admins** manage projects, visibility and who may edit.
+**Editors** write and change meeting content. Everyone else reads whatever the
+projects they can see allow.
+
+Roles are still being rolled out, so what you see today is not the finished
+access model.
 
 ## Notes
 

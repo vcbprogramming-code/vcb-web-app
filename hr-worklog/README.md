@@ -23,6 +23,15 @@ coverage, workload and cost by activity.
 - **Edit window** — entries cannot be filled more than a day ahead, and older
   days lock after a few days for anyone but an admin
 
+## Access
+
+Three roles: **admin** sees and edits every site, **manager** and **staff** are
+scoped to their own. Admins also control the settings that affect everyone, such
+as how far back entries stay editable.
+
+Roles are still being rolled out — the app is open while it is in demo, so what
+you see today is not the finished access model.
+
 ## Notes
 
 Every change is recorded with what it was before, so an edit can always be

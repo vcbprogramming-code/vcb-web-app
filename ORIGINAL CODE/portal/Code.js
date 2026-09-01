@@ -46,7 +46,14 @@ var APPS = [
     // Re-pointed 2026-09-01: the previous deployment belonged to script project
     // 13GL834Y…, which no longer exists in Drive. HR was rebuilt as project
     // 16IoKsjX… and redeployed, so the old /exec URL is permanently dead.
-    url:  'https://script.google.com/macros/s/AKfycbyNqO1jmKGF72N2v03ObFXIqQGChREaFFtIKaJg_os2K-btyx5XWf4xcxQNAJykw1s/exec',
+    //
+    // This deployment is the one set to "Anyone" — NOT "Anyone with a Google
+    // account", which is what the earlier rebuilt deployments defaulted to and
+    // which put a sign-in page in front of the app. That setting lives in the
+    // deployment record only: appsscript.json's webapp.access does not control
+    // it, and clasp cannot write it. It has to be set in the editor under
+    // Deploy ▸ Manage deployments.
+    url:  'https://script.google.com/macros/s/AKfycbz4q_xAlsKRM-fXys7-JMKcDhsrz6qw-FECzZvcRDFc3anzHiXxu8cJJ7kvooS4IwcI/exec',
     icon: 'hr',
     accent: '#34d399'
   },

@@ -1928,14 +1928,46 @@ function busy(on){ show($('loading'),on); show($('view'),!on); }
 // Breadcrumb shown inside the loading spinner so a stuck boot reveals its stage.
 function bootStage(s){ try { var el=$('bootStage'); if(el) el.textContent=s; } catch(e){} }
 
+// A server error must NOT destroy the page.
+//
+// Losing the database should look like an app with no data in it — header, nav
+// and site cards all present, every figure zero — not a blank screen carrying a
+// stack trace, which reads as "the app is broken" when the app is fine and only
+// the data is missing. Meeting Minutes already behaves this way; HR did not,
+// which is why the same missing database looked far worse here.
+//
+// So fatal() only wipes the view when there is nothing on screen yet. Once the
+// shell has rendered, the message goes in a banner above it and the structure
+// stays put.
 function fatal(msg){
+  var v=$('view');
+  if(v && v.getAttribute('data-shell')==='1'){ return softFail(msg); }
   show($('loading'),false);
-  var v=$('view'); if(!v) return;
+  if(!v) return;
   v.style.display='';
   v.innerHTML='<div class="card"><h1>⚠️ โหลดแอปไม่สำเร็จ</h1>'
     +'<pre class="errbox">'+esc(msg)+'</pre>'
     +'<p><button class="btn" onclick="location.reload()">ลองใหม่</button></p>'
     +'<p class="hint">คัดลอกข้อความสีแดงทั้งหมดส่งให้ผู้ดูแลระบบ</p></div>';
+}
+
+// The non-destructive counterpart: say what went wrong, leave everything the
+// user was looking at exactly where it was.
+function softFail(msg){
+  show($('loading'),false);
+  try {
+    var bar=$('degradedBar');
+    if(!bar){
+      bar=document.createElement('div');
+      bar.id='degradedBar';
+      bar.className='flash error';
+      bar.style.display='';
+      var v=$('view');
+      if(v && v.parentNode) v.parentNode.insertBefore(bar, v);
+    }
+    bar.textContent='⚠️ ' + msg;
+    bar.style.display='';
+  } catch(e){ /* a banner is a courtesy; never let it break the render */ }
 }
 function flash(msg,kind){
   var f=$('flash'); f.className='flash '+(kind||'ok'); f.textContent=msg; f.style.display='';
@@ -2007,20 +2039,44 @@ function boot(){
     }
   });
 }
-// Data layer is unreachable (see api_bootstrap's catch). Still show the real
-// app shell (topbar/logo) — just swap the content area for a clear inline
-// notice instead of the dashboard, and skip building nav links that need
-// data we don't have.
+// Data layer is unreachable (see api_bootstrap's catch).
+//
+// Build the REAL app — topbar, nav, dashboard — from an empty dataset, and put
+// the reason in a banner above it. An app with no data in it still shows what
+// it is and what it would hold; an error card shows neither, and makes a
+// missing database look like broken software.
+//
+// The empty state comes from the same render path as a normal boot, so there is
+// no second layout to keep in step: whatever the dashboard does with zero sites
+// is exactly what appears here.
 function bootDegraded_(r){
   busy(false);
   $('topbar').style.display='';
-  var n=$('nav'); if(n) n.innerHTML='<span class="who">'+esc(t('ไม่สามารถเชื่อมต่อฐานข้อมูลได้'))+'</span>';
-  var v=$('view'); if(!v) return;
-  v.style.display='';
-  v.innerHTML='<div class="card"><h1>⚠️ '+esc(t('ไม่สามารถโหลดข้อมูลได้ในขณะนี้'))+'</h1>'
-    +'<p class="hint">'+esc(t('แอปยังใช้งานได้ แต่ข้อมูลจากฐานข้อมูลยังไม่พร้อม ลองใหม่อีกครั้งในอีกสักครู่'))+'</p>'
-    +'<pre class="errbox">'+esc(r.degradedError||'')+'</pre>'
-    +'<p><button class="btn" onclick="location.reload()">'+esc(t('ลองใหม่'))+'</button></p></div>';
+
+  var v=$('view');
+  if(v){
+    v.style.display='';
+    // Tells fatal() a shell exists, so a later error becomes a banner rather
+    // than wiping what the user is looking at.
+    v.setAttribute('data-shell','1');
+  }
+
+  softFail(t('ไม่สามารถเชื่อมต่อฐานข้อมูลได้') + ' — ' + (r.degradedError||''));
+
+  // Render the ordinary UI against empty data. BOOT is already set by the
+  // caller, and api_bootstrap's degraded shape carries the same keys a normal
+  // boot does (email, role, isAdmin, canEntry, sites) — all empty — so the
+  // usual render path works without a special case.
+  try {
+    buildNav();
+    go('dashboard');
+  } catch(e){
+    // The empty-state render itself failed — fall back to the plain notice
+    // rather than leaving a blank page.
+    if(v) v.innerHTML='<div class="card"><h1>⚠️ '+esc(t('ไม่สามารถโหลดข้อมูลได้ในขณะนี้'))+'</h1>'
+      +'<pre class="errbox">'+esc(r.degradedError||'')+'</pre>'
+      +'<p><button class="btn" onclick="location.reload()">'+esc(t('ลองใหม่'))+'</button></p></div>';
+  }
 }
 function onBootError(r){
   var code=r&&r.error||'UNKNOWN';
@@ -5620,7 +5676,21 @@ function ss_(){
   if (!SS_CACHE_) throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ตรวจสิทธิ์/รหัสไฟล์');
   return SS_CACHE_;
 }
-function sh_(name){ return ss_().getSheetByName(name); }
+// Returns null when the database cannot be opened, rather than propagating the
+// throw from ss_().
+//
+// Every read path goes through here, and rows_() already treats a null sheet as
+// "no rows". That turns a missing database into an app full of zeroes with its
+// structure intact — the sites, the nav, the month picker all still render —
+// instead of a blank page carrying a stack trace.
+//
+// ss_() still throws, so WRITES fail loudly. Silently accepting an entry that
+// was never stored would be far worse than refusing it: the person would
+// believe their work was saved.
+function sh_(name){
+  try { return ss_().getSheetByName(name); }
+  catch(e){ return null; }
+}
 
 function readObjects_(sheet){
   var values = sheet.getDataRange().getValues();
@@ -6751,7 +6821,15 @@ function api_bootstrap(){
   }
 }
 function _api_bootstrap_(){
-  if(!sh_(SHEETS.EMP)||!sh_(SHEETS.SITES)||!sh_(SHEETS.CONFIG)) return { ok:false, error:'NO_SETUP' };
+  // Missing sheets used to return ok:false, which the client rendered as a
+  // fatal page. Return the degraded shape instead: ok:true so the shell builds,
+  // degraded:true so the client knows the numbers are not real. The user sees
+  // the app with nothing in it and a banner saying why — which is the truth —
+  // rather than an error screen implying the app itself is broken.
+  if(!sh_(SHEETS.EMP)||!sh_(SHEETS.SITES)||!sh_(SHEETS.CONFIG)){
+    return { ok:true, degraded:true, degradedError:'NO_SETUP',
+      email:'', role:'', isAdmin:false, canEntry:false, sites:[] };
+  }
   // For access=ANYONE + executeAs=USER_DEPLOYING, Apps Script hides external
   // (non-domain) users' emails from the script for privacy. We treat such
   // users as anonymous viewers — they get the dashboard read-only, no role

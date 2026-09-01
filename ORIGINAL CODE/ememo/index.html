@@ -58,9 +58,13 @@ header span{font-size:11px;opacity:.55}
 
 /* Date range row */
 .datebar{background:#fafafa;padding:8px 28px;border-bottom:1px solid #ececec;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.datebar input[type=date],.datebar .dfld{padding:5px 8px;border:1px solid #d0d0d0;border-radius:5px;font-size:12px;color:#333;outline:none;background:white}
-.datebar .dfld{width:104px;text-align:center}
-.datebar input[type=date]:focus,.datebar .dfld:focus{border-color:#1a73e8}
+/* Scoped to .dfld itself, not to .datebar — the date boxes now live on the
+   main filter row, and tying their appearance to the row they sit in meant
+   they lost it the moment they moved. */
+input[type=date].dfld,.dfld{padding:5px 8px;border:1px solid #d0d0d0;border-radius:5px;font-size:12px;color:#333;outline:none;background:white}
+.dfld{width:104px;text-align:center}
+.dfld:focus{border-color:#1a73e8}
+.darrow{color:#aaa;font-size:12px}
 .qbtn{padding:5px 11px;border:1.5px solid #d0d0d0;border-radius:16px;background:white;cursor:pointer;font-size:11px;font-weight:500;color:#555;transition:all .15s;white-space:nowrap}
 .qbtn:hover{border-color:#34a853;color:#34a853}
 .qbtn.on{background:#34a853;border-color:#34a853;color:white}
@@ -688,13 +692,13 @@ html.dark .pfmsDiv{background:#2c3447}
 html.dark .pfmsCaret{color:#7d8399}
 html.dark .datebar{background:#141a29;border-bottom-color:#262d3e}
 html.dark .datebar label{color:#9aa0b2}
-html.dark .datebar input[type=date],html.dark .datebar .dfld{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
+html.dark .dfld{background:#1a2030;border-color:#2c3447;color:#cdd2e1}
 html.dark .qbtn{background:#1a2030;border-color:#2c3447;color:#a8aec1}
 html.dark .qbtn:hover{border-color:#4f9dff;color:#9dc3e6}
 html.dark .qbtn.on{background:#2E75B6;border-color:#2E75B6;color:#fff}
 html.dark .clrbtn{background:#1a2030}
 /* Native date picker icon is black by default → invisible on dark fields. */
-html.dark .datebar input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer}
+html.dark .dfld::-webkit-calendar-picker-indicator{filter:invert(1) brightness(2);cursor:pointer}
 html.dark .stat{color:#9aa0b2}
 html.dark table{background:#1a2030;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 html.dark thead tr{background:#0b1020;color:#cdd2e1}
@@ -829,7 +833,7 @@ html.is-mobile .datebar{flex-wrap:nowrap}
 /* One shared box spec, matching .dtsel (doc-type / status) exactly —
    height:36px, radius:8px — so every filter control in the header looks
    like one standardized set instead of some boxes taller than others. */
-html.is-mobile .datebar .dfld{
+html.is-mobile .dfld{
   height:36px;border-radius:8px;padding:0 6px;font-size:12px;
   min-width:0;box-sizing:border-box;
 }
@@ -839,7 +843,7 @@ html.is-mobile .datebar .dfld{
    picked, or a short "Date" placeholder when empty. Both boxes are the
    same size and both draw their label inside the box, never beside it.
    See .dwrap1/.dlbl below and refreshDateLabels() in the script. */
-html.is-mobile .datebar .dfld{flex:0 0 auto;width:70px;max-width:70px;text-align:center;color:transparent;-webkit-appearance:none;appearance:none;background:white}
+html.is-mobile .dfld{flex:0 0 auto;width:70px;max-width:70px;text-align:center;color:transparent;-webkit-appearance:none;appearance:none;background:white}
 html.is-mobile .dwrap1{position:relative;display:inline-flex;flex:0 0 auto}
 html.is-mobile .dlbl{
   position:absolute;inset:0;pointer-events:none;background:none;
@@ -1270,20 +1274,25 @@ var _SHARE_DOC_ID = <?!= JSON.stringify(shareDocId || '') ?>;
     </button>
     <div class="pfmsPanel" id="pfmsPanel"></div>
   </div>
-</div>
-
-<!-- Date filters -->
-<div class="datebar">
+  <!-- The two date boxes sit on this row rather than their own. They are the
+       narrowest controls in the set (70px each on mobile) and the project
+       picker leaves room for them, so a second row for two small fields was
+       mostly empty space. The quick-range buttons stay below: they are wide
+       enough that pulling them up here would wrap the row on a phone. -->
+  <div class="divider"></div>
   <span class="dwrap1">
     <input type="date" id="d1" class="dfld" onchange="onDateChange(this)" onfocus="onDateFocus(this,event)">
     <span class="dlbl" id="d1lbl"></span>
   </span>
-  <span style="color:#aaa;font-size:12px">→</span>
+  <span class="darrow">→</span>
   <span class="dwrap1">
     <input type="date" id="d2" class="dfld" onchange="onDateChange(this)" onfocus="onDateFocus(this,event)">
     <span class="dlbl" id="d2lbl"></span>
   </span>
-  <div class="divider"></div>
+</div>
+
+<!-- Quick ranges -->
+<div class="datebar">
   <button class="qbtn" data-q="7"  onclick="setQuick(this,7)"  data-i18n="last_7">Last 7 days</button>
   <button class="qbtn" data-q="30" onclick="setQuick(this,30)" data-i18n="last_30">Last 30 days</button>
   <button class="qbtn" data-q="lm" onclick="setQuick(this,'lm')" data-i18n="last_month">Last month</button>

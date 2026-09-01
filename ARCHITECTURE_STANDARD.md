@@ -8,21 +8,30 @@ the live Apps Script deployments on **2026-08-30**.
 
 ```
 VCB Connect/
-├── portal/            ├── credit-facility/   ├── system-map/
-├── sop/               ├── hr-worklog/        ├── meeting-minutes/
-├── onboarding/        ├── ememo/
+├── ORIGINAL CODE/            Google Apps Script (plain JS) — 🟢 LIVE
+│   ├── portal/               ├── credit-facility/   ├── system-map/
+│   ├── sop/                  ├── hr-worklog/        ├── meeting-minutes/
+│   └── onboarding/           └── ememo/
 │
-│     each module contains exactly two folders:
-│       ORIGINAL CODE/         Google Apps Script (plain JS) — 🟢 LIVE
-│       FOR DEPLOYMENT TEAM/   React 18 + TypeScript (Vite)  — ⚪ not deployed
+├── FOR DEPLOYMENT TEAM/      React 18 + Express + Postgres — ⚪ not deployed
+│   ├── api/                  one Express API for every module
+│   ├── shared/               api client, auth, i18n, theme, Tailwind preset
+│   ├── supabase/migrations/  39 tables across six Postgres schemas
+│   └── <module>/             one React SPA each
 │
 ├── README.md
-└── ARCHITECTURE_STANDARD.md   ← this file
+├── TECH_STACK.md             what the deployment side must be built with
+└── ARCHITECTURE_STANDARD.md  ← this file
 ```
 
+The split is by **owner**, one level from the top: everything the deployment
+team builds is under `FOR DEPLOYMENT TEAM/`, everything running in production
+today is under `ORIGINAL CODE/`. It was per-module until 2026-09-01, which put
+deployment work in nine places and stopped the tree describing who owned what.
+
 **`ORIGINAL CODE/` is canonical.** It is what employees actually use.
-`FOR DEPLOYMENT TEAM/` is a downstream React mirror kept in sync afterwards —
-read its `PORT_NOTES.md` before assuming a feature exists there.
+`FOR DEPLOYMENT TEAM/` is a downstream rewrite — read its `PORT_NOTES.md`
+before assuming a feature exists there.
 
 There is no `frontend/` + `backend/` split inside these folders, deliberately: in
 Apps Script the backend is the `api_*` functions and the frontend is the HTML
@@ -36,7 +45,7 @@ served from the same file, so the split cannot exist.
 | Credit Facility | `183uDd0f…AVIqW` | Sheet `1AP5bJBw…Tp-YnE8` (ScriptProp `MASTER_SHEET_ID`) |
 | System Map | `1fHG0p18…G1EUO` | none — static renderer |
 | SOP | `1oiWdc-1…8PVeY` | Google **Doc** `1emolyEx…HheJxo` + ScriptProperties (chunked) |
-| HR Work Log | `13GL834Y…0gxVzu` | Sheet `1lyn78vJ…CAgEn-A` (`DB_ID` + `DB_ID_OVERRIDE_`) |
+| HR Work Log | `16IoKsjX…6tMJR` | Sheet `1HOGRGzX…_POtqro` (`DB_ID`) |
 | Meeting Minutes | `1Ozxm34T…7KE6vf` | Sheet `1ouYa11i…tRCCfs` (ScriptProp `MINUTES_DB_SPREADSHEET_ID`); attachments in Drive folder `1EPGohkA…j5zuJR` |
 | Onboarding | `15EUqN1-…9EmLHa` | Sheet `1H5d-BwY…uhmfW0k` (ScriptProp `PROGRESS_SS_ID`) |
 | E-Memo | `1TVYyTD7…GY92Op` | Sheet `1PYXXfMs…riGHPa1s` (ScriptProp `MASTER_SHEET_ID`) — handed to an external developer, not maintained here |
@@ -45,17 +54,31 @@ Portal and System Map hold no data, so they cannot have a "missing database".
 
 ### Where each database actually lives
 
-Full ids, so nobody has to go hunting again. Every one was opened and confirmed
-alive on 2026-08-31.
+Full ids, so nobody has to go hunting again. Confirmed 2026-09-01.
 
 | App | Spreadsheet / Doc | Full id |
 |---|---|---|
-| HR Work Log | HR Work Log — Database | `1lyn78vJ2xKBhMJUs7LxTXI9kB49or6uxVRH_CAgEn-A` |
+| HR Work Log | HR Work Log — Database | `1HOGRGzX2a0udCcW156W4EqPfca1WOHsVJtiE_POtqro` |
 | Onboarding | VCB Onboarding Portal — Progress Data | `1H5d-BwYADdUMix_BjzzWgSo5tFNrgPCYr9nhuhmfW0k` |
-| Meeting Minutes | VCB Meeting Minutes — Database | `1ouYa11iXkwi3tZiL6yKMy742c9nnh7ACQf0j_tRCCfs` |
-| E-Memo | VCB Document Control — Master | `1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s` |
-| Credit Facility | VCB Credit Facility Master | `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` |
+| Meeting Minutes | VCB Meeting Minutes — Database | `1jE7V15Fr9SnYyPG2DohZd-i0_w-zjQt0ThlvcWuQMZM` |
+| E-Memo | VCB Document Control — Master | `1kbqNZ5NAQcAxNamOHreoV7SbndSY2EwpB90mqV9ErHE` |
+| Credit Facility | VCB Credit Facility Master | `1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY` |
 | SOP | VCB-MANGO ERP SOP 2569 (a **Doc**, not a Sheet) | `1emolyExkvNIIEAp-8jWqM3laDF_H6c0v8qVuwHheJxo` |
+
+**Four of these changed on 2026-09-01.** The previous ids were deleted from
+Drive along with a batch of loose files at My Drive root, and Drive Trash was
+emptied before anyone noticed. What survived were copies made on 2026-08-30 —
+by accident, and dismissed as junk at the time. They are now the live
+databases.
+
+Meeting Minutes, Credit Facility and E-Memo were repointed by editing their
+Script Properties; HR's id is in source (`DB_ID`). The copies were verified
+byte-for-byte against what was lost where a comparison was possible: HR's 382
+work entries are identical in both.
+
+Backups of all six sit in **My Drive ▸ Backup**, named `BACKUP 2026-09-01 — …`.
+Copies inside Drive protect against a bad edit, not against Drive itself —
+a real backup needs to be off Drive entirely.
 
 **Five of the six ids appear in no source file.** They live in that app's Script
 Properties — Apps Script editor → ⚙️ Project Settings → Script Properties, at

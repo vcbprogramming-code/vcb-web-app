@@ -1,0 +1,63 @@
+// What is still local data, and why.
+//
+// The APPS array and the I18N dictionary that used to live here are gone: tiles
+// come from GET /api/portal/apps (lib/portalApi.js) and copy from the shared
+// dictionary in i18n.js. What remains is the holiday table, which has no API
+// endpoint and no table in supabase/migrations — it is a fixed calendar, not
+// company data, so it stays compiled into the bundle exactly as the Apps Script
+// version kept it in Code.js.
+
+// Fixed-date Thai public holidays — ported verbatim from Code.js
+// THAI_HOLIDAYS_FIXED. Month/day repeats every year, so no per-year table.
+// Deliberately excludes lunar/Buddhist holidays (Makha Bucha, Visakha Bucha,
+// Asalha Bucha, Buddhist Lent) and government "compensation day"
+// (วันหยุดชดเชย) substitutions, since both shift yearly and are announced
+// by cabinet resolution.
+export const THAI_HOLIDAYS_FIXED = [
+  { month: 1, day: 1, name_en: "New Year's Day", name_th: 'วันขึ้นปีใหม่' },
+  { month: 4, day: 6, name_en: 'Chakri Day', name_th: 'วันจักรี' },
+  { month: 4, day: 13, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 4, day: 14, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 4, day: 15, name_en: 'Songkran Festival', name_th: 'วันสงกรานต์' },
+  { month: 5, day: 1, name_en: 'National Labor Day', name_th: 'วันแรงงานแห่งชาติ' },
+  { month: 5, day: 4, name_en: 'Coronation Day', name_th: 'วันฉัตรมงคล' },
+  { month: 7, day: 28, name_en: "King's Birthday", name_th: 'วันเฉลิมพระชนมพรรษา ร.10' },
+  { month: 8, day: 12, name_en: "Mother's Day", name_th: 'วันแม่แห่งชาติ' },
+  { month: 10, day: 13, name_en: 'King Bhumibol Memorial Day', name_th: 'วันคล้ายวันสวรรคต ร.9' },
+  { month: 10, day: 23, name_en: 'Chulalongkorn Day', name_th: 'วันปิยมหาราช' },
+  { month: 12, day: 5, name_en: "Father's Day", name_th: 'วันพ่อแห่งชาติ' },
+  { month: 12, day: 10, name_en: 'Constitution Day', name_th: 'วันรัฐธรรมนูญ' },
+  { month: 12, day: 31, name_en: "New Year's Eve", name_th: 'วันสิ้นปี' },
+];
+
+/** Holidays for one year, keyed 'YYYY-MM-DD' — mirrors Code.js getHolidays(). */
+export function getHolidays(year) {
+  const out = {};
+  for (const h of THAI_HOLIDAYS_FIXED) {
+    const key = `${year}-${String(h.month).padStart(2, '0')}-${String(h.day).padStart(2, '0')}`;
+    out[key] = { name_en: h.name_en, name_th: h.name_th };
+  }
+  return out;
+}
+
+// Placeholder panels. Neither has an endpoint in api/src/routes/portal.js nor a
+// table in supabase/migrations/002_portal.sql — the birthday panel says so in
+// its own footnote (panel.birthdaysNote), and leave is deliberately empty,
+// matching the Apps Script portal's default "no one on leave" state.
+export const SAMPLE_BIRTHDAYS = [
+  { name: 'กรกวรรษ จันทนาม', dept: 'DRIVER', when: 'Tue, Sep 8' },
+  { name: 'ชาญ กรุณจินตดิฏฐ์', dept: 'ENG', when: 'Tue, Sep 8' },
+  { name: 'จิราพร ศรีแก้ว', dept: 'ACCT', when: 'Wed, Sep 16' },
+];
+
+export const SAMPLE_LEAVE = [];
+
+// Shortcut links that are not portal.apps rows: they point at third-party
+// systems, not VCB Connect modules, so they are not tiles and have no key in
+// the database.
+export const SHORTCUT_LINKS = {
+  erp: 'https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/',
+  zoom: 'https://zoom.us/join',
+  onboarding:
+    'https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec',
+};

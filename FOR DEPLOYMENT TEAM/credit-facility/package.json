@@ -1,26 +1,26 @@
 {
-  "name": "vcb-credit-facility-react",
+  "name": "vcb-credit-facility",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "React/Vercel mirror of the VCB Credit Facility GAS web app (canonical source lives in the project root).",
+  "description": "VCB Connect — Credit Facility SPA. React 18 + Vite 5 + Tailwind 3, JavaScript only, talking to the single Express API at api/.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.4",
+    "@vcb/shared": "file:../shared",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.6.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
     "vite": "^5.4.11"
   }
 }

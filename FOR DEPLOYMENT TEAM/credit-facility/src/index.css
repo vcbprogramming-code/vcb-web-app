@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Everything visual lives in Tailwind utility classes on the components. What
+   remains here is only what a utility class cannot express: the page ground,
+   and two small primitives reused across every table and form.
+
+   The 460-line src/styles.css this replaces keyed its dark mode off
+   `html.dark` with its own :root custom properties. Both are gone: the theme
+   selector is now Tailwind's `darkMode: 'class'` toggled by shared/src/
+   theme.jsx, and the colours come from shared/tailwind.preset.js.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    /* Thai sits taller than Latin — the preset's fontSize steps already carry
+       looser leading; this keeps long-form blocks consistent with them. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased;
+    @apply dark:bg-surface-dark dark:text-ink-dark;
+  }
+
+  /* Money columns must line up digit under digit down a column of totals. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* The one focus treatment, so every control agrees. */
+  .focusable {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-600/40 focus-visible:ring-offset-1;
+    @apply dark:focus-visible:ring-offset-surface-dark;
+  }
+
+  .field {
+    @apply w-full rounded-control border border-line bg-surface-card px-3 py-2 text-sm text-ink;
+    @apply placeholder:text-ink-muted;
+    @apply focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20;
+    @apply dark:border-line-dark dark:bg-surface-dark-card dark:text-ink-dark dark:placeholder:text-ink-dark-muted;
+  }
+}

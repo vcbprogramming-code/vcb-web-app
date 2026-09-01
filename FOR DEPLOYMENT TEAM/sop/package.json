@@ -1,25 +1,25 @@
 {
-  "name": "sop-webapp-react",
+  "name": "sop-webapp",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "React port of the VCB-MANGO ERP SOP web app (mirrors ../ORIGINAL CODE/apps-script/).",
+  "description": "VCB-MANGO ERP SOP — React SPA on the VCB Connect stack (React 18 · Vite 5 · Tailwind 3 · React Router 6 · JavaScript only).",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.4",
+    "@vcb/shared": "file:../shared",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11"
   }
 }

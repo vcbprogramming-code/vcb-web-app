@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+ * What is left in CSS, and why.
+ *
+ * The 907-line stylesheet this replaces is gone: layout, spacing, colour,
+ * borders and dark mode are Tailwind utilities on the elements themselves.
+ * Four things survive here because a utility class genuinely cannot express
+ * them, not because they were awkward to convert:
+ *
+ *   1. --mc  a per-module accent chosen at RUNTIME from data (sc.module). A
+ *            utility would need all eleven variants written out at every use
+ *            site; one custom property set by an inline style is honest.
+ *   2. .steps  the numbered-list counter. Numbering must follow the position of
+ *            NUMBERED lines only, skipping sub-bullets and captions, which is
+ *            what a CSS counter does and what JS numbering would duplicate.
+ *   3. .flow-grid  the swimlane track sizing shared between the lane header row
+ *            and the node grid, driven by --flow-col.
+ *   4. Thin scrollbars and the print rules.
+ * ------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink font-sans antialiased dark:bg-surface-dark dark:text-ink-dark;
+  }
+
+  /* Sarabun's Thai stack sits taller than Latin; keep headings from clipping
+     tone marks when a Thai and an English word share a line. */
+  :lang(th) {
+    line-height: 1.65;
+  }
+
+  ::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-pill bg-line dark:bg-line-dark;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+}
+
+@layer components {
+  /* --- 1. runtime module accent ------------------------------------------ */
+  /* Set by an inline style="--mc: …" on the element; these two utilities read
+     it. Any element that needs its module's colour uses one of them. */
+  .mc-text {
+    color: var(--mc, theme('colors.brand.700'));
+  }
+  .mc-bg {
+    background-color: var(--mc, theme('colors.brand.700'));
+  }
+  .mc-border-l {
+    border-left-color: var(--mc, theme('colors.brand.700'));
+  }
+  .mc-ring {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--mc, #1D4E89) 28%, transparent);
+  }
+
+  /* --- 2. procedure steps ------------------------------------------------- */
+  /* Numbered steps count themselves. Sub-bullets and captions are inside the
+     same <ol> so they stay in document order, but they must not advance the
+     counter — hence the counter lives on .step-n only. */
+  .steps {
+    counter-reset: sop-step;
+    @apply m-0 list-none space-y-2 p-0;
+  }
+  .steps .step-n {
+    counter-increment: sop-step;
+    @apply relative pl-9;
+  }
+  .steps .step-n::before {
+    content: counter(sop-step);
+    @apply absolute left-0 top-[2px] inline-flex h-6 w-6 items-center justify-center
+           rounded-pill bg-brand-50 text-xs font-bold text-brand-700
+           dark:bg-brand-950 dark:text-brand-300;
+  }
+
+  /* --- 3. swimlane diagram ------------------------------------------------ */
+  /* The lane header row and the node grid must share identical column tracks or
+     the arrows land beside their boxes. One variable, two grids. */
+  .flow-canvas {
+    --flow-col: 200px;
+  }
+  @media (min-width: 1280px) {
+    .flow-canvas {
+      --flow-col: 232px;
+    }
+  }
+  .flow-tracks {
+    grid-template-columns: repeat(var(--flow-lanes), var(--flow-col));
+  }
+}
+
+@layer utilities {
+  /* Long Thai body copy breaks better with this than with the default. */
+  .break-thai {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

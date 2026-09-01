@@ -288,7 +288,8 @@ const listQuery = z.object({
 router.get(
   '/data',
   asyncRoute(async (req, res) => {
-    const [facilities, costCategories, caps, transactions, requests] = await Promise.all([
+    const [facilities, costCategories, caps, transactions, requests, projects, facTypes] =
+      await Promise.all([
       // facility_used is the view that reproduces the sheet's derived `Used`
       // (override, else the sum of unpaid transactions). Reading it here keeps
       // that calculation in one place instead of duplicating it in JS.
@@ -312,6 +313,20 @@ router.get(
       ),
       rows('select * from credit.transactions order by updated_at desc'),
       rows('select * from credit.requests order by updated_at desc'),
+      // Sent with the bootstrap rather than fetched separately: the UI cannot
+      // render a project name, a company filter or a document-kind pill without
+      // them, so a second round trip would only add a flash of raw codes.
+      rows(
+        `select code, name_th, company, sort_order
+           from credit.projects
+          where active
+          order by sort_order nulls last, code`
+      ),
+      rows(
+        `select no, code, name_th, name_en, kind, doc_kind
+           from credit.facility_types
+          order by no`
+      ),
     ]);
 
     res.json({
@@ -343,6 +358,20 @@ router.get(
       })),
       transactions: transactions.map(toTransaction),
       requests: requests.map(toRequest),
+      projects: projects.map((p) => ({
+        code: p.code,
+        th: p.name_th,
+        company: p.company,
+        sortOrder: p.sort_order,
+      })),
+      facTypes: facTypes.map((t) => ({
+        no: t.no,
+        code: t.code,
+        th: t.name_th,
+        en: t.name_en,
+        kind: t.kind,
+        docKind: t.doc_kind,
+      })),
     });
   })
 );
@@ -406,6 +435,60 @@ router.get(
   asyncRoute(async (_req, res) => {
     const list = await rows('select name from credit.cost_categories order by sort_order nulls last, name');
     res.json(list.map((c) => c.name));
+  })
+);
+
+/**
+ * The projects every other table's `project` column refers to.
+ *
+ * These were hardcoded arrays in the client until the migration made them real
+ * tables. The client needs them for three things it cannot do from codes alone:
+ * show Thai project names rather than `BT1`, populate the company filter (which
+ * otherwise has nothing to list), and group projects by the legal entity that
+ * signs — several projects share one company.
+ */
+router.get(
+  '/projects',
+  asyncRoute(async (_req, res) => {
+    const list = await rows(
+      `select code, name_th, company, sort_order, active
+         from credit.projects
+        where active
+        order by sort_order nulls last, code`
+    );
+    res.json(
+      list.map((p) => ({
+        code: p.code,
+        th: p.name_th,
+        company: p.company,
+        sortOrder: p.sort_order,
+      }))
+    );
+  })
+);
+
+/**
+ * The ten facility types, keyed by the number carried on every facility and
+ * transaction. `docKind` drives the BG / T/L / L/G / B/E pills.
+ */
+router.get(
+  '/facility-types',
+  asyncRoute(async (_req, res) => {
+    const list = await rows(
+      `select no, code, name_th, name_en, kind, doc_kind
+         from credit.facility_types
+        order by no`
+    );
+    res.json(
+      list.map((t) => ({
+        no: t.no,
+        code: t.code,
+        th: t.name_th,
+        en: t.name_en,
+        kind: t.kind,
+        docKind: t.doc_kind,
+      }))
+    );
   })
 );
 

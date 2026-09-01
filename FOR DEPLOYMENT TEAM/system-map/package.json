@@ -1,24 +1,24 @@
 {
-  "name": "system-operating-map-webapp-react",
+  "name": "vcb-system-map",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "React port of the VCB System Operating Map (mirror of the standalone Index.html v8.86 + Code.js doGet() wrapper).",
+  "description": "VCB System Operating Map — interactive swimlane map of company systems. Static renderer: no database, no API.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@vcb/shared": "file:../shared",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.4.11"
   }
 }

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Everything that CAN be a utility IS a utility, in the JSX. app.css was 1030
+   lines; what survived is the short list Tailwind 3 cannot express as a class:
+
+     - `content: attr(data-ph)` placeholders on empty grid cells. The weekly
+       grid packs two slots into a cell the size of a thumbnail; a real <input>
+       placeholder needs a real input, and 31 columns x 2 slots x 20 employees
+       of them is thousands of focusable nodes. A pseudo-element costs none.
+     - the lock glyph on a closed day, likewise a pseudo-element
+     - the ring and bar fill animations, which animate a CSS custom property
+       set per element from JSX
+     - scrollbar-gutter, and hiding the scrollbar on the horizontal day strip
+
+   No :root token block any more: colour lives in the shared Tailwind preset,
+   and dark mode is `class="dark"` on <html> (shared/src/theme.jsx), not the
+   `body.dark` the old stylesheet toggled.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  /* Reserve the scrollbar gutter so the layout does not jump sideways when a
+     page grows tall enough to need one (spinner -> loaded cards). */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased dark:bg-surface-dark dark:text-ink-dark;
+    margin: 0;
+  }
+}
+
+@layer components {
+  /* ---------------- weekly grid cell placeholders ---------------- */
+  /* The empty-cell prompt. `content: attr(...)` has no utility equivalent, and
+     the text itself comes from the dictionary via a data attribute so it stays
+     translatable. */
+
+  .cell-ph:empty::before {
+    content: attr(data-ph);
+    @apply text-[0.58rem] text-ink-muted/60 dark:text-ink-dark-muted/60;
+  }
+
+  /* The main slot of an editable, empty, non-weekend day invites a click. The
+     hover state swaps in the longer label — again attr(), again no utility. */
+  .cell-pick:empty::before {
+    content: '+';
+    @apply text-base font-bold text-brand-600/60;
+  }
+
+  .cell-pick:hover:empty::before {
+    content: attr(data-ph-hover);
+    @apply text-[0.62rem] font-semibold text-brand-700/80 dark:text-brand-300/80;
+  }
+
+  /* A locked day carries a padlock in the corner. Decorative only — the real
+     lock is the enforce_entry_window trigger in the database. */
+  .cell-locked::after {
+    content: '🔒';
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    font-size: 0.55rem;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* ---------------- animated fills ---------------- */
+  /* Both animate to a value only the component knows, passed in as a custom
+     property from JSX. A Tailwind keyframe cannot read a per-element variable. */
+
+  .ring-fill {
+    animation: ring-fill 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  @keyframes ring-fill {
+    from {
+      stroke-dashoffset: var(--ring-len, 169.65);
+    }
+    to {
+      stroke-dashoffset: var(--ring-end, 0);
+    }
+  }
+
+  .bar-fill {
+    width: var(--w, 0%);
+    animation: bar-fill 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  @keyframes bar-fill {
+    from {
+      width: 0;
+    }
+    to {
+      width: var(--w, 0%);
+    }
+  }
+
+  /* ---------------- the day strip ---------------- */
+  /* A month of days scrolls sideways on a narrow screen. The scrollbar itself
+     is noise under a row of 31 tiles, and there is no utility to hide it. */
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ring-fill,
+    .bar-fill {
+      animation: none;
+    }
+  }
+}

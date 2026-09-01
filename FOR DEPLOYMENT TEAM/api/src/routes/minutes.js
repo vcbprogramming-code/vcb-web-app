@@ -29,6 +29,8 @@ import { z } from 'zod';
 import { one, rows, tx } from '../db.js';
 import { allowAnonymous, requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncRoute } from '../middleware/error.js';
+import { presignUpload, presignDownload, safeKey } from '../lib/storage.js';
+import { randomToken } from '../auth.js';
 
 const router = Router();
 
@@ -993,6 +995,68 @@ router.delete(
 // this records the resulting link — the old app put it in Drive and stored the
 // share URL, same division of labour. Uploading bytes through this JSON API
 // would mean a 33% base64 tax on a 25MB cap against a 2mb body limit.
+
+export const ATTACHMENTS_BUCKET = 'meeting-attachments';
+
+// Signed into the upload URL so the stored object is the type that was
+// declared. Deliberately narrower than "anything a browser can pick": these are
+// meeting documents, and an upload URL that will accept any content type is an
+// open file host with extra steps.
+const ATTACHMENT_CONTENT_TYPES = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  txt: 'text/plain',
+};
+
+const uploadUrlQuery = z.object({
+  filename: z.string().min(1).max(255),
+  ext: z.enum(Object.keys(ATTACHMENT_CONTENT_TYPES)),
+});
+
+/**
+ * A URL the browser can PUT one attachment to, before POSTing its metadata.
+ *
+ * The object key is random rather than derived from the filename. Thai
+ * filenames are normal here, and sanitising an unbounded character set well
+ * enough to be a safe path is a losing game — the original name is kept in the
+ * database instead, where it is data rather than a path.
+ *
+ * Editor-gated like the metadata write it precedes: an anonymous reader who
+ * could obtain an upload URL could store files against a meeting they may only
+ * read.
+ */
+router.get(
+  '/meetings/:id/attachments/upload-url',
+  requireAuth,
+  requireRole('minutes', 'editor', 'admin'),
+  asyncRoute(async (req, res) => {
+    const q = uploadUrlQuery.parse(req.query);
+
+    const meeting = await one('select id from minutes.minutes where id = $1', [req.params.id]);
+    if (!meeting) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const path = safeKey(`${req.params.id}`, q.filename, randomToken(16));
+
+    try {
+      const [uploadUrl, downloadUrl] = await Promise.all([
+        presignUpload(ATTACHMENTS_BUCKET, path, ATTACHMENT_CONTENT_TYPES[q.ext]),
+        presignDownload(ATTACHMENTS_BUCKET, path),
+      ]);
+      res.json({ bucket: ATTACHMENTS_BUCKET, path, uploadUrl, downloadUrl });
+    } catch (err) {
+      console.error('[minutes] could not sign attachment URLs:', err.message);
+      res.status(503).json({ error: 'STORAGE_UNAVAILABLE' });
+    }
+  })
+);
 
 router.post(
   '/meetings/:id/attachments',

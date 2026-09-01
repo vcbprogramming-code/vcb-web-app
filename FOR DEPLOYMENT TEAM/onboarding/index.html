@@ -1,13 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>react</title>
+    <title>VCB Onboarding Portal</title>
+    <!-- Paint the stored theme before React mounts, or someone on dark gets a
+         white flash on every load. Mirrors applyStoredThemeEarly() in
+         shared/src/theme.jsx; the key and the class are that module's contract. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('vcb_theme') || 'auto';
+          var d = t === 'dark' || (t !== 'light' &&
+            matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', d);
+          document.documentElement.style.colorScheme = d ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

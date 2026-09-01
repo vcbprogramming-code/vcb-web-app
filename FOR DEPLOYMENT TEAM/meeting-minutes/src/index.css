@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Everything Tailwind CAN express is a utility class in the .jsx files. What
+   is left here is only what a utility cannot reach, and each block says why.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  /* Sarabun is loaded from Google Fonts in index.html; this makes it the
+     document default so Thai never falls back mid-string. */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink font-sans text-sm antialiased dark:bg-surface-dark dark:text-ink-dark;
+  }
+
+  /* The rendered-document iframe is a separate document and inherits none of
+     this; its CSS lives in lib/docCss.js. */
+}
+
+@layer components {
+  /* -------------------------------------------------------------------------
+     .doc-body — the ONLY place raw server HTML is styled.
+     -------------------------------------------------------------------------
+     The project-tab executive summary is inserted with dangerouslySetInnerHTML
+     from HTML an editor wrote. Tailwind cannot reach into markup it never sees,
+     and the @tailwind/typography plugin is ruled out by TECH_STACK.md, so these
+     descendant rules are written by hand. Same reason the editor rules below
+     exist. */
+  .doc-body {
+    @apply text-ink dark:text-ink-dark;
+  }
+  .doc-body p {
+    @apply mb-[7px] last:mb-0;
+  }
+  .doc-body ul,
+  .doc-body ol {
+    @apply mb-[9px] pl-5 list-disc;
+  }
+  .doc-body ol {
+    @apply list-decimal;
+  }
+  .doc-body li {
+    @apply mb-[5px];
+  }
+  .doc-body h1,
+  .doc-body h2,
+  .doc-body h3 {
+    @apply text-[14.5px] font-bold text-brand-900 mt-[11px] mb-[5px] dark:text-brand-300;
+  }
+  .doc-body table {
+    @apply w-full border-collapse text-[12.5px] my-1 mb-[9px];
+  }
+  .doc-body td,
+  .doc-body th {
+    @apply border border-line px-2 py-1 align-top text-left dark:border-line-dark;
+  }
+  .doc-body a {
+    @apply text-brand-600 underline dark:text-brand-300;
+  }
+  .doc-body img {
+    @apply max-w-full h-auto;
+  }
+  .doc-body .seclabel {
+    @apply text-[12.5px] font-extrabold text-brand-600 mt-4 mb-[7px] pb-1 border-b border-line first:mt-0.5 dark:text-brand-300 dark:border-line-dark;
+  }
+  .doc-body .bmuted {
+    @apply text-ink-muted italic dark:text-ink-dark-muted;
+  }
+  .doc-body .dash-bullets {
+    @apply list-disc pl-5 my-1;
+  }
+
+  /* -------------------------------------------------------------------------
+     .ed-area — the contentEditable surface.
+     -------------------------------------------------------------------------
+     Its children are created at runtime by execCommand and by the paste
+     sanitizer, so no className can ever be attached to them. Descendant rules
+     are the only way to style them, and the tick-list ::before is a generated
+     box that has no element to carry a utility at all. */
+  .ed-area {
+    @apply flex-1 overflow-auto px-[34px] py-[26px] text-[14.5px] leading-[1.62] outline-none;
+  }
+  .ed-area h1,
+  .ed-area h2 {
+    @apply text-brand-900 font-bold dark:text-brand-300;
+  }
+  .ed-area h1 {
+    @apply text-xl mt-[18px] mb-2.5;
+  }
+  .ed-area h2 {
+    @apply text-lg mt-3.5 mb-2;
+  }
+  .ed-area p {
+    @apply py-1;
+  }
+  .ed-area ul,
+  .ed-area ol {
+    @apply pl-[26px] list-disc;
+  }
+  .ed-area ol {
+    @apply list-decimal;
+  }
+  .ed-area li {
+    @apply py-1;
+  }
+  .ed-area a {
+    @apply text-brand-600 underline dark:text-brand-300;
+  }
+  .ed-area table {
+    @apply w-full border-collapse my-3;
+  }
+  .ed-area td,
+  .ed-area th {
+    @apply border border-line px-[9px] py-1.5 dark:border-line-dark;
+  }
+  /* The green check is a generated marker on a runtime-created <li>. There is
+     no element to hang a utility on — this must be CSS. It matches the
+     list-style-type rule the printed page uses (see lib/docCss.js). */
+  .ed-area .tick-list,
+  .ed-area .tick-list li {
+    @apply list-none;
+  }
+  .ed-area .tick-list {
+    @apply pl-6;
+  }
+  .ed-area .tick-list li {
+    @apply relative;
+  }
+  .ed-area .tick-list li::before {
+    content: '✓';
+    @apply absolute -left-[22px] text-ok font-bold;
+  }
+}
+
+@layer utilities {
+  /* Multi-line clamp. Tailwind 3.4 ships line-clamp, but these two fixed
+     heights also reserve the row so cards do not resize as excerpts load. */
+  .excerpt-2 {
+    @apply line-clamp-2;
+  }
+  .excerpt-3 {
+    @apply line-clamp-3 min-h-[50px];
+  }
+
+  /* The hidden-meeting hatch. A repeating-linear-gradient has no utility, and
+     the stripe must stay visible in both themes. */
+  .hatch-hidden {
+    background: repeating-linear-gradient(45deg, #fff, #fff 10px, #fcf4f4 10px, #fcf4f4 20px);
+  }
+  :is(.dark) .hatch-hidden {
+    background: repeating-linear-gradient(45deg, #161b22, #161b22 10px, #1f1719 10px, #1f1719 20px);
+  }
+
+  /* The document iframe reports its own height through JS (see MeetingDetail);
+     it must start hidden so an un-paginated first paint never flashes. */
+  .render-frame {
+    @apply block w-full border-0 rounded-lg min-h-[80vh] invisible;
+  }
+  .frame-ready .render-frame {
+    @apply visible;
+  }
+}

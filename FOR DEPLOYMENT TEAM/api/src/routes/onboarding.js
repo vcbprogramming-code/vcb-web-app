@@ -39,6 +39,7 @@ import { z } from 'zod';
 import { rows, one, tx } from '../db.js';
 import { allowAnonymous, requireAuth, requireRole } from '../middleware/auth.js';
 import { asyncRoute } from '../middleware/error.js';
+import { presignUpload, presignDownload } from '../lib/storage.js';
 
 const router = Router();
 
@@ -442,6 +443,17 @@ router.delete(
 const ALLOWED_DOC_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
 export const DOCUMENTS_BUCKET = 'required-documents';
 
+// Signed into the upload URL, so the extension the client asked for is the
+// content type the object is stored as.
+const DOC_CONTENT_TYPES = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
 router.get(
   '/documents/:name/path',
   allowAnonymous,
@@ -457,7 +469,33 @@ router.get(
     const emp = await one('select name from onboarding.employees where name = $1', [name]);
     if (!emp) return res.status(404).json({ error: 'NOT_FOUND' });
 
-    res.json({ bucket: DOCUMENTS_BUCKET, path: `${name}/${q.doc_id}.${q.ext}` });
+    const path = `${name}/${q.doc_id}.${q.ext}`;
+
+    // Sign both directions here. The file itself never passes through Express:
+    // the browser PUTs to uploadUrl and GETs from downloadUrl, so a large scan
+    // does not occupy a worker for the length of the transfer, and does not hit
+    // the 2 MB JSON body limit set in index.js.
+    //
+    // Content-Type is signed into the upload URL, so the holder cannot use it to
+    // store something other than what they declared. The URLs expire in minutes,
+    // which is what keeps an anonymous endpoint from becoming open storage —
+    // the path is already scoped to one employee's folder.
+    const contentType = DOC_CONTENT_TYPES[q.ext];
+    let uploadUrl = null;
+    let downloadUrl = null;
+    try {
+      [uploadUrl, downloadUrl] = await Promise.all([
+        presignUpload(DOCUMENTS_BUCKET, path, contentType),
+        presignDownload(DOCUMENTS_BUCKET, path),
+      ]);
+    } catch (err) {
+      // Storage misconfigured (missing S3 credentials, wrong endpoint). Return
+      // the path anyway so the client can say "hand this to HR" rather than
+      // failing outright — a new employee should not be blocked by our config.
+      console.error('[onboarding] could not sign document URLs:', err.message);
+    }
+
+    res.json({ bucket: DOCUMENTS_BUCKET, path, uploadUrl, downloadUrl });
   })
 );
 

@@ -1,15 +1,29 @@
 <!DOCTYPE html>
-<html class="js">
+<html lang="th">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VCB Connect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    // Paint the right theme before React mounts, or someone on dark gets a
+    // white flash. Mirrors applyStoredThemeEarly() in shared/src/theme.jsx —
+    // same key, same class, same fallback.
+    (function () {
+      try {
+        var t = localStorage.getItem('vcb_theme') || 'auto';
+        var d = t === 'dark' || (t !== 'light' &&
+          matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', d);
+        document.documentElement.style.colorScheme = d ? 'dark' : 'light';
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

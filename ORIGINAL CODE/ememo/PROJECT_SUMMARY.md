@@ -110,7 +110,7 @@ Layout after the 2026-05-23 reorganization: everything related to the web applic
 | [_appsscript_live/Seed.js](_appsscript_live/Seed.js) | Initial seed data for `setupMasterSheet()`. |
 | [_appsscript_live/appsscript.json](_appsscript_live/appsscript.json) | Apps Script manifest (OAuth scopes, Drive v3, web-app access). |
 | [_appsscript_live/.clasp.json](_appsscript_live/.clasp.json) | Clasp config — links this directory to script id `1TVYyTD7KycQvn6zoakJtnjVuOejR_xwr8JWhWq4t5QNYmPHKmEGY92Op` (matches the pinned Script ID above; an older doc revision showed a stale/dead id here). |
-| [VCB Document Control — Master.gsheet](VCB%20Document%20Control%20—%20Master.gsheet) | Shortcut to the master Sheet — points to file id `1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s`. **See ⚠ below.** |
+| [VCB Document Control — Master.gsheet](VCB%20Document%20Control%20—%20Master.gsheet) | Shortcut to the master Sheet — points to file id `1kbqNZ5NAQcAxNamOHreoV7SbndSY2EwpB90mqV9ErHE`. **See ⚠ below.** |
 | `VCB Master BACKUP 20260523-151745 (pre-row-cleanup).gsheet` | Backup of 1PYXX taken before the finance / CVE row cleanup. Safe to delete once you're confident the cleanup stuck. |
 
 **Removed / no longer exist:** `SKILL.md` (the old `claude-document-control` skill — a wholly separate, redundant automation that scanned Gmail into a local `.xlsx` via an external Claude-agent cron; deleted, superseded by the self-contained `gmailAutoLog` trigger in Code.js), `VCB Document Control — Master.xlsx` (the disconnected, stale local Excel copy that SKILL.md's pipeline wrote to; deleted — it was never the app's real database), and `_appsscript_new/` + `_appsscript_new/SETUP.md` (the staged clean-room standup template; no longer present on disk — if a fresh-account standup is needed again, it will need to be regenerated from the current `_appsscript_live/`, re-scrubbing env-specific values to `REPLACE_*` placeholders, rather than reusing an old copy).
@@ -128,7 +128,7 @@ The local sync path doesn't matter to the running app — the cron and the porta
 
 ## Critical gotchas (must read before editing)
 
-**Canonical master Sheet (after 2026-05-23 recovery):** `1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s` — the local `.gsheet` shortcut in this folder. This is what the web app's `MASTER_SHEET_ID` script property points to, and what the cron + portal both read/write. The historical duplicate `1X32T9j0hLbFKH4c24YKI54wl_e58L0c0VjvY86N-BvQ` was deleted when the old Apps Script project was wiped on 2026-05-23, so the consolidation issue is resolved by attrition. Only edit 1PYXX going forward.
+**Canonical master Sheet (after 2026-05-23 recovery):** `1kbqNZ5NAQcAxNamOHreoV7SbndSY2EwpB90mqV9ErHE` — the local `.gsheet` shortcut in this folder. This is what the web app's `MASTER_SHEET_ID` script property points to, and what the cron + portal both read/write. The historical duplicate `1X32T9j0hLbFKH4c24YKI54wl_e58L0c0VjvY86N-BvQ` was deleted when the old Apps Script project was wiped on 2026-05-23, so the consolidation issue is resolved by attrition. Only edit 1PYXX going forward.
 
 **⚠ Drive Link column MUST hold plain URL strings — never `=HYPERLINK("...","Open")` formulas.**
 Every row's `docKey` (the unique ID the portal uses to look up a row when "Open" is clicked) comes from the Drive Link cell value via `getValues()`. For a `=HYPERLINK` formula, `getValues()` returns the **display label** (`"Open"`), so every linked row collides on the same key — and `getDocAttachments` returns the *first* matching row's Gmail thread for **every** Open click (symptom: clicking any document shows the same wrong thread ID in the error / viewer). Always use `setValue(url)`, not `setFormula(=HYPERLINK(...))`. If legacy `=HYPERLINK` cells turn up, run `normalizeDriveLinks()` to convert them in-place.
@@ -263,7 +263,7 @@ After 2026-05-23 the canonical attachment folders moved (or were re-created) und
 
 - New script created from local source via `clasp create`: new script id `1TVYyTD7…HKmEGY92Op`, new deployment id `AKfycbxv70XmR…ROn`, new `/exec` URL.
 - The original OAuth client (`521733401644-…`) was preserved; the new `/exec` URL was added to its Authorized redirect URIs.
-- `MASTER_SHEET_ID` script property re-set to `1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s` (the duplicate `1X32T9…` was deleted along with the old project, resolving the duplicate-sheet issue by attrition).
+- `MASTER_SHEET_ID` script property re-set to `1kbqNZ5NAQcAxNamOHreoV7SbndSY2EwpB90mqV9ErHE` (the duplicate `1X32T9…` was deleted along with the old project, resolving the duplicate-sheet issue by attrition).
 - Old dead `.clasp.json` backed up next to the live one as `.clasp.json.OLD-DEAD-20260523-…`.
 
 **2026-05-23 / 24 — Drive Link rebuild after a Drive reorganization.** Attachments had been re-uploaded into `H:\My Drive\WORK\06 CORPORATE DOCS\9. DOCUMENT CONTROL\<project>\` with new file IDs, breaking every Drive Link in the master sheet. New helpers added to Code.js:

@@ -1,6 +1,8 @@
+import vcbPreset from '../shared/tailwind.preset.js';
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  presets: [require('../shared/tailwind.preset.js')],
+  presets: [vcbPreset],
   content: [
     './index.html',
     './src/**/*.{js,jsx}',

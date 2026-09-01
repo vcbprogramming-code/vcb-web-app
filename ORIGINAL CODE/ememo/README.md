@@ -20,7 +20,7 @@ interface the team browses day to day.
 ## Data
 
 One Google Sheet, `VCB Document Control — Master`
-(`1PYXXfMszDoQiQmhPqUimOc5QLIHNK3fjFUtriGHPa1s`), found via the script property
+(`1kbqNZ5NAQcAxNamOHreoV7SbndSY2EwpB90mqV9ErHE`), found via the script property
 `MASTER_SHEET_ID`, with one tab per project plus a discussion tab. A dated
 backup sheet is kept deliberately as a restore point, and each memo generates a
 Doc and PDF filed into its project folder.

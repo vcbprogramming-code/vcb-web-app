@@ -31,7 +31,7 @@ access model.
 ## Data
 
 One Google Sheet, `VCB Meeting Minutes — Database`
-(`1ouYa11iXkwi3tZiL6yKMy742c9nnh7ACQf0j_tRCCfs`), found via the script property
+(`1jE7V15Fr9SnYyPG2DohZd-i0_w-zjQt0ThlvcWuQMZM`), found via the script property
 `MINUTES_DB_SPREADSHEET_ID`. Tabs: Minutes (one row per meeting), Content
 (bodies, chunked because a cell has a size limit), Versions, AUDIT_LOG,
 FATHOM_RAW_LOG.

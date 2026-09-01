@@ -104,7 +104,8 @@
 
 - **ผู้อนุมัติ (Manager)**: ปัจจุบันคือ `c.chavananand@vcb-con.com` เท่านั้น — เพิ่มได้โดยแจ้งอีเมล แล้วให้แก้ค่า `MANAGERS` ใน `Code.js` + redeploy
 - **แก้โค้ด/หน้าจอ**: ไฟล์ต้นทางทั้ง 4 อยู่ในโฟลเดอร์โปรเจกต์นี้ (Code.js, Seed.js, index.html, appsscript.json) — ใช้ clasp push → create-version → redeploy ไปยัง deployment เดิม (URL ไม่เปลี่ยน) ดูขั้นตอนละเอียดใน SETUP.md
-- **รีเซ็ตข้อมูลจาก Excel ใหม่**: รันฟังก์ชัน `resetMaster()` ในตัวแก้ไข Apps Script
+- **รีเซ็ตข้อมูลจาก Excel ใหม่**: สร้างสเปรดชีตใหม่เอง แล้วรัน `bindMaster('<id>')` ตามด้วย `setupMaster_()` — ดูขั้นตอนใน SETUP.md
+  (ฟังก์ชัน `resetMaster()` ถูกลบออกเมื่อ 2026-09-01 เพราะมันลบค่า `MASTER_SHEET_ID` ก่อนสร้างใหม่ ทำให้แอปชี้ไปที่ชีตเปล่าและทิ้งฐานข้อมูลจริงไว้)
 - ที่มาข้อมูล: snapshot เดือนล่าสุดของไฟล์ใน `H:\My Drive\WORK\01 FINANCE & ACCT\4. วงเงินกู้โครงการ\` (ปัจจุบันมี 4 ไฟล์: CVE, VK2, BV, BT1 — โครงการอื่นยังไม่มีไฟล์)
 
 ---

@@ -20,6 +20,7 @@ export function requireAuth(req, res, next) {
     email: payload.sub,
     name: payload.name || '',
     roles: payload.roles || {},
+    hrSites: payload.hrSites || [],
   };
   next();
 }

@@ -8,7 +8,7 @@ Day-to-day workflow for editing, pushing, and verifying changes to the VCB Credi
 
 - **Node.js 18+** with `npm` on PATH
 - **`@google/clasp`** v3.x — `npm install -g @google/clasp`
-- A Google account that has **Editor** access to the Apps Script project (scriptId `183uDd0fXOiniijzMXZuz3Y7ZryuOkuULDDupa3mSfQM_oawzcL2AVIqW`) and **Editor** access to the master sheet (`1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` — see [Master sheet status](#master-sheet-status)).
+- A Google account that has **Editor** access to the Apps Script project (scriptId `183uDd0fXOiniijzMXZuz3Y7ZryuOkuULDDupa3mSfQM_oawzcL2AVIqW`) and **Editor** access to the master sheet (`1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY` — see [Master sheet status](#master-sheet-status)).
 - Windows PowerShell (the provided `deploy.ps1` is PowerShell). Bash on Windows can also work with `cmd /c clasp <cmd>` — bare `clasp` may fail with `PSSecurityException` until you set an execution policy.
 
 > Today the deploying account is `c.chavananand@vcb-con.com`. Web-app traffic runs `executeAs: USER_DEPLOYING`, so whoever last deployed is the account whose Drive holds the runtime sheet.
@@ -31,9 +31,12 @@ Day-to-day workflow for editing, pushing, and verifying changes to the VCB Credi
 
 3. **Confirm script properties are set on the live project**
    In the Apps Script editor → **Project Settings** → **Script properties**, there must be:
-   - `MASTER_SHEET_ID` = `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8`
+   - `MASTER_SHEET_ID` = `1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY`
 
-   If missing, the app will create a brand-new master spreadsheet on first run and store its ID here automatically (via `setupMaster_`). Don't rely on that unless you're starting fresh — set the property manually to bind to the existing sheet.
+   If missing, `setupMaster_()` will create a brand-new master spreadsheet on
+   first run and store its id here. That is correct behaviour for a genuine
+   first run and wrong in every other case, so set the property manually to
+   bind to the existing sheet before opening the app.
 
 ---
 
@@ -99,10 +102,11 @@ Files that exist **only on the remote** (not in this folder) will silently be de
 
 As of the **2026-08-05 recovery** (the project from the prior 2026-05-23 recovery, `1rvARww1jMh…`, was itself deleted; this folder is now pushed into project `183uDd0fX…`), `MASTER_SHEET_ID` **is set** on the live script — bound via `bindMaster()` to the existing master sheet, so no data was lost. For reference, `getMaster_()`'s behavior on any future recovery:
 
-- If `MASTER_SHEET_ID` = `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` and the deployer account can open that sheet → **reuse the existing master**, keeping all user-entered Transactions, Requests, Limits, Audit, CashPlan rows.
-- If the property is unset, **or** the stored sheet ID can't be opened → `setupMaster_()` will silently **create a brand-new master sheet** in the deployer's Drive, seed it from `Seed.js`, and store the new ID. Any prior user-entered data not also in `Seed.js` is lost.
+- If `MASTER_SHEET_ID` = `1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY` and the deployer account can open that sheet → **reuse the existing master**, keeping all user-entered Transactions, Requests, Limits, Audit, CashPlan rows.
+- If the stored sheet ID **can't be opened** → `getMaster_()` throws and says so. It does **not** create a replacement. That was the behaviour until 2026-07-01, when it orphaned a month of data onto a fresh seed; the guard has been in place since.
+- If the property is **unset** → `setupMaster_()` creates a new master sheet and seeds it from `Seed.js`. That is a genuine first run. It is also why you should bind the property before first open on any recovery: an unset property looks exactly like a first run.
 
-**On any future project recovery**, set it manually before opening the web app: Apps Script editor → Project Settings → Script properties → Add `MASTER_SHEET_ID` = `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` — or run `bindMaster('1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8')` once from the editor's function dropdown (a plain admin function in `Code.js`, already there for this purpose).
+**On any future project recovery**, set it manually before opening the web app: Apps Script editor → Project Settings → Script properties → Add `MASTER_SHEET_ID` = `1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY` — or run `bindMaster('1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY')` once from the editor's function dropdown (a plain admin function in `Code.js`, already there for this purpose).
 
 ---
 
@@ -111,13 +115,13 @@ As of the **2026-08-05 recovery** (the project from the prior 2026-05-23 recover
 | What | ID | Where it's referenced |
 |------|-----|----------------------|
 | Apps Script project | `183uDd0fXOiniijzMXZuz3Y7ZryuOkuULDDupa3mSfQM_oawzcL2AVIqW` | [.clasp.json](.clasp.json) |
-| Master spreadsheet | `1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8` | Script property `MASTER_SHEET_ID` |
+| Master spreadsheet | `1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY` | Script property `MASTER_SHEET_ID` |
 | Live deployment (Google login required) | `AKfycbytkA07aNklbDv3gKca-iI02FPCdC1Q0i3gAtE1Ls1ry9MCoIUmG_KabhCBip8C0vn91g` | The `/exec` URL in [../README.md](../README.md); access = **Anyone with Google Account** |
 | **Old (deleted, 2026-05-23) Apps Script project** | `1H_qKDmB82sMFAtshDiwzC61LmXhGUKo9V5j7MbWZDRDNN3ysZy6_k8RP` | superseded — kept for audit only |
 | **Old (deleted, 2026-08-05) Apps Script project** | `1rvARww1jMh5WP-5GVUKpj-hLmiR6OtvZCpUpyeqVKDm6EfrjVDGus1RM` | superseded — kept for audit only |
 | **Old (dead) deployment URLs** | `AKfycbz4ZYgwTPIIOHDzhEyMEv74VmZoT-vcmJ-jsbGU1E63rKfCf10JxmOl_9sO8SR4KV22-w`, `AKfycbztWhyi0anTnTu8lOkMYVrECpRStAn0jqjlNrfxPlnnTwkk1t45XfCofWiv9wLLVEisjQ` | Anything still linking to these needs updating |
 
-**2026-08-05 second deletion incident:** the Apps Script project from the first recovery (`1rvARww1jMh…`) was itself deleted from Drive — same failure signature (`/exec` URL showed Google Drive's "Sorry, the file you have requested does not exist" page; `clasp deployments` returned `Requested entity was not found`). Recovered by creating a brand-new standalone project (`clasp create-script --type standalone`), pushing this folder's source into it, deploying fresh, then running the existing `bindMaster('1AP5bJBw7KXL7mAKI9iWYvv5rmAgvkwA32Zv9Tp-YnE8')` helper (Code.js) once from the Apps Script editor to rebind `MASTER_SHEET_ID` — this preserved all existing Transactions/Requests/Limits/Audit/CashPlan data instead of reseeding blank. **Root cause of the deletions is still unknown** — worth checking Drive activity/audit log on the script file if it happens a third time.
+**2026-08-05 second deletion incident:** the Apps Script project from the first recovery (`1rvARww1jMh…`) was itself deleted from Drive — same failure signature (`/exec` URL showed Google Drive's "Sorry, the file you have requested does not exist" page; `clasp deployments` returned `Requested entity was not found`). Recovered by creating a brand-new standalone project (`clasp create-script --type standalone`), pushing this folder's source into it, deploying fresh, then running the existing `bindMaster('1hZtE7druGaOjjm7FeH5VQQCzyhbHKwoQ0xhIEbiuoXY')` helper (Code.js) once from the Apps Script editor to rebind `MASTER_SHEET_ID` — this preserved all existing Transactions/Requests/Limits/Audit/CashPlan data instead of reseeding blank. **Root cause of the deletions is still unknown** — worth checking Drive activity/audit log on the script file if it happens a third time.
 
 The Drive shortcut [VCB Credit Facility Master.gsheet](../VCB%20Credit%20Facility%20Master.gsheet) (project root) opens the master sheet (still alive, unaffected by either incident). Any shortcut/bookmark pointing at the old script IDs above needs re-pointing to <https://script.google.com/d/183uDd0fXOiniijzMXZuz3Y7ZryuOkuULDDupa3mSfQM_oawzcL2AVIqW/edit>. Drive shortcuts are keyed by `doc_id`, so re-dragging the new URL into this folder is the fix.
 
@@ -144,8 +148,18 @@ The normal **daily workflow** above already covers it (push → create-version �
 
 If you ever need to wipe and reseed:
 
-1. Open the Apps Script editor.
-2. Run `resetMaster()` — this rebuilds all tabs from `SEED_PROJECTS`, `SEED_FAC_TYPES`, `SEED_FACILITIES`, and `SEED_TXNS` in [Seed.js](Seed.js).
+1. Create a new spreadsheet by hand, in Drive.
+2. Open the Apps Script editor and run `bindMaster('<the new sheet id>')`.
+3. Run `setupMaster_()` to build the tabs from `SEED_PROJECTS`,
+   `SEED_FAC_TYPES`, `SEED_FACILITIES` and `SEED_TXNS` in [Seed.js](Seed.js).
+
+> `resetMaster()` used to do all of this in one click and was **removed on
+> 2026-09-01**. It deleted `MASTER_SHEET_ID` before rebuilding, which made the
+> "no id stored means genuine first run" guard pass by construction — so it
+> would happily abandon a live database and point the app at a blank one. The
+> data survived; the app just stopped looking at it. Rebuilding is now two
+> deliberate steps, neither reachable by a mis-click from the function
+> dropdown.
 
 The facility baseline lives 100% in `Seed.js` (NOT in the sheet). The sheet only stores Transactions, Requests, Limits, Audit, and CashPlan. So to correct a facility number, edit `Seed.js` and redeploy — don't edit the sheet.
 

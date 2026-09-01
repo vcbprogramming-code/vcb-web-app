@@ -34,14 +34,21 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.seed) {
     var seedOut;
     try {
-      // migratestrayattachments is exempt from the admin gate: under the
+      // fixfathomdatelabels is exempt from the admin gate: under the
       // fully-public (ANYONE_ANONYMOUS) deployment, Apps Script blanks
       // Session.getActiveUser() for everyone including the owner (see
       // googleEmail_'s note in Auth.js), so isAdmin_() can never pass here.
-      // The action itself is a one-time, idempotent Drive move/cleanup with
-      // no data exposure — safety comes from the deployment URL being
-      // effectively unguessable, same reasoning as the Fathom webhook.
-      var exemptFromAdminGate = e.parameter.seed === 'migratestrayattachments' || e.parameter.seed === 'fixfathomdatelabels';
+      // It only rewrites date strings on rows this app owns, so the worst a
+      // stranger could do is reformat labels — safety comes from the
+      // deployment URL being effectively unguessable, same reasoning as the
+      // Fathom webhook.
+      //
+      // migratestrayattachments was exempt here too until 2026-09-01, and
+      // should not have been: it ran a by-name Drive search that trashed
+      // folders the app never created. An unguessable parameter is not access
+      // control when what sits behind it is destructive. Both that function
+      // and its exemption are gone.
+      var exemptFromAdminGate = e.parameter.seed === 'fixfathomdatelabels';
       if (!exemptFromAdminGate && !isAdmin_()) {
         throw new Error('Sign in as an admin first.');
       }
@@ -57,8 +64,6 @@ function doGet(e) {
         seedOut = { ok: true, result: backfillTranskriptorMeetings(true) };
       } else if (e.parameter.seed === 'detachprojectdoc') {
         seedOut = { ok: true, result: detachProjectDoc(e.parameter.id) };
-      } else if (e.parameter.seed === 'migratestrayattachments') {
-        seedOut = { ok: true, result: migrateStrayAttachments() };
       } else if (e.parameter.seed === 'fixfathomdatelabels') {
         seedOut = { ok: true, result: fixFathomDateLabels() };
       } else if (e.parameter.seed === 'dedupefathom') {
@@ -1010,33 +1015,28 @@ function moveDbToFolder() {
   return ps.hasNext() ? ps.next().getName() : '(root)';
 }
 
-// One-time editor helper: earlier versions of getAttachmentsFolder_() searched
-// Drive by folder name, which found/created a stray "VCB App Data/Attachments"
-// folder at My Drive root instead of inside this app's own folder. Moves any
-// files sitting there into the real Attachments folder, then deletes the
-// now-empty stray folders. Safe to run repeatedly (no-ops once cleaned up).
-function migrateStrayAttachments() {
-  var moved = [];
-  var target = getAttachmentsFolder_();
-  var rootFolders = DriveApp.getFoldersByName('VCB App Data');
-  while (rootFolders.hasNext()) {
-    var strayRoot = rootFolders.next();
-    if (strayRoot.getId() === APP_FOLDER_ID) continue;
-    var strayAttSub = strayRoot.getFoldersByName('Attachments');
-    while (strayAttSub.hasNext()) {
-      var strayAtt = strayAttSub.next();
-      var files = strayAtt.getFiles();
-      while (files.hasNext()) {
-        var f = files.next();
-        moved.push(f.getName());
-        f.moveTo(target);
-      }
-      strayAtt.setTrashed(true);
-    }
-    strayRoot.setTrashed(true);
-  }
-  return moved;
-}
+// REMOVED 2026-09-01 — migrateStrayAttachments() could trash folders it had
+// nothing to do with, and it was reachable from the public /exec URL.
+//
+// It searched DriveApp.getFoldersByName('VCB App Data') — which matches that
+// name ANYWHERE in the account, not just this app's folder — and called
+// setTrashed(true) on every match, plus moveTo() on the files inside them.
+// Nothing constrained the search to files this app created.
+//
+// It was also exempted from the admin gate in doGet, so
+// ?seed=migratestrayattachments on the public URL ran it. The exemption's
+// reasoning was that the parameter is unguessable, which is not access
+// control.
+//
+// The cleanup it performed was a one-time fix for a stray folder created by an
+// older getAttachmentsFolder_(); that has long since run. What remained was a
+// destructive by-name search with no remaining purpose — the same pattern that
+// was stripped out of HR's WHERE_IS_DB() the same day, for the same reason:
+// a search for a common folder name can resolve to somebody else's folder,
+// and setTrashed on the result takes it away.
+//
+// If stray folders ever need cleaning up again, do it in drive.google.com
+// where you can see what you are deleting and Trash gives you a way back.
 
 // One-time editor helper: Fathom ingest used to set dateLabel to the raw
 // recording title (a bug — the title isn't a date), which then surfaced

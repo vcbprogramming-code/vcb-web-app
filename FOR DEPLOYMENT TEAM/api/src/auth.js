@@ -68,6 +68,13 @@ export function issueToken(user) {
       sub: user.email,
       name: user.name || '',
       roles: user.roles || {},
+      // requireHrSite() reads this to decide which sites a non-admin may see.
+      // It was computed at sign-in and returned in the response body but never
+      // signed into the token, so it arrived at the guard as undefined and
+      // every non-admin got 403 SITE_SCOPE_UNKNOWN — or worse, an empty site
+      // list from /bootstrap, which reads as "you belong to no sites" rather
+      // than as a bug.
+      hrSites: user.hrSites || [],
     },
     JWT_SECRET,
     { expiresIn: JWT_TTL, issuer: 'vcb-connect' }

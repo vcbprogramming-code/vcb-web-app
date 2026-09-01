@@ -32,7 +32,7 @@ const passwordSchema = z.object({
 async function sessionFor(email, name) {
   const roles = await resolveRoles(email);
   const hrSites = roles.hr ? await hrSitesFor(email, roles.hr) : [];
-  const token = issueToken({ email, name, roles });
+  const token = issueToken({ email, name, roles, hrSites });
   return { token, user: { email, name, roles, hrSites } };
 }
 

@@ -1027,12 +1027,26 @@ function migrateBeneficiary() {
   return { ok: true, scanned: scanned, moved: moved, notesCleaned: notesCleaned, skipped: skipped };
 }
 
-/** One-time / admin: rebuild the master sheet from seed. */
-function resetMaster() {
-  PropertiesService.getScriptProperties().deleteProperty('MASTER_SHEET_ID');
-  var ss = setupMaster_();
-  return ss.getUrl();
-}
+/**
+ * REMOVED 2026-09-01 — this function abandoned the live database.
+ *
+ * It deleted MASTER_SHEET_ID and called setupMaster_(), which creates a new
+ * spreadsheet and writes its id back over the pointer. getMaster_()'s guard
+ * could not stop it: that guard treats "no id stored" as a genuine first run,
+ * and deleting the property first made the test pass by construction.
+ *
+ * The real database was never touched — the app simply stopped looking at it,
+ * which is indistinguishable from data loss to everyone using it. HR Work Log
+ * lost its database twice this way before the same pattern was removed there,
+ * and this sat in the editor's function dropdown one row from bindMaster(),
+ * which is what someone reaches for when something is already wrong.
+ *
+ * To rebuild a master sheet deliberately: create the spreadsheet by hand, then
+ * bindMaster('<its id>') below. Two steps, both explicit, neither reachable by
+ * a mis-click.
+ *
+ * See ARCHITECTURE_STANDARD.md rule 2, "Never silently reseed".
+ */
 
 /** Admin helper: returns the master sheet URL (also forces creation). */
 function masterUrl() {

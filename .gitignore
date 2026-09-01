@@ -45,5 +45,5 @@ yarn-error.log*
 *.mp4
 
 # Contains a live Google OAuth client secret - excluded until credential is moved out of source
-ememo/ORIGINAL CODE/Code.js
-ememo/ORIGINAL CODE/PROJECT_SUMMARY.md
+ORIGINAL CODE/ememo/Code.js
+ORIGINAL CODE/ememo/PROJECT_SUMMARY.md

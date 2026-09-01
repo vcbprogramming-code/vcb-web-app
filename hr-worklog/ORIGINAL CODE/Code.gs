@@ -5574,7 +5574,19 @@ function SEED_ENTRIES(){ var s=loadSeed_(); return { support:s.support||[], oper
 // (1MYHU0ic…5ZIQ) no longer exists in Drive — it returned 404 — so the app was
 // running only via the DB_ID_OVERRIDE_ script property. Keeping a dead id here
 // is what made the auto-create fallback below reachable in the first place.
-var DB_ID = "1lyn78vJ2xKBhMJUs7LxTXI9kB49or6uxVRH_CAgEn-A";
+// Re-pointed 2026-09-01. The previous id (1lyn78vJ…) no longer exists.
+//
+// This file holds the 382 real work entries — 225 for บ้านแพ้ว and 157 for
+// พขร.ปูน, spanning 2025-12-31 to 2026-03-31 — plus the 44 activity codes and
+// 20 job codes the app needs as reference data. Verified byte-for-byte against
+// the other surviving copy: the work entries are identical in both, so nothing
+// was lost by choosing this one.
+//
+// It also carries demo seed from 2026-08-19 (Config records demo_seed_done):
+// 24 legacy monthly grid tabs whose first employee row is identical across
+// five different construction sites, which real work never is. Those tabs are
+// not read by any current code path and can be deleted from the sheet by hand.
+var DB_ID = "1HOGRGzX2a0udCcW156W4EqPfca1WOHsVJtiE_POtqro";
 var SS_CACHE_ = null;
 
 // DB_ID above is the authority. DB_ID_OVERRIDE_ is only consulted when DB_ID

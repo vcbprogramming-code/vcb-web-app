@@ -1,0 +1,24 @@
+{
+  "name": "@vcb/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared frontend foundation for the VCB Connect SPAs — api client, auth, i18n, theme, Tailwind preset.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./api": "./src/api.js",
+    "./auth": "./src/auth.jsx",
+    "./i18n": "./src/i18n.jsx",
+    "./theme": "./src/theme.jsx",
+    "./tailwind.preset": "./tailwind.preset.js"
+  },
+  "files": [
+    "src",
+    "tailwind.preset.js"
+  ],
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

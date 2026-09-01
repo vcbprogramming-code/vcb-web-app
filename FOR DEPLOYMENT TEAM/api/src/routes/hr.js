@@ -442,7 +442,7 @@ router.post(
     const by = req.user.email;
 
     try {
-      const written = await tx(async (c) => {
+      const written = await tx(req.user, async (c) => {
         let n = 0;
         for (const cell of body.cells) {
           const value = (cell.value ?? '').trim();
@@ -815,7 +815,7 @@ router.post(
   requireRole('hr', 'admin'),
   asyncRoute(async (req, res) => {
     const m = migrationSchema.parse(req.body);
-    const row = await tx(async (c) => {
+    const row = await tx(req.user, async (c) => {
       const emp = await c.query('select eid, site_key from hr.employees where eid = $1', [m.eid]);
       if (!emp.rows[0]) {
         const e = new Error('Employee not found');

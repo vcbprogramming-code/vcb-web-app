@@ -51,17 +51,44 @@ export async function one(text, params) {
 /**
  * Run several statements as one transaction.
  *
- *   await tx(async (c) => {
- *     await c.query('insert into … values ($1)', [a]);
- *     await c.query('update … set … where id = $1', [b]);
- *   });
+ *   await tx(async (c) => { … });                 // no actor context
+ *   await tx(req.user, async (c) => { … });       // actor context set
  *
  * Rolls back on any throw, and always returns the client to the pool.
+ *
+ * **Pass the user whenever the statements touch HR.** HR's triggers
+ * (`enforce_entry_window`, `audit_work_entry`) read `app.actor_email` and
+ * `app.actor_role` to decide who is editing and whether they may edit outside
+ * the normal window. Both fail closed — unset means role 'none' and an empty
+ * email — so omitting the user does not error, it silently locks admins out
+ * past the edit window and writes audit rows with no actor. That is the failure
+ * this parameter exists to prevent, and it is invisible until someone goes
+ * looking at the audit log months later.
+ *
+ * The settings are `set local`, so they live and die with the transaction and
+ * cannot leak to the next caller that borrows this pooled connection.
  */
-export async function tx(fn) {
+export async function tx(userOrFn, maybeFn) {
+  const fn = typeof userOrFn === 'function' ? userOrFn : maybeFn;
+  const user = typeof userOrFn === 'function' ? null : userOrFn;
+
   const client = await pool.connect();
   try {
     await client.query('begin');
+
+    if (user) {
+      // Parameterised: `set local` will not take $1, so this goes through
+      // set_config(), which does — never interpolate an email into SQL text.
+      await client.query('select set_config($1, $2, true)', [
+        'app.actor_email',
+        String(user.email || ''),
+      ]);
+      await client.query('select set_config($1, $2, true)', [
+        'app.actor_role',
+        String(user.roles?.hr || 'none'),
+      ]);
+    }
+
     const result = await fn(client);
     await client.query('commit');
     return result;

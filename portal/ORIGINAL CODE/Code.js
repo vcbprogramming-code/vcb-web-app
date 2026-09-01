@@ -43,7 +43,10 @@ var APPS = [
     key:  'hr',
     name: 'HR Work Log',
     desc: 'Attendance, task logs & timesheet for the HR team.',
-    url:  'https://script.google.com/macros/s/AKfycbzEg5Sn0tNnciRkWmwnsEM9cmq0NVmy6weblTLPqlAOccsDKkh9m6dmLMRVBpqspBblUA/exec',
+    // Re-pointed 2026-09-01: the previous deployment belonged to script project
+    // 13GL834Y…, which no longer exists in Drive. HR was rebuilt as project
+    // 16IoKsjX… and redeployed, so the old /exec URL is permanently dead.
+    url:  'https://script.google.com/macros/s/AKfycbyNqO1jmKGF72N2v03ObFXIqQGChREaFFtIKaJg_os2K-btyx5XWf4xcxQNAJykw1s/exec',
     icon: 'hr',
     accent: '#34d399'
   },

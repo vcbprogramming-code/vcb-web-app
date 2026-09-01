@@ -5576,104 +5576,136 @@ function SEED_ENTRIES(){ var s=loadSeed_(); return { support:s.support||[], oper
 // is what made the auto-create fallback below reachable in the first place.
 var DB_ID = "1lyn78vJ2xKBhMJUs7LxTXI9kB49or6uxVRH_CAgEn-A";
 var SS_CACHE_ = null;
-// Self-healing: if DB_ID can't be opened (e.g. the file was deleted), the app
-// auto-creates a replacement spreadsheet on first use and remembers its id in
-// Script Properties (DB_ID_OVERRIDE_), so nobody ever has to touch Drive by
-// hand. Employees never see or interact with the sheet directly.
+
+// DB_ID above is the authority. DB_ID_OVERRIDE_ is only consulted when DB_ID
+// itself will not open.
+//
+// It used to be the other way round, and that inversion is what let a stale
+// script property silently shadow a corrected constant: on 2026-08-31 a reseed
+// wrote an override pointing at a blank sheet, and from then on the app read
+// the blank one even though DB_ID named the real database. A value nobody can
+// see in the source outranking a value everybody can read is the wrong
+// precedence for the thing that decides where all the data lives.
+//
+// The override still exists because a genuine relocation needs a way to
+// redirect the app without a code push — it just no longer wins by default.
 function activeDbId_(){
-  try {
-    var override = PropertiesService.getScriptProperties().getProperty('DB_ID_OVERRIDE_');
-    if (override) return override;
-  } catch(e){}
   return DB_ID;
+}
+function overrideDbId_(){
+  try {
+    return PropertiesService.getScriptProperties().getProperty('DB_ID_OVERRIDE_') || '';
+  } catch(e){ return ''; }
 }
 // Diagnostic: run from the editor to see which spreadsheet the app is
 // currently using and its Drive URL.
-// Walks/creates a Drive folder path from My Drive root, e.g.
-// ['WORK','08 CLAUDE CODE','HR Work Log Web App'] -> that nested folder.
-function walkOrCreatePath_(root, segments){
-  var cur = root;
-  segments.forEach(function(name){
-    var it = cur.getFoldersByName(name);
-    cur = it.hasNext() ? it.next() : cur.createFolder(name);
-  });
-  return cur;
-}
+// Read-only diagnostic: run from the editor to see which spreadsheet the app is
+// actually reading and where it lives.
+//
+// This used to move the database into a folder it located BY NAME, walking down
+// from My Drive root and creating each segment that did not exist, and it
+// trashed any other folder sharing the target's name. Every one of those verbs
+// was capable of touching a file the app never created: a by-name search
+// matches anything anywhere in Drive, so 'WORK' could resolve to somebody
+// else's 'WORK', and setTrashed on the result would take it away.
+//
+// A diagnostic has no business writing to Drive at all. It now only reports.
+// Filing a database into a folder is a one-off human task; if it needs doing,
+// do it in drive.google.com where you can see what you are moving.
 function WHERE_IS_DB(){
   var id = activeDbId_();
+  var ov = overrideDbId_();
   var url = 'https://docs.google.com/spreadsheets/d/' + id + '/edit';
-  var stalePath = ['HR Work Log Web App — Database'];   // wrongly created at Drive root earlier
-  var filedInto = '(unchanged)';
+
+  var where = '(could not read)';
+  var title = '(could not read)';
   try {
-    var projectFolder = walkOrCreatePath_(DriveApp.getRootFolder(), ['WORK','08 CLAUDE CODE','HR Work Log Web App']);
     var file = DriveApp.getFileById(id);
-    var already = false;
+    title = file.getName();
+    var names = [];
     var parents = file.getParents();
-    while (parents.hasNext()) { if (parents.next().getId() === projectFolder.getId()) already = true; }
-    if (!already) {
-      projectFolder.addFile(file);
-      var oldParents = file.getParents();
-      while (oldParents.hasNext()) { var p = oldParents.next(); if (p.getId() !== projectFolder.getId()) p.removeFile(file); }
-      filedInto = projectFolder.getUrl();
-    } else { filedInto = 'already in ' + projectFolder.getUrl(); }
-    // Clean up the stray same-named folder mistakenly created at Drive root earlier, if empty.
-    var stale = DriveApp.getFoldersByName(stalePath[0]);
-    while (stale.hasNext()){
-      var sf = stale.next();
-      if (sf.getId() !== projectFolder.getId() && !sf.getFiles().hasNext() && !sf.getFolders().hasNext()){
-        sf.setTrashed(true);
-      }
-    }
-  } catch(e){ filedInto = 'filing failed: ' + e.message; }
-  Logger.log('ACTIVE DB_ID = ' + id);
-  Logger.log('URL          = ' + url);
-  Logger.log('FOLDER       = ' + filedInto);
+    while (parents.hasNext()) names.push(parents.next().getName());
+    where = names.length ? names.join(' | ') : 'My Drive (root)';
+  } catch(e){ where = 'open failed: ' + e.message; }
+
+  Logger.log('ACTIVE DB_ID  = ' + id + '   (from DB_ID in source)');
+  Logger.log('OVERRIDE      = ' + (ov || '(not set)') +
+             (ov && ov !== id ? '   ← set but NOT in use; DB_ID takes precedence' : ''));
+  Logger.log('TITLE         = ' + title);
+  Logger.log('LIVES IN      = ' + where);
+  Logger.log('URL           = ' + url);
   return url;
 }
-function createFreshDb_(){
-  var ss = SpreadsheetApp.create('HR Work Log — Database');
-  try {
-    var folderName = 'HR Work Log Web App — Database';
-    var folders = DriveApp.getFoldersByName(folderName);
-    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-    var file = DriveApp.getFileById(ss.getId());
-    folder.addFile(file);
-    DriveApp.getRootFolder().removeFile(file);   // Sheets.create() lands it in My Drive root by default
-  } catch(e){}   // filing is a nicety — never let it block the app from getting a working DB
-  try { PropertiesService.getScriptProperties().setProperty('DB_ID_OVERRIDE_', ss.getId()); } catch(e){}
-  return ss;
-}
-function ss_(){
-  if (SS_CACHE_) return SS_CACHE_;
-  var id = activeDbId_();
-  try { SS_CACHE_ = SpreadsheetApp.openById(id); }
-  catch(e){
-    // The active id would not open. Before failing, fall back to the known-good
-    // DB_ID constant — a STALE OVERRIDE is the likely cause (activeDbId_ prefers
-    // DB_ID_OVERRIDE_, so an old override silently shadows a corrected DB_ID).
-    // This recovers to a real, existing database; it never creates one.
-    if (id !== DB_ID) {
-      try {
-        SS_CACHE_ = SpreadsheetApp.openById(DB_ID);
-        // The override is wrong and DB_ID works — clear it so the app stops
-        // being routed at a dead sheet on every future call.
-        try { PropertiesService.getScriptProperties().deleteProperty('DB_ID_OVERRIDE_'); } catch(e3){}
-      } catch(e2){ SS_CACHE_ = null; }
-    }
-    if (!SS_CACHE_) {
-      // NEVER auto-create a replacement here. A database that will not open has
-      // been moved, trashed, or had its sharing changed — provisioning a blank
-      // one silently strands every existing record and the app looks empty.
-      // Fail loudly instead so the real cause gets fixed. (Matches the guard in
-      // Meeting Minutes and Credit Facility; see ARCHITECTURE_STANDARD.md rule 2.)
-      throw new Error(
-        'เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ' + (e && e.message) +
-        ' | ระบบจะไม่สร้างฐานข้อมูลใหม่ให้อัตโนมัติ เพื่อป้องกันข้อมูลสูญหาย ' +
-        'โปรดกู้คืนไฟล์เดิมจาก Drive Trash หรือแก้ค่า DB_ID_OVERRIDE_ ให้ถูกต้อง'
-      );
+// createFreshDb_() used to live here and has been deleted outright.
+//
+// It created a replacement spreadsheet whenever openById threw, and ss_()'s
+// catch block was its only caller. That is what happened on 2026-08-31: a
+// transient open failure — an API blip, not a missing file — made the app
+// build a blank database, file it into a new folder at My Drive root, and
+// write DB_ID_OVERRIDE_ so it kept reading the blank one forever after. The
+// real database was never touched; the app simply stopped looking at it.
+//
+// Credit Facility hit the identical bug on 2026-07-01 and Meeting Minutes was
+// guarded at the same time. HR was the last app still carrying the pattern.
+//
+// It is deleted rather than left unused because an unused function that
+// provisions a database is an invitation to wire it back in. If first-run
+// provisioning is ever needed it belongs in a manually-invoked function that
+// refuses to run when DB_ID or DB_ID_OVERRIDE_ is already set.
+//
+// See ARCHITECTURE_STANDARD.md rule 2, "Never silently reseed".
+
+// How many times to retry a failed open before concluding the database is
+// really gone. The 08-31 incident was a SINGLE transient failure; one retry
+// would have prevented it entirely.
+var DB_OPEN_ATTEMPTS_ = 3;
+
+function openDbById_(id){
+  var lastErr = null;
+  for (var i = 0; i < DB_OPEN_ATTEMPTS_; i++){
+    try { return SpreadsheetApp.openById(id); }
+    catch(e){
+      lastErr = e;
+      // Back off before retrying: 0.5s, then 1.5s. A rate-limit or a 500 clears
+      // in that window; a deleted file does not, so this costs two seconds in
+      // the genuine-failure case and saves the database in the transient one.
+      if (i < DB_OPEN_ATTEMPTS_ - 1) Utilities.sleep(500 * (i + 1) * 2);
     }
   }
-  if (!SS_CACHE_) throw new Error('เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ตรวจสิทธิ์/รหัสไฟล์');
+  throw lastErr;
+}
+
+function ss_(){
+  if (SS_CACHE_) return SS_CACHE_;
+
+  var id = activeDbId_();
+  var firstErr = null;
+
+  // DB_ID first — it is the value in source control, visible to anyone reading
+  // the file.
+  try { SS_CACHE_ = openDbById_(id); }
+  catch(e){ firstErr = e; }
+
+  // Only if that genuinely will not open do we consider the override, which is
+  // how a deliberate relocation is honoured without a code push.
+  if (!SS_CACHE_) {
+    var ov = overrideDbId_();
+    if (ov && ov !== id) {
+      try { SS_CACHE_ = openDbById_(ov); } catch(e2){}
+    }
+  }
+
+  if (!SS_CACHE_) {
+    // NEVER auto-create a replacement here. A database that will not open after
+    // three attempts has been moved, trashed, or had its sharing changed —
+    // provisioning a blank one silently strands every existing record while the
+    // app looks like it is working. Fail loudly so the real cause gets fixed.
+    throw new Error(
+      'เปิดฐานข้อมูลไม่ได้ (DB_ID=' + id + ') — ' + (firstErr && firstErr.message) +
+      ' | ระบบจะไม่สร้างฐานข้อมูลใหม่ให้อัตโนมัติ เพื่อป้องกันข้อมูลสูญหาย ' +
+      'โปรดกู้คืนไฟล์เดิมจาก Drive Trash หรือแก้ค่า DB_ID_OVERRIDE_ ให้ถูกต้อง'
+    );
+  }
   return SS_CACHE_;
 }
 // Returns null when the database cannot be opened, rather than propagating the

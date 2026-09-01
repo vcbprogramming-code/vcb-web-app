@@ -819,6 +819,13 @@ html.is-mobile .bar{
 html.is-mobile #srch{flex:1 1 100%;width:auto;min-width:0;height:36px;border-radius:8px;font-size:14px;padding:0 12px}
 html.is-mobile .bar .divider{display:none}
 html.is-mobile .dtsel{flex:1 1 calc(50% - 3px);width:auto;max-width:none;min-width:0;height:36px;border-radius:8px;font-size:13px;padding:0 8px}
+/* Doc-type and status still take half a row each. The project picker does not:
+   it shares its line with the two date boxes, which are 70px apiece. Left at
+   50% it sat alone with the rest of the row empty and pushed the dates onto a
+   line of their own — the whole point of moving them up here. */
+html.is-mobile .pfms{flex:1 1 auto;min-width:0}
+html.is-mobile .pfmsBtn{width:100%;min-width:0}
+html.is-mobile .pfmsLabel,html.is-mobile #pfmsLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html.is-mobile .pfmsPanel{left:auto;right:0;min-width:min(300px,calc(100vw - 24px))}
 
 /* Date filter bar — 2 dense rows. Row 1: label + From + → + To.
@@ -829,7 +836,11 @@ html.is-mobile .datebar{
   padding-right:max(12px,env(safe-area-inset-right));
   flex-wrap:wrap;gap:5px;align-items:center;
 }
-html.is-mobile .datebar{flex-wrap:nowrap}
+/* Was nowrap, which kept the two date boxes on one line with the quick
+   buttons running off the right edge. The dates have moved to the filter row,
+   so this row is only buttons now and they should wrap into view rather than
+   disappear past the screen. */
+html.is-mobile .datebar{flex-wrap:wrap}
 /* One shared box spec, matching .dtsel (doc-type / status) exactly —
    height:36px, radius:8px — so every filter control in the header looks
    like one standardized set instead of some boxes taller than others. */

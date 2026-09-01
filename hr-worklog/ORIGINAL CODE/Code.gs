@@ -7512,7 +7512,18 @@ function _api_decideLeaveRequest_(id, approve){
 }
 
 /* ============================ DASHBOARD ============================ */
+// The dashboard's data call. Wrapped like api_bootstrap: a missing database
+// returns the normal shape with nothing in it, so the dashboard draws its
+// month header, view toggles and export button over an empty site grid rather
+// than the client tearing the page down through fatal().
 function api_adminSummary(year,month){
+  try { return _api_adminSummary_(year,month); }
+  catch(e){
+    return { rows:[], today:'', days:[], lockDays:3, degraded:true,
+      degradedError:(e&&e.message?e.message:String(e)) };
+  }
+}
+function _api_adminSummary_(year,month){
   rcReset_(); var u=requireView_(); var keys=scopedSiteKeys_(u);
   // 60-second per-user cache. Same user reloading the dashboard for the same
   // (year, month) within a minute gets the cached payload instantly instead

@@ -60,7 +60,13 @@ comment on table portal.app_roles is
 -- change, and doing it accidentally by inserting a second row would silently
 -- give whichever row sorted first.
 create table if not exists portal.access_grants (
-  email      text not null,
+  -- Lower-cased by CHECK, not by convention. The primary key is on the raw
+  -- column, so a row inserted as Somchai@vcb-con.com by a one-off script would
+  -- not collide with somchai@vcb-con.com and the person would end up with two
+  -- rows for one app - which the one-role-per-app shape above cannot express.
+  -- The API already lowercases; this makes it impossible to get wrong from
+  -- anywhere else.
+  email      text not null check (email = lower(email)),
   app_key    text not null references portal.apps(key) on delete cascade,
   role       text not null,
   granted_by text,                    -- who clicked the button
@@ -107,21 +113,50 @@ create index if not exists access_audit_at_idx    on portal.access_audit(at desc
 -- the one-off scripts and a psql session must be audited too — the value of
 -- this log is that it has no gaps.
 create or replace function portal.log_access_change() returns trigger
-language plpgsql as $$
+language plpgsql as $
+declare
+  -- Branch on TG_OP rather than coalesce(new.x, old.x): in PL/pgSQL, touching
+  -- NEW during a DELETE raises "record new is not assigned yet" - it does not
+  -- evaluate to null. Written the coalesce way, every revocation would throw
+  -- and access could be granted but never taken away.
+  v_email   text;
+  v_app     text;
+  v_old     text;
+  v_new     text;
+  v_note    text;
 begin
+  if TG_OP = 'DELETE' then
+    v_email := old.email; v_app := old.app_key;
+    v_old   := old.role;  v_new := null;
+    v_note  := old.note;
+  elsif TG_OP = 'INSERT' then
+    v_email := new.email; v_app := new.app_key;
+    v_old   := null;      v_new := new.role;
+    v_note  := new.note;
+  else -- UPDATE
+    v_email := new.email; v_app := new.app_key;
+    v_old   := old.role;  v_new := new.role;
+    v_note  := new.note;
+  end if;
+
+  -- An UPDATE that changes only the note is not an access change; skip it so
+  -- the log stays a record of who could reach what.
+  if TG_OP = 'UPDATE' and v_old is not distinct from v_new then
+    return new;
+  end if;
+
   insert into portal.access_audit (actor, email, app_key, old_role, new_role, note)
   values (
     -- set by api/src/db.js tx(); null from a direct psql session, which is
     -- itself worth seeing in the log.
     nullif(current_setting('app.actor_email', true), ''),
-    coalesce(new.email, old.email),
-    coalesce(new.app_key, old.app_key),
-    old.role,
-    new.role,
-    coalesce(new.note, old.note)
+    v_email, v_app, v_old, v_new, v_note
   );
-  return coalesce(new, old);
-end $$;
+
+  -- AFTER trigger: the return value is ignored, but DELETE must not return NEW.
+  if TG_OP = 'DELETE' then return old; end if;
+  return new;
+end $;
 
 drop trigger if exists access_grants_audit on portal.access_grants;
 create trigger access_grants_audit
@@ -133,6 +168,27 @@ create trigger access_grants_audit
 -- Seeded from the requireRole() calls that exist today. rank orders them in the
 -- admin screen and makes "at least this powerful" expressible later without
 -- hard-coding a list of names in the UI.
+-- portal.apps ships EMPTY - it is populated at runtime through the portal admin
+-- screen - so seeding roles for apps that do not exist yet would fail this
+-- migration on the app_key foreign key and block the deploy. Register all eight
+-- modules first (not just the ones with roles - the admin screen lists every
+-- app and shows "open to everyone" for those without); on conflict do nothing means a real row added
+-- later through the UI is never clobbered by a re-run.
+--
+-- url is required and unknown at migration time. The portal admin screen sets
+-- the real one per environment; an empty string is honest about that where a
+-- guessed localhost URL would look configured and be wrong in production.
+insert into portal.apps (key, name, name_th, url, sort_order, enabled) values
+  ('ememo',      'E-Memo',                        'อีเมโม',              '', 10, true),
+  ('minutes',    'Meeting Minutes',               'รายงานการประชุม',      '', 20, true),
+  ('sop',        'Standard Operating Procedures', 'มาตรฐานการใช้งานระบบ', '', 30, true),
+  ('sysmap',     'System Map',                    'แผนผังการทำงานของระบบ', '', 40, true),
+  ('hr',         'HR Work Log',                   'บันทึกการทำงานรายวัน',  '', 50, true),
+  ('credit',     'Credit Facility Manager',       'ติดตามวงเงินสินเชื่อ',   '', 60, true),
+  ('onboarding', 'Onboarding Portal',             'ปฐมนิเทศพนักงานใหม่',   '', 70, true),
+  ('portal',     'VCB Connect',                   'วีซีบี คอนเน็ค',        '', 80, true)
+on conflict (key) do nothing;
+
 insert into portal.app_roles (app_key, role, label, label_th, description, rank) values
   ('hr',     'staff',   'Staff',        'พนักงาน',        'Log own work; request leave.',                        10),
   ('hr',     'manager', 'Manager',      'ผู้จัดการ',        'Everything staff can do, plus approve leave for own sites.', 20),

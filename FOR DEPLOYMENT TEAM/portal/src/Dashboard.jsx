@@ -196,7 +196,13 @@ export default function Dashboard({
             </p>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+          {/* auto-fit, not fixed breakpoints - the live .apps-grid is
+              repeat(auto-fit, minmax(280px, 1fr)) with an 18px gap. Hard-coded
+              columns agree with it between 1280 and 1920 and then stop: at
+              2560 the live app fits five tiles and the port still drew three,
+              leaving half the row empty. Letting the grid decide also means a
+              seventh app needs no breakpoint edit. */}
+          <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
             {filteredApps.map((a, i) => {
               const copy = appCopy(a, lang, t);
               return (
@@ -209,7 +215,7 @@ export default function Dashboard({
                   // inline style — Tailwind cannot generate a class for a value
                   // it never sees at build time.
                   style={{ borderTopColor: a.accent || undefined, animationDelay: `${i * 45}ms` }}
-                  className={`${CARD_CLASS} reveal group flex flex-col gap-2.5 border-t-2 p-4 transition-shadow hover:shadow-card-hover`}
+                  className={`${CARD_CLASS} reveal group flex flex-col gap-3.5 rounded-2xl border-t-2 p-[22px] transition-shadow hover:shadow-card-hover`}
                   {...bindTooltip({
                     key: `card-${a.key}`,
                     name: copy.name,
@@ -219,22 +225,31 @@ export default function Dashboard({
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className="grid h-9 w-9 shrink-0 place-items-center rounded-control"
+                      className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-xl border border-line dark:border-line-dark"
                       style={{
                         backgroundColor: a.accent ? `${a.accent}1f` : undefined,
                         color: a.accent || undefined,
                       }}
                     >
-                      <AppIcon icon={a.icon} className="h-[18px] w-[18px]" />
+                      <AppIcon icon={a.icon} className="h-6 w-6" />
                     </span>
-                    <span className="min-w-0 flex-1 font-semibold text-ink dark:text-ink-dark">
+                    {/* min-height of two lines, as .app-name has: without it a
+                        one-line title makes a shorter card and the row grows to
+                        the tallest, which is what made this grid look ragged. */}
+                    <span className="min-h-[2.6em] min-w-0 flex-1 text-base font-semibold leading-[1.3] text-ink dark:text-ink-dark">
                       {copy.name}
                     </span>
                   </div>
-                  <p className="text-sm text-ink-muted dark:text-ink-dark-muted">{copy.desc}</p>
-                  <span className="mt-auto pt-1 text-sm font-medium text-accent dark:text-accent-dark">
-                    {t('dash.launch')}{' '}
-                    <span className="inline-block transition-transform group-hover:translate-x-1">
+                  {/* Three lines reserved — .app-desc's min-height. */}
+                  <p className="min-h-[4.5em] text-[13.5px] leading-[1.5] text-ink-muted dark:text-ink-dark-muted">
+                    {copy.desc}
+                  </p>
+                  <span
+                    className="mt-auto flex items-center gap-[5px] pt-0.5 text-xs font-medium"
+                    style={{ color: a.accent || undefined }}
+                  >
+                    {t('dash.launch')}
+                    <span className="inline-block transition-transform duration-150 group-hover:translate-x-[3px]">
                       →
                     </span>
                   </span>

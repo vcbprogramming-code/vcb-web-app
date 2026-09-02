@@ -116,11 +116,14 @@ export default function HolidayCalendar() {
         </div>
       </PanelHead>
 
-      <div className="grid grid-cols-7 gap-1">
+      {/* gap 2px and the small type sizes below are the live .cal-grid /
+          .cal-dow / .cal-day values. The port was uniformly a size larger,
+          which made the calendar taller than the panel beside it. */}
+      <div className="grid grid-cols-7 gap-[2px]">
         {dowNames.map((d, i) => (
           <div
             key={i}
-            className="pb-1 text-center text-[10px] font-semibold uppercase text-ink-muted dark:text-ink-dark-muted"
+            className="pb-1 text-center text-[8.5px] font-bold uppercase text-ink-muted dark:text-ink-dark-muted"
           >
             {d}
           </div>
@@ -157,7 +160,7 @@ export default function HolidayCalendar() {
             <div
               key={i}
               title={h ? holidayName(h) : undefined}
-              className={`relative grid h-8 place-items-center rounded text-xs ${tone}`}
+              className={`relative grid h-[22px] place-items-center rounded-[5px] text-[9.5px] font-medium ${tone}`}
             >
               {c.day}
               {h && !isToday && (
@@ -168,23 +171,23 @@ export default function HolidayCalendar() {
         })}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-ink-muted dark:text-ink-dark-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-holiday dark:bg-holiday-dark/40" />
+      <div className="mt-3 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] text-ink-muted dark:text-ink-dark-muted">
+        <span className="flex items-center gap-1">
+          <span className="h-[7px] w-[7px] shrink-0 rounded-[2px] bg-holiday dark:bg-holiday-dark/40" />
           {t('cal.legendHoliday')}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-weekend dark:bg-weekend-dark" />
+        <span className="flex items-center gap-1">
+          <span className="h-[7px] w-[7px] shrink-0 rounded-[2px] bg-weekend dark:bg-weekend-dark" />
           {t('cal.legendWeekend')}
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-accent dark:bg-accent-dark" />
+        <span className="flex items-center gap-1">
+          <span className="h-[7px] w-[7px] shrink-0 rounded-[2px] bg-accent dark:bg-accent-dark" />
           {t('cal.legendToday')}
         </span>
       </div>
 
       {nextHoliday && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-control bg-surface-sunken px-3 py-2 text-xs dark:bg-surface-dark-sunken">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-control bg-surface-sunken px-3 py-2 text-[11px] dark:bg-surface-dark-sunken">
           <span className="text-ink dark:text-ink-dark">
             {t('cal.nextHoliday', { name: nextHoliday.name, date: nextHoliday.date })}
           </span>

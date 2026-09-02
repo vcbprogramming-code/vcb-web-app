@@ -51,7 +51,12 @@ export default {
         'shell-sm': '214px 268px 1fr',
         // Timeline collapses the middle column to nothing rather than
         // unmounting it, so the document pane does not reflow on toggle.
+        // One per breakpoint, matching .body.timeline-mode in the original -
+        // only the widest existed, and none of them was ever applied, so the
+        // empty list column kept its full 360px on the timeline.
         'shell-timeline': '294px 0 1fr',
+        'shell-timeline-md': '258px 0 1fr',
+        'shell-timeline-sm': '214px 0 1fr',
         // One horizontal timeline lane: fixed label gutter + the date track.
         lane: '200px 1fr',
       },

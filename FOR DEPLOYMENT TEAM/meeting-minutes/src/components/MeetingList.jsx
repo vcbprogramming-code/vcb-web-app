@@ -45,15 +45,14 @@ export default function MeetingList({ activeProject, activeId, query, searchMatc
     meetings.filter((m) => passesProjectFilter(m, activeProject) && inRange(m, r)).length;
 
   // Timeline replaces this column entirely — the timeline itself renders in the
-  // detail pane. The header stays so the column does not collapse mid-animation.
+  // detail pane. The section stays mounted so the document pane does not reflow
+  // on toggle, but the grid gives it 0 width (grid-cols-shell-timeline-*), so
+  // it must draw nothing: no border and no label, or a 360px column of empty
+  // grey sits between the projects list and the timeline. That is what
+  // .body.timeline-mode .list does in the original — width 0, border-right
+  // none, overflow hidden.
   if (activeProject === TIMELINE_PROJECT) {
-    return (
-      <section className="flex min-h-0 flex-col overflow-hidden border-r border-line bg-surface dark:border-line-dark dark:bg-surface-dark">
-        <div className="px-3.5 pb-1.5 pt-3 text-xs text-ink-muted dark:text-ink-dark-muted">
-          {t('nav.timeline')}
-        </div>
-      </section>
-    );
+    return <section aria-hidden="true" className="min-h-0 overflow-hidden" />;
   }
 
   const label =

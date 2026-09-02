@@ -225,7 +225,12 @@ function HorizontalTimeline({ projects, meetings, hidden, onOpen }) {
                     ({pts.length})
                   </small>
                 </div>
-                <div className="relative h-[22px] rounded bg-surface-sunken dark:bg-surface-dark-sunken">
+                {/* The lane track. Deliberately faint: in the original this is
+                    var(--line-soft) (#eaeef2) on a white panel, a step small
+                    enough that the eye reads the dots and the month gridlines
+                    rather than a row of grey bars. surface-sunken is the
+                    app's panel grey and sat too heavy here. */}
+                <div className="relative h-[22px] rounded bg-[#eaeef2] dark:bg-white/[.06]">
                   {pts.map((m) => (
                     <button
                       key={m.id}

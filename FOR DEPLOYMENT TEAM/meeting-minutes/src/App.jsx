@@ -213,7 +213,18 @@ export default function App() {
           Apps Script app swapped whole panes with .mobile-pane-* classes and a
           document-level click handler; a responsive grid does the same job
           without any JavaScript at all. */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-shell-sm xl:grid-cols-shell-md 2xl:grid-cols-shell">
+      {/* On the timeline the middle column collapses to 0, as
+          .body.timeline-mode does in the original: the timeline renders in the
+          document pane and wants the width. It stays mounted rather than
+          unmounting so the document pane does not reflow on toggle. */}
+      <div
+        className={
+          'grid min-h-0 flex-1 grid-cols-1 ' +
+          (onTimelineRoute
+            ? 'lg:grid-cols-shell-timeline-sm xl:grid-cols-shell-timeline-md 2xl:grid-cols-shell-timeline'
+            : 'lg:grid-cols-shell-sm xl:grid-cols-shell-md 2xl:grid-cols-shell')
+        }
+      >
         <Sidebar
           active={highlighted}
           onPick={pickProject}

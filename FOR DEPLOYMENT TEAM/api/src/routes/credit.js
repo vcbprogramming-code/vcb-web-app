@@ -22,6 +22,13 @@ const router = Router();
 
 // Every route in this module needs a signed-in caller. Mounting it once here
 // rather than per-route means a new route cannot accidentally ship public.
+//
+// NOT gated on a credit role, deliberately. Access rights are administered from
+// the portal (and each app own settings) and are not wired yet; gating here
+// would lock everyone out of a module whose permissions nobody can grant.
+// The ROLE VOCABULARY is defined - see docs/ACCESS_MODEL.md - so turning this
+// into requireRole('credit', 'manager', 'viewer') is a one-line change once
+// the admin UI can assign it.
 router.use(requireAuth);
 
 const manager = requireRole('credit', 'manager');

@@ -271,4 +271,257 @@ router.delete(
   })
 );
 
+
+/**
+ * Which apps may this caller administer access for?
+ *
+ * The senior role in each app carries the right to manage that app's own
+ * access — an HR admin manages HR access, a minutes admin manages minutes
+ * access. That is what makes "access rights from within each app's settings"
+ * work without every module needing a portal admin standing by.
+ *
+ * A portal admin is handled by the caller, not here: they administer
+ * everything, and expressing that as "every key in this map" would silently
+ * stop being true the moment an app was added without a role.
+ */
+function adminableApps(user) {
+  const OWNER_ROLE = {
+    hr: 'admin',
+    minutes: 'admin',
+    credit: 'manager',
+    sop: 'editor',
+    portal: 'admin',
+  };
+  const roles = user?.roles || {};
+  return Object.entries(OWNER_ROLE)
+    .filter(([app, needed]) => roles[app] === needed)
+    .map(([app]) => app);
+}
+
+/* ------------------------------ access rights ----------------------------- */
+
+// Administering who may use which app.
+//
+// TWO PLACES USE THESE ENDPOINTS, deliberately:
+//
+//   * The portal's own settings — the whole picture. Every person, every app,
+//     one screen. This is where you answer "what can Somchai get to?".
+//   * Each app's settings — its own slice, scoped by ?app=hr. This is where an
+//     HR admin manages HR access without being handed the credit facility.
+//
+// Same endpoints, same data, different scope. The alternative — a separate
+// admin surface per module — is six places to fix a bug and six chances for
+// them to disagree about what a role means.
+//
+// NOT ENFORCED YET. portal.access_grants is written here and read by the admin
+// screens, but api/src/auth.js resolveRoles() still reads the per-module tables
+// (hr.users, credit.managers, …). Populate and check this first; switching
+// resolveRoles() over is a separate change, so that a mistake in the new table
+// cannot lock the company out of its own portal. See supabase/migrations/008.
+
+const appKey = z.string().min(1).max(64);
+const emailSchema = z.string().email().max(320);
+
+/**
+ * The role vocabulary, per app.
+ *
+ * The admin screen renders a dropdown from this rather than hard-coding role
+ * names, so an app that gains a role gains it in the UI without a deploy.
+ * Anonymous-readable: it is a list of words, and the sign-in screen has no
+ * token to send yet.
+ */
+router.get(
+  '/access/roles',
+  allowAnonymous,
+  asyncRoute(async (req, res) => {
+    const q = z.object({ app: appKey.optional() }).parse(req.query);
+    const list = await rows(
+      `select r.app_key, r.role, r.label, r.label_th, r.description, r.rank,
+              a.name as app_name, a.name_th as app_name_th
+         from portal.app_roles r
+         join portal.apps a on a.key = r.app_key
+        where ($1::text is null or r.app_key = $1)
+        order by a.sort_order, r.rank desc`,
+      [q.app ?? null]
+    );
+    res.json(list);
+  })
+);
+
+/**
+ * Who has access to what.
+ *
+ * ?app=hr narrows to one app, which is what an app's own settings screen
+ * sends. ?email= narrows to one person, which is what you want when someone
+ * asks "why can't I open Credit?".
+ *
+ * Portal admins see everything. An app admin sees only their app — enforced
+ * here rather than trusted from the query string, because ?app is a client
+ * input and "only send us your own app" is not a security boundary.
+ */
+router.get(
+  '/access/grants',
+  requireAuth,
+  asyncRoute(async (req, res) => {
+    const q = z
+      .object({ app: appKey.optional(), email: z.string().max(320).optional() })
+      .parse(req.query);
+
+    const isPortalAdmin = req.user?.roles?.portal === 'admin';
+    // The apps this caller may administer: all of them for a portal admin,
+    // otherwise the ones where they hold the most senior role.
+    const mine = adminableApps(req.user);
+
+    if (!isPortalAdmin && q.app && !mine.includes(q.app)) {
+      return res.status(403).json({ error: 'FORBIDDEN', app: q.app });
+    }
+    const scope = isPortalAdmin ? null : mine;
+
+    const list = await rows(
+      `select g.email, g.app_key, g.role, g.granted_by, g.granted_at, g.note,
+              r.label, r.label_th
+         from portal.access_grants g
+         left join portal.app_roles r on r.app_key = g.app_key and r.role = g.role
+        where ($1::text is null or g.app_key = $1)
+          and ($2::text is null or lower(g.email) = lower($2))
+          and ($3::text[] is null or g.app_key = any($3))
+        order by lower(g.email), g.app_key`,
+      [q.app ?? null, q.email ?? null, scope]
+    );
+    res.json(list);
+  })
+);
+
+/**
+ * Everything one person can reach, across every app.
+ *
+ * The shape the portal's per-person screen wants: one row per app, with the
+ * granted role or null. Apps with no roles defined come back with
+ * roles: [] — "everyone who can sign in may use it" — rather than being
+ * omitted, so the screen shows the complete picture instead of implying an app
+ * does not exist.
+ */
+router.get(
+  '/access/person/:email',
+  requireAuth,
+  asyncRoute(async (req, res) => {
+    const email = emailSchema.parse(req.params.email);
+    const list = await rows(
+      `select a.key as app_key, a.name, a.name_th, a.sort_order,
+              g.role, g.granted_by, g.granted_at, g.note,
+              coalesce(
+                (select json_agg(json_build_object(
+                          'role', r.role, 'label', r.label,
+                          'label_th', r.label_th, 'rank', r.rank)
+                        order by r.rank desc)
+                   from portal.app_roles r where r.app_key = a.key),
+                '[]'::json
+              ) as roles
+         from portal.apps a
+         left join portal.access_grants g
+                on g.app_key = a.key and lower(g.email) = lower($1)
+        where a.enabled
+        order by a.sort_order, a.name`,
+      [email]
+    );
+    res.json({ email, apps: list });
+  })
+);
+
+const grantSchema = z.object({
+  email: emailSchema,
+  app: appKey,
+  // null revokes. Sending role: null rather than DELETE keeps the admin screen
+  // to one verb: it always PUTs the state it wants.
+  role: z.string().min(1).max(64).nullable(),
+  note: z.string().max(500).optional(),
+});
+
+/**
+ * Grant, change, or revoke one person's role in one app.
+ *
+ * Idempotent: PUT the state you want. The trigger on portal.access_grants
+ * writes portal.access_audit either way, including the delete, so a revocation
+ * leaves a record even though the grant row is gone.
+ */
+router.put(
+  '/access/grants',
+  requireAuth,
+  asyncRoute(async (req, res) => {
+    const g = grantSchema.parse(req.body);
+
+    const isPortalAdmin = req.user?.roles?.portal === 'admin';
+    if (!isPortalAdmin && !adminableApps(req.user).includes(g.app)) {
+      return res.status(403).json({ error: 'FORBIDDEN', app: g.app });
+    }
+
+    // Refuse a role the app does not define, rather than storing a typo that
+    // silently grants nothing. The FK would catch it too; this says why.
+    if (g.role) {
+      const known = await one(
+        'select 1 from portal.app_roles where app_key = $1 and role = $2',
+        [g.app, g.role]
+      );
+      if (!known) {
+        return res.status(400).json({ error: 'UNKNOWN_ROLE', app: g.app, role: g.role });
+      }
+    }
+
+    const saved = await tx(req.user, async (c) => {
+      if (!g.role) {
+        await c.query('delete from portal.access_grants where lower(email) = lower($1) and app_key = $2',
+          [g.email, g.app]);
+        return null;
+      }
+      const { rows: r } = await c.query(
+        `insert into portal.access_grants (email, app_key, role, granted_by, note)
+         values (lower($1), $2, $3, $4, $5)
+         on conflict (email, app_key) do update
+            set role = excluded.role,
+                granted_by = excluded.granted_by,
+                granted_at = now(),
+                note = excluded.note
+         returning *`,
+        [g.email, g.app, g.role, req.user?.email ?? null, g.note ?? null]
+      );
+      return r[0];
+    });
+
+    res.json(saved ?? { email: g.email.toLowerCase(), app_key: g.app, role: null });
+  })
+);
+
+/**
+ * The change history for one person, or for one app.
+ *
+ * Read-only by construction: rows are written by a database trigger, and an
+ * endpoint that let a client write them would make the log worthless as
+ * evidence of who granted what.
+ */
+router.get(
+  '/access/audit',
+  requireAuth,
+  requireRole('portal', 'admin'),
+  asyncRoute(async (req, res) => {
+    const q = z
+      .object({
+        email: z.string().max(320).optional(),
+        app: appKey.optional(),
+        limit: z.coerce.number().int().min(1).max(500).default(100),
+      })
+      .parse(req.query);
+
+    const list = await rows(
+      `select id, at, actor, email, app_key, old_role, new_role, note
+         from portal.access_audit
+        where ($1::text is null or lower(email) = lower($1))
+          and ($2::text is null or app_key = $2)
+        order by at desc
+        limit $3`,
+      [q.email ?? null, q.app ?? null, q.limit]
+    );
+    res.json(list);
+  })
+);
+
 export default router;

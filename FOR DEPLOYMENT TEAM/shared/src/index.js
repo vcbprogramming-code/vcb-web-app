@@ -51,3 +51,12 @@ export {
   DEFAULT_THEME,
 } from './theme.jsx';
 
+// Access rights: who may use which app. Used by the portal settings screen and
+// by each app own settings - see access.js.
+export {
+  getAccessRoles,
+  getAccessGrants,
+  getPersonAccess,
+  setAccessGrant,
+  getAccessAudit,
+} from './access.js';

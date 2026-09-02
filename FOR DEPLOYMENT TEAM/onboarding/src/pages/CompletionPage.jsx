@@ -63,23 +63,43 @@ export default function CompletionPage() {
           <PageTitle>{t('completion.welcome')}</PageTitle>
         </div>
 
+        {/* Each card carries its photograph and its "Learn more" link, as in
+            the original. Both were text-only here because the two pages they
+            lead to had not been ported, so the links had nowhere to go. */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-card border border-line bg-surface-card p-5 shadow-card dark:border-line-dark dark:bg-surface-dark-card">
-            <h3 className="mb-2 text-lg font-bold">{tc('Meet Our Team')}</h3>
-            <p className="text-sm text-ink-muted dark:text-ink-dark-muted">
-              {tc(
-                'Explore the infrastructure works that define our execution standards. Each project reflects coordination, discipline, and long-term durability.'
-              )}
-            </p>
-          </div>
-          <div className="rounded-card border border-line bg-surface-card p-5 shadow-card dark:border-line-dark dark:bg-surface-dark-card">
-            <h3 className="mb-2 text-lg font-bold">{tc('Check Out Life on Site')}</h3>
-            <p className="text-sm text-ink-muted dark:text-ink-dark-muted">
-              {tc(
-                'From early morning briefings to milestone handovers, our teams operate in dynamic environments where teamwork and structure drive results.'
-              )}
-            </p>
-          </div>
+          {[
+            {
+              to: '/meet-our-team',
+              image: '/img/meet-team-nyp2019-award.jpg',
+              title: 'Meet Our Team',
+              body: 'Explore the infrastructure works that define our execution standards. Each project reflects coordination, discipline, and long-term durability.',
+            },
+            {
+              to: '/life-on-site',
+              image: '/img/los-toolbox-real.jpg',
+              title: 'Check Out Life on Site',
+              body: 'From early morning briefings to milestone handovers, our teams operate in dynamic environments where teamwork and structure drive results.',
+            },
+          ].map((card) => (
+            <div
+              key={card.to}
+              className="flex flex-col overflow-hidden rounded-card border border-line bg-surface-card shadow-card dark:border-line-dark dark:bg-surface-dark-card"
+            >
+              <img
+                src={card.image}
+                alt={tc(card.title)}
+                loading="lazy"
+                className="h-[200px] w-full object-cover"
+              />
+              <div className="flex flex-1 flex-col gap-2 p-5">
+                <h3 className="text-lg font-bold">{tc(card.title)}</h3>
+                <p className="text-sm text-ink-muted dark:text-ink-dark-muted">{tc(card.body)}</p>
+                <div className="mt-auto pt-3">
+                  <CtaLink to={card.to}>{t('gallery.learnMore')}</CtaLink>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div>

@@ -109,7 +109,12 @@ export default function Layout() {
       </aside>
 
       {/* section.block: padding 8px 28px 28px in the original. */}
-      <main className="w-full max-w-page flex-1 px-7 pb-7 pt-2">
+      {/* No w-full: beside a 274px sidebar that is flex-none, w-full asks for
+          100% of the whole row, so the row came to viewport + 274 and the page
+          scrolled sideways by exactly the sidebar's width at tablet sizes.
+          flex-1 takes the space that is left, and min-w-0 lets it be narrower
+          than its widest child so inner scrollers clip instead of pushing. */}
+      <main className="min-w-0 max-w-page flex-1 px-7 pb-7 pt-2">
         <Outlet />
       </main>
 

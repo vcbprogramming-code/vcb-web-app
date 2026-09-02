@@ -5,6 +5,8 @@ import RequiredDocuments from './pages/RequiredDocuments.jsx';
 import CompletionPage from './pages/CompletionPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import OrgChartPage from './pages/OrgChartPage.jsx';
+import MeetOurTeamPage from './pages/MeetOurTeamPage.jsx';
+import LifeOnSitePage from './pages/LifeOnSitePage.jsx';
 import PageResolver from './pages/PageResolver.jsx';
 
 // React Router 6. These are the same routes the module already had — <Routes>
@@ -24,6 +26,10 @@ export default function App() {
         <Route path="/required-documents" element={<RequiredDocuments />} />
         <Route path="/completion" element={<CompletionPage />} />
         <Route path="/company-structure" element={<OrgChartPage />} />
+        {/* Both must stay above /:pageKey, which is a catch-all and would
+            otherwise swallow them into the department resolver. */}
+        <Route path="/meet-our-team" element={<MeetOurTeamPage />} />
+        <Route path="/life-on-site" element={<LifeOnSitePage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/:pageKey" element={<PageResolver />} />
       </Route>

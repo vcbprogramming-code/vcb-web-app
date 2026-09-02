@@ -179,6 +179,12 @@ export const dictionary = createDictionary({
   },
   'completion.print': { th: 'พิมพ์แบบฟอร์มสำเร็จการปฐมนิเทศ', en: 'Print Completion Form' },
 
+  /* --------------------------- photo galleries --------------------------- */
+  'gallery.learnMore': { th: 'ดูเพิ่มเติม', en: 'Learn more' },
+  'gallery.back': { th: 'กลับไปหน้าสำเร็จการปฐมนิเทศ', en: 'Back to Completion' },
+  // The original's Life on Site returns to Home, not to Completion.
+  'gallery.backToOnboarding': { th: 'กลับไปหน้าปฐมนิเทศ', en: 'Return to Onboarding' },
+
   /* ------------------------------- org chart ----------------------------- */
   'org.chart': { th: 'ผังองค์กร', en: 'Org Chart' },
   'org.group': { th: 'โครงสร้างกลุ่มบริษัท', en: 'Group Structure' },

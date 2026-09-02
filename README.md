@@ -35,9 +35,9 @@ FOR DEPLOYMENT TEAM/    React + Express + Postgres. Not deployed.
 └── <module>/           one Vite SPA per app
 ```
 
-The live apps keep running until the replacement is verified. Do not change
-`ORIGINAL CODE/` and `FOR DEPLOYMENT TEAM/` expecting them to stay in step —
-they are separate implementations, not two copies.
+The live apps keep running until the replacement is verified. The two trees are
+separate implementations of the same requirements, not two copies of one
+codebase: a change in one does not appear in the other.
 
 ระบบเดิมยังใช้งานตามปกติจนกว่าระบบใหม่จะผ่านการตรวจสอบ
 
@@ -60,7 +60,7 @@ cd "FOR DEPLOYMENT TEAM/api" && npm install && npm run dev     # :3000
 cd "FOR DEPLOYMENT TEAM/portal" && npm install && npm run dev  # :5173
 ```
 
-`api/.env` needs `DATABASE_URL` (Supabase **pooler**, port 6543 — Render is
+`api/.env` requires `DATABASE_URL` (Supabase **pooler**, port 6543 — Render is
 IPv4-only) and `JWT_SECRET` (≥32 chars). Both are checked at startup. Thai
 fonts must be in `api/assets/fonts/` or the API refuses to boot; see the README
 there.
@@ -70,28 +70,45 @@ Every module is its own Vite app with its own port. `@vcb/shared` is aliased to
 
 ---
 
-## Things that will cost you an afternoon
+## Constraints in the data model
 
-**Buddhist era.** A sheet tab named `2569-08` is Gregorian `2026-08`. Off by
-543. Use the helpers in `api/src/lib/excel.js`.
+Facts about how this system stores things. They are not preferences and do not
+change with taste.
 
-**HR slots.** Slot 1 is งานหลัก, slot 2 is งานเสริม — not AM/PM. Both filled is
-**one** manday. Use the `hr.mandays` view; counting `work_entries` rows
-double-counts every two-task day.
+**Buddhist era.** Sheet tabs and Thai-facing dates are BE; the database is
+Gregorian. `2569-08` is `2026-08` — a 543-year offset. Conversion lives in
+`api/src/lib/excel.js`.
 
-**Schema qualification.** `hr.employees` and `onboarding.employees` are
-different tables. Always qualify.
+**HR slots are tasks, not times.** Slot 1 is งานหลัก, slot 2 is งานเสริม. The
+"AM"/"PM" column names in the legacy sheet are historical and misleading. A day
+with both slots filled is **one** manday, which is what the `hr.mandays` view
+expresses; `work_entries` has one row per slot and counting it double-counts
+every two-task day.
 
-**One origin.** Theme, language and session live in `localStorage`, which is
-per-origin. Serve every module from `vcb-connect.com/<path>`, never a subdomain.
-See [`docs/ONE_DOMAIN.md`](FOR%20DEPLOYMENT%20TEAM/docs/ONE_DOMAIN.md).
+**Two `employees` tables.** `hr.employees` is keyed by `eid`;
+`onboarding.employees` is keyed by name and unrelated. Unqualified
+`employees` resolves by search_path, not intent.
 
-**Access is not enforced yet.** `resolveRoles()` still reads six per-module
-tables; `portal.access_grants` exists but nothing reads it. Populate and diff
-before switching. See [`docs/ACCESS_MODEL.md`](FOR%20DEPLOYMENT%20TEAM/docs/ACCESS_MODEL.md).
+**localStorage is per-origin.** `vcb_theme`, `vcb_lang` and `vcb_token` do
+not cross between hosts, so a subdomain per module breaks the shared session and
+appearance. Module links carry `?theme=` and `?lang=` as a fallback for
+bookmarks and development. Topology in
+[`docs/ONE_DOMAIN.md`](FOR%20DEPLOYMENT%20TEAM/docs/ONE_DOMAIN.md).
 
-**`.gscript` files are live cloud objects.** Deleting one locally trashes the
-real Apps Script project. This has already cost six apps once.
+**Access control is defined but not enforced.** `resolveRoles()` reads six
+per-module tables. `portal.access_grants` and `portal.app_roles` exist and
+have endpoints, but nothing reads them for authorisation yet. The four steps to
+switch over, in order, are in
+[`docs/ACCESS_MODEL.md`](FOR%20DEPLOYMENT%20TEAM/docs/ACCESS_MODEL.md).
+
+**`.gscript` and `.gsheet` files are live cloud objects.** They are pointers
+Drive resolves, not local copies. Deleting or moving one locally trashes the
+real Apps Script project or Spreadsheet. This has already happened.
+
+**PDFKit drops missing glyphs silently.** Without Sarabun in
+`api/assets/fonts/`, Thai text is absent from generated PDFs with no error.
+`assertFontsPresent()` runs before `app.listen()` so the API refuses to boot
+instead.
 
 ---
 
@@ -100,14 +117,14 @@ real Apps Script project. This has already cost six apps once.
 | File | For |
 |---|---|
 | [ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md) | Script IDs, data locations, per-app inventory |
-| [TECH_STACK.md](TECH_STACK.md) | What to build with, what not to |
+| [TECH_STACK.md](TECH_STACK.md) | The stack, and what is deliberately excluded |
 | [`docs/ACCESS_MODEL.md`](FOR%20DEPLOYMENT%20TEAM/docs/ACCESS_MODEL.md) | Roles, grants, what is not wired |
 | [`docs/ONE_DOMAIN.md`](FOR%20DEPLOYMENT%20TEAM/docs/ONE_DOMAIN.md) | Deployment topology |
 | `<module>/PORT_NOTES.md` | What each port covers and what it does not |
 | `supabase/migrations/` | Schema, one file per app, traps noted inline |
 
-Source comments explain *why*, not *what*. Read them before changing anything —
-several record a bug that was expensive to find.
+Source comments record *why* a decision was made rather than what the code does.
+Several document a bug that took a long time to find.
 
 ---
 

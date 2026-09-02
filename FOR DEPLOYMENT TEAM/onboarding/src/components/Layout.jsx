@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
-import { useI18n, useTheme } from '@vcb/shared';
+import { useState } from 'react';
+import { AppSettings, useI18n } from '@vcb/shared';
 import JourneyStepper from './JourneyStepper.jsx';
 import { useProgress } from '../lib/useProgress.js';
 import { REQUIRED_DOCUMENTS } from '../data/requiredDocuments.js';
@@ -30,27 +31,13 @@ const navLinkClass = ({ isActive }) =>
       : 'text-sidebar-text hover:bg-white/10 hover:text-white dark:text-sidebar-text-dark',
   ].join(' ');
 
-function SegmentedButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={[
-        'flex-1 rounded-control px-2 py-1.5 text-xs font-semibold transition-colors',
-        active
-          ? 'bg-white/20 text-white'
-          : 'text-sidebar-dim hover:bg-white/10 hover:text-white dark:text-sidebar-dim-dark',
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  );
-}
+// Same rule as every other module: the deployment says where the portal is,
+// and it defaults to the root because on one domain the portal IS the root.
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || '/';
 
 export default function Layout() {
-  const { resolved, setTheme } = useTheme();
-  const { lang, setLang, t } = useI18n();
+  const { t } = useI18n();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // The stepper needs to know who this is and what they have finished. This is
   // the same hook every page uses; useProgress keeps one cache per employee, so
@@ -66,14 +53,25 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex w-full flex-none flex-col gap-6 bg-onb-sidebar px-5 py-6 text-white dark:bg-onb-sidebar-dark md:w-[274px]">
-        <Link to="/" className="flex flex-col">
-          <span className="font-display text-base font-extrabold tracking-[0.04em]">
-            {t('app.brand')}
-          </span>
-          <span className="text-xs text-sidebar-text opacity-70 dark:text-sidebar-text-dark">
-            {t('app.company')}
-          </span>
-        </Link>
+        {/* A sidebar has room for a real label where a topbar only has room
+            for a brand mark, so the way back to the portal says so. */}
+        <div className="flex flex-col gap-3">
+          <a
+            href={PORTAL_URL}
+            className="inline-flex items-center gap-1.5 self-start rounded-control text-xs text-sidebar-dim transition-colors hover:text-white dark:text-sidebar-dim-dark"
+          >
+            <span aria-hidden="true">←</span>
+            {t('app.backToPortal')}
+          </a>
+          <Link to="/" className="flex flex-col">
+            <span className="font-display text-base font-extrabold tracking-[0.04em]">
+              {t('app.brand')}
+            </span>
+            <span className="text-xs text-sidebar-text opacity-70 dark:text-sidebar-text-dark">
+              {t('app.company')}
+            </span>
+          </Link>
+        </div>
 
         {/* The journey, not a page index. Which step someone is on, what is
             behind them and what is still locked is the whole point of this
@@ -89,38 +87,21 @@ export default function Layout() {
           requiredDocsDone={requiredDocsDone}
         />
 
-        <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-4">
-          <div>
-            <p className="mb-1.5 text-[0.7rem] uppercase tracking-wide text-sidebar-dim dark:text-sidebar-dim-dark">
-              {t('settings.appearance')}
-            </p>
-            <div className="flex gap-1 rounded-control bg-black/20 p-1">
-              <SegmentedButton active={resolved !== 'dark'} onClick={() => setTheme('light')}>
-                {t('theme.light')}
-              </SegmentedButton>
-              <SegmentedButton active={resolved === 'dark'} onClick={() => setTheme('dark')}>
-                {t('theme.dark')}
-              </SegmentedButton>
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1.5 text-[0.7rem] uppercase tracking-wide text-sidebar-dim dark:text-sidebar-dim-dark">
-              {t('settings.language')}
-            </p>
-            <div className="flex gap-1 rounded-control bg-black/20 p-1">
-              <SegmentedButton active={lang === 'th'} onClick={() => setLang('th')}>
-                ไทย
-              </SegmentedButton>
-              <SegmentedButton active={lang === 'en'} onClick={() => setLang('en')}>
-                EN
-              </SegmentedButton>
-            </div>
-          </div>
-
+        <div className="mt-auto flex flex-col gap-1 border-t border-white/10 pt-4">
+          {/* One gear, as in every other module. Appearance and language were
+              two segmented blocks taking a third of this column for settings
+              somebody chooses once. */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-2 rounded-control px-3 py-2 text-left text-sm text-sidebar-text transition-colors hover:bg-white/10 hover:text-white dark:text-sidebar-text-dark"
+          >
+            <span aria-hidden="true">⚙</span>
+            {t('settings.title')}
+          </button>
           <NavLink
             to="/admin"
-            className="rounded-control px-3 py-2 text-center text-xs text-sidebar-dim transition-colors hover:bg-white/10 hover:text-white dark:text-sidebar-dim-dark"
+            className="rounded-control px-3 py-2 text-xs text-sidebar-dim transition-colors hover:bg-white/10 hover:text-white dark:text-sidebar-dim-dark"
           >
             {t('nav.admin')}
           </NavLink>
@@ -131,6 +112,8 @@ export default function Layout() {
       <main className="w-full max-w-page flex-1 px-7 pb-7 pt-2">
         <Outlet />
       </main>
+
+      <AppSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

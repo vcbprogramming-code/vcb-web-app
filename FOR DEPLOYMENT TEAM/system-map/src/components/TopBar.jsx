@@ -1,12 +1,23 @@
 /** Brand banner + header: layer filters, direct/indirect toggles, registry/AI
- *  buttons, language switch, and the department filter bar.
+ *  buttons, settings, and the department filter bar.
+ *
+ *  This module keeps its own bar rather than using the shared AppBar: the row
+ *  under the banner carries the layer and department filters that ARE this
+ *  app, and the live version puts them in the chrome too. The banner itself
+ *  matches AppBar - brand link home, divider, title, subtitle - and language
+ *  and appearance sit behind the gear like everywhere else.
  */
-import { useI18n } from '@vcb/shared';
+import { useState } from 'react';
+import { AppSettings, useI18n } from '@vcb/shared';
 import { useStore } from '../store.jsx';
 import { DEPTS } from '../data/index.js';
 import { tDept } from '../lib/mapLang.js';
 
 const DEPT_ORDER = ['eng', 'pm', 'proc', 'fin', 'acc', 'asset', 'hr'];
+
+// Same as every other module: the deployment says where the portal is, and it
+// defaults to the root because on one domain the portal IS the root.
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || '/';
 
 /** The header's small pill button. `tone` picks the accent ring. */
 const BTN =
@@ -39,14 +50,17 @@ function Btn({ active, tone = 'plain', className = '', ...rest }) {
 
 export default function TopBar() {
   const s = useStore();
-  const { t, lang, toggleLang } = useI18n();
+  // lang is still needed: tDept() picks the Thai or English department name.
+  // Only the language TOGGLE moved into the settings sheet, not the value.
+  const { t, lang } = useI18n();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <>
       <div className="brand-banner flex flex-shrink-0 items-center gap-4 bg-map-brand px-5 py-[13px] shadow-brand">
         <a
           className="rounded-md text-xl font-bold tracking-[.2px] text-white no-underline transition-opacity duration-150 hover:opacity-[.82] focus-visible:opacity-[.82] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white/35"
-          href="/"
+          href={PORTAL_URL}
           target="_top"
           title={t('app.backToPortal')}
         >
@@ -92,8 +106,11 @@ export default function TopBar() {
             <Btn tone="ai" active={s.showAiMode} onClick={s.toggleAiMode}>
               {t('hdr.aiOpps')}
             </Btn>
-            <Btn tone="lang" active={lang === 'th'} onClick={toggleLang}>
-              {lang === 'th' ? '🇬🇧 EN' : '🇹🇭 TH'}
+            {/* The gear, not a language button. Language and appearance live
+                behind it in every module; a flag also names a country rather
+                than a language. */}
+            <Btn tone="lang" active={false} onClick={() => setSettingsOpen(true)} title={t('settings.title')}>
+              ⚙
             </Btn>
           </div>
         </div>
@@ -134,6 +151,7 @@ export default function TopBar() {
           </div>
         </div>
       </div>
+      <AppSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 }

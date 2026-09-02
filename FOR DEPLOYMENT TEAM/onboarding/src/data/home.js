@@ -1,13 +1,18 @@
 // Ported from the original app's PAGES['home'] (content.html) — every
-// text field is verbatim from the source. Embedded images
-// (EMBEDDED_IMAGES.* — base64 data URIs baked into the original's
-// images.html, ~7MB) are NOT ported here; see React/README.md's "Images"
-// section for why that's a deliberate separate step, not an oversight.
+// text field is verbatim from the source.
+//
+// The original bakes its images into images.html as base64 data URIs
+// (EMBEDDED_IMAGES.*, ~7MB). The ones Home actually shows are extracted to
+// files under public/img/ and referenced by path: a browser caches them
+// separately and does not re-parse them with every page load.
 
 export const HOME_HERO = {
   title: "VCB 90-Day Onboarding Portal",
   lead: "This portal defines the required knowledge, system mastery, execution standards, and governance expectations for all new employees during their first 90 days.",
   note: "Confirmation of employment is based on competency, documentation accuracy, system discipline, and risk awareness.",
+  // EMBEDDED_IMAGES.homeHeroPhoto. The original uses it as a background
+  // behind a dark overlay (.hero.has-photo), not as an <img>.
+  photo: "/img/home-hero.jpg",
 };
 
 export const CEO_QUOTE = {

@@ -18,10 +18,30 @@ export default function Home() {
 
   return (
     <Page>
-      <header className="flex flex-col gap-3">
-        <PageTitle>{tc(HOME_HERO.title)}</PageTitle>
-        <p className="text-lg text-ink-subtle dark:text-ink-dark-muted">{tc(HOME_HERO.lead)}</p>
-        <p className="text-sm text-ink-muted dark:text-ink-dark-muted">{tc(HOME_HERO.note)}</p>
+      {/* .hero.has-photo: the photograph is a background behind a 55% dark
+          overlay, not an <img>, and the block is centred white-on-dark at a
+          260px minimum height. The port had a plain left-aligned heading.
+
+          The note keeps a near-white card with dark text in BOTH themes.
+          styles.html records that as a fixed bug: theming its text put
+          near-white on near-white in dark mode. */}
+      <header
+        className="relative flex min-h-[260px] flex-col items-center justify-center gap-3.5 rounded-card bg-cover bg-center px-6 py-10 text-center text-white"
+        style={{
+          backgroundImage: `linear-gradient(rgba(5,7,15,0.55), rgba(5,7,15,0.55)), url(${HOME_HERO.photo})`,
+        }}
+      >
+        <div className="max-w-[900px]">
+          {/* PageTitle takes no className; the colour is inherited from the
+              hero's text-white rather than set here. */}
+          <PageTitle>{tc(HOME_HERO.title)}</PageTitle>
+          <p className="mx-auto mt-3.5 max-w-[760px] text-base leading-relaxed text-[#dfe6ff]">
+            {tc(HOME_HERO.lead)}
+          </p>
+          <p className="mx-auto mt-3.5 max-w-[760px] rounded-lg border-l-[3px] border-accent bg-white/95 px-3.5 py-2.5 text-left text-sm text-[#171b2e] shadow-[0_4px_14px_rgba(0,0,0,0.18)]">
+            {tc(HOME_HERO.note)}
+          </p>
+        </div>
       </header>
 
       <Section title={tc(CEO_QUOTE.heading)}>

@@ -59,6 +59,17 @@ export default function DepartmentLanding() {
             {tc(p)}
           </p>
         ))}
+        {/* .erp-flow-photo. The original shows this diagram on every
+            department landing page and it was absent here. object-contain,
+            not cover: a cropped flowchart loses the boxes at its edges. The
+            white plate is deliberate and unthemed - the diagram is drawn on
+            white, so on a dark page it needs its own ground. */}
+        <img
+          src="/img/erp-flowchart.jpg"
+          alt={t('dept.workflow')}
+          loading="lazy"
+          className="mt-4 max-h-[480px] w-full rounded-xl border border-line bg-white object-contain p-2 dark:border-line-dark"
+        />
       </Section>
 
       <Section title={t('dept.phases')}>

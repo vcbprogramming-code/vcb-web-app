@@ -10,7 +10,13 @@ import { Link } from 'react-router-dom';
 // one anyway.
 
 export function Page({ children, className = '' }) {
-  return <div className={`flex flex-col gap-6 ${className}`}>{children}</div>;
+  // min-w-0 on the children, not just the column. A flex item defaults to
+  // min-width:auto, so it refuses to shrink below its content: anything with
+  // an internal horizontal scroller - the Track Record row, the org chart -
+  // widens the whole page instead of clipping, and the page itself scrolls
+  // sideways on a tablet. The overflow-x-auto container cannot clip until its
+  // parent is allowed to be narrower than what it holds.
+  return <div className={`flex min-w-0 flex-col gap-6 [&>*]:min-w-0 ${className}`}>{children}</div>;
 }
 
 export function PageTitle({ children }) {

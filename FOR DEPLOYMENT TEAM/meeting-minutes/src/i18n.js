@@ -341,6 +341,8 @@ export const dictionary = createDictionary({
   },
   'editor.time': { th: 'เวลา', en: 'Time' },
   'editor.timePlaceholder': { th: 'เช่น 10:00', en: 'e.g. 10:00' },
+  'editor.undo': { th: 'ย้อนกลับ (Ctrl+Z)', en: 'Undo (Ctrl+Z)' },
+  'editor.redo': { th: 'ทำซ้ำ (Ctrl+Shift+Z)', en: 'Redo (Ctrl+Shift+Z)' },
   'editor.bold': { th: 'ตัวหนา', en: 'Bold' },
   'editor.italic': { th: 'ตัวเอียง', en: 'Italic' },
   'editor.bulletList': { th: 'รายการหัวข้อย่อย', en: 'Bullet list' },

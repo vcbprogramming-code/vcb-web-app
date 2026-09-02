@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, useI18n } from '@vcb/shared';
 import * as minutesApi from '../lib/minutesApi';
 import { errorMessage } from '../lib/errors';
@@ -115,8 +115,144 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
     return newBlock;
   }
 
+  /* ------------------------------- undo/redo ------------------------------ */
+
+  // Our own stack, not the browser's. Enter, paste and the checklist edit the
+  // DOM directly (see the header), and the browser's undo stack never saw those
+  // changes - execCommand('undo') would skip past them and restore a document
+  // that never existed.
+  //
+  // A snapshot is { html, caret }: restoring the text without the caret leaves
+  // the cursor at position 0, so undoing a typo means finding your place again.
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
+  const typingTimer = useRef(null);
+
+  /** Character offset of the caret within the editable area. */
+  const caretOffset = useCallback(() => {
+    const area = areaRef.current;
+    if (!area) return 0;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return 0;
+    const range = sel.getRangeAt(0).cloneRange();
+    range.selectNodeContents(area);
+    range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+    return range.toString().length;
+  }, []);
+
+  /** Put the caret back at a character offset, walking the text nodes. */
+  const setCaretOffset = useCallback((offset) => {
+    const area = areaRef.current;
+    if (!area) return;
+    const walker = document.createTreeWalker(area, NodeFilter.SHOW_TEXT);
+    let remaining = offset;
+    let node = walker.nextNode();
+    while (node) {
+      if (remaining <= node.length) {
+        const range = document.createRange();
+        range.setStart(node, Math.max(0, remaining));
+        range.collapse(true);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return;
+      }
+      remaining -= node.length;
+      node = walker.nextNode();
+    }
+    // Offset past the end - the content shrank. Land at the end rather than
+    // leaving the caret nowhere.
+    const range = document.createRange();
+    range.selectNodeContents(area);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, []);
+
+  /**
+   * Record the state BEFORE an edit.
+   *
+   * Typing coalesces: a keystroke schedules one push 500ms later, so a
+   * sentence is one undo step rather than forty. A structural edit (paste,
+   * Enter, a toolbar command) pushes immediately, because those are the steps
+   * someone actually wants to take back one at a time.
+   */
+  const pushUndo = useCallback((immediate = false) => {
+    const area = areaRef.current;
+    if (!area) return;
+    const take = () => {
+      const snapshot = { html: area.innerHTML, caret: caretOffset() };
+      const top = undoStack.current[undoStack.current.length - 1];
+      if (top && top.html === snapshot.html) return;
+      undoStack.current.push(snapshot);
+      // A bounded stack: an hour of editing should not grow without limit.
+      if (undoStack.current.length > 200) undoStack.current.shift();
+      redoStack.current = [];
+    };
+    if (immediate) {
+      if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null; }
+      take();
+      return;
+    }
+    if (typingTimer.current) return;
+    take();
+    typingTimer.current = setTimeout(() => { typingTimer.current = null; }, 500);
+  }, [caretOffset]);
+
+  const applySnapshot = useCallback((snapshot) => {
+    const area = areaRef.current;
+    if (!area || !snapshot) return;
+    area.innerHTML = snapshot.html;
+    setCaretOffset(snapshot.caret);
+    area.focus();
+  }, [setCaretOffset]);
+
+  const doUndo = useCallback(() => {
+    const area = areaRef.current;
+    if (!area || !undoStack.current.length) return;
+    if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null; }
+    const current = { html: area.innerHTML, caret: caretOffset() };
+    let prev = undoStack.current.pop();
+    // The top of the stack equals the current state when nothing was typed
+    // after it was pushed. Skip it so one Ctrl+Z always moves something.
+    if (prev.html === current.html && undoStack.current.length) prev = undoStack.current.pop();
+    redoStack.current.push(current);
+    applySnapshot(prev);
+  }, [applySnapshot, caretOffset]);
+
+  const doRedo = useCallback(() => {
+    const area = areaRef.current;
+    if (!area || !redoStack.current.length) return;
+    undoStack.current.push({ html: area.innerHTML, caret: caretOffset() });
+    applySnapshot(redoStack.current.pop());
+  }, [applySnapshot, caretOffset]);
+
   function handleKeyDown(e) {
+    // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y, which Windows users reach
+    // for). Handled before anything else and with preventDefault, or the
+    // browser runs its own undo over a DOM it did not build.
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) doRedo();
+      else doUndo();
+      return;
+    }
+    if (mod && (e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault();
+      doRedo();
+      return;
+    }
+
+    // Any other key edits the document: record the state before it lands.
+    // Coalesced, so a sentence is one undo step and not forty.
+    if (!mod && e.key.length === 1) pushUndo();
+    if (e.key === 'Backspace' || e.key === 'Delete') pushUndo();
+
     if (e.key !== 'Enter' || e.shiftKey) return;
+    // Enter restructures the document, so it is its own undo step.
+    pushUndo(true);
     const area = areaRef.current;
     if (!area) return;
     const sel = window.getSelection();
@@ -189,6 +325,9 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
   }
 
   function handlePaste(e) {
+    // A paste replaces a selection and can drop a whole document in. Its own
+    // undo step, always.
+    pushUndo(true);
     const html = e.clipboardData.getData('text/html');
     const frag = document.createDocumentFragment();
 
@@ -239,6 +378,7 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
 
   const focusArea = () => areaRef.current?.focus();
   const cmd = (c) => {
+    pushUndo(true);
     document.execCommand(c, false);
     focusArea();
   };
@@ -390,6 +530,25 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
           >
             {/* onMouseDown preventDefault everywhere: without it the button
                 takes focus and the selection the command acts on is gone. */}
+            <button
+              type="button"
+              title={t('editor.undo')}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={doUndo}
+              className={toolBtn}
+            >
+              ↶
+            </button>
+            <button
+              type="button"
+              title={t('editor.redo')}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={doRedo}
+              className={toolBtn}
+            >
+              ↷
+            </button>
+            <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-line dark:bg-line-dark" />
             <button
               type="button"
               title={t('editor.bold')}

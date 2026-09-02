@@ -55,9 +55,55 @@ export const SAMPLE_LEAVE = [];
 // Shortcut links that are not portal.apps rows: they point at third-party
 // systems, not VCB Connect modules, so they are not tiles and have no key in
 // the database.
+//
+// Onboarding used to be listed here with its Apps Script /exec URL, copied from
+// the live portal where that was correct. It is NOT a shortcut: there is a full
+// React onboarding module in this repo, so it belongs in portal.apps like every
+// other module and its URL comes from the database. Leaving it here sent people
+// from the new portal back into the stack we replatformed away from.
 export const SHORTCUT_LINKS = {
   erp: 'https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/',
   zoom: 'https://zoom.us/join',
-  onboarding:
-    'https://script.google.com/macros/s/AKfycbwYEjPc_fS-0ygn4gPg8ePSBIm2DkTyS94BTon-IgC5AtiUYYQnZ6v3seV8GsGwGHrL/exec',
 };
+
+/**
+ * A module link that carries the current theme and language.
+ *
+ * WHY THIS IS NOT REDUNDANT ON ONE DOMAIN
+ *
+ * Once every module is served from vcb-connect.com/<path> (see
+ * docs/ONE_DOMAIN.md) localStorage is shared and the parameters change nothing.
+ * They matter in two cases that are not going away:
+ *
+ *   * Development. Each module runs on its own port, and a port is a different
+ *     origin, so nothing in localStorage crosses between them. Without this,
+ *     setting the portal to light and opening HR gives a dark HR - which looks
+ *     like the preference was ignored rather than like a limitation of running
+ *     eight dev servers side by side.
+ *
+ *   * A module opened directly. A bookmark, a link in an email, a machine that
+ *     has never loaded the portal. There is no stored preference to read, and
+ *     the module would fall back to the OS setting.
+ *
+ * The receiving app consumes the parameters once, writes them to its own
+ * storage and strips them from the address bar - see readStoredTheme() in
+ * shared/src/theme.jsx - so they do not linger in a bookmark and re-force a
+ * preference the person has since changed.
+ */
+export function appLink(url, { theme, lang } = {}) {
+  if (!url) return url;
+  try {
+    // Relative paths are the production shape ('/hr'); absolute ones are the
+    // dev shape ('http://localhost:5181'). A base makes both parse.
+    const u = new URL(url, window.location.origin);
+    if (theme) u.searchParams.set('theme', theme);
+    if (lang) u.searchParams.set('lang', lang);
+    // Same-origin links stay relative so they do not look like they leave the
+    // site, and so a rewrite in front of them keeps working.
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : u.toString();
+  } catch {
+    // A URL that will not parse is returned untouched: a tile that navigates
+    // without the theme is far better than a tile that does not navigate.
+    return url;
+  }
+}

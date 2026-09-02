@@ -41,7 +41,54 @@ export const DEFAULT_THEME = 'auto';
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
+/**
+ * A theme handed over in the URL, as `?theme=dark`.
+ *
+ * The portal appends this to every module link. On one domain it is redundant —
+ * localStorage already carries the choice — but localStorage is scoped to an
+ * ORIGIN, and during development each module runs on its own port. Without
+ * this, setting the portal to light and opening HR gives you a dark HR, which
+ * looks like the setting was ignored rather than like a limitation of running
+ * eight dev servers.
+ *
+ * It also covers a real production case: a module opened from a bookmark or a
+ * pasted link on a machine that has never visited the portal.
+ *
+ * Consumed once and written to storage, so it survives navigation inside the
+ * module and does not have to be threaded through every link. The parameter is
+ * then stripped from the address bar — leaving it there would let a stale
+ * bookmark keep forcing a theme the person has since changed.
+ */
+function readUrlTheme() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('theme');
+    return THEMES.includes(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function stripUrlTheme() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('theme')) return;
+    url.searchParams.delete('theme');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  } catch {
+    /* a browser that refuses replaceState still has the right theme */
+  }
+}
+
 function readStoredTheme() {
+  // URL first: it is the more recent instruction. Someone arriving from a
+  // portal set to light means to see light, whatever this origin remembers
+  // from an earlier visit.
+  const fromUrl = readUrlTheme();
+  if (fromUrl) {
+    writeStoredTheme(fromUrl);
+    stripUrlTheme();
+    return fromUrl;
+  }
   try {
     const v = localStorage.getItem(THEME_KEY);
     return THEMES.includes(v) ? v : null;

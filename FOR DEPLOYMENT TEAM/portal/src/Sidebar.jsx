@@ -1,4 +1,4 @@
-import { useI18n } from '@vcb/shared';
+import { useI18n, useTheme } from '@vcb/shared';
 import {
   AiTavernIcon,
   AppIcon,
@@ -9,7 +9,7 @@ import {
   OnboardingIcon,
   ZoomIcon,
 } from './icons';
-import { SHORTCUT_LINKS } from './data';
+import { SHORTCUT_LINKS, appLink } from './data';
 import { appCopy } from './lib/appCopy';
 
 const NAV_ITEM =
@@ -32,6 +32,13 @@ export default function Sidebar({
   bindTooltip,
 }) {
   const { t, lang } = useI18n();
+  const { theme } = useTheme();
+
+  // Pulled out of the applications list and rendered under "More" instead. It
+  // is a ported module like the others - its URL comes from portal.apps, not a
+  // hard-coded Apps Script link - but it is for new starters in their first
+  // days rather than part of anyone's daily work.
+  const onboardingApp = apps.find((a) => a.key === 'onboarding') || null;
 
   return (
     <>
@@ -74,13 +81,16 @@ export default function Sidebar({
 
         <nav className="flex-1 px-3 pb-4">
           <div className={SECTION_LABEL}>{t('nav.applications')}</div>
-          {apps.map((a) => {
+          {/* Onboarding is a module like the rest, but it belongs under "More"
+              with the new-starter material rather than in the daily-work list -
+              so it is pulled out here and rendered below, not twice. */}
+          {apps.filter((a) => a.key !== 'onboarding').map((a) => {
             const copy = appCopy(a, lang, t);
             return (
               <a
                 key={a.key}
                 className={NAV_ITEM}
-                href={a.url}
+                href={appLink(a.url, { theme, lang })}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onClose}
@@ -133,22 +143,27 @@ export default function Sidebar({
           </a>
 
           <div className={SECTION_LABEL}>{t('nav.more')}</div>
-          <a
-            className={NAV_ITEM}
-            href={SHORTCUT_LINKS.onboarding}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onClose}
-            {...bindTooltip({
-              key: 'nav-onboarding',
-              name: t('nav.onboarding'),
-              desc: t('tt.onboardingDesc'),
-              kind: 'nav',
-            })}
-          >
-            <OnboardingIcon className="h-[18px] w-[18px] shrink-0" />
-            <span>{t('nav.onboarding')}</span>
-          </a>
+          {/* Onboarding is a module, so its URL comes from portal.apps rather
+              than a constant - it moves with the environment like every other
+              app instead of being pinned to whatever was hard-coded. It renders
+              here rather than as a tile because it is for new starters on their
+              first days, not part of everyone's daily work. */}
+          {onboardingApp ? (
+            <a
+              className={NAV_ITEM}
+              href={appLink(onboardingApp.url, { theme, lang })}
+              onClick={onClose}
+              {...bindTooltip({
+                key: 'nav-onboarding',
+                name: t('nav.onboarding'),
+                desc: t('tt.onboardingDesc'),
+                kind: 'nav',
+              })}
+            >
+              <OnboardingIcon className="h-[18px] w-[18px] shrink-0" />
+              <span>{t('nav.onboarding')}</span>
+            </a>
+          ) : null}
           <button className={NAV_ITEM} type="button" title={t('nav.comingSoon')} disabled>
             <AiTavernIcon className="h-[18px] w-[18px] shrink-0" />
             <span>{t('nav.aiTavern')}</span>

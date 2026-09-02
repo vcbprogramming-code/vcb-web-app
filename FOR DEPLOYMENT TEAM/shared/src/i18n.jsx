@@ -30,7 +30,45 @@ export const DEFAULT_LANG = 'th';
 // portal — which is the point of "one website".
 export const LANG_KEY = 'vcb_lang';
 
+/**
+ * A language handed over in the URL, as `?lang=th`.
+ *
+ * Mirrors readUrlTheme() in theme.jsx and exists for the same reason:
+ * localStorage is scoped to an ORIGIN, so a portal set to Thai cannot reach a
+ * module running on another port during development, and cannot reach a module
+ * opened from a bookmark on a machine that has never visited the portal.
+ *
+ * Consumed once, written to storage, then stripped from the address bar so a
+ * stale link cannot keep re-forcing a language the person has since changed.
+ */
+function readUrlLang() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('lang');
+    return LANGS.includes(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function stripUrlLang() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('lang')) return;
+    url.searchParams.delete('lang');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  } catch {
+    /* a browser that refuses replaceState still has the right language */
+  }
+}
+
 function readStoredLang() {
+  // URL first — it is the more recent instruction. See readStoredTheme().
+  const fromUrl = readUrlLang();
+  if (fromUrl) {
+    writeStoredLang(fromUrl);
+    stripUrlLang();
+    return fromUrl;
+  }
   try {
     const v = localStorage.getItem(LANG_KEY);
     return LANGS.includes(v) ? v : null;

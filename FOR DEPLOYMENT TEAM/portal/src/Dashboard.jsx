@@ -76,34 +76,13 @@ export default function Dashboard({
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
-      {/* dismissible banner */}
-      {showBanner && (
-        <div className={`${CARD_CLASS} mb-4 flex items-start gap-3.5 px-4 py-3.5`}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-accent/10 text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
-            <AnnouncementIcon className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            {announcement.title && (
-              <p className="font-semibold text-ink dark:text-ink-dark">{announcement.title}</p>
-            )}
-            {announcement.body && (
-              <p className="mt-0.5 whitespace-pre-line text-sm text-ink-muted dark:text-ink-dark-muted">
-                {announcement.body}
-              </p>
-            )}
-          </div>
-          <IconButton
-            className="h-7 w-7 shrink-0 text-lg leading-none"
-            title={t('banner.dismiss')}
-            aria-label={t('banner.dismiss')}
-            onClick={onDismissBanner}
-          >
-            ×
-          </IconButton>
-        </div>
-      )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      {/* 2.3fr / 1fr, matching the live portal .dash-grid. A fixed 320px was
+          narrower than the live column at every width above ~1200px, which is
+          why Thai full names truncated in the birthdays list and both panel
+          headings wrapped onto two lines. minmax(0,...) on the first column
+          keeps a wide table inside it from pushing the side column off-screen. */}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,2.3fr)_minmax(0,1fr)]">
         {/* -------------------- left column -------------------- */}
         <div className="min-w-0 space-y-5">
           {/* Greeting first, then announcements — the order the live app uses.
@@ -136,6 +115,37 @@ export default function Dashboard({
               <span className="text-xs text-white/60">{clockText}</span>
             </div>
           </section>
+
+          {/* The announcement lives inside the left column, under the greeting,
+              exactly as the live portal puts it inside .dash-main. Above the
+              grid it spanned the calendar column too, which made it wider than
+              the greeting it belongs with and pushed the calendar down by its
+              whole height. */}
+        {showBanner && (
+          <div className={`${CARD_CLASS} mb-4 flex items-start gap-3.5 px-4 py-3.5`}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-accent/10 text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
+              <AnnouncementIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              {announcement.title && (
+                <p className="font-semibold text-ink dark:text-ink-dark">{announcement.title}</p>
+              )}
+              {announcement.body && (
+                <p className="mt-0.5 whitespace-pre-line text-sm text-ink-muted dark:text-ink-dark-muted">
+                  {announcement.body}
+                </p>
+              )}
+            </div>
+            <IconButton
+              className="h-7 w-7 shrink-0 text-lg leading-none"
+              title={t('banner.dismiss')}
+              aria-label={t('banner.dismiss')}
+              onClick={onDismissBanner}
+            >
+              ×
+            </IconButton>
+          </div>
+        )}
 
           {/* The panel is hidden entirely while the banner is showing the same
               announcement. It used to render regardless, so a dashboard with a
@@ -246,56 +256,84 @@ export default function Dashboard({
         <div className="space-y-5">
           <HolidayCalendar />
 
-          <Panel className="reveal">
-            <PanelHead>
-              <PanelTitle>{t('panel.birthdays')}</PanelTitle>
-            </PanelHead>
-            <div className="space-y-3">
-              {SAMPLE_BIRTHDAYS.map((b) => (
-                <div key={b.name} className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
-                    {initialsFromName(b.name)}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-ink dark:text-ink-dark">
-                      {b.name}{' '}
-                      <span className="text-[10px] uppercase tracking-wide text-ink-muted dark:text-ink-dark-muted">
-                        {b.dept}
-                      </span>
-                    </p>
-                    <p className="text-xs text-ink-muted dark:text-ink-dark-muted">{b.when}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 border-t border-line pt-3 text-[11px] text-ink-muted dark:border-line-dark dark:text-ink-dark-muted">
-              {t('panel.birthdaysNote')}
-            </p>
-          </Panel>
+          {/* One panel, two columns, a rule between them — the live portal's
+              .side-row. Two stacked panels read as two unrelated things and
+              push the leave list below the fold on a short window; these are a
+              single glance: who is celebrating, and who is out.
 
+              Stacks below sm because 1fr 1fr on a phone gives two columns too
+              narrow for a Thai full name. */}
           <Panel className="reveal">
-            <PanelHead>
-              <PanelTitle>{t('panel.leave')}</PanelTitle>
-            </PanelHead>
-            {SAMPLE_LEAVE.length === 0 ? (
-              <p className="text-sm text-ink-muted dark:text-ink-dark-muted">
-                {t('panel.leaveEmpty')}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {SAMPLE_LEAVE.map((l) => (
-                  <div key={l.name} className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
-                      {initialsFromName(l.name)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-ink dark:text-ink-dark">{l.name}</p>
-                      <p className="text-xs text-ink-muted dark:text-ink-dark-muted">{l.when}</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-0">
+              <div className="min-w-0 sm:pr-3.5">
+                <PanelHead>
+                  <PanelTitle>{t('panel.birthdays')}</PanelTitle>
+                </PanelHead>
+                <div className="space-y-3">
+                  {SAMPLE_BIRTHDAYS.map((b) => (
+                    <div key={b.name} className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
+                        {initialsFromName(b.name)}
+                      </span>
+                      {/* Name and department on one flex row, the department a
+                          pill that never shrinks — .bday-meta / .bday-dept in
+                          the live portal. Inline in the same <p>, the
+                          department competed with the name for width and made
+                          Thai full names truncate far earlier than they need
+                          to. */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-xs font-semibold text-ink dark:text-ink-dark">
+                            {b.name}
+                          </span>
+                          {b.dept ? (
+                            <span
+                              className="bday-dept shrink-0 rounded-pill bg-surface-sunken px-2 py-px text-[10px] font-semibold lowercase text-accent first-letter:uppercase dark:bg-surface-dark-sunken dark:text-accent-dark"
+                            >
+                              {b.dept}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="truncate text-[11px] text-ink-muted dark:text-ink-dark-muted">
+                          {b.when}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <p className="mt-3 border-t border-line pt-3 text-[11px] text-ink-muted dark:border-line-dark dark:text-ink-dark-muted">
+                  {t('panel.birthdaysNote')}
+                </p>
               </div>
-            )}
+
+              {/* The rule is a left border on the second column, exactly as the
+                  live CSS does it — a separate divider element would need its
+                  own height management to reach both ends. */}
+              <div className="min-w-0 border-t border-line pt-4 sm:border-l sm:border-t-0 sm:pl-3.5 sm:pt-0 dark:border-line-dark">
+                <PanelHead>
+                  <PanelTitle>{t('panel.leave')}</PanelTitle>
+                </PanelHead>
+                {SAMPLE_LEAVE.length === 0 ? (
+                  <p className="text-sm text-ink-muted dark:text-ink-dark-muted">
+                    {t('panel.leaveEmpty')}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {SAMPLE_LEAVE.map((l) => (
+                      <div key={l.name} className="flex items-center gap-3">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/10 text-[11px] font-semibold text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
+                          {initialsFromName(l.name)}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-ink dark:text-ink-dark">{l.name}</p>
+                          <p className="text-xs text-ink-muted dark:text-ink-dark-muted">{l.when}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </Panel>
         </div>
       </div>

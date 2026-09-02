@@ -114,7 +114,15 @@ export default function Layout() {
           scrolled sideways by exactly the sidebar's width at tablet sizes.
           flex-1 takes the space that is left, and min-w-0 lets it be narrower
           than its widest child so inner scrollers clip instead of pushing. */}
-      <main className="min-w-0 max-w-page flex-1 px-7 pb-7 pt-2">
+      {/* No max-width here. The original's .main is `flex: 1; min-width: 0`
+          with no cap at all — --maxw (1520px) belongs to .section-inner, the
+          content INSIDE it. Capping main itself left the page ending partway
+          across a wide screen with dead space beside it.
+
+          No w-full either: beside a 274px flex-none sidebar that asks for 100%
+          of the whole row, so the row came to viewport + 274 and the page
+          scrolled sideways by exactly the sidebar's width at tablet sizes. */}
+      <main className="min-w-0 flex-1 px-7 pb-7 pt-2">
         <Outlet />
       </main>
 

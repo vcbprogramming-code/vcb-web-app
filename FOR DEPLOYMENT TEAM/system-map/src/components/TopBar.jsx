@@ -8,7 +8,7 @@
  *  and appearance sit behind the gear like everywhere else.
  */
 import { useState } from 'react';
-import { AppSettings, useI18n } from '@vcb/shared';
+import { AppBar, useI18n } from '@vcb/shared';
 import { useStore } from '../store.jsx';
 import { DEPTS } from '../data/index.js';
 import { tDept } from '../lib/mapLang.js';
@@ -53,29 +53,15 @@ export default function TopBar() {
   // lang is still needed: tDept() picks the Thai or English department name.
   // Only the language TOGGLE moved into the settings sheet, not the value.
   const { t, lang } = useI18n();
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <>
-      <div className="brand-banner flex flex-shrink-0 items-center gap-4 bg-map-brand px-5 py-[13px] shadow-brand">
-        <a
-          className="rounded-md text-xl font-bold tracking-[.2px] text-white no-underline transition-opacity duration-150 hover:opacity-[.82] focus-visible:opacity-[.82] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white/35"
-          href={PORTAL_URL}
-          target="_top"
-          title={t('app.backToPortal')}
-        >
-          {t('app.brand')}
-        </a>
-        <div className="h-[34px] w-px bg-white/[.28]" />
-        <div className="flex flex-col gap-1">
-          <span className="text-base2 font-semibold uppercase tracking-[.5px] text-white opacity-95">
-            {t('app.title')}
-          </span>
-          <span className="text-base2 font-medium text-white opacity-[.85]">
-            {t('app.subtitle')}
-          </span>
-        </div>
-      </div>
+      {/* The shared bar, as in every other module. This was a hand-rolled
+          banner with the same shape but its own colours and spacing — 64px
+          tall against everyone else's, its own brand size, and a settings gear
+          that lived down in the filter row as a small chip rather than in the
+          bar. The filter row below is genuinely this module's own and stays. */}
+      <AppBar title={t('app.title')} subtitle={t('app.subtitle')} />
 
       <div className="app-header relative z-50 flex flex-shrink-0 flex-col gap-[5px] border-b-2 border-map-rail bg-map-head px-5 py-[7px]">
         <div className="flex flex-nowrap items-center gap-1.5">
@@ -105,12 +91,6 @@ export default function TopBar() {
             </Btn>
             <Btn tone="ai" active={s.showAiMode} onClick={s.toggleAiMode}>
               {t('hdr.aiOpps')}
-            </Btn>
-            {/* The gear, not a language button. Language and appearance live
-                behind it in every module; a flag also names a country rather
-                than a language. */}
-            <Btn tone="lang" active={false} onClick={() => setSettingsOpen(true)} title={t('settings.title')}>
-              ⚙
             </Btn>
           </div>
         </div>
@@ -151,7 +131,6 @@ export default function TopBar() {
           </div>
         </div>
       </div>
-      <AppSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 }

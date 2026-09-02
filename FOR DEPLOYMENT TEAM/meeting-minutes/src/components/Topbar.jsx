@@ -39,16 +39,9 @@ export default function Topbar({ query, onQuery, onSettings }) {
           </span>
         </button>
       }
-      settingsFooter={
-        signedIn ? (
-          <p className="truncate text-xs text-ink-muted dark:text-ink-dark-muted">
-            {user?.email}
-            {role ? ` · ${role}` : ''}
-          </p>
-        ) : null
-      }
+      identityNote={role}
     >
-      <div className="flex min-w-0 max-w-[420px] flex-1 items-center gap-2 rounded-pill bg-white/15 px-3 py-1.5 focus-within:bg-white/25 sm:w-[320px] sm:flex-none">
+      <div className="flex h-10 min-w-0 max-w-[420px] flex-1 items-center gap-2 rounded-[9px] border border-white/[.18] bg-white/10 px-3 focus-within:bg-white/20 sm:w-[320px] sm:flex-none">
         <span aria-hidden="true" className="text-sm">
           🔎
         </span>

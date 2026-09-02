@@ -231,6 +231,22 @@ export function AuthProvider({ children, api = defaultApi }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/**
+ * The auth context if there is one, otherwise null — no throw.
+ *
+ * For shared chrome that renders in every module including the ones with no
+ * AuthProvider. System Map is deliberately one of those: it is a static
+ * renderer with nothing to protect, and adding a provider just to satisfy the
+ * bar would put a login wall in front of a page that needs none.
+ *
+ * Only for "show this if we happen to know who is signed in". Anything that
+ * GATES on identity must use useAuth() and get the throw, because a missing
+ * provider there is a wiring bug, not a signed-out person.
+ */
+export function useAuthOptional() {
+  return useContext(AuthContext);
+}
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

@@ -27,12 +27,12 @@ export const sopDict = createDictionary({
   /* ------------------------------- chrome -------------------------------- */
   'app.brand': { th: 'VCB Group', en: 'VCB Group' },
   'app.subtitle': {
-    th: 'Mango ERP Standard Operating Procedure',
-    en: 'Mango ERP Standard Operating Procedure',
+    th: 'Standard Operating Procedure',
+    en: 'Standard Operating Procedure',
   },
   'app.subtitleTH': {
-    th: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · มาตรฐานการใช้งานระบบ',
-    en: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · มาตรฐานการใช้งานระบบ',
+    th: 'ระเบียบปฏิบัติงานมาตรฐาน',
+    en: 'ระเบียบปฏิบัติงานมาตรฐาน',
   },
   'app.backToPortal': {
     th: 'กลับไปหน้าหลัก VCB Connect',

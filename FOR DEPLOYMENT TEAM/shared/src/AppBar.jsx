@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from './i18n.jsx';
 import { useTheme } from './theme.jsx';
+import { useAuthOptional } from './auth.jsx';
 
 /**
  * The bar every module wears.
@@ -170,9 +171,15 @@ export default function AppBar({
   settingsExtra = null,
   settingsFooter = null,
   right = null,
+  identityNote = null,
 }) {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
+  // Optional: System Map has no AuthProvider by design, and the bar must not
+  // be the thing that forces one onto a module with nothing to protect.
+  const auth = useAuthOptional();
+  const user = auth?.user;
+  const signedIn = auth?.signedIn;
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Carry appearance and language home, so returning to the portal does not
@@ -191,7 +198,10 @@ export default function AppBar({
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 bg-brand-bar px-4 py-2.5 text-white shadow-topbar dark:bg-brand-bar-dark">
+      {/* Metrics taken from E-Memo, which is the one that reads clearly:
+          padding 16px 28px, brand 17px, subtitle 11px. The 9.5px title the
+          other modules had was too small to read at a glance. */}
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 bg-brand-bar px-7 py-4 text-white shadow-topbar dark:bg-brand-bar-dark">
         <div className="order-1 flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none">
           {/* The brand is the way back to the portal — the convention everywhere
               else on the web, and it means no module needs its own "back"
@@ -199,17 +209,22 @@ export default function AppBar({
           <a
             href={home}
             title={t('app.backToPortal')}
-            className="shrink-0 text-[17px] font-bold tracking-wide text-white no-underline transition-colors hover:text-white/80 lg:text-xl"
+            className="shrink-0 text-[17px] font-bold tracking-wide text-white no-underline transition-colors hover:text-white/80"
           >
             {t('app.brand')}
           </a>
-          <span className="h-7 w-px shrink-0 bg-white/30" aria-hidden="true" />
-          <div className="flex min-w-0 flex-col gap-0.5 overflow-hidden">
-            <span className="truncate text-[9.5px] font-semibold uppercase tracking-wider text-white/90 lg:text-[11px]">
+          <span className="h-8 w-px shrink-0 bg-white/30" aria-hidden="true" />
+          {/* Fixed 40px, matching the chips beside it. Left to size itself the
+              block came out 40px with one subtitle and 45px with two, so the
+              bar was 72px in most modules and 77px in Meeting Minutes — the
+              kind of difference nobody can name but everybody sees when moving
+              between two tabs. leading-tight keeps both lines inside it. */}
+          <div className="flex h-10 min-w-0 flex-col justify-center gap-0.5 overflow-hidden leading-tight">
+            <span className="truncate text-[13px] font-semibold uppercase tracking-wider text-white/95">
               {title}
             </span>
             {(subtitle || subtitleTh) && (
-              <span className="truncate text-[9.5px] text-white/70 lg:text-[11px]">
+              <span className="truncate text-[11px] text-white/70">
                 {lang === 'th' ? subtitleTh || subtitle : subtitle || subtitleTh}
               </span>
             )}
@@ -226,12 +241,31 @@ export default function AppBar({
 
         <div className="order-2 flex shrink-0 items-center gap-2 lg:order-3">
           {right}
+          {/* Who is signed in, in the bar, in the same place in every module.
+              The live apps show it here; the port showed it in SOP's bar only,
+              and elsewhere buried in the settings sheet or not at all. Hidden
+              below lg — at that width the bar has no room and the settings
+              sheet still carries it. */}
+          {signedIn && user?.email ? (
+            <span
+              className="hidden max-w-[280px] items-center gap-1.5 text-[13px] font-medium text-white/90 lg:flex"
+              title={user.email}
+            >
+              <span className="truncate">{user.email}</span>
+              {identityNote ? (
+                <span className="shrink-0 text-white/70">· {identityNote}</span>
+              ) : null}
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
             title={t('settings.title')}
             aria-label={t('settings.title')}
-            className="grid h-8 w-8 place-items-center rounded-control text-white/85 transition-colors hover:bg-white/15 hover:text-white"
+            // E-Memo's .dm-btn: a 40px chip with a 9px radius and an 18px
+            // glyph, matching every other control in the bar so their top and
+            // bottom edges sit on one plane. A bare 32px icon button did not.
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-white/[.18] bg-white/10 text-white transition-colors hover:bg-white/20"
           >
             <GearIcon className="h-[18px] w-[18px]" />
           </button>

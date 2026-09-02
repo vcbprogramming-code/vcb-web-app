@@ -27,10 +27,11 @@
  */
 
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '@vcb/shared';
 
 import TopBar from './components/TopBar.jsx';
+import SettingsModal from './components/SettingsModal.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import CaseListPane from './components/CaseListPane.jsx';
 import FlowListPane from './components/FlowListPane.jsx';
@@ -122,10 +123,15 @@ export default function App() {
   // which is what the old body.reports-mode rule expressed.
   const wide = isReports || isVersions;
 
+  // The module-specific settings (default view, versions, about, contact) live
+  // in this modal. The shared settings sheet owns theme and language; this
+  // opens from a row inside it, so there is still one gear.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
     <div className="flex h-screen flex-col bg-surface text-ink dark:bg-surface-dark dark:text-ink-dark">
       <LegacyQueryRedirect />
-      <TopBar />
+      <TopBar onSettings={() => setSettingsOpen(true)} />
 
       <div
         className={`grid min-h-0 flex-1 grid-cols-1 ${
@@ -200,6 +206,7 @@ export default function App() {
       <div className="sr-only" role="status" aria-live="polite">
         {status === STATUS.loading ? t('common.loading') : ''}
       </div>
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

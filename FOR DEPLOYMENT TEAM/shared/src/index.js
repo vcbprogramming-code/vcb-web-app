@@ -23,7 +23,7 @@ export {
   clearStoredToken,
 } from './api.js';
 
-export { AuthProvider, useAuth, RequireRole } from './auth.jsx';
+export { AuthProvider, useAuth, useAuthOptional, RequireRole } from './auth.jsx';
 
 export {
   I18nProvider,

@@ -127,7 +127,8 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="w-full max-w-page flex-1 px-6 py-10 md:px-10">
+      {/* section.block: padding 8px 28px 28px in the original. */}
+      <main className="w-full max-w-page flex-1 px-7 pb-7 pt-2">
         <Outlet />
       </main>
     </div>

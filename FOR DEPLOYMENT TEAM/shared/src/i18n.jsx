@@ -195,6 +195,13 @@ export const commonDictionary = createDictionary({
   'auth.role': { th: 'บทบาท', en: 'Role' },
 
   // settings
+  // Used by AppBar, the one topbar every module wears. app.brand is the group
+  // name rather than the module name: the module is identified by the subtitle
+  // beside it, and the brand is what takes you back to the portal.
+  'app.brand':          { th: 'VCB Group', en: 'VCB Group' },
+  'app.backToPortal':   { th: 'กลับสู่ VCB Connect', en: 'Back to VCB Connect' },
+  'settings.title':     { th: 'ตั้งค่า', en: 'Settings' },
+  'settings.appearance':{ th: 'ธีม', en: 'Appearance' },
   'settings.language': { th: 'ภาษา', en: 'Language' },
   'settings.theme': { th: 'ธีม', en: 'Theme' },
   'theme.light': { th: 'สว่าง', en: 'Light' },

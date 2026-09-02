@@ -38,7 +38,11 @@ export default {
         'onb-sidebar-dark': 'linear-gradient(180deg, #0A0F22, #05070F)',
       },
       maxWidth: {
-        page: '900px',
+        // --maxw in the original's styles.html. At 900px every page rendered
+        // in a narrow column with the sidebar's width of empty space beside
+        // it, which folded the four-across values grid to two and made the
+        // whole app look cramped.
+        page: '1520px',
       },
     },
   },

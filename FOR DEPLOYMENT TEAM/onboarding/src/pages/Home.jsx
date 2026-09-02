@@ -36,22 +36,30 @@ export default function Home() {
         <p className="mb-4 text-sm text-ink-muted dark:text-ink-dark-muted">
           {tc('What we stand for — internalize these from Day 0')}
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* Four across, as .values-grid is — two below 1100px, one below 560.
+            Centred text with no bullet markers: that is what lets four narrow
+            cards stay readable side by side, where a left-aligned disc list
+            drags the eye to the left edge and wastes the width. */}
+        <div className="grid gap-[18px] grid-cols-1 min-[560px]:grid-cols-2 min-[1100px]:grid-cols-4">
           {CULTURE_VALUES.map((v) => (
             <div
               key={v.name}
-              className="rounded-card border border-line bg-surface-sunken p-4 dark:border-line-dark dark:bg-surface-dark-sunken"
+              className="rounded-card border border-line bg-surface-card p-5 text-center shadow-card transition-shadow hover:shadow-card-hover dark:border-line-dark dark:bg-surface-dark-card"
             >
-              <h3 className="mb-2 text-lg font-bold">{tc(v.name)}</h3>
-              <p className="text-sm">{tc(v.body)}</p>
-              <ul className="my-3 list-disc space-y-1 pl-5 text-sm">
+              <h3 className="mb-2 text-[1.1rem] font-bold text-ink dark:text-ink-dark">
+                {tc(v.name)}
+              </h3>
+              <p className="mb-2 text-[0.85rem] text-ink-muted dark:text-ink-dark-muted">
+                {tc(v.body)}
+              </p>
+              <ul className="mb-2 list-none p-0 text-[0.85rem] leading-[1.5] text-ink dark:text-ink-dark">
                 {v.bullets.map((b) => (
-                  <li key={b}>{tc(b)}</li>
+                  <li key={b} className="mb-1">
+                    {tc(b)}
+                  </li>
                 ))}
               </ul>
-              <p className="text-sm font-semibold text-ink-subtle dark:text-ink-dark-muted">
-                {tc(v.footer)}
-              </p>
+              <p className="m-0 text-[0.85rem] text-ink dark:text-ink-dark">{tc(v.footer)}</p>
             </div>
           ))}
         </div>

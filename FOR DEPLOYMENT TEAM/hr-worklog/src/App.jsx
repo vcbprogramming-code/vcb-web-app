@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { useAuth, useI18n, useTheme } from '@vcb/shared';
+import { AppBar, useAuth, useI18n } from '@vcb/shared';
 import { useHrData } from './HrData';
 import { Empty, Spinner } from './ui';
 import { errorMessage } from './lib/errors';
@@ -13,8 +13,7 @@ import SettingsPage from './SettingsPage';
 /* --------------------------------- topbar --------------------------------- */
 
 function Topbar() {
-  const { t, lang, setLang } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const { user, signOut } = useAuth();
   const { isAdmin, canEntry, email, role } = useHrData();
 
@@ -28,66 +27,64 @@ function Topbar() {
         { to: '/entry', label: t('nav.entry'), show: canEntry },
         { to: '/index', label: t('nav.index'), show: isAdmin },
         { to: '/requests', label: t('nav.requests'), show: true },
-        { to: '/settings', label: t('nav.settings'), show: true },
+        // Settings is NOT a nav link: the gear in the bar is the one way in,
+        // as it is in the live app and in every other module. Two controls
+        // labelled Settings side by side is a question, not a feature.
       ].filter((l) => l.show),
     [t, canEntry, isAdmin]
   );
 
+  // title is the module's fixed English name; subtitle is app.title, which
+  // already resolves per language. Passing subtitle AND subtitleTh printed the
+  // same words twice, because app.title IS the translated string.
   return (
-    <header className="sticky top-0 z-20 bg-brand-bar shadow-topbar dark:bg-brand-bar-dark">
-      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
-        <span className="text-base font-extrabold tracking-tight text-white">HR Work Log</span>
-        <span aria-hidden="true" className="hidden h-7 w-px bg-white/25 sm:block" />
-        <span className="hidden text-sm font-semibold text-white/90 sm:block">
-          {t('app.title')}
-        </span>
-
-        <nav className="ml-auto flex flex-wrap items-center gap-1">
-          {links.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              className={({ isActive }) =>
-                'rounded-control px-3 py-1.5 text-sm font-medium transition-colors ' +
-                (isActive ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white')
-              }
-            >
-              {l.label}
-            </NavLink>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setLang(lang === 'th' ? 'en' : 'th')}
-            title={t('settings.language')}
-            className="rounded-control px-2.5 py-1.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            {lang === 'th' ? 'EN' : 'ไทย'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={t('settings.theme')}
-            aria-label={t('settings.theme')}
-            className="rounded-control px-2.5 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-          >
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
-
-          <span className="ml-2 hidden text-xs text-white/70 lg:block">
+    <AppBar
+      title="HR DAILY WORK LOG"
+      subtitle={t('app.title')}
+      settingsExtra={
+        <NavLink
+          to="/settings"
+          className="flex items-center justify-between gap-3 rounded-control px-1 py-2 text-sm text-ink hover:bg-surface-sunken dark:text-ink-dark dark:hover:bg-surface-dark-sunken"
+        >
+          <span>{t('nav.settings')}</span>
+          <span aria-hidden="true" className="text-ink-muted dark:text-ink-dark-muted">→</span>
+        </NavLink>
+      }
+      settingsFooter={
+        <div className="flex items-center justify-between gap-3">
+          <span className="min-w-0 truncate text-xs text-ink-muted dark:text-ink-dark-muted">
             {email || user?.email}
             {role ? ` · ${role}` : ''}
           </span>
           <button
             type="button"
             onClick={signOut}
-            className="rounded-control px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            className="shrink-0 rounded-control px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-bg dark:text-danger-dark"
           >
             {t('auth.signOut')}
           </button>
-        </nav>
-      </div>
-    </header>
+        </div>
+      }
+    >
+      {/* The module's own nav, in the slot AppBar leaves for it. Sign out and
+          the identity moved into the settings sheet: they were three more
+          things competing with the pages people came here to open, and every
+          other module already keeps them behind the gear. */}
+      <nav className="flex flex-wrap items-center gap-1">
+        {links.map((l) => (
+          <NavLink
+            key={l.to}
+            to={l.to}
+            className={({ isActive }) =>
+              'rounded-control px-3 py-1.5 text-sm font-medium transition-colors ' +
+              (isActive ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white')
+            }
+          >
+            {l.label}
+          </NavLink>
+        ))}
+      </nav>
+    </AppBar>
   );
 }
 

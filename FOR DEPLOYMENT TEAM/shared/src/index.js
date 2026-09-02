@@ -60,3 +60,8 @@ export {
   setAccessGrant,
   getAccessAudit,
 } from './access.js';
+
+// The one topbar every module wears - brand, module name, a slot for the
+// module own controls, and the gear that holds appearance and language.
+// See AppBar.jsx for why this is shared rather than copied six times.
+export { default as AppBar, AppSettings } from './AppBar.jsx';

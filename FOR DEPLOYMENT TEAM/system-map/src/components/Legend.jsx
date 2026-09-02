@@ -31,7 +31,7 @@ export default function Legend() {
 
   return (
     <div
-      className="fixed bottom-3.5 left-3.5 z-[45] max-w-[250px] select-none rounded-[10px] border border-map-hair bg-[rgba(13,20,34,.95)] text-mini text-slate-300 shadow-legend"
+      className="fixed bottom-3.5 left-3.5 z-[45] max-w-[250px] select-none rounded-[10px] border border-map-hair bg-map-panel/95 text-mini text-slate-300 shadow-legend"
       id="mapLegend"
     >
       <button

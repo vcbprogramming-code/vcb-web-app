@@ -22,12 +22,63 @@
 
      3. ::after content (the EXIT marker) and :empty, which have no utility form.
 
-   Dark-only by design: this is a diagram surface, not a document. The original
-   shipped one dark palette and the connector colours (sky/amber/violet) are
-   chosen against #0a0f1e. It is painted explicitly rather than inheriting.
+   The original shipped one dark palette, and for a while so did this port -
+   the theme toggle set data-theme and nothing on this module responded, so
+   light mode was simply dark. The ramp is now CSS variables (referenced from
+   tailwind.config.js) with a light set below.
+
+   The connector colours (sky/amber/violet) stay as they are in both themes:
+   they are the diagram legend, they read against either ground, and changing
+   them per theme would mean the same arrow means two different things.
    --------------------------------------------------------------------------- */
 
 @layer base {
+  /* Light is the default; dark is what .dark on <html> selects. That is the
+     contract the shared ThemeProvider actually implements (theme.jsx toggles a
+     class, it does not set data-theme) - keying off [data-theme] matched
+     nothing here and light mode rendered dark. */
+  :root {
+    --map-bg: #f6f8fa;
+    --map-panel: #ffffff;
+    --map-head: #eef2f7;
+    --map-rail: #cbd5e1;
+    --map-rail2: #94a3b8;
+    --map-sunk: #f1f5f9;
+    --map-card: #ffffff;
+    --map-card2: #f8fafc;
+    --map-doc: #f2f7fc;
+    --map-manual: #eef4fb;
+    --map-detail: #ffffff;
+    --map-hair: #dde3ec;
+    --map-hair2: #d5dbe6;
+    --map-ink: #1e293b;
+    --sl-100: #0f172a; --sl-200: #1e293b; --sl-300: #334155; --sl-400: #64748b;
+    --sl-500: #64748b; --sl-600: #64748b; --sl-700: #cbd5e1; --sl-800: #e2e8f0;
+    --sl-900: #f1f5f9;
+  }
+
+  /* Dark: the original palette, unchanged. */
+  :root.dark {
+    --map-bg: #0a0f1e;
+    --map-panel: #111827;
+    --map-head: #1e293b;
+    --map-rail: #334155;
+    --map-rail2: #475569;
+    --map-sunk: #0f172a;
+    --map-card: #0e1626;
+    --map-card2: #111a2e;
+    --map-doc: #0d1b2a;
+    --map-manual: #101c34;
+    --map-detail: #0b1220;
+    --map-hair: #243049;
+    --map-hair2: #283040;
+    --map-ink: #e2e8f0;
+    /* Tailwind slate, as-is: bright numbers are bright on this dark ground. */
+    --sl-100: #f1f5f9; --sl-200: #e2e8f0; --sl-300: #cbd5e1; --sl-400: #94a3b8;
+    --sl-500: #64748b; --sl-600: #94a3b8; --sl-700: #334155; --sl-800: #1e293b;
+    --sl-900: #0f172a;
+  }
+
   html,
   body {
     height: 100%;
@@ -35,7 +86,13 @@
   }
 
   body {
-    @apply bg-map-bg text-slate-200 antialiased;
+    /* The variables directly rather than @apply: inside @layer base, an
+       @apply of a theme colour that is itself defined further up this same
+       layer fails to resolve ("class does not exist"), and the whole
+       stylesheet then fails to compile - a blank page, not a wrong colour. */
+    background-color: var(--map-bg);
+    color: var(--map-ink);
+    -webkit-font-smoothing: antialiased;
     margin: 0;
   }
 

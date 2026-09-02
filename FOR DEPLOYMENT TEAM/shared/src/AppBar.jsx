@@ -91,7 +91,12 @@ export function AppSettings({ open, onClose, extra = null, footer = null }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4"
+      // Above everything. z-50 put this behind System Map's trace overlay
+      // (z-65) and its detail sidebar (z-200), so pressing the gear in trace
+      // mode appeared to do nothing — the sheet opened underneath. A modal
+      // invoked from the app bar has to outrank whatever the module stacks
+      // beneath it, and the bar itself is z-20.
+      className="fixed inset-0 z-[1000] grid place-items-center bg-black/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-label={t('settings.title')}

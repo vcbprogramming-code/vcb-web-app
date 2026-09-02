@@ -16,20 +16,42 @@ export default {
       // of the shared preset because no other module renders a swimlane canvas.
       // These are the exact hex values styles.css already used, not new colours.
       colors: {
+        // Each resolves a CSS variable so the whole ramp can be swapped for
+        // light mode in one place (index.css). The dark values below are the
+        // originals; before this the hexes were baked in here and the theme
+        // toggle changed nothing on this module - it was dark either way.
         map: {
-          bg: '#0a0f1e',       // page behind the canvas
-          panel: '#111827',    // sidebar
-          head: '#1e293b',     // header / table head / info cards
-          rail: '#334155',     // default control border
-          rail2: '#475569',    // hover border
-          sunk: '#0f172a',     // inputs
-          card: '#0e1626',     // route/crumb/support cards
-          card2: '#111a2e',    // stage cards
-          doc: '#0d1b2a',      // doc nodes
-          manual: '#101c34',   // manual node fill
-          detail: '#0b1220',   // focus detail pane
-          hair: '#243049',     // hairline borders
-          hair2: '#283040',    // sidebar left border
+          bg: 'var(--map-bg)',         // page behind the canvas
+          panel: 'var(--map-panel)',   // sidebar
+          head: 'var(--map-head)',     // header / table head / info cards
+          rail: 'var(--map-rail)',     // default control border
+          rail2: 'var(--map-rail2)',   // hover border
+          sunk: 'var(--map-sunk)',     // inputs
+          card: 'var(--map-card)',     // route/crumb/support cards
+          card2: 'var(--map-card2)',   // stage cards
+          doc: 'var(--map-doc)',       // doc nodes
+          manual: 'var(--map-manual)', // manual node fill
+          detail: 'var(--map-detail)', // focus detail pane
+          hair: 'var(--map-hair)',     // hairline borders
+          hair2: 'var(--map-hair2)',   // sidebar left border
+          ink: 'var(--map-ink)',       // body text
+        },
+        // The slate ramp the components already use, redirected through
+        // variables so it inverts with the theme. 26 places said
+        // text-slate-200/300 for "bright text on the dark canvas" and
+        // text-slate-600 for "muted" - literal hexes that would have been
+        // near-white on white and near-black on black. Rewriting every call
+        // site would have been the same change spelled 26 times.
+        slate: {
+          100: 'var(--sl-100)',
+          200: 'var(--sl-200)',
+          300: 'var(--sl-300)',
+          400: 'var(--sl-400)',
+          500: 'var(--sl-500)',
+          600: 'var(--sl-600)',
+          700: 'var(--sl-700)',
+          800: 'var(--sl-800)',
+          900: 'var(--sl-900)',
         },
         // Diagram semantics. `flow` is the direct/trigger blue, `alt` the
         // indirect/deferred amber, `ai` the AI-opportunity violet.

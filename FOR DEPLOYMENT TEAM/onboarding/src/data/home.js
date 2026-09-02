@@ -11,6 +11,8 @@ export const HOME_HERO = {
 };
 
 export const CEO_QUOTE = {
+  // Extracted from the original images.html into public/img.
+  portrait: "/img/ceo-portrait.jpg",
   heading: "Welcome Message from our CEO",
   quote:
     "We're thrilled to have you onboard. We believe that every person here contributes to our success, and we're committed to helping you thrive. Let's build something great together.",
@@ -20,18 +22,21 @@ export const CEO_QUOTE = {
 export const CULTURE_VALUES = [
   {
     name: "Discipline",
+    icon: "/img/value-discipline.jpg",
     body: "We follow structured systems, documented processes, and approval hierarchies.",
     bullets: ["No shortcuts", "No undocumented commitments", "No uncontrolled decisions"],
     footer: "Discipline protects our liquidity, reputation, and long-term stability.",
   },
   {
     name: "Responsibility",
+    icon: "/img/value-responsibility.jpg",
     body: "Every action has operational and financial impact. We take ownership of:",
     bullets: ["Our decisions", "Our documentation", "Our deadlines", "Our results"],
     footer: "Responsibility is not transferred — it is upheld.",
   },
   {
     name: "Integrity",
+    icon: "/img/value-integrity.jpg",
     body: "We operate with transparency, honesty, and regulatory compliance.",
     bullets: [
       "Accurate reporting",
@@ -43,6 +48,7 @@ export const CULTURE_VALUES = [
   },
   {
     name: "Excellence",
+    icon: "/img/value-excellence.jpg",
     body: "We execute with precision, coordination, and continuous improvement.",
     bullets: ["Accurate quantities", "Controlled costs", "Timely delivery", "Risk awareness"],
     footer: "Excellence is achieved through consistency, not chance.",

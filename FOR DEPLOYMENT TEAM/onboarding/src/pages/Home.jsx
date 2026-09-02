@@ -24,12 +24,26 @@ export default function Home() {
       </header>
 
       <Section title={tc(CEO_QUOTE.heading)}>
-        <blockquote className="border-l-4 border-accent pl-4 text-lg italic dark:border-accent-dark">
-          “{tc(CEO_QUOTE.quote)}”
-        </blockquote>
-        <p className="mt-3 text-sm font-semibold text-ink-muted dark:text-ink-dark-muted">
-          — {tc(CEO_QUOTE.attribution)}
-        </p>
+        {/* .quote-card: 760px, centred, portrait above the quote rather than a
+            left rule beside it. The portrait is the first thing anyone notices
+            missing when comparing the two. */}
+        <div className="mx-auto max-w-[760px] rounded-card border border-line bg-surface-card p-6 text-center shadow-card dark:border-line-dark dark:bg-surface-dark-card">
+          {CEO_QUOTE.portrait ? (
+            <img
+              src={CEO_QUOTE.portrait}
+              alt=""
+              aria-hidden="true"
+              className="mx-auto mb-4 block h-[84px] w-[84px] rounded-full border-[3px] border-accent object-cover dark:border-accent-dark"
+              loading="lazy"
+            />
+          ) : null}
+          <blockquote className="m-0 text-[1.05rem] italic leading-[1.7] text-ink dark:text-ink-dark">
+            “{tc(CEO_QUOTE.quote)}”
+          </blockquote>
+          <cite className="mt-3.5 block font-bold not-italic text-ink dark:text-ink-dark">
+            — {tc(CEO_QUOTE.attribution)}
+          </cite>
+        </div>
       </Section>
 
       <Section title={tc('VCB Culture & Values')}>
@@ -46,6 +60,19 @@ export default function Home() {
               key={v.name}
               className="rounded-card border border-line bg-surface-card p-5 text-center shadow-card transition-shadow hover:shadow-card-hover dark:border-line-dark dark:bg-surface-dark-card"
             >
+              {/* .value-icon: 96px square, object-contain, 14px below.
+                  Extracted from the original images.html into public/img
+                  rather than left as base64 - four JPEGs at ~18KB each that
+                  the browser can cache. */}
+              {v.icon ? (
+                <img
+                  src={v.icon}
+                  alt=""
+                  aria-hidden="true"
+                  className="mx-auto mb-3.5 block h-24 w-24 object-contain"
+                  loading="lazy"
+                />
+              ) : null}
               <h3 className="mb-2 text-[1.1rem] font-bold text-ink dark:text-ink-dark">
                 {tc(v.name)}
               </h3>

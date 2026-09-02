@@ -44,8 +44,8 @@ export const dictionary = createDictionary({
   // languages; the Thai form is the subtitle beneath it.
   'app.brand': 'VCB Group',
   'app.subtitle': {
-    th: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · รายงานการประชุมภายใน',
-    en: 'Vichitbhan Construction Group · Internal meeting minutes',
+    th: 'รายงานการประชุมภายใน',
+    en: 'Internal meeting minutes',
   },
   'app.backToPortal': { th: 'กลับไปหน้าหลัก VCB Connect', en: 'Back to VCB Connect home' },
 

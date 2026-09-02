@@ -27,7 +27,11 @@ import FunctionRegistry from './components/FunctionRegistry.jsx';
 function useSyncHeaderHeight() {
   useLayoutEffect(() => {
     const sync = () => {
-      const banner = document.querySelector('.brand-banner');
+      // The bar is the shared AppBar now, which renders a plain <header> and
+      // carries no .brand-banner class. Querying that class returned null and
+      // --header-h came out 72px against a true 144px, so the canvas started a
+      // whole bar too high and the connector lines ran up behind it.
+      const banner = document.querySelector('header');
       const header = document.querySelector('.app-header');
       const h = (banner ? banner.offsetHeight : 0) + (header ? header.offsetHeight : 0);
       document.documentElement.style.setProperty('--header-h', h + 'px');

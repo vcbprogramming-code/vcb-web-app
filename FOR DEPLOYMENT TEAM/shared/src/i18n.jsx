@@ -200,6 +200,12 @@ export const commonDictionary = createDictionary({
   // beside it, and the brand is what takes you back to the portal.
   'app.brand':          { th: 'VCB Group', en: 'VCB Group' },
   'app.backToPortal':   { th: 'กลับสู่ VCB Connect', en: 'Back to VCB Connect' },
+  // The company's name, in one place. Modules had it four different ways -
+  // "กลุ่มวิจิตรภัณฑ์ก่อสร้าง", "บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด",
+  // "Vichitbhan Construction Group", and "Vichitphan" with a p, which is a
+  // misspelling that reached the banner in two modules. A company name is not
+  // a per-module wording choice.
+  'app.company':        { th: 'วิจิตรภัณฑ์ก่อสร้าง จำกัด', en: 'Vichitbhan Construction co.,Ltd.' },
   'settings.title':     { th: 'ตั้งค่า', en: 'Settings' },
   'settings.appearance':{ th: 'ธีม', en: 'Appearance' },
   'settings.language': { th: 'ภาษา', en: 'Language' },

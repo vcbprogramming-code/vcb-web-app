@@ -187,6 +187,23 @@ export default function AppBar({
   const signedIn = auth?.signedIn;
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // What this module is, without the company name in front of it. Callers still
+  // pass subtitle/subtitleTh; anything that arrives with the old
+  // "<company> · <descriptor>" shape is split so the company half is dropped
+  // and only the descriptor survives — the bar supplies the company itself.
+  const descriptor = (() => {
+    const raw = lang === 'th' ? subtitleTh || subtitle : subtitle || subtitleTh;
+    if (!raw) return '';
+    const parts = String(raw).split('·');
+    if (parts.length < 2) return String(raw).trim();
+    // Only drop the first segment when it IS the company name. A subtitle that
+    // merely happens to contain a "·" keeps both halves — SOP's Thai line has
+    // no company in it and would otherwise lose its first half.
+    const head = parts[0].trim();
+    const namesCompany = /วิจิตรภัณฑ์|Vichit[bp]han|VCB/i.test(head);
+    return (namesCompany ? parts.slice(1).join('·') : String(raw)).trim();
+  })();
+
   // Carry appearance and language home, so returning to the portal does not
   // flip it back — the same reason module links carry them outward. See
   // appLink() in the portal.
@@ -214,25 +231,30 @@ export default function AppBar({
           <a
             href={home}
             title={t('app.backToPortal')}
-            className="shrink-0 text-[17px] font-bold tracking-wide text-white no-underline transition-colors hover:text-white/80"
+            className="shrink-0 text-[24px] font-extrabold leading-none tracking-[.3px] text-white no-underline transition-opacity hover:opacity-[.85]"
           >
             {t('app.brand')}
           </a>
-          <span className="h-8 w-px shrink-0 bg-white/30" aria-hidden="true" />
+          <span className="h-10 w-px shrink-0 bg-white/45" aria-hidden="true" />
           {/* Fixed 40px, matching the chips beside it. Left to size itself the
               block came out 40px with one subtitle and 45px with two, so the
               bar was 72px in most modules and 77px in Meeting Minutes — the
               kind of difference nobody can name but everybody sees when moving
               between two tabs. leading-tight keeps both lines inside it. */}
-          <div className="flex h-10 min-w-0 flex-col justify-center gap-0.5 overflow-hidden leading-tight">
-            <span className="truncate text-[13px] font-semibold uppercase tracking-wider text-white/95">
+          <div className="flex h-10 min-w-0 flex-col justify-center gap-1.5 overflow-hidden">
+            <span className="truncate text-[12.5px] font-bold uppercase leading-none tracking-[2.5px] text-white">
               {title}
             </span>
-            {(subtitle || subtitleTh) && (
-              <span className="truncate text-[11px] text-white/70">
-                {lang === 'th' ? subtitleTh || subtitle : subtitle || subtitleTh}
-              </span>
-            )}
+            {/* The company name comes from the shared dictionary, so it is
+                always in the reader's language and always spelled the same.
+                Modules pass only their own descriptor; before this each one
+                carried its own copy of the company name inside its subtitle
+                string, which is how "Vichitphan" reached two banners while the
+                rest said "Vichitbhan". */}
+            <span className="truncate text-[13px] font-medium leading-none tracking-[.5px] text-white">
+              {t('app.company')}
+              {descriptor ? ` · ${descriptor}` : ''}
+            </span>
           </div>
         </div>
 

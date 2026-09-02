@@ -32,10 +32,8 @@ export const dictionary = createDictionary({
   /* ------------------------------- chrome -------------------------------- */
   'app.title': { th: 'พอร์ทัลปฐมนิเทศ', en: 'Onboarding Portal' },
   'app.brand': { th: 'VCB ONBOARDING', en: 'VCB ONBOARDING' },
-  'app.company': {
-    th: 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด',
-    en: 'Vichitbhan Construction Co., Ltd.',
-  },
+  // app.company deliberately not defined here: the company name lives in the
+  // shared dictionary so every module spells it the same way.
 
   /* --------------------------------- nav --------------------------------- */
   'nav.home': { th: 'หน้าแรก', en: 'Home' },

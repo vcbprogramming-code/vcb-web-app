@@ -29,8 +29,8 @@ export const dictionary = createDictionary({
   /* ---------------------------------- app --------------------------------- */
   'app.title': { th: 'VCB Credit Facility Manager', en: 'VCB Credit Facility Manager' },
   'app.subtitle': {
-    th: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามวงเงินสินเชื่อทุกโครงการ',
-    en: 'Vichitphan Construction Group · Track credit facilities across all projects',
+    th: 'ติดตามวงเงินสินเชื่อทุกโครงการ',
+    en: 'Track credit facilities across all projects',
   },
   'app.backToPortal': { th: 'กลับไปหน้าหลัก VCB Connect', en: 'Back to VCB Connect home' },
   'app.manager': { th: 'ผู้บริหาร', en: 'Manager' },

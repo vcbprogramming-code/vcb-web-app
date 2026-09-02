@@ -93,16 +93,28 @@ export default function Home() {
       </Section>
 
       <Section title={tc('Our Track Record')}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* .carousel-static .carousel-track: a flex row with a 12px gap and
+            260px slides, not a wrapping grid. Four equal columns wrapped 3+1
+            and left a hole; the original shows them in one line that scrolls. */}
+        <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
           {TRACK_RECORD_SLIDES.map((slide) => (
-            <div key={slide.caption} className="flex flex-col gap-2">
-              {/* The original's base64 project photos (~7MB, images.html) are
-                  still not ported — this is the same placeholder the module
-                  shipped with. */}
-              <div
-                className="aspect-video rounded-card bg-gradient-to-br from-line to-surface-sunken dark:from-line-dark dark:to-surface-dark-sunken"
-                aria-hidden="true"
-              />
+            <div
+              key={slide.caption}
+              className="flex w-[320px] shrink-0 snap-start flex-col gap-2 sm:w-[360px]"
+            >
+              {slide.image ? (
+                <img
+                  src={slide.image}
+                  alt={tc(slide.caption)}
+                  className="h-[260px] w-full rounded-card object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div
+                  className="h-[260px] rounded-card bg-gradient-to-br from-line to-surface-sunken dark:from-line-dark dark:to-surface-dark-sunken"
+                  aria-hidden="true"
+                />
+              )}
               <span className="text-sm text-ink-muted dark:text-ink-dark-muted">
                 {tc(slide.caption)}
               </span>

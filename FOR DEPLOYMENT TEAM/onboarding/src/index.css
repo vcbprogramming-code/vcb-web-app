@@ -135,3 +135,17 @@
     color: #000 !important;
   }
 }
+
+/* The live carousel hides its overflow entirely (.carousel-viewport) and steps
+   with translateX. This port lets the row scroll natively instead — same
+   result for a reader, and it works without JS — but the bar itself is chrome
+   the original never shows. */
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

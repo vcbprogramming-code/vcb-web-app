@@ -55,9 +55,12 @@ export const CULTURE_VALUES = [
   },
 ];
 
+// The same four photographs the original shows, extracted from images.html.
+// Real jobsite shots rather than stock: the section is called Our Track Record
+// and a generic image would say nothing.
 export const TRACK_RECORD_SLIDES = [
-  { caption: "Infrastructure project" },
-  { caption: "Power House Unit" },
-  { caption: "Navigation Lock" },
-  { caption: "Spillway" },
+  { image: "/img/track-record-real.jpg", caption: "Infrastructure project" },
+  { image: "/img/los-power-house-real.jpg", caption: "Power House Unit" },
+  { image: "/img/los-navigation-lock-real.jpg", caption: "Navigation Lock" },
+  { image: "/img/los-spillway.jpg", caption: "Spillway" },
 ];

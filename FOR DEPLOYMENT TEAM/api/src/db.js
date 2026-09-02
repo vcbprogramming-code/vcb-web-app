@@ -14,6 +14,18 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+// Fail at boot rather than at the first query. With DATABASE_URL unset, pg
+// falls back to libpq defaults and quietly tries localhost:5432 as the current
+// OS user - so every request times out or reports "role does not exist", and
+// none of it says the connection string is missing.
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Use the Supabase POOLER string on port 6543, not the " +
+      "direct connection: Render is IPv4-only and the direct host resolves to IPv6 " +
+      "only, which fails with ENETUNREACH. See .env.example."
+  );
+}
+
 // Supabase requires TLS. `rejectUnauthorized:false` is what Supabase's own
 // connection docs specify: their certificate chain is not in Node's default
 // trust store, and without this every query fails with SELF_SIGNED_CERT_IN_CHAIN.

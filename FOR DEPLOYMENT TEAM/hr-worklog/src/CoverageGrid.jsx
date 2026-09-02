@@ -60,10 +60,13 @@ export default function CoverageGrid({
   }, [days, employees, entries]);
 
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3">
       {/* ---- the day strip ---- */}
-      <div>
-        <div className="no-scrollbar flex gap-0.5 overflow-x-auto pb-1">
+      {/* min-w-0 on the wrapper as well as the scroller: a grid item defaults
+          to min-width:auto, so this plain div stretched to the strip full
+          content width and took the page with it. */}
+      <div className="min-w-0">
+        <div className="no-scrollbar flex min-w-0 gap-0.5 overflow-x-auto pb-1">
           {days.map((day) => {
             const stat = perDay.get(day.date);
             const pct = stat && stat.total ? Math.round((stat.filled / stat.total) * 100) : 0;
@@ -89,7 +92,10 @@ export default function CoverageGrid({
       </div>
 
       {/* ---- the grid ---- */}
-      <div className="overflow-auto rounded-control border border-line dark:border-line-dark">
+      {/* min-w-0: without it this grid child cannot shrink below the table
+          width, so the page itself scrolled sideways on a phone instead of
+          this box scrolling. */}
+      <div className="min-w-0 overflow-auto rounded-control border border-line dark:border-line-dark">
         <table className="w-max border-collapse text-xs">
           <thead>
             <tr>

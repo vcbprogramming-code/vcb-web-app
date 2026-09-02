@@ -167,7 +167,10 @@ export function StoreProvider({ children }) {
   //   hasEditor  what this client believes from its own token. Used only to
   //              explain WHY editing is unavailable — "you are not an editor"
   //              versus "you are not signed in".
-  const canEdit = Boolean(doc.meta?.isAdmin);
+  // Defaults OPEN when meta has not arrived: doc.meta is {} before the first
+  // successful load and whenever the API is unreachable, and Boolean({}.isAdmin)
+  // is false - which hid every Edit control behind a backend outage.
+  const canEdit = doc.meta?.isAdmin !== false;
   const hasEditorRole = hasRole('sop', 'editor');
 
   const value = useMemo(

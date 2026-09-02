@@ -288,7 +288,8 @@ export function untagMeeting(id, projectId) {
  * Word, Excel, PowerPoint, images, text/CSV); anything else is
  * VALIDATION_FAILED. Returns the full updated { attachments }.
  *
- * NOTE: minutes.js exposes no presign route of its own — see uploadUrlFor().
+ * The presign step is uploadUrlFor(); this records only the metadata, so the
+ * bytes never travel through the JSON body.
  */
 export function addAttachment(id, { name, mimeType, url, size }) {
   return api.post(`${BASE}/meetings/${encodeURIComponent(id)}/attachments`, {
@@ -308,24 +309,26 @@ export function removeAttachment(id, fileId) {
 /**
  * Ask the API to sign a Storage upload for an attachment.
  *
- * ---------------------------------------------------------------------------
- * THIS ENDPOINT DOES NOT EXIST YET.
- * ---------------------------------------------------------------------------
- * api/src/routes/minutes.js has no presign route. Onboarding has one
- * (GET /api/onboarding/documents/:name/path, which returns
- * { bucket, path, uploadUrl, downloadUrl } from lib/storage.js), and minutes
- * needs the same thing before attaching a file can work end to end.
+ * Returns { bucket, path, uploadUrl, downloadUrl }. PUT the bytes at uploadUrl
+ * with putToStorage below, then POST the metadata with addAttachment; the API
+ * stores metadata only, so the bytes never pass through the JSON body.
  *
- * The client half is written here so the flow is one function when the route
- * lands, and it FAILS LOUDLY rather than silently degrading: uploading through
- * the JSON API is not a fallback that exists to be taken. Until the route is
- * added, addAttachment can only record a URL the user already has.
+ * The endpoint takes `ext`, not a content type: api/src/routes/minutes.js maps
+ * a short allow-list of extensions to the content type it signs into the URL,
+ * so a caller cannot ask for an upload slot that accepts anything. The
+ * extension therefore has to come off the filename here, and an unlisted one is
+ * refused by the API with a 400 rather than silently producing a URL that the
+ * later PUT would reject.
  */
-export function uploadUrlFor(meetingId, { fileName, contentType, signal } = {}) {
+export function uploadUrlFor(meetingId, { fileName, signal } = {}) {
+  // Last dot only, lowercased: "รายงาน ประจำเดือน.PDF" is a perfectly normal
+  // name here, and everything before the extension is the API's problem to
+  // store as data rather than ours to sanitise into a path.
+  const ext = String(fileName || '').split('.').pop().toLowerCase();
   return api.get(
-    `${BASE}/meetings/${encodeURIComponent(meetingId)}/attachment-url${qs({
-      name: fileName,
-      contentType,
+    `${BASE}/meetings/${encodeURIComponent(meetingId)}/attachments/upload-url${qs({
+      filename: fileName,
+      ext,
     })}`,
     { signal }
   );

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useI18n, useTheme } from '@vcb/shared';
+import { useI18n } from '@vcb/shared';
 import { AnnouncementIcon, AppIcon } from './icons';
-import Globe from './Globe';
 import HolidayCalendar from './HolidayCalendar';
 import { SAMPLE_BIRTHDAYS, SAMPLE_LEAVE } from './data';
 import { appCopy } from './lib/appCopy';
@@ -35,7 +34,6 @@ export default function Dashboard({
   bindTooltip,
 }) {
   const { t, lang } = useI18n();
-  const { isDark } = useTheme();
 
   // The clock ticks every 30s, as index.html's did — a minute-resolution
   // display does not need a per-second render.
@@ -98,11 +96,53 @@ export default function Dashboard({
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* -------------------- left column -------------------- */}
         <div className="min-w-0 space-y-5">
-          <Panel className="reveal">
+          {/* Greeting first, then announcements — the order the live app uses.
+              The port had them reversed, which buried the person's own name
+              under a panel that is usually empty.
+
+              Dark gradient with white text, matching .welcome-card in the live
+              index.html: the same sidebar gradient, so the greeting reads as
+              part of the app's chrome rather than as another white card in a
+              stack of white cards. The ::after radial highlight is reproduced
+              as the absolutely-positioned span below. */}
+          <section
+            className="reveal relative flex flex-wrap items-center justify-between gap-5 overflow-hidden rounded-card bg-gradient-to-br from-brand-900 to-brand-700 px-8 py-6 text-white shadow-card"
+          >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(420px_220px_at_90%_0%,rgba(79,209,255,0.22),transparent_70%)]"
+            />
+            <div className="relative min-w-0">
+              <p className="text-xl font-bold">
+                {t(greetingKeyForHour(now.getHours()))}, {greeting}
+              </p>
+              <p className="mt-1 text-sm text-white/65">{t('dash.welcomeSub')}</p>
+            </div>
+            <div className="relative flex flex-col items-start gap-2 sm:items-end">
+              <span className="inline-flex items-center gap-2 rounded-pill bg-white/10 px-3 py-1 text-xs font-medium text-white">
+                <span className="h-1.5 w-1.5 rounded-full bg-ok-dark" />
+                {t('dash.systemOnline')}
+              </span>
+              <span className="text-xs text-white/60">{clockText}</span>
+            </div>
+          </section>
+
+          {/* The panel is hidden entirely while the banner is showing the same
+              announcement. It used to render regardless, so a dashboard with a
+              live announcement in the banner ALSO said "No announcements right
+              now" directly beneath it - two statements contradicting each other
+              on the same screen. */}
+          {hasAnnouncement && !bannerDismissed ? null : (
+          <Panel className="reveal" style={{ animationDelay: '45ms' }}>
             <PanelHead>
               <PanelTitle>{t('panel.announcements')}</PanelTitle>
             </PanelHead>
-            {hasAnnouncement ? (
+            {/* Only shown once the banner above is dismissed. Both were
+                rendering the same announcement at the same time, so the same
+                Thai paragraph appeared twice on first load. The banner is the
+                one that demands attention; the panel is where it lives
+                afterwards. */}
+            {hasAnnouncement && bannerDismissed ? (
               <div>
                 {announcement.title && (
                   <p className="font-semibold text-ink dark:text-ink-dark">{announcement.title}</p>
@@ -119,27 +159,7 @@ export default function Dashboard({
               </p>
             )}
           </Panel>
-
-          <section
-            className={`${CARD_CLASS} reveal flex flex-wrap items-center justify-between gap-4 p-5`}
-            style={{ animationDelay: '45ms' }}
-          >
-            <div className="min-w-0">
-              <p className="text-2xl font-semibold text-ink dark:text-ink-dark">
-                {t(greetingKeyForHour(now.getHours()))}, {greeting}
-              </p>
-              <p className="mt-1 text-sm text-ink-muted dark:text-ink-dark-muted">
-                {t('dash.welcomeSub')}
-              </p>
-            </div>
-            <div className="flex flex-col items-start gap-1.5 sm:items-end">
-              <span className="inline-flex items-center gap-2 rounded-pill bg-ok-bg px-3 py-1 text-xs font-medium text-ok-fg dark:bg-ok/15 dark:text-ok-dark">
-                <span className="h-1.5 w-1.5 rounded-full bg-ok dark:bg-ok-dark" />
-                {t('dash.systemOnline')}
-              </span>
-              <span className="text-xs text-ink-muted dark:text-ink-dark-muted">{clockText}</span>
-            </div>
-          </section>
+          )}
 
           <div className="reveal flex items-baseline justify-between gap-3" style={{ animationDelay: '90ms' }}>
             <h2 className="text-lg font-semibold text-ink dark:text-ink-dark">
@@ -209,13 +229,11 @@ export default function Dashboard({
         </div>
 
         {/* -------------------- right column -------------------- */}
+        {/* The globe used to sit at the top of this column. It was decoration
+            costing 210px above the calendar — the thing people actually come
+            here to read. It now fills the sign-in screen behind the login card,
+            where being decorative is the entire job. */}
         <div className="space-y-5">
-          {/* The globe is decoration and overflows its card by design (the stage
-              is pulled up 108px), so the card clips it. */}
-          <div className={`${CARD_CLASS} reveal grid h-[210px] place-items-center overflow-hidden`}>
-            <Globe dark={isDark} />
-          </div>
-
           <HolidayCalendar />
 
           <Panel className="reveal">

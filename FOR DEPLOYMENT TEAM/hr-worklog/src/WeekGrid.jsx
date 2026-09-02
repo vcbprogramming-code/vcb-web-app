@@ -79,8 +79,9 @@ export default function WeekGrid({
   const ahead = isoPlus(today, 1);
 
   return (
-    <div className="grid gap-3">
-      <div className="overflow-auto rounded-control border border-line dark:border-line-dark">
+    <div className="grid min-w-0 gap-3">
+      {/* min-w-0 - see CoverageGrid.jsx. */}
+      <div className="min-w-0 overflow-auto rounded-control border border-line dark:border-line-dark">
         <table className="w-full border-collapse text-xs">
           <thead>
             <tr>

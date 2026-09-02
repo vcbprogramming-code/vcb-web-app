@@ -28,6 +28,10 @@
 //   POST   /api/hr/migrations                     admin
 //   GET    /api/hr/migrations                     admin
 //   GET    /api/hr/audit                          admin
+//   GET    /api/hr/export/mandays?year&month      xlsx
+//   GET    /api/hr/export/site/:siteKey?year&month  xlsx
+//   GET    /api/hr/export/index                   xlsx
+//   GET    /api/hr/export/cost-index              xlsx
 //
 // The api client is created ONCE here rather than per call, and main.jsx hands
 // this same instance to <AuthProvider>. A second createApi() anywhere would get
@@ -297,3 +301,79 @@ export function listAudit({ site, eid, limit, signal } = {}) {
 // so a retry double-writes some months and skips others. Historical data is
 // loaded by the one-off migration script instead, where a failure can be
 // inspected and restarted. Do not add one back.
+
+/* --------------------------------- exports -------------------------------- */
+
+// The four download buttons the Apps Script app had. They were ported as
+// translation strings but never as calls, so the buttons had nothing to invoke
+// and were left out of the UI entirely - which read as a feature that had been
+// dropped in the port rather than one that was unfinished.
+//
+// api/src/routes/hr.js builds each workbook with ExcelJS and streams it. The
+// shared client returns the Response itself for `raw`, so the bytes never pass
+// through JSON.parse.
+
+/**
+ * Save a Response body as a file.
+ *
+ * The filename comes from Content-Disposition, which the API percent-encodes
+ * (filename*=UTF-8'') because every one of these names is Thai and a raw UTF-8
+ * filename in that header is mangled or dropped by several browsers.
+ */
+async function saveResponse(res, fallbackName) {
+  const cd = res.headers.get('content-disposition') || '';
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  const plain = /filename="?([^";]+)"?/i.exec(cd);
+  let name = fallbackName;
+  if (star) {
+    try {
+      name = decodeURIComponent(star[1]);
+    } catch {
+      /* keep the fallback rather than a half-decoded name */
+    }
+  } else if (plain) {
+    name = plain[1];
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoking immediately can cancel the download in Safari; one tick is enough.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
+}
+
+/** Mandays by Work Category and Activity for one month. */
+export async function exportMandayReport({ year, month, signal } = {}) {
+  const res = await api.get(`/api/hr/export/mandays?year=${year}&month=${month}`, {
+    raw: true,
+    signal,
+  });
+  return saveResponse(res, `HR Manday Report ${year}-${month}.xlsx`);
+}
+
+/** One site's month as a grid: a row per employee, a column per day. */
+export async function exportSiteMonth({ site, year, month, signal } = {}) {
+  const res = await api.get(
+    `/api/hr/export/site/${encodeURIComponent(site)}?year=${year}&month=${month}`,
+    { raw: true, signal }
+  );
+  return saveResponse(res, `${site} ${year}-${month}.xlsx`);
+}
+
+/** The shared Work Index catalogue (กิจกรรม). */
+export async function exportWorkIndex({ signal } = {}) {
+  const res = await api.get('/api/hr/export/index', { raw: true, signal });
+  return saveResponse(res, 'VCB Work Index.xlsx');
+}
+
+/** The ERP cost-code catalogue (หมวดงาน). */
+export async function exportCostIndex({ signal } = {}) {
+  const res = await api.get('/api/hr/export/cost-index', { raw: true, signal });
+  return saveResponse(res, 'VCB Cost Index.xlsx');
+}

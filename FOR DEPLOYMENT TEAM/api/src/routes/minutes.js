@@ -126,6 +126,12 @@ function toListItem(r, projectId, taggedFromInbox) {
 function expandListRow(r, visibleTo) {
   const out = [toListItem(r, r.project_id)];
   for (const pid of r.tagged_project_ids || []) {
+    // Skip a tag pointing at the row own project. The client keys the list by
+    // projectId:id, so emitting both copies collides - React drops one and
+    // warns about duplicate keys. Nothing stops a meeting being tagged into
+    // the project it already belongs to, so filter it here rather than trust
+    // the data.
+    if (pid === r.project_id) continue;
     if (!visibleTo || visibleTo(pid)) out.push(toListItem(r, pid, true));
   }
   return out;
@@ -276,7 +282,9 @@ router.get(
     const counts = await rows(
       `select pid, count(*)::int as n
          from (
-           select unnest(array[m.project_id] || m.tagged_project_ids) as pid
+           -- distinct: a row tagged into its own project would otherwise
+           -- count twice here and the badge would overstate the tab.
+           select distinct m.id, unnest(array[m.project_id] || m.tagged_project_ids) as pid
              from minutes.minutes m
             where $1::boolean
                or (m.visible and (
@@ -1050,7 +1058,17 @@ router.get(
         presignUpload(ATTACHMENTS_BUCKET, path, ATTACHMENT_CONTENT_TYPES[q.ext]),
         presignDownload(ATTACHMENTS_BUCKET, path),
       ]);
-      res.json({ bucket: ATTACHMENTS_BUCKET, path, uploadUrl, downloadUrl });
+      // contentType is returned because the PUT must send EXACTLY the type
+      // that was signed into the URL. The browser file.type is not a reliable
+      // substitute - it is empty for .docx on some Windows configurations, and
+      // an S3 signature mismatch fails the upload with an opaque 403.
+      res.json({
+        bucket: ATTACHMENTS_BUCKET,
+        path,
+        uploadUrl,
+        downloadUrl,
+        contentType: ATTACHMENT_CONTENT_TYPES[q.ext],
+      });
     } catch (err) {
       console.error('[minutes] could not sign attachment URLs:', err.message);
       res.status(503).json({ error: 'STORAGE_UNAVAILABLE' });

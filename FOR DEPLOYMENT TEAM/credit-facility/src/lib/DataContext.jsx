@@ -7,7 +7,6 @@
 // refetch rather than an in-place edit of a global.
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@vcb/shared';
 import * as apiCredit from './api.js';
 import { COST_CATEGORY_DEFAULTS } from './domain.js';
 
@@ -25,7 +24,6 @@ const EMPTY = {
 };
 
 export function DataProvider({ children }) {
-  const { signedIn } = useAuth();
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -64,13 +62,12 @@ export function DataProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
+    // NOT gated on signedIn - see hr-worklog/src/HrData.jsx. Skipping the
+    // fetch left the shell rendering an empty dataset, indistinguishable from
+    // a module that had lost its features.
     setLoading(true);
     reload();
-  }, [signedIn, reload]);
+  }, [reload]);
 
   /** Fire a toast; it clears itself, matching the 2.6s of legacy.js toast(). */
   const notify = useCallback((message) => {

@@ -329,7 +329,28 @@ function doGet(e) {
     return ContentService.createTextOutput(outA).setMimeType(ContentService.MimeType.PLAIN_TEXT);
   }
 
-  var data = getSopData();
+  /* getSopData() throws when the Doc will not open and neither the cache nor
+     the chunked Script Properties can serve a copy. Unguarded, that throw
+     escaped doGet and the visitor got Apps Script's raw error page.
+
+     The cache usually masks a dead Doc, which makes this worse rather than
+     better: the app keeps working until a cache expiry, then dies with nothing
+     connecting the failure to its cause.
+
+     Falling back to an empty document renders the real app — sidebar, topbar,
+     search, the Process Flows (which ship in the source, not the Doc) — with
+     no cases in it. That is the truth of the situation, and it is what the
+     other apps do. `degraded` lets the client say why. */
+  var data;
+  try {
+    data = getSopData();
+  } catch (errData) {
+    console.warn('SOP document unavailable, rendering empty: ' + (errData && errData.message));
+    data = { meta: {}, scenarios: [], reports: [] };
+    data.meta.degraded = true;
+    data.meta.degradedError = (errData && errData.message) ? errData.message : String(errData);
+  }
+  if (!data.meta) data.meta = {};
   // Inject session info so the client knows whether to show edit UI
   data.meta.isAdmin = isAdmin_();
   try { data.meta.userEmail = Session.getActiveUser().getEmail() || ''; } catch (e2) { data.meta.userEmail = ''; }

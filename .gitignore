@@ -44,6 +44,12 @@ yarn-error.log*
 # Large unreferenced media (kept on disk, not in git)
 *.mp4
 
+# ...except the login-screen background, which the portal REFERENCES. It is
+# 1.9MB (the 50MB source lives in _BACKUP), and without it in the repo the
+# deployment team gets a sign-in page with a dead <video> and no way to know
+# what belongs there.
+!FOR DEPLOYMENT TEAM/portal/public/globe.mp4
+
 # Contains a live Google OAuth client secret - excluded until credential is moved out of source
 ORIGINAL CODE/ememo/Code.js
 ORIGINAL CODE/ememo/PROJECT_SUMMARY.md

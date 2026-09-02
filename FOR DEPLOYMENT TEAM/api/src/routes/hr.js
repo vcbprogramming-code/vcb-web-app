@@ -28,6 +28,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { rows, one, tx } from '../db.js';
+import { toWorkbook, gregorianToBe } from '../lib/excel.js';
 import { requireAuth, requireRole, requireHrSite } from '../middleware/auth.js';
 import { asyncRoute } from '../middleware/error.js';
 
@@ -882,5 +883,229 @@ router.get(
 // not resumable, so a retry double-writes some months and skips others.
 // Historical data is loaded by the one-off migration script instead, where a
 // failure can be inspected and restarted. Do not add one back.
+
+/* -------------------------------- exports --------------------------------- */
+
+// The Apps Script app had four download buttons. They were ported as
+// translation strings but never as endpoints, so the buttons had nothing to
+// call and were dropped from the UI - the feature read as deleted rather than
+// unfinished. These restore them.
+//
+// Apps Script built each file by creating a temporary Spreadsheet, formatting
+// it, fetching /export?format=xlsx with the script OAuth token, then trashing
+// the temp file. There is no Drive here: ExcelJS writes the workbook in process
+// and it streams straight to the client. That also removes the failure mode
+// where a mid-run error left the temp spreadsheet behind in the owner's Drive.
+
+/** Every export sends the same headers; only the filename varies. */
+function sendXlsx(res, buf, filename) {
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  // filename* with percent-encoding, because these names are Thai: a raw UTF-8
+  // filename in this header is mangled or dropped by several browsers.
+  res.setHeader(
+    'Content-Disposition',
+    "attachment; filename*=UTF-8''" + encodeURIComponent(filename)
+  );
+  res.send(buf);
+}
+
+/**
+ * Mandays by Work Category and by Activity for one month, as .xlsx.
+ *
+ * THE WEIGHTING IS THE POINT. A day with งานหลัก only counts 1.0 against that
+ * activity. A day with งานหลัก AND งานเสริม counts 0.5 against each, because the
+ * person still worked one day - which is exactly what hr.mandays says. Summing
+ * 1.0 per work_entries row would report 1.5 mandays for one day worked and
+ * inflate precisely the sites that bother to log งานเสริม.
+ *
+ * `value` holds "<activity code> / <cost code>"; split_part with ' / ' matches
+ * how /summary reads the same column.
+ */
+router.get(
+  '/export/mandays',
+  asyncRoute(async (req, res) => {
+    const q = z
+      .object({
+        year: z.coerce.number().int().min(2000).max(2100),
+        month: z.coerce.number().int().min(1).max(12),
+      })
+      .parse(req.query);
+
+    // Admins are unscoped; everyone else sees only their own sites. Passing
+    // null for the array turns the guard clause into a no-op for admins.
+    const scope = req.user?.roles?.hr === 'admin' ? null : req.user?.hrSites ?? [];
+
+    // codePart 1 = activity code, 2 = cost code — the two halves of `value`.
+    const sql = (codePart, catalog) => `
+      with filled as (
+        select w.site_key, w.eid, w.entry_date, w.value,
+               count(*) over (partition by w.eid, w.entry_date) as slots
+          from hr.work_entries w
+         -- A range, not date_trunc(): work_entries_site_date_idx is on
+         -- (site_key, entry_date), and wrapping the column in a function makes
+         -- it unusable. Same rows, index-friendly.
+         where w.entry_date >= make_date($1, $2, 1)
+           and w.entry_date < (make_date($1, $2, 1) + interval '1 month')
+           and coalesce(w.value, '') <> ''
+           and ($3::text[] is null or w.site_key = any($3))
+      ),
+      weighted as (
+        select f.site_key,
+               lower(trim(split_part(f.value, ' / ', ${codePart}))) as code,
+               1.0 / f.slots as md
+          from filled f
+         where coalesce(trim(split_part(f.value, ' / ', ${codePart})), '') <> ''
+      )
+      select s.name as site_name, c.code as code, c.name as name,
+             round(sum(w.md)::numeric, 1) as mandays
+        from weighted w
+        join hr.sites s on s.site_key = w.site_key
+        join ${catalog} c on lower(trim(c.code)) = w.code
+       group by s.name, c.code, c.name
+       order by s.name, c.code`;
+
+    const [byActivity, byCategory] = await Promise.all([
+      rows(sql(1, 'hr.master_index'), [q.year, q.month, scope]),
+      rows(sql(2, 'hr.cost_index'), [q.year, q.month, scope]),
+    ]);
+
+    // Buddhist era in the label: the sheet and the staff both use it, so a file
+    // stamped 2026-09 gets filed under the wrong year by whoever opens it.
+    const ym = gregorianToBe(q.year) + '-' + String(q.month).padStart(2, '0');
+    const columns = [
+      { key: 'month', header: 'เดือน', width: 12 },
+      { key: 'site_name', header: 'หน่วยงาน', width: 34 },
+      { key: 'code', header: 'รหัส', width: 14 },
+      { key: 'name', header: 'ชื่อ', width: 46 },
+      { key: 'mandays', header: 'วันทำงาน', width: 12 },
+    ];
+    const withMonth = (list) => list.map((r) => ({ ...r, month: ym }));
+
+    const buf = await toWorkbook([
+      { name: 'หมวดงาน Work Category', columns, rows: withMonth(byCategory) },
+      { name: 'กิจกรรม Activity', columns, rows: withMonth(byActivity) },
+    ]);
+    sendXlsx(res, buf, 'HR Manday Report ' + ym + '.xlsx');
+  })
+);
+
+/** One site's month as a grid: a row per employee, a column per day. */
+router.get(
+  '/export/site/:siteKey',
+  requireHrSite(),
+  asyncRoute(async (req, res) => {
+    const q = z
+      .object({
+        year: z.coerce.number().int().min(2000).max(2100),
+        month: z.coerce.number().int().min(1).max(12),
+      })
+      .parse(req.query);
+
+    const [site, roster, entries] = await Promise.all([
+      one('select site_key, name as site_name, company from hr.sites where site_key = $1', [
+        req.params.siteKey,
+      ]),
+      rows(
+        `select eid, emp_id, name, position, kind
+           from hr.employees
+          where site_key = $1
+          order by (kind = 'operation') desc, name`,
+        [req.params.siteKey]
+      ),
+      rows(
+        `select eid, entry_date, slot, value
+           from hr.work_entries
+          where site_key = $1
+            and entry_date >= make_date($2, $3, 1)
+            and entry_date < (make_date($2, $3, 1) + interval '1 month')
+          order by entry_date, slot`,
+        [req.params.siteKey, q.year, q.month]
+      ),
+    ]);
+
+    const lastDay = new Date(q.year, q.month, 0).getDate();
+    const byEid = new Map();
+    for (const e of entries) {
+      const day = new Date(e.entry_date).getDate();
+      if (!byEid.has(e.eid)) byEid.set(e.eid, {});
+      const cell = byEid.get(e.eid);
+      // Slot 1 and slot 2 are งานหลัก and งานเสริม, not morning and afternoon.
+      // Both land in ONE cell so the day still reads as a single day worked.
+      cell[day] = cell[day] ? cell[day] + ' + ' + e.value : e.value;
+    }
+
+    const columns = [
+      { key: 'emp_id', header: 'รหัสพนักงาน', width: 14 },
+      { key: 'name', header: 'ชื่อ-สกุล', width: 30 },
+      { key: 'position', header: 'ตำแหน่ง', width: 24 },
+      { key: 'kind', header: 'ประเภท', width: 12 },
+    ];
+    for (let d = 1; d <= lastDay; d++) {
+      columns.push({ key: 'd' + d, header: String(d), width: 16 });
+    }
+
+    const out = roster.map((r) => {
+      const row = { emp_id: r.emp_id, name: r.name, position: r.position, kind: r.kind };
+      const cells = byEid.get(r.eid) || {};
+      for (let d = 1; d <= lastDay; d++) row['d' + d] = cells[d] ?? null;
+      return row;
+    });
+
+    const ym = gregorianToBe(q.year) + '-' + String(q.month).padStart(2, '0');
+    const buf = await toWorkbook([{ name: ym, columns, rows: out }]);
+    sendXlsx(res, buf, (site?.site_name || req.params.siteKey) + ' ' + ym + '.xlsx');
+  })
+);
+
+/** The shared Work Index catalogue. */
+router.get(
+  '/export/index',
+  asyncRoute(async (req, res) => {
+    const list = await rows(
+      `select code, name, description, category, mapping, fixed_cost, allowed_cost
+         from hr.master_index
+        order by code`
+    );
+    const buf = await toWorkbook([
+      {
+        name: 'Work Index',
+        columns: [
+          { key: 'code', header: 'รหัส', width: 14 },
+          { key: 'name', header: 'ชื่อกิจกรรม', width: 46 },
+          { key: 'description', header: 'รายละเอียด', width: 60 },
+          { key: 'category', header: 'หมวด', width: 22 },
+          { key: 'mapping', header: 'Mapping', width: 22 },
+          { key: 'fixed_cost', header: 'Fixed cost', width: 14 },
+          { key: 'allowed_cost', header: 'Allowed cost', width: 14 },
+        ],
+        rows: list,
+      },
+    ]);
+    sendXlsx(res, buf, 'VCB Work Index.xlsx');
+  })
+);
+
+/** The ERP cost-code catalogue. */
+router.get(
+  '/export/cost-index',
+  asyncRoute(async (req, res) => {
+    const list = await rows('select code, name, name_en from hr.cost_index order by code');
+    const buf = await toWorkbook([
+      {
+        name: 'Cost Index',
+        columns: [
+          { key: 'code', header: 'รหัส', width: 14 },
+          { key: 'name', header: 'หมวดงาน', width: 46 },
+          { key: 'name_en', header: 'Work Category', width: 46 },
+        ],
+        rows: list,
+      },
+    ]);
+    sendXlsx(res, buf, 'VCB Cost Index.xlsx');
+  })
+);
 
 export default router;

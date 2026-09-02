@@ -35,7 +35,12 @@ export function Card({ className = '', children, style }) {
     <div
       style={style}
       className={
-        'rounded-card border border-line bg-surface-card p-4 shadow-card ' +
+        // min-w-0: a Card is almost always a grid/flex item, and those default
+        // to min-width:auto - they refuse to shrink below their content. A card
+        // holding a wide table therefore forced the whole PAGE to scroll
+        // sideways on a phone, carrying the header and nav off screen, instead
+        // of letting the table own scroll container do the scrolling.
+        'min-w-0 rounded-card border border-line bg-surface-card p-4 shadow-card ' +
         'dark:border-line-dark dark:bg-surface-dark-card dark:shadow-card-dark ' +
         className
       }

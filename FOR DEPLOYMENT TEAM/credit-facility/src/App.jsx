@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { useAuth, useT } from '@vcb/shared';
+import { useT } from '@vcb/shared';
 
 import { DataProvider, useData } from './lib/DataContext.jsx';
 import { FilterProvider, useFilters } from './lib/FilterContext.jsx';
@@ -20,7 +20,6 @@ import FilterBar from './components/FilterBar.jsx';
 import RequestDialog from './components/RequestDialog.jsx';
 import TxnDialog from './components/TxnDialog.jsx';
 import SettingsDialog from './components/SettingsDialog.jsx';
-import SignIn from './components/SignIn.jsx';
 import { Empty, Spinner, Toast } from './components/ui.jsx';
 
 import FacilitiesView from './views/FacilitiesView.jsx';
@@ -41,10 +40,11 @@ const TABS = [
 ];
 
 export default function App() {
-  const { signedIn, loading: authLoading } = useAuth();
 
-  if (authLoading) return <BootSpinner />;
-  if (!signedIn) return <SignIn />;
+  // Not held behind authLoading — see hr-worklog. A failed /auth/me left the
+  // app on a spinner forever; the shell renders and the data follows.
+  // NOT gated - see hr-worklog. The portal authenticates and the API enforces
+  // roles; this renders either way.
 
   return (
     <DataProvider>
@@ -52,15 +52,6 @@ export default function App() {
         <Shell />
       </FilterProvider>
     </DataProvider>
-  );
-}
-
-function BootSpinner() {
-  const t = useT();
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-surface dark:bg-surface-dark">
-      <Spinner label={t('common.loading')} />
-    </div>
   );
 }
 

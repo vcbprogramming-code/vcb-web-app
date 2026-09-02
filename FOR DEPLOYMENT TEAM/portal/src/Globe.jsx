@@ -211,8 +211,16 @@ function buildBinaryDigits(
  * @param dark  whether the dark palette is painted right now. Comes from the
  *              shared useTheme().isDark, passed in rather than read from the
  *              DOM so the canvas repaints on a theme switch.
+ * @param size  stage size in CSS px. Defaults to STAGE (280), which is what the
+ *              dashboard card was built around.
+ *
+ *              Pass a real number rather than scaling with a CSS transform: the
+ *              canvas is a bitmap, so transform:scale(3) stretches 280px of
+ *              pixels across 840 and the result is visibly soft. Everything
+ *              here is drawn from a unit sphere and multiplied by the radius,
+ *              so asking for a bigger size redraws at that size instead.
  */
-export default function Globe({ dark = false }) {
+export default function Globe({ dark = false, size: sizeProp = STAGE }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -222,12 +230,22 @@ export default function Globe({ dark = false }) {
     if (!ctx) return
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const size = STAGE
+    const size = sizeProp
+    // Every distance below is expressed relative to the original 280px stage,
+    // so one factor scales the sphere, the digits and the particle field
+    // together and the composition holds at any size.
+    const k = size / STAGE
     canvas.width = size * dpr
     canvas.height = size * dpr
     canvas.style.width = `${size}px`
     canvas.style.height = `${size}px`
     ctx.scale(dpr, dpr)
+    // Draw in the original 280px coordinate system and let the canvas scale the
+    // whole composition. Applied on top of the dpr scale, so a 900px stage on a
+    // 2x display genuinely rasterises at 1800px — line widths, text and glows
+    // all sharpen with it, which a CSS transform on the finished bitmap cannot
+    // do. RADIUS and every literal offset below stay in their original units.
+    if (k !== 1) ctx.scale(k, k)
 
     const particles = buildParticles()
     // Two depth layers: a smaller set of clear/sharp digits (as before) plus
@@ -276,8 +294,12 @@ export default function Globe({ dark = false }) {
     }
 
     const start = performance.now()
-    const cx = size / 2
-    const cy = size / 2
+    // STAGE, not size: the context is already scaled by k above, so the centre
+    // has to be expressed in the same unscaled coordinate system as RADIUS and
+    // every other literal here. Using `size` would apply the factor twice and
+    // push the sphere off the canvas.
+    const cx = STAGE / 2
+    const cy = STAGE / 2
     const perspective = 420
 
     function project(p0, spin) {
@@ -496,11 +518,48 @@ export default function Globe({ dark = false }) {
     // prop, so the canvas must be redrawn rather than left in the old palette.
   }, [dark])
 
+  const k = sizeProp / STAGE
+
   return (
+    /* The outer box is the true footprint. The inner stage keeps its original
+       280px geometry — the orbit rings, bloom and scan are all hardcoded pixel
+       offsets around a 280px centre — and one transform scales the finished
+       composition, so the DOM overlays follow the canvas exactly.
+       The canvas itself is NOT relying on that transform for resolution: it
+       redraws at the real size (see the useEffect above), so it stays sharp.
+
+       The -108px lift is deliberate on the dashboard, where the card clips the
+       globe's top to sit it low in a short card. Off the dashboard there is
+       nothing to clip against and the lift only pushes the sphere off the top
+       of the screen, so it applies at the default size only. */
     <div
-      className="globe-stage pointer-events-none relative -mt-[108px] grid h-[280px] w-[280px] place-items-center outline-none"
+      className="globe-stage pointer-events-none relative grid place-items-center outline-none"
+      style={{
+        width: sizeProp,
+        height: sizeProp,
+        marginTop: k === 1 ? -108 : 0,
+      }}
       aria-hidden="true"
     >
+      {/* The canvas is a direct child, NOT inside the scaled wrapper below: it
+          already redraws at the full pixel size in the effect above, so putting
+          it under a transform would scale it a second time and throw the
+          particle field far outside the frame. */}
+      <canvas ref={canvasRef} className="absolute inset-0 drop-shadow-[0_10px_34px_rgba(58,91,255,0.18)] dark:drop-shadow-[0_10px_34px_rgba(0,0,0,0.45)]" />
+
+      {/* Only the DOM overlays get scaled. Their offsets are hardcoded around a
+          280px centre (-150px margins for a 300px ring, and so on), so one
+          transform keeps them aligned to the canvas rather than rewriting a
+          dozen literals.
+
+          Pinned to the centre and translated back by half its own size before
+          scaling: `absolute` alone anchors a box at the parent's top-left, so
+          the overlays grew out of the corner of a 1400px stage while the canvas
+          stayed centred — which read as a second, offset globe. */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 grid h-[280px] w-[280px] place-items-center"
+        style={{ transform: `translate(-50%, -50%) scale(${k})` }}
+      >
       {/* Orbit rings. The 3D rotation and the bead riding the rim are in
           index.css (.orbit-ring) — rotateX on a perspective parent and a
           ::after pseudo-element are both out of reach of a utility class. */}
@@ -510,11 +569,6 @@ export default function Globe({ dark = false }) {
       />
       <div className="orbit-ring orbit-anim-1 -ml-[129px] -mt-[129px] h-[258px] w-[258px] animate-orbit1" />
 
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 drop-shadow-[0_10px_34px_rgba(58,91,255,0.18)] dark:drop-shadow-[0_10px_34px_rgba(0,0,0,0.45)]"
-      />
-
       <div className="globe-bloom relative h-[190px] w-[190px] [transform-style:preserve-3d]">
         <div className="globe-scan scan-anim pointer-events-none absolute left-1/2 top-1/2 -ml-[95px] -mt-[95px] h-[190px] w-[190px] animate-scan-spin rounded-full opacity-45" />
         <div className="globe-pulse-ring pulse-anim absolute inset-0 animate-pulse-out rounded-full border" />
@@ -523,6 +577,7 @@ export default function Globe({ dark = false }) {
           style={{ animationDelay: '1.7s' }}
         />
       </div>
+    </div>
     </div>
   )
 }

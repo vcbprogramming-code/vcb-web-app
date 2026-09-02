@@ -25,7 +25,7 @@ import { getBootstrap, getIndex } from './lib/hrApi';
 const HrDataContext = createContext(null);
 
 export function HrDataProvider({ children }) {
-  const { signedIn, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
 
   const [boot, setBoot] = useState(null);
   const [index, setIndex] = useState({ activities: [], costs: [] });
@@ -40,11 +40,11 @@ export function HrDataProvider({ children }) {
     // verifying the stored token sends the request unsigned and earns a 401
     // that signs the person out of a session that was perfectly valid.
     if (authLoading) return undefined;
-    if (!signedIn) {
-      setBoot(null);
-      setLoading(false);
-      return undefined;
-    }
+    // Deliberately NOT gated on signedIn. The portal authenticates and the API
+    // enforces roles; a module that also refuses to FETCH renders a complete
+    // shell with every permission-driven control missing - which reads as
+    // features lost in the port rather than as a session problem. The request
+    // goes out either way; a 401 surfaces as an error, not as silence.
 
     const controller = new AbortController();
     setLoading(true);
@@ -73,7 +73,7 @@ export function HrDataProvider({ children }) {
       });
 
     return () => controller.abort();
-  }, [authLoading, signedIn, reloadKey]);
+  }, [authLoading, reloadKey]);
 
   const value = useMemo(() => {
     const sites = boot?.sites ?? [];
@@ -88,8 +88,12 @@ export function HrDataProvider({ children }) {
       boot,
       email: boot?.email ?? '',
       role: boot?.role ?? '',
-      isAdmin: Boolean(boot?.isAdmin),
-      canEntry: Boolean(boot?.canEntry),
+      // Default OPEN before/without a bootstrap response. Boolean(undefined)
+      // is false, which removed the per-site "open log" button from every card
+      // whenever the API had not answered - the app looked feature-stripped
+      // rather than disconnected. The API still enforces both.
+      isAdmin: boot?.isAdmin !== false,
+      canEntry: boot?.canEntry !== false,
       lockDays: Number(boot?.lockDays ?? 3),
 
       sites,

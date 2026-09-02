@@ -46,7 +46,12 @@ export default function Dashboard({ onOpen }) {
         <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]">
           {cards.map(({ p, m }) => (
             <button
-              key={m.id}
+              // Keyed by PROJECT + meeting, not the meeting alone. One meeting
+              // can be the latest for two projects at once - it is tagged into
+              // a second project and arrives in the list under both - and two
+              // cards keyed by the same m.id collide, so React drops one and
+              // that project silently loses its card.
+              key={`${p.id}:${m.id}`}
               type="button"
               onClick={() => onOpen(m.id)}
               // The project colour is per-row data, so it is the one inline

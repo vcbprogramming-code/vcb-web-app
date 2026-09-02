@@ -324,6 +324,7 @@ export const dictionary = createDictionary({
   /* --------------------------- dashboard --------------------------- */
   'dash.mandayReport': { th: 'รายงานวันทำงาน', en: 'Manday report' },
   'dash.report': { th: 'รายงาน', en: 'Report' },
+  'dash.exporting': { th: 'กำลังส่งออก…', en: 'Exporting…' },
   'dash.mandayReportHint': { th: 'ส่งออกสรุปวันทำงานรายหมวดงาน/กิจกรรม สำหรับเดือนนี้ (Excel)', en: 'Export this month manday summary by Work Category / Activity (Excel)' },
 
   /* -------------------------- work index -------------------------- */

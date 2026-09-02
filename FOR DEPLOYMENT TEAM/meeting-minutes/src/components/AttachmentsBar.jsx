@@ -51,14 +51,13 @@ export default function AttachmentsBar({ meeting, canEdit, onUpdated, onToast, o
     onBusy(t('attach.uploading', { name: file.name }));
     try {
       // 1. Ask the API where to put it.
-      const signed = await minutesApi.uploadUrlFor(meeting.id, {
-        fileName: file.name,
-        contentType,
-      });
+      const signed = await minutesApi.uploadUrlFor(meeting.id, { fileName: file.name });
       if (!signed?.uploadUrl || !signed?.downloadUrl) throw new Error('NO_UPLOAD_URL');
 
-      // 2. Send the bytes straight to Storage.
-      await minutesApi.putToStorage(signed.uploadUrl, file, contentType);
+      // 2. Send the bytes straight to Storage, with the type the API SIGNED -
+      //    not file.type. They differ (file.type is empty for .docx on some
+      //    Windows setups) and a signature mismatch fails with an opaque 403.
+      await minutesApi.putToStorage(signed.uploadUrl, file, signed.contentType || contentType);
 
       // 3. Record only the metadata against the meeting.
       const { attachments: next } = await minutesApi.addAttachment(meeting.id, {

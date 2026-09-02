@@ -93,7 +93,7 @@ export default function WorkIndex() {
           </Hint>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           {tab === 'work' ? (
             <table className="w-full min-w-[46rem] border-collapse text-sm">
               <thead>

@@ -15,6 +15,19 @@
 import { createDictionary } from '@vcb/shared';
 
 export const dictionary = createDictionary({
+  /* ------------------------------ sign-in -------------------------------- */
+  // auth.email, auth.password, auth.signIn and auth.signInWithGoogle come from
+  // the shared commonDictionary; only what is specific to this screen is here.
+  'portal.subtitle': { th: 'พอร์ทัลอินทราเน็ตภายในองค์กร', en: 'Internal Intranet Portal' },
+  'portal.internalOnly': { th: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง · สำหรับใช้ภายในเท่านั้น', en: 'VCB Group · Internal Use Only' },
+  'auth.or': { th: 'หรือ', en: 'or' },
+  'auth.usePassword': { th: 'เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน', en: 'Sign in with email and password' },
+  'auth.signingIn': { th: 'กำลังเข้าสู่ระบบ…', en: 'Signing in…' },
+  'auth.back': { th: '← กลับไปเลือกวิธีเข้าสู่ระบบ', en: '← Back to sign-in options' },
+  'auth.badCredentials': { th: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', en: 'That email and password do not match.' },
+  'auth.failed': { th: 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', en: 'Sign-in failed. Please try again.' },
+  'common.loading': { th: 'กำลังโหลด…', en: 'Loading…' },
+
   /* ------------------------------- chrome -------------------------------- */
   'portal.brandSub': { th: 'พอร์ทัลอินทราเน็ตภายในองค์กร', en: 'Internal Intranet Portal' },
   'portal.staff': { th: 'พนักงาน', en: 'Staff' },

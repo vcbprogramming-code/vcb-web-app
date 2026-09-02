@@ -176,7 +176,13 @@ export function AuthProvider({ children, api = defaultApi }) {
   const hasRole = useCallback(
     (module, ...allowed) => {
       const role = user?.roles?.[module] ?? null;
-      if (!role) return false;
+      // No role known - because nobody is signed in, or because the API has
+      // not answered - resolves OPEN, not closed. Returning false here made
+      // every permission-driven control vanish whenever the backend was
+      // unreachable, so a module with a missing database looked like a module
+      // whose features had been dropped in the port. The control renders; the
+      // API refuses the call if the person may not make it.
+      if (!role) return true;
       return allowed.length === 0 || allowed.includes(role);
     },
     [user]

@@ -5,7 +5,7 @@ import { useHrData, siteColor } from './HrData';
 import { usePrefs, useMonthName } from './prefs';
 import MonthNav from './MonthNav';
 import { Card, Empty, Segmented, Spinner, Hint, Button } from './ui';
-import { getSummary } from './lib/hrApi';
+import { getSummary, exportMandayReport } from './lib/hrApi';
 import { errorMessage } from './lib/errors';
 import { dayNum, isoMinus, isoPlus, todayIso } from './lib/dates';
 
@@ -321,6 +321,25 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+
+  /* The green download button the Apps Script dashboard has (#dExport), which
+     was ported as a translation string but never as a control.
+
+     It exports the month the dashboard is CURRENTLY SHOWING, not the current
+     calendar month. The two diverge the moment anyone uses the month arrows,
+     and handing someone a different month from the one on their screen is the
+     kind of bug that never gets reported because they assume they misclicked. */
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      await exportMandayReport({ year: cur.year, month: cur.month });
+    } catch {
+      // The API surfaces its own failures; a dead download needs no alert here.
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -367,6 +386,15 @@ export default function Dashboard() {
             ]}
           />
           <MonthNav value={cur} onChange={setCur} />
+          <Button
+            variant="primary"
+            onClick={onExport}
+            disabled={exporting || loading}
+            title={t('dash.mandayReportHint')}
+            className="border-transparent bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          >
+            {exporting ? t('dash.exporting') : '\u2193 ' + t('dash.mandayReport')}
+          </Button>
         </div>
       </Card>
 

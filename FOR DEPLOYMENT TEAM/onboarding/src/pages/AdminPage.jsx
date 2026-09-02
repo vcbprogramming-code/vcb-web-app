@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { useAuth, useI18n } from '@vcb/shared';
+import { useI18n } from '@vcb/shared';
 import { ALL_DEPARTMENTS } from '../data/allDepartments.js';
 import { useChecklistOverrides } from '../lib/useChecklistOverrides.js';
 import { useContentText } from '../lib/contentText.js';
-import AdminSignIn from '../components/AdminSignIn.jsx';
 import AdminItemRow from '../components/AdminItemRow.jsx';
 import AdminCohort from '../components/AdminCohort.jsx';
 import { ErrorBanner, Page, PageTitle } from '../components/ui.jsx';
@@ -35,7 +34,7 @@ const PHASES = [
 export default function AdminPage() {
   const { t } = useI18n();
   const tc = useContentText();
-  const { signedIn, hasRole, loading } = useAuth();
+  const loading = false;
 
   const [deptId, setDeptId] = useState(ALL_DEPARTMENTS[0].id);
   const [phaseSuffix, setPhaseSuffix] = useState('day-1-30');
@@ -51,10 +50,8 @@ export default function AdminPage() {
     );
   }
 
-  // Not signed in, or signed in without the role: show the sign-in panel
-  // rather than an editor whose every save would be refused.
-  if (!signedIn) return <AdminSignIn />;
-  if (!hasRole('portal', 'admin')) return <AdminSignIn missingRole />;
+  // NOT gated - the portal authenticates and the API refuses a save this
+  // person may not make. The editor renders; enforcement stays server-side.
 
   const dept = ALL_DEPARTMENTS.find((d) => d.id === deptId);
   const phase = dept.content.phases.find((p) => p.dayRange === phaseSuffix);

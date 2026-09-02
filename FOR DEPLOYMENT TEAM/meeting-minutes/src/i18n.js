@@ -472,11 +472,12 @@ export const dictionary = createDictionary({
     en: 'The file could not be uploaded. Please try again.',
   },
   'err.uploadUnavailable': {
-    // The presign route does not exist in api/src/routes/minutes.js yet — see
-    // uploadUrlFor in lib/minutesApi.js. Say so plainly rather than failing
-    // with a generic error the user cannot act on.
-    th: 'ยังแนบไฟล์ไม่ได้ — เซิร์ฟเวอร์ยังไม่มีช่องทางอัปโหลด กรุณาแจ้งผู้ดูแลระบบ',
-    en: 'Attaching a file is not available yet — the server has no upload route. Please tell an administrator.',
+    // Shown on a 404 from the presign route. The route DOES exist now
+    // (GET /meetings/:id/attachments/upload-url); a 404 here means this API
+    // build predates it, so the sentence points at the deployment rather than
+    // telling the user a feature was never written.
+    th: 'ยังแนบไฟล์ไม่ได้ — เซิร์ฟเวอร์ที่ใช้อยู่ยังไม่รองรับการอัปโหลด กรุณาแจ้งผู้ดูแลระบบให้อัปเดต',
+    en: 'Attaching a file is unavailable — this server build has no upload route. Please ask an administrator to update it.',
   },
   'err.loadFailed': { th: 'โหลดข้อมูลไม่สำเร็จ', en: 'Could not load this.' },
 

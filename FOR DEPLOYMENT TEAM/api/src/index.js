@@ -17,6 +17,7 @@ import minutesRoutes from './routes/minutes.js';
 import sopRoutes from './routes/sop.js';
 import onboardingRoutes from './routes/onboarding.js';
 import portalRoutes from './routes/portal.js';
+import { assertFontsPresent } from './lib/pdf.js';
 
 const app = express();
 
@@ -60,6 +61,25 @@ app.use('/api/portal', portalRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
+
+// Fail at startup, not at the first download. PDFKit does not error on a
+// missing glyph - it writes nothing - so without the Thai fonts every PDF
+// comes out with correct margins and no Thai text, and nobody notices until a
+// signed document reaches someone. A container that cannot produce a valid
+// document should not report itself healthy.
+//
+// Set PDF_FONTS_OPTIONAL=1 only for a deployment that genuinely issues no PDFs.
+try {
+  assertFontsPresent();
+} catch (err) {
+  if (process.env.PDF_FONTS_OPTIONAL === '1') {
+    console.warn('[api] ' + err.message);
+    console.warn('[api] PDF_FONTS_OPTIONAL=1 - starting anyway; PDF routes will fail.');
+  } else {
+    console.error('[api] ' + err.message);
+    process.exit(1);
+  }
+}
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {

@@ -85,12 +85,11 @@ export default function Topbar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        {showAdmin && (
-          <IconButton title={t('admin.manage')} aria-label={t('admin.manage')} onClick={onAdmin}>
-            <GearIcon />
-          </IconButton>
-        )}
-
+        {/* "Manage announcement" used to be its own button here, wearing the
+            same gear icon as Settings — two identical gears side by side, and
+            nothing but a tooltip to tell them apart. It is now an item inside
+            the settings menu, which is where a rarely-used admin action
+            belongs. */}
         <div className="relative" ref={wrapRef}>
           <IconButton
             aria-label={t('settings.theme')}
@@ -135,6 +134,20 @@ export default function Topbar({
 
               <div className="my-3 border-t border-line dark:border-line-dark" />
 
+              {showAdmin && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-sunken dark:text-ink-dark dark:hover:bg-surface-dark-sunken"
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    onAdmin();
+                  }}
+                >
+                  <GearIcon className="h-4 w-4" />
+                  <span>{t('admin.manage')}</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-sunken dark:text-ink-dark dark:hover:bg-surface-dark-sunken"
@@ -147,18 +160,21 @@ export default function Topbar({
                 <span>{t('nav.help')}</span>
               </button>
 
-              {signedIn && (
-                <button
-                  type="button"
-                  className="mt-1 w-full rounded-control px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-bg dark:text-danger-dark dark:hover:bg-danger/10"
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    signOut();
-                  }}
-                >
-                  {t('auth.signOut')}
-                </button>
-              )}
+              {/* No longer conditional on signedIn: the portal gates on `user`
+                  in App.jsx, so anyone seeing this menu is signed in by
+                  definition. signOut() clears the token, which drops the app
+                  back to the sign-in screen — that is the "return to login"
+                  route, and it is also how you switch account. */}
+              <button
+                type="button"
+                className="mt-1 w-full rounded-control px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-bg dark:text-danger-dark dark:hover:bg-danger/10"
+                onClick={() => {
+                  setSettingsOpen(false);
+                  signOut();
+                }}
+              >
+                {t('auth.signOut')}
+              </button>
             </div>
           )}
         </div>

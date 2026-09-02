@@ -11,7 +11,23 @@ function doGet(e) {
      and injected as a plain JSON blob the same way initialPage already is
      (see Index.html) — content.html applies these on top of the hardcoded
      PAGES baseline right after building it. */
-  template.checklistOverridesJson = JSON.stringify(getChecklistOverrides());
+  /* Wrapped: getChecklistOverrides() throws by design when the content sheet
+     cannot be opened (see getChecklistContentSheet_ — it refuses to create a
+     replacement, which is correct). Unguarded here, that throw escaped doGet
+     and the visitor got Apps Script's raw error page instead of the app.
+
+     A missing sheet means "no admin edits to apply", not "no app". The
+     checklist has a full hardcoded baseline in PAGES; the overrides are edits
+     layered on top. Falling back to none renders the standard checklist —
+     every page, every task, all the structure — which is what the user should
+     see. Progress checkmarks load async and degrade on their own. */
+  var overrides = {};
+  try {
+    overrides = getChecklistOverrides();
+  } catch (err) {
+    console.warn('checklist overrides unavailable, using the hardcoded baseline: ' + err.message);
+  }
+  template.checklistOverridesJson = JSON.stringify(overrides);
   return template.evaluate()
     .setTitle('VCB 90-Day Onboarding Portal')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

@@ -7,6 +7,7 @@ import Dashboard, { initialsFromName } from './Dashboard';
 import HelpModal from './HelpModal';
 import AnnouncementEditor from './AnnouncementEditor';
 import Tooltip, { useTooltip } from './Tooltip';
+import SignInScreen from './SignInScreen.jsx';
 import { getAnnouncement, listApps } from './lib/portalApi';
 import { isDismissed, markDismissed } from './lib/announcementDismissal';
 
@@ -127,6 +128,19 @@ export default function App() {
       bindTooltip={bindTooltip}
     />
   );
+
+  /* The portal is the front door to every internal system, so it asks who you
+     are before opening. Held until authLoading settles: AuthProvider verifies a
+     stored token against /auth/me on mount, and rendering the sign-in screen
+     during that check would flash it at people who are already signed in. */
+  if (authLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-surface dark:bg-surface-dark">
+        <span className="text-sm text-ink-muted dark:text-ink-dark-muted">{t('common.loading')}</span>
+      </div>
+    );
+  }
+  if (!user) return <SignInScreen />;
 
   return (
     <div className="flex min-h-screen">

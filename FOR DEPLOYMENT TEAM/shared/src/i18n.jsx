@@ -142,6 +142,14 @@ export const commonDictionary = createDictionary({
   // auth
   'auth.signIn': { th: 'เข้าสู่ระบบ', en: 'Sign in' },
   'auth.signOut': { th: 'ออกจากระบบ', en: 'Sign out' },
+  // Shown when a module needs a session it does not have. The portal is the
+  // only place anyone signs in; a module never asks for a password itself.
+  'auth.signInAtPortal': { th: 'กรุณาเข้าสู่ระบบที่ VCB Connect', en: 'Please sign in at VCB Connect' },
+  'auth.portalHandlesSignIn': {
+    th: 'เข้าสู่ระบบครั้งเดียวที่หน้าหลัก แล้วใช้งานได้ทุกแอปโดยไม่ต้องเข้าสู่ระบบซ้ำ',
+    en: 'Sign in once at the portal and every app opens without asking again.',
+  },
+  'auth.goToPortal': { th: 'ไปที่ VCB Connect', en: 'Go to VCB Connect' },
   'auth.signInWithGoogle': { th: 'เข้าสู่ระบบด้วย Google', en: 'Sign in with Google' },
   'auth.email': { th: 'อีเมล', en: 'Email' },
   'auth.password': { th: 'รหัสผ่าน', en: 'Password' },

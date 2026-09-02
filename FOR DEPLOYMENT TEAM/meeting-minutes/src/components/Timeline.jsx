@@ -192,6 +192,10 @@ function HorizontalTimeline({ projects, meetings, hidden, onOpen }) {
     const left = pct(isoOf(cursor));
     if (left >= 0 && left <= 100) {
       ticks.push({
+        // Keyed by the month, not by `left`: with a short date range two
+        // consecutive months can land on the same percentage, and duplicate
+        // keys made React drop one of the labels.
+        key: `${cursor.getFullYear()}-${cursor.getMonth()}`,
         left,
         label: `${monthLabel(cursor.getMonth(), lang, true)} '${String(
           lang === 'th' ? cursor.getFullYear() + 543 : cursor.getFullYear()
@@ -246,7 +250,7 @@ function HorizontalTimeline({ projects, meetings, hidden, onOpen }) {
         <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[214px] right-0 z-0">
           {ticks.map((tick) => (
             <div
-              key={tick.left}
+              key={tick.key}
               style={{ left: `${tick.left.toFixed(2)}%` }}
               className="absolute inset-y-0 w-0 border-l border-dashed border-line dark:border-line-dark"
             />
@@ -257,7 +261,7 @@ function HorizontalTimeline({ projects, meetings, hidden, onOpen }) {
       <div className="relative ml-[214px] mt-1.5 h-[26px] shrink-0">
         {ticks.map((tick) => (
           <div
-            key={tick.left}
+            key={tick.key}
             style={{ left: `${tick.left.toFixed(2)}%` }}
             className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10.5px] text-ink-muted dark:text-ink-dark-muted"
           >

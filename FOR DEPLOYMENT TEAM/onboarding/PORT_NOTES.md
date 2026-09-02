@@ -167,13 +167,19 @@ but no page calls them — the original React scaffold had no UI for either
 either, so this is a pre-existing gap carried forward, not a regression. The
 endpoints and hooks are ready when someone builds the screen.
 
+## Images
+
+The original carries ~7MB of base64 data URIs in `images.html`. The ones its
+pages actually show are extracted to `public/img/` and referenced by path, so a
+browser caches them instead of re-parsing them on every load. Filenames are the
+kebab-cased `EMBEDDED_IMAGES` key, which is how a file is traced back to its
+source.
+
+`images.html` holds more keys than the pages use. Only the referenced ones are
+extracted; an unreferenced key is not a missing image.
+
 ## Still not ported
 
-Unchanged from before this conversion, and listed so they are not mistaken for
-conversion casualties:
-
-- The **journey stepper** in the sidebar (Pre-boarding → … → Completion with
-  done/current/locked states) is still a plain nav list.
-- The home page's **embedded project photos** (~7MB of base64 in the original's
-  `images.html`) are still placeholders.
-- The org chart is at `/company-structure` rather than inline on Home.
+Nothing. The three items previously listed here — the sidebar journey stepper,
+the embedded photographs, and the org chart being on a route rather than
+inline on Home — have all been ported.

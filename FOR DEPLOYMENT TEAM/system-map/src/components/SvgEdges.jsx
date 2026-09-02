@@ -148,6 +148,10 @@ export function drawArrows(selectedNodeId) {
     } else {
       const CORRIDOR = 50;
       const cr = 9;
+      // Verbatim from the original (Index.html, drawArrows): the comparison
+      // reads oddly — it tests the target's top against the source's bottom —
+      // but it is what the live app does, and the routing here has to match it
+      // rather than be improved.
       const sameRow = Math.abs(tr.top - fr.bottom) < 40;
       if (sameRow) {
         // Neighbours on the same row: arch over the top.

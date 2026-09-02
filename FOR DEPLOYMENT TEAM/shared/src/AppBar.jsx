@@ -268,22 +268,6 @@ export default function AppBar({
 
         <div className="order-2 flex shrink-0 items-center gap-2 lg:order-3">
           {right}
-          {/* Who is signed in, in the bar, in the same place in every module.
-              The live apps show it here; the port showed it in SOP's bar only,
-              and elsewhere buried in the settings sheet or not at all. Hidden
-              below lg — at that width the bar has no room and the settings
-              sheet still carries it. */}
-          {signedIn && user?.email ? (
-            <span
-              className="hidden max-w-[280px] items-center gap-1.5 text-[13px] font-medium text-white/90 lg:flex"
-              title={user.email}
-            >
-              <span className="truncate">{user.email}</span>
-              {identityNote ? (
-                <span className="shrink-0 text-white/70">· {identityNote}</span>
-              ) : null}
-            </span>
-          ) : null}
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
@@ -295,6 +279,35 @@ export default function AppBar({
             className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-white/[.18] bg-white/10 text-white transition-colors hover:bg-white/20"
           >
             <GearIcon className="h-[18px] w-[18px]" />
+          </button>
+
+          {/* E-Memo's .user-as: plain inline text after the gear, 13px/500,
+              clickable, and — the part every other module was missing — it
+              says "Sign in" when nobody is. Showing nothing at all leaves a
+              person unable to tell whether they are signed in or the bar
+              simply has no room for it.
+
+              Both states open settings. There is no single signIn() to call
+              from here — the provider exposes signInWithGoogle and
+              signInWithPassword, and choosing between them is not the app
+              bar's decision to make; settings is where that choice lives.
+              Hidden below lg: at that width the bar has no room, and the
+              settings sheet still carries the identity. */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title={signedIn ? user?.email : t('auth.signIn')}
+            className="hidden max-w-[260px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] transition-colors hover:text-white lg:inline-flex"
+          >
+            <span className="max-w-[220px] truncate">
+              {signedIn && user?.email ? user.email : t('auth.signIn')}
+            </span>
+            {signedIn && identityNote ? (
+              <>
+                <span className="shrink-0 opacity-[.55]">·</span>
+                <span className="shrink-0 opacity-[.85]">{identityNote}</span>
+              </>
+            ) : null}
           </button>
         </div>
       </header>

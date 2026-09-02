@@ -41,6 +41,23 @@ export const dictionary = createDictionary({
   'nav.home': { th: 'หน้าแรก', en: 'Home' },
   'nav.requiredDocuments': { th: 'เอกสารที่ต้องใช้', en: 'Required Documents' },
   'nav.completion': { th: 'สำเร็จการปฐมนิเทศ', en: 'Completion' },
+
+  // The sidebar journey stepper - the seven steps the live app shows, ported
+  // from getJourneySteps() in progress.html.
+  'stepper.title':               { th: 'เส้นทางการปฐมนิเทศ', en: 'Onboarding journey' },
+  'stepper.preBoarding':         { th: 'ก่อนเริ่มงาน', en: 'Pre-boarding' },
+  'stepper.requiredDocuments':   { th: 'เอกสารที่ต้องส่ง', en: 'Required Documents' },
+  'stepper.departmentSelection': { th: 'เลือกแผนก', en: 'Department Selection' },
+  'stepper.completion':          { th: 'สำเร็จการปฐมนิเทศ', en: 'Completion' },
+  'stepper.day-1-30':            { th: 'วันที่ 1-30', en: 'Day 1-30' },
+  'stepper.day-31-60':           { th: 'วันที่ 31-60', en: 'Day 31-60' },
+  'stepper.day-61-90':           { th: 'วันที่ 61-90', en: 'Day 61-90' },
+  // Abbreviated so the sidebar column stays scannable; the page itself spells
+  // them out in full.
+  'stepper.reading':             { th: 'อ่าน', en: 'Reading' },
+  'stepper.knowledge':           { th: 'ความรู้', en: 'Knowledge' },
+  'stepper.outputs':             { th: 'ผลงาน', en: 'Outputs' },
+  'stepper.lockedHint':          { th: 'เลือกแผนกก่อนจึงจะเปิดขั้นตอนนี้ได้', en: 'Pick a department to unlock this step' },
   'nav.companyStructure': { th: 'โครงสร้างบริษัท', en: 'Company Structure' },
   'nav.admin': { th: 'ผู้ดูแลระบบ', en: 'Admin' },
 

@@ -1,7 +1,8 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useI18n, useTheme } from '@vcb/shared';
-import { ALL_DEPARTMENTS } from '../data/allDepartments.js';
-import { useContentText } from '../lib/contentText.js';
+import JourneyStepper from './JourneyStepper.jsx';
+import { useProgress } from '../lib/useProgress.js';
+import { REQUIRED_DOCUMENTS } from '../data/requiredDocuments.js';
 
 // The sidebar shell, ported from the original app's Index.html/app.html.
 //
@@ -12,9 +13,14 @@ import { useContentText } from '../lib/contentText.js';
 // [data-theme] — the shared ones write vcb_theme/vcb_lang and toggle
 // class="dark", which is what Tailwind's darkMode: 'class' reads.
 //
-// The full journey stepper (Pre-boarding -> ... -> Completion with
-// done/current/locked states) is still NOT ported; this remains a plain nav
-// list, as it was before the conversion.
+// The journey stepper (Pre-boarding -> ... -> Completion, with done/current/
+// locked states and per-block sub-steps) lives in JourneyStepper.jsx and is
+// what this column renders. It replaced a flat list of page links, which said
+// nothing about where in the 90 days anyone actually was.
+//
+// There is deliberately no /company-structure entry: the live app has no such
+// page. Its org chart is a section inside the home page, and a top-level nav
+// item for it was something this port invented.
 
 const navLinkClass = ({ isActive }) =>
   [
@@ -45,7 +51,17 @@ function SegmentedButton({ active, onClick, children }) {
 export default function Layout() {
   const { resolved, setTheme } = useTheme();
   const { lang, setLang, t } = useI18n();
-  const tc = useContentText();
+
+  // The stepper needs to know who this is and what they have finished. This is
+  // the same hook every page uses; useProgress keeps one cache per employee, so
+  // reading it here does not fetch a second time.
+  const { department, level, isTaskDone } = useProgress();
+
+  // The same rule as the original's areRequiredDocsComplete(): every required
+  // document ticked. RequiredDocuments.jsx records an upload as the task
+  // `doc::<id>`, so the completion state is already in the progress map and
+  // does not need its own request.
+  const requiredDocsDone = REQUIRED_DOCUMENTS.every((doc) => isTaskDone(`doc::${doc.id}`));
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
@@ -59,25 +75,19 @@ export default function Layout() {
           </span>
         </Link>
 
-        <nav className="flex flex-col gap-1">
-          <NavLink to="/" end className={navLinkClass}>
-            {t('nav.home')}
-          </NavLink>
-          <NavLink to="/required-documents" className={navLinkClass}>
-            {t('nav.requiredDocuments')}
-          </NavLink>
-          {ALL_DEPARTMENTS.map((dept) => (
-            <NavLink key={dept.id} to={`/${dept.landingPageKey}`} className={navLinkClass}>
-              {tc(dept.content.title)}
-            </NavLink>
-          ))}
-          <NavLink to="/completion" className={navLinkClass}>
-            {t('nav.completion')}
-          </NavLink>
-          <NavLink to="/company-structure" className={navLinkClass}>
-            {t('nav.companyStructure')}
-          </NavLink>
-        </nav>
+        {/* The journey, not a page index. Which step someone is on, what is
+            behind them and what is still locked is the whole point of this
+            column in the live app - a flat list of links says none of it.
+
+            The department landing pages are still reachable: the stepper links
+            straight to the phase pages, which is where the work actually is,
+            and the department name is in the step label. */}
+        <JourneyStepper
+          department={department}
+          level={level}
+          isTaskDone={isTaskDone}
+          requiredDocsDone={requiredDocsDone}
+        />
 
         <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-4">
           <div>

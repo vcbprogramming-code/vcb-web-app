@@ -1,194 +1,144 @@
 # VCB Connect
 
-The internal web portal for VCB Group (วิจิตรภัณฑ์ก่อสร้าง), a Thai construction
-company — a launcher plus seven business apps that employees use daily.
+**The internal digital workplace of VCB Group (วิจิตรภัณฑ์ก่อสร้าง).**
+**ระบบงานภายในของกลุ่มวิจิตรภัณฑ์ก่อสร้าง**
 
-The apps are **live in production right now**, written in Google Apps Script,
-serving real staff. Nothing here is a greenfield project.
+---
 
-For the reference detail — script ids, exact data stores, the rules — see
-**[ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md)**.
+## Purpose · วัตถุประสงค์
 
-## The one thing that confuses everyone
+VCB Connect brings the company's daily operational work into one place. A site
+engineer records the day's labour, a finance officer checks a credit facility
+before a drawdown, a new employee works through their first ninety days, and a
+department head looks up the correct procedure — each through the same portal,
+with one sign-in and one set of permissions.
 
-**There are two codebases here, and they are not the same apps.**
+Before this system, that work was spread across spreadsheets, paper forms,
+email threads and individual habit. The cost was not inconvenience but
+uncertainty: no single answer to what had been recorded, who had approved it,
+or which version of a procedure was current.
 
-```
-VCB Connect/
-├── ORIGINAL CODE/          ← Google Apps Script. LIVE. Real users, real data.
-│   ├── hr-worklog/
-│   ├── meeting-minutes/
-│   └── … one folder per app
-└── FOR DEPLOYMENT TEAM/    ← React + Express + Postgres. Not deployed yet.
-    ├── api/                the one Express API, shared by every module
-    ├── shared/             api client, auth, i18n, theme
-    ├── supabase/           migrations
-    ├── hr-worklog/         React SPA
-    └── … one folder per app
-```
+VCB Connect exists to make the company's own records dependable — complete
+enough to rely on, consistent enough to compare, and traceable enough to audit.
 
-| | `ORIGINAL CODE/` | `FOR DEPLOYMENT TEAM/` |
+> ระบบ VCB Connect รวมงานปฏิบัติการประจำวันของบริษัทไว้ในที่เดียว วิศวกรหน้างานบันทึกการทำงานประจำวัน
+> ฝ่ายการเงินตรวจสอบวงเงินสินเชื่อก่อนเบิกใช้ พนักงานใหม่ดำเนินการตามโปรแกรมปฐมนิเทศ 90 วัน
+> และหัวหน้าแผนกค้นหาระเบียบปฏิบัติที่ถูกต้อง โดยเข้าใช้งานผ่านระบบเดียวกัน
+> ด้วยการเข้าสู่ระบบครั้งเดียวและสิทธิ์การใช้งานชุดเดียว
+>
+> ก่อนมีระบบนี้ งานเหล่านี้กระจายอยู่ในไฟล์ตาราง เอกสารกระดาษ อีเมล และวิธีการเฉพาะตัวของแต่ละคน
+> ปัญหาที่แท้จริงไม่ใช่ความไม่สะดวก แต่คือความไม่แน่นอน — ไม่มีคำตอบเดียวว่ามีการบันทึกอะไรไว้บ้าง
+> ใครเป็นผู้อนุมัติ และระเบียบปฏิบัติฉบับใดที่ใช้อยู่ในปัจจุบัน
+>
+> VCB Connect มีขึ้นเพื่อทำให้ข้อมูลของบริษัทเชื่อถือได้ — ครบถ้วนพอที่จะใช้อ้างอิง
+> สม่ำเสมอพอที่จะเปรียบเทียบ และตรวจสอบย้อนกลับได้
+
+---
+
+## What it covers · ขอบเขตการใช้งาน
+
+| Application | Purpose | ระบบงาน |
 |---|---|---|
-| Language | plain JavaScript (`.js` / `.gs`) | plain JavaScript (`.js` / `.jsx`) |
-| Runs on | Google's servers | nowhere yet |
-| Data | real Google Sheets | Postgres, via the Express API |
-| Users | all staff, today | none |
+| **Portal** | The single entry point. Announcements, the holiday calendar, and access to every application. | ประตูทางเข้าระบบ ประกาศ ปฏิทินวันหยุด และทางเข้าสู่ทุกระบบงาน |
+| **HR Work Log** | Daily labour records across eight project sites and roughly 345 staff. The basis of manday reporting. | บันทึกการทำงานรายวันของ 8 หน่วยงาน พนักงานประมาณ 345 คน ใช้เป็นฐานของรายงานวันทำงาน |
+| **Credit Facility Manager** | Bank facilities, drawdowns, approval requests and monthly cash planning. | วงเงินสินเชื่อธนาคาร การเบิกใช้ คำขออนุมัติ และแผนกระแสเงินสดรายเดือน |
+| **Meeting Minutes** | Meeting records, decisions and action items, with automatic import from recordings. | บันทึกการประชุม มติ และรายการติดตาม พร้อมนำเข้าอัตโนมัติจากไฟล์บันทึกเสียง |
+| **Standard Operating Procedures** | The authoritative procedures for the MANGO ERP, with version history. | ระเบียบปฏิบัติมาตรฐานสำหรับระบบ MANGO ERP พร้อมประวัติการแก้ไข |
+| **System Map** | How the company's systems connect, department by department. | แผนผังการเชื่อมโยงระบบต่าง ๆ ของบริษัท แยกตามแผนก |
+| **Onboarding Portal** | The ninety-day programme for new employees, tracked to completion. | โปรแกรมปฐมนิเทศ 90 วันสำหรับพนักงานใหม่ พร้อมติดตามความคืบหน้า |
+| **E-Memo** | Document control, memo issuance and approval workflow. | ระบบควบคุมเอกสาร การออกบันทึกข้อความ และขั้นตอนการอนุมัติ |
 
-`ORIGINAL CODE/` is canonical. If the two disagree, the Apps Script version is
-right and the React one is behind.
+Most of the interface is Thai; English is available throughout.
+ส่วนติดต่อผู้ใช้ส่วนใหญ่เป็นภาษาไทย และมีภาษาอังกฤษให้เลือกใช้ได้ทุกหน้าจอ
 
-**The React apps talk to `api/`, not to the database.** The browser never holds
-database credentials; every request goes through Express, which is the only
-thing that does. That also means access control lives in the API — the schemas
-used to enforce it with row level security, which worked while the browser was
-the Postgres client and does not now.
+---
 
-In Apps Script there is no frontend/backend split: the backend is the `api_*`
-functions and the frontend is the HTML served from the same file. That is why
-those folders are flat rather than split into `frontend/` + `backend/`.
+## Principles · หลักการออกแบบ
 
-## The apps
+**One record, not several.** Each fact is entered once and read everywhere it is
+needed. A work log entry becomes a manday figure, a cost allocation and a
+monthly report without being retyped.
+**บันทึกครั้งเดียว ใช้ได้ทุกที่** — ข้อมูลถูกบันทึกเพียงครั้งเดียวและถูกนำไปใช้ในทุกจุดที่ต้องการ
 
-| App | What it does | Live data |
+**Permissions by application.** A person is granted a role in each application
+separately. Access to the HR records does not imply access to credit facilities.
+**สิทธิ์แยกตามระบบงาน** — สิทธิ์ในระบบหนึ่งไม่ได้หมายถึงสิทธิ์ในอีกระบบหนึ่ง
+
+**Changes are recorded.** Edits to operational records and to access rights are
+written to an audit log that cannot be edited from the application.
+**บันทึกการเปลี่ยนแปลง** — การแก้ไขข้อมูลและสิทธิ์ถูกบันทึกไว้ และไม่สามารถแก้ไขผ่านระบบได้
+
+**The company owns its data.** Records are held in a database the company
+controls, exportable in standard formats at any time.
+**ข้อมูลเป็นของบริษัท** — จัดเก็บในฐานข้อมูลที่บริษัทควบคุม และส่งออกได้ตลอดเวลา
+
+---
+
+## Status · สถานะปัจจุบัน
+
+The system is being moved from its original implementation to a platform the
+company operates directly. Both versions are in this repository.
+
+ระบบอยู่ระหว่างการย้ายจากรูปแบบเดิมไปสู่แพลตฟอร์มที่บริษัทดูแลเอง
+โดยเก็บทั้งสองเวอร์ชันไว้ในที่เก็บโค้ดนี้
+
+| | Location | Status |
 |---|---|---|
-| **portal** | the launcher — tiles linking to everything else | none |
-| **hr-worklog** | daily work log across 8 sites, ~345 staff | Google Sheet |
-| **meeting-minutes** | minutes, with Fathom + Transkriptor auto-import | Google Sheet |
-| **sop** | standard operating procedures for the MANGO ERP | Google Doc |
-| **credit-facility** | credit limits, drawdowns, approvals | Google Sheet |
-| **onboarding** | 90-day new-employee programme | Google Sheet |
-| **system-map** | interactive map of company systems | none — static |
-| **ememo** | document control / e-signature | handed to an external dev |
+| **In service** | `ORIGINAL CODE/` | Eight applications on Google Apps Script, used daily by staff. |
+| **In preparation** | `FOR DEPLOYMENT TEAM/` | Eight applications rebuilt on React, Express and PostgreSQL. Not yet in service. |
 
-Much of the UI text is Thai. `ORIGINAL CODE/` files carry substantial comments,
-usually explaining *why* something is the way it is — those are worth reading
-before changing anything.
+The applications in service continue to run unchanged while the replacement is
+prepared. No staff member is asked to move until the replacement is complete
+and verified.
 
-## Where to read next
+ระบบที่ใช้งานอยู่ยังคงทำงานตามปกติระหว่างการเตรียมระบบใหม่
+และจะไม่มีการเปลี่ยนผู้ใช้จนกว่าระบบใหม่จะสมบูรณ์และผ่านการตรวจสอบแล้ว
 
-1. **[ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md)** — app inventory with
-   script ids, where each app keeps its data, the rules, and what changed
-   recently.
-2. **[TECH_STACK.md](TECH_STACK.md)** — what the deployment side must be built
-   with, and what it must not.
-3. **`FOR DEPLOYMENT TEAM/<module>/PORT_NOTES.md`** — what each React port
-   covers and what it does not.
-4. **`FOR DEPLOYMENT TEAM/supabase/migrations/`** — the Postgres schema, one
-   file per module, with the app-specific traps noted inline.
-5. **`ORIGINAL CODE/<module>/`** — the live app's own README, PROJECT_SUMMARY,
-   SETUP, CHANGELOG and design notes, where they exist.
+### Why the platform is changing · เหตุผลของการเปลี่ยนแพลตฟอร์ม
 
-## Working on the live apps
+The original applications store their records in Google Sheets. That was the
+right decision to begin with — it required no infrastructure and let the
+company start immediately. It stopped being right as the records grew:
 
-Each `ORIGINAL CODE/<module>/` folder is a `clasp` project. From inside it:
+- **Loss is possible and hard to reverse.** A spreadsheet moved to the wrong
+  folder is a database that has been deleted.
+- **Reliability declines with size.** Reading an entire sheet to answer one
+  question becomes slower every month.
+- **Access cannot be described precisely.** Sharing settings are per file, not
+  per role, so "this person may read HR but not credit" cannot be expressed.
 
-```sh
-clasp pull    # ALWAYS first — someone may have edited in the browser
-# make changes
-clasp push    # overwrites the live code with your local files
-```
+The replacement addresses all three. It is not a change of appearance.
 
-Skipping the `pull` silently destroys anyone else's browser-side edits.
+ระบบเดิมจัดเก็บข้อมูลใน Google Sheets ซึ่งเป็นทางเลือกที่เหมาะสมในช่วงเริ่มต้น
+เพราะไม่ต้องลงทุนโครงสร้างพื้นฐานและเริ่มใช้งานได้ทันที
+แต่เมื่อข้อมูลเพิ่มขึ้น ข้อจำกัดจึงชัดเจน — ข้อมูลสูญหายได้และกู้คืนยาก
+ประสิทธิภาพลดลงตามปริมาณข้อมูล และไม่สามารถกำหนดสิทธิ์รายบุคคลต่อระบบงานได้อย่างแม่นยำ
+ระบบใหม่แก้ไขทั้งสามประเด็นนี้ มิใช่เพียงการเปลี่ยนรูปลักษณ์
 
-`clasp push` updates code only — the live `/exec` URL keeps serving its current
-version until a new deployment is created, so pushing mid-day is safe.
+---
 
-**A new deployment does not inherit the manifest's access setting.** `appsscript.json`
-declaring `"access": "ANYONE_ANONYMOUS"` describes what the script asks for; the
-permission that actually applies is set on the deployment itself, in the editor
-under Deploy ▸ Manage deployments. A deployment created by `clasp` defaults to
-restricted, and the only symptom is a Google sign-in page where the app should
-be. This cost an afternoon on 2026-09-01.
+## Documentation · เอกสารประกอบ
 
-## Running the React side
+For those working on the system:
 
-```sh
-cd "FOR DEPLOYMENT TEAM/<module>"
-npm install
-npm run dev
-```
+| Document | Contents |
+|---|---|
+| [ARCHITECTURE_STANDARD.md](ARCHITECTURE_STANDARD.md) | Application inventory, script identifiers, and where each application keeps its data. |
+| [TECH_STACK.md](TECH_STACK.md) | The technologies the replacement is built with, and those deliberately excluded. |
+| [`FOR DEPLOYMENT TEAM/docs/ACCESS_MODEL.md`](FOR%20DEPLOYMENT%20TEAM/docs/ACCESS_MODEL.md) | How access rights are structured and administered. |
+| [`FOR DEPLOYMENT TEAM/docs/ONE_DOMAIN.md`](FOR%20DEPLOYMENT%20TEAM/docs/ONE_DOMAIN.md) | Why every application must be served from one domain. |
+| `FOR DEPLOYMENT TEAM/<module>/PORT_NOTES.md` | What each rebuilt application covers, and what it does not. |
+| `FOR DEPLOYMENT TEAM/supabase/migrations/` | The database schema, one file per application. |
+| `ORIGINAL CODE/<module>/` | Each application's own documentation. |
 
-The API it talks to lives in `FOR DEPLOYMENT TEAM/api/` and is shared by every
-module — one Express app, one deploy, one JWT that works everywhere.
+The source files carry substantial explanatory comments, generally recording
+*why* a decision was made rather than what the code does. They are worth
+reading before making changes.
 
-All seven build clean. `node_modules/` and `dist/` are not committed, and are
-best deleted when you are done — Drive syncs this folder, and 26,000 build files
-will stall its queue.
+ไฟล์โค้ดมีคำอธิบายประกอบไว้อย่างละเอียด โดยเน้นเหตุผลของการตัดสินใจมากกว่าการอธิบายการทำงาน
+ควรอ่านก่อนแก้ไข
 
-## Two things that will bite you
+---
 
-**1. `.gscript` and `.gsheet` files are not shortcuts.** On Google Drive for
-Desktop each one *is* the live Apps Script project or Spreadsheet. Copying one
-makes Drive create a new empty project; deleting one trashes the real thing.
-Both happened on 2026-08-30 and took six live apps offline until they were
-restored from Drive Trash. Never `cp`, `mv` or `rm` them — to relocate one, move
-it in File Explorer within the synced folder.
-
-**2. Names outlive their meaning.** Several fields are called something the app
-no longer does:
-
-- HR Work Log's sheet columns are `AM 1`…`PM 31`, but the app has **no
-  morning/afternoon split**. They are งานหลัก (main task) and งานเสริม
-  (optional extra). A day with both filled is still **one manday** — counting
-  them as two breaks every workload total.
-- Meeting Minutes has `doc_id`, `tab_id` and `source = 'doc-import'`, but Google
-  Docs stopped being the source of truth on 2026-07-19. The import path is
-  permanently disabled; re-enabling it would overwrite real edits.
-- SOP writes into a Google Doc on every save, so the Doc is a current mirror —
-  but editing the Doc does **not** flow back into the app.
-
-When in doubt, read what the code does, not what the column is called.
-
-## The migration
-
-The intent is to leave Apps Script for React + Express + Postgres. The code is
-written: seven SPAs converted, one Express API with every route, and migrations
-creating 39 tables across six Postgres schemas.
-
-**Nothing is connected.** No Supabase project exists and no data has been
-imported. The SPAs build and the API parses; none of it has run against a real
-database.
-
-Recommended order, and why:
-
-1. **credit-facility** — the pilot. Not yet in daily use, so mistakes are cheap.
-   Learn the real cost here.
-2. **onboarding** — was already querying Supabase directly, so its data shapes
-   are proven.
-3. **sop** — simplest: no spreadsheet, one JSON document.
-4. **system-map** — stores nothing; a static build.
-5. **meeting-minutes** — the Fathom/Transkriptor triggers have no Vercel
-   equivalent and must be rebuilt, or recordings silently stop arriving.
-6. **portal** — late, because every tile points at another app's URL.
-7. **hr-worklog** — last. 8,000 lines, 50 server functions, in daily use.
-
-**The security model changes, and this is the part to get right.** Apps Script
-gets identity free: `Session.getActiveUser().getEmail()` is supplied by Google
-and cannot be spoofed, so a server-side allowlist is enough.
-
-That is gone. The browser now sends a JWT the API issued, so anything the React
-app decides about roles only hides menus — the API is the real gate, and a route
-without a guard is public to the internet. The schemas' 45 row level security
-policies were **removed**, not carried across: they worked while the browser was
-the Postgres client, but the API connects as a single database user, so every
-policy would see the same principal and could not tell callers apart. Keeping
-them would have implied a protection that was no longer there. Access control
-lives in `api/src/middleware/auth.js` and in each route.
-
-## Known gaps
-
-**Theme fragmentation — resolved on the deployment side, still live in
-`ORIGINAL CODE/`.** The Apps Script apps each implement light/dark differently:
-four CSS selectors (`html[data-theme]`, `body.dark`, `html.theme-dark`,
-`html.dark`) and five `localStorage` keys between them, so a user's choice does
-not follow them from one app to the next. The React side converged on one
-convention in `FOR DEPLOYMENT TEAM/shared/src/theme.jsx` — `html.dark`, key
-`vcb_theme`, with `auto` following the OS. The live apps keep their own until
-they are replaced.
-
-**The live handles sit inside the repo.** Each `ORIGINAL CODE/<module>/` folder
-contains the `.gscript` and `.gsheet` files that *are* the live cloud objects,
-inside a git working tree on a Drive-synced volume. `.gitignore` keeps them out
-of commits, but not out of the way of every git and sync operation that touches
-those paths. Moving them somewhere Drive and git do not both reach is the one
-protection no amount of care in the code provides.
+*VCB Group · Internal use only*
+*กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ใช้ภายในองค์กรเท่านั้น*

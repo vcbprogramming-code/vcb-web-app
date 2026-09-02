@@ -57,8 +57,15 @@ export default function Dashboard({
   // is what gets searched — not the raw English row.
   const q = query.trim().toLowerCase();
   const filteredApps = useMemo(() => {
-    if (!q) return apps;
-    return apps.filter((a) => {
+    // Onboarding is a ported module and its URL comes from portal.apps like
+    // every other one — but it is NOT a tile. It is the 90-day programme a new
+    // starter works through in their first weeks and then never opens again,
+    // not part of anyone's daily work, so it belongs in the sidebar under
+    // "More" (where the live portal also puts it) and not in the grid everyone
+    // looks at every morning.
+    const tiles = apps.filter((a) => a.key !== 'onboarding');
+    if (!q) return tiles;
+    return tiles.filter((a) => {
       const copy = appCopy(a, lang, t);
       return `${copy.name} ${copy.desc}`.toLowerCase().includes(q);
     });
@@ -169,7 +176,7 @@ export default function Dashboard({
               {t('dash.applications')}
             </h2>
             <span className="text-xs text-ink-muted dark:text-ink-dark-muted">
-              {apps.length} {t('dash.available')}
+              {filteredApps.length} {t('dash.available')}
             </span>
           </div>
 

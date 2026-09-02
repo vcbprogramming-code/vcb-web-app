@@ -2,10 +2,11 @@ import { useI18n } from '@vcb/shared';
 import { CEO_QUOTE, CULTURE_VALUES, HOME_HERO, TRACK_RECORD_SLIDES } from '../data/home.js';
 import { useContentText } from '../lib/contentText.js';
 import { CtaLink, Page, PageTitle, Section } from '../components/ui.jsx';
+import CompanyStructure from '../components/orgchart/CompanyStructure.jsx';
 
 // Ported from the original app's PAGES['home'] (content.html) — hero, CEO
-// quote, Culture & Values, and Our Track Record. The embedded Org Chart /
-// Group Structure tree lives at /company-structure instead of inline here.
+// quote, Culture & Values, Our Track Record, and the embedded Org Chart /
+// Group Structure tree, in that order.
 //
 // Every content string goes through tc() rather than t(): these are the
 // migrated English sentences from content.html, resolved to their dot key by
@@ -121,6 +122,17 @@ export default function Home() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* Company Structure sits here, directly beneath Our Track Record, which
+          is where the original puts it. It had been moved to a route of its
+          own; after the nav entry for that route was removed the section was
+          reachable only by typing the URL, so on Home it was simply gone. */}
+      {/* t(), not tc(): this heading has a real translation key, where the
+          other headings on this page are migrated content strings resolved by
+          their English text. tc() would have fallen through to raw English. */}
+      <Section title={t('nav.companyStructure')}>
+        <CompanyStructure />
       </Section>
 
       <div>

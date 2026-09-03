@@ -184,8 +184,19 @@ export default function Lanes({ focusStageLaneIds }) {
               return (
                 <div className="contents" key={node.id}>
                   {prev !== null ? (
-                    <div className="flex w-6 flex-shrink-0 items-center justify-center text-lg font-bold text-[#4a7fa8]">
-                      {isConnected ? '›' : ''}
+                    <div className="flex w-6 flex-shrink-0 items-center justify-center text-flow">
+                      {/* Drawn, not typed. The original sets Segoe UI on the
+                          body, where "›" renders as a solid arrowhead; this port
+                          uses Sarabun (it has to, for Thai), whose "›" is a thin
+                          chevron. Same character, quarter the ink — the arrows
+                          between boxes all but vanished. An SVG looks the same
+                          in any font. */}
+                      {isConnected ? (
+                        <svg viewBox="0 0 24 14" width="24" height="14" aria-hidden="true">
+                          <line x1="0" y1="7" x2="15" y2="7" stroke="currentColor" strokeWidth="3" />
+                          <path d="M13 1 L23 7 L13 13 Z" fill="currentColor" />
+                        </svg>
+                      ) : null}
                     </div>
                   ) : null}
                   <NodeBox node={node} connected={connected} />

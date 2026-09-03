@@ -291,13 +291,15 @@ export default function AppBar({
               from here — the provider exposes signInWithGoogle and
               signInWithPassword, and choosing between them is not the app
               bar's decision to make; settings is where that choice lives.
-              Hidden below lg: at that width the bar has no room, and the
-              settings sheet still carries the identity. */}
+              Always visible, at every width. It was hidden below lg, which
+              meant most windows showed no identity at all — the one thing this
+              element exists to say. It truncates instead: a shortened address
+              still tells you an account is signed in, where nothing does not. */}
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
             title={signedIn ? user?.email : t('auth.signIn')}
-            className="hidden max-w-[260px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] transition-colors hover:text-white lg:inline-flex"
+            className="inline-flex min-w-0 max-w-[140px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] transition-colors hover:text-white sm:max-w-[200px] lg:max-w-[260px]"
           >
             <span className="max-w-[220px] truncate">
               {signedIn && user?.email ? user.email : t('auth.signIn')}

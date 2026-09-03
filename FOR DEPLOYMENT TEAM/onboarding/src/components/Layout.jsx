@@ -55,7 +55,12 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex w-full flex-none flex-col gap-6 bg-onb-sidebar px-5 py-6 text-white dark:bg-onb-sidebar-dark md:w-[274px]">
+      {/* Pinned to the viewport and scrolling inside itself, as the original
+          does (position:fixed; top:0; bottom:0; overflow-y:auto). As an
+          ordinary flex child it grew to the full page height - 2821px on the
+          home page - which put Settings, Admin and the signed-in email at
+          y=2700, reachable only by scrolling the entire page. */}
+      <aside className="flex w-full flex-none flex-col gap-6 self-start overflow-y-auto bg-onb-sidebar px-5 py-6 text-white dark:bg-onb-sidebar-dark md:sticky md:top-0 md:h-screen md:w-[274px]">
         {/* A sidebar has room for a real label where a topbar only has room
             for a brand mark, so the way back to the portal says so. */}
         <div className="flex flex-col gap-3">

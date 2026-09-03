@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
-import { AppSettings, useI18n } from '@vcb/shared';
+import { AppSettings, useAuthOptional, useI18n } from '@vcb/shared';
 import JourneyStepper from './JourneyStepper.jsx';
 import { useProgress } from '../lib/useProgress.js';
 import { REQUIRED_DOCUMENTS } from '../data/requiredDocuments.js';
@@ -37,6 +37,9 @@ const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || '/';
 
 export default function Layout() {
   const { t } = useI18n();
+  const auth = useAuthOptional();
+  const user = auth?.user;
+  const signedIn = auth?.signedIn;
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // The stepper needs to know who this is and what they have finished. This is
@@ -105,6 +108,18 @@ export default function Layout() {
           >
             {t('nav.admin')}
           </NavLink>
+
+          {/* Who is signed in, next to the gear, as the top bar shows it in
+              every other module. Says "Sign in" when nobody is, so signed-out
+              is distinguishable from simply not shown. */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title={signedIn ? user?.email : t('auth.signIn')}
+            className="max-w-full truncate rounded-control px-3 py-2 text-left text-xs text-sidebar-dim transition-colors hover:bg-white/10 hover:text-white dark:text-sidebar-dim-dark"
+          >
+            {signedIn && user?.email ? user.email : t('auth.signIn')}
+          </button>
         </div>
       </aside>
 

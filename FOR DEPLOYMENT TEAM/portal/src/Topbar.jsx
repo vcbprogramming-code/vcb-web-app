@@ -45,7 +45,7 @@ export default function Topbar({
 }) {
   const { t, lang, setLang } = useI18n();
   const { theme, setTheme } = useTheme();
-  const { signedIn, signOut } = useAuth();
+  const { user, signedIn, signOut } = useAuth();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -183,11 +183,14 @@ export default function Topbar({
           <span className="grid h-7 w-7 place-items-center rounded-full bg-accent text-[11px] font-semibold text-white dark:bg-accent-dark dark:text-surface-dark">
             {initials}
           </span>
+          {/* The email, not the display name. The page body already greets
+              this person by name; what the bar is for is saying WHICH account
+              they are on, which is what every other module shows here. */}
           <span
-            className="max-w-[140px] truncate text-sm text-ink dark:text-ink-dark"
+            className="max-w-[200px] truncate text-sm text-ink dark:text-ink-dark"
             title={userTitle}
           >
-            {greeting}
+            {signedIn && user?.email ? user.email : t('auth.signIn')}
           </span>
         </div>
       </div>

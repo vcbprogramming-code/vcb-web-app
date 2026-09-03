@@ -90,7 +90,12 @@ export default function App() {
 
       <div className="block h-[calc(100vh-var(--header-h))] overflow-hidden">
         <div
-          className="map-scroll box-border h-full w-full overflow-auto px-6 pb-20 pt-5"
+          // relative: the SVG overlay inside is position:absolute and needs a
+          // containing block here. Without one it positioned against <body>,
+          // so its origin never lined up with lanesWrap and every arrow was
+          // drawn 164px too high. The original gets this free because its
+          // overlay and wrapper are adjacent siblings.
+          className="map-scroll relative box-border h-full w-full overflow-auto px-6 pb-20 pt-5"
           id="mapScroll"
         >
           <StageCrumb />

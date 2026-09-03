@@ -56,6 +56,22 @@ export function drawArrows(selectedNodeId) {
   svg.style.height = H + 'px';
   const wrapRect = wrap.getBoundingClientRect();
 
+  // Put the SVG's origin ON the wrapper. Every path below is computed in
+  // wrapper-local coordinates (r.left - wrapRect.left), which only lands
+  // correctly if the SVG starts where the wrapper starts.
+  //
+  // In the original the two are adjacent siblings, so the overlay's top:0
+  // already coincided with the wrapper. This port renders <StageCrumb /> in
+  // between them, so the overlay sat 164px above the wrapper and every arrow
+  // was drawn that far too high - which is what put trigger arrows at y=-20,
+  // above the first row, pointing at nothing.
+  const host = svg.offsetParent || svg.parentElement;
+  if (host) {
+    const hostRect = host.getBoundingClientRect();
+    svg.style.left = Math.round(wrapRect.left - hostRect.left + host.scrollLeft) + 'px';
+    svg.style.top = Math.round(wrapRect.top - hostRect.top + host.scrollTop) + 'px';
+  }
+
   // One arrowhead marker per connection type.
   const defs = document.createElementNS(SVG_NS, 'defs');
   Object.entries(typeColor).forEach(([type, col]) => {

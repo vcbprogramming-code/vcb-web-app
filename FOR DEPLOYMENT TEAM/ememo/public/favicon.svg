@@ -1,0 +1,15 @@
+<!--
+  The VCB Connect tab mark, shared by every module.
+
+  Onboarding was still shipping Vite's scaffold favicon (a purple #863bff
+  lightning bolt), which is why its tab looked like a different product than
+  the rest. The other modules declared `href="data:,"` or nothing at all, so
+  they fell back to the browser's generic globe. One mark, one file.
+
+  A "V" monogram on the brand blue, drawn rather than set in type so it does
+  not depend on a font being available at 16px.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="VCB Connect">
+  <rect width="64" height="64" rx="13" fill="#1F3864"/>
+  <path d="M16 18h9.4l6.6 20.3L38.6 18H48L36.2 48h-8.4L16 18Z" fill="#fff"/>
+</svg>

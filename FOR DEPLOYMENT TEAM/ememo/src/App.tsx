@@ -29,7 +29,21 @@ type SortKey = 'num' | 'iso' | 'proj' | 'code' | 'subject'
 const SORT_KEYS: SortKey[] = ['num', 'iso', 'proj', 'code', 'subject']
 
 export default function App() {
-  const { t, era, auth, signIn } = useStore()
+  const { t, lang, era, auth, signIn, dark } = useStore()
+
+  // Where the portal is, and carry appearance and language to it so returning
+  // does not flip either. Same rule as every other module: the deployment says
+  // where the portal lives, defaulting to the root because on one domain the
+  // portal IS the root.
+  const portalHref = (() => {
+    const base = (import.meta as any).env?.VITE_PORTAL_URL || '/'
+    try {
+      const u = new URL(base, window.location.origin)
+      u.searchParams.set('theme', dark ? 'dark' : 'light')
+      u.searchParams.set('lang', lang)
+      return u.origin === window.location.origin ? u.pathname + u.search : u.toString()
+    } catch { return base }
+  })()
 
   const [raw, setRaw] = useState<DocumentsByProject>({})
   const [loading, setLoading] = useState(true)
@@ -160,13 +174,24 @@ export default function App() {
       <header>
         <div className="brandwrap">
           <div className="brand-txt">
-            <a className="brand-home" href="#" onClick={(e) => e.preventDefault()} title="Back to VCB Connect Home">
+            {/* The brand is the way back to the portal, as in every other
+                module, and it carries the current theme and language so the
+                portal does not flip appearance on arrival. It was href="#"
+                with preventDefault, so it went nowhere at all. */}
+            <a className="brand-home" href={portalHref} title={lang === 'th' ? 'กลับสู่ VCB Connect' : 'Back to VCB Connect'}>
               <h1>VCB Group</h1>
             </a>
             <span className="brand-div"></span>
             <div className="brand-stack">
               <span className="brand-sub">Document Control · e-Memo</span>
-              <span className="brand-th">กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามสถานะเอกสารภายใน</span>
+              {/* One line, in the reader's language, and the company name in
+                  the form the rest of VCB Connect uses. This showed the English
+                  and Thai lines stacked together regardless of language. */}
+              <span className="brand-th">
+                {lang === 'th'
+                  ? 'วิจิตรภัณฑ์ก่อสร้าง จำกัด · ติดตามสถานะเอกสารภายใน'
+                  : 'Vichitbhan Construction co.,Ltd. · Internal document control'}
+              </span>
             </div>
           </div>
         </div>

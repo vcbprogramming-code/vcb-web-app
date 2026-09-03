@@ -23,13 +23,25 @@ interface Store {
 const Ctx = createContext<Store | null>(null)
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => (lsGet('vcb-lang') === 'th' ? 'th' : 'en'))
+  // Theme and language read the SHARED keys the rest of VCB Connect uses
+  // (vcb_theme / vcb_lang), not this module's old vcb-dm / vcb-lang. Those
+  // were private to E-Memo, so switching appearance or language in the portal
+  // did not follow the person in here — the whole point of one website.
+  //
+  // vcb_theme holds 'light' | 'dark' | 'auto'; 'auto' follows the OS, which is
+  // also the shared default. Thai is the shared default language.
+  const [lang, setLangState] = useState<Lang>(() => (lsGet('vcb_lang') === 'en' ? 'en' : 'th'))
   const [era, setEraState] = useState<Era>(() => (lsGet('vcb-era') === 'be' ? 'be' : 'ce'))
-  const [dark, setDarkState] = useState<boolean>(() => lsGet('vcb-dm') === '1')
+  const [dark, setDarkState] = useState<boolean>(() => {
+    const t = lsGet('vcb_theme') || 'auto'
+    if (t === 'dark') return true
+    if (t === 'light') return false
+    try { return window.matchMedia('(prefers-color-scheme: dark)').matches } catch { return false }
+  })
   const [auth, setAuth] = useState<Auth | null>(null)
 
-  useEffect(() => { document.documentElement.classList.toggle('dark', dark); lsSet('vcb-dm', dark ? '1' : '0') }, [dark])
-  useEffect(() => { lsSet('vcb-lang', lang); document.documentElement.lang = lang }, [lang])
+  useEffect(() => { document.documentElement.classList.toggle('dark', dark); lsSet('vcb_theme', dark ? 'dark' : 'light') }, [dark])
+  useEffect(() => { lsSet('vcb_lang', lang); document.documentElement.lang = lang }, [lang])
   useEffect(() => { lsSet('vcb-era', era) }, [era])
 
   const t = useMemo(() => makeT(lang), [lang])

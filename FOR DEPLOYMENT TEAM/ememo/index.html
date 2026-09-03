@@ -3,11 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>VCB E-MEMO</title>
+  <title>E-Memo · VCB Connect</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <script>
     // Restore persisted dark-mode + mobile detection before paint (ported
     // verbatim from the original Apps Script <head> bootstrap).
-    try { if (localStorage.getItem('vcb-dm') === '1') document.documentElement.classList.add('dark'); } catch (e) {}
+    // Reads the SHARED vcb_theme, matching the rest of VCB Connect, and runs
+    // before paint so there is no flash of the wrong theme. 'auto' (the shared
+    // default) follows the OS.
+    try {
+      var t = localStorage.getItem('vcb_theme') || 'auto';
+      var d = t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (d) document.documentElement.classList.add('dark');
+    } catch (e) {}
     (function () {
       function isPhone() {
         try { if (window.matchMedia && window.matchMedia('(pointer:coarse)').matches && window.innerWidth <= 820) return true; } catch (e) {}

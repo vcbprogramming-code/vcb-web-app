@@ -82,14 +82,31 @@ lands on the other origin — which is the problem this exists to avoid.
 ## The preview is not like this
 
 Locally each module runs on its own port — 5180, 5181, 5182 … — which are
-separate origins. **Theme, language and session do not carry between them in the
-preview, and that is expected.** It is a limitation of running eight dev servers
-side by side, not a bug in the apps, and it disappears once they are served from
-one domain.
+separate origins, and `localStorage` is per-origin. A module on 5185 cannot
+read what the portal wrote on 5180.
 
-Do not "fix" it by writing the theme to a cookie or a query parameter. That
-would add a mechanism that exists only to paper over the preview, and it would
-still be there after the real deployment made it pointless.
+**This has a real fix, already in the code, not a preview-only workaround:**
+every module link carries `?theme=` and `?lang=` (see `appLink()` in
+portal/src/data.js), and the shared providers read and persist them on arrival.
+A module that skips this — E-Memo, being outside `@vcb/shared` — has to read
+the same two parameters itself in its own pre-paint bootstrap. This is the
+actual cross-origin mechanism, in production as much as locally; on one domain
+it simply has nothing to do, because there is only one origin to carry state
+between.
+
+Two environment variables the checked-in `.env.example` files do not set,
+because they are correctly empty in production (one domain, so a relative
+`/api/...` and a relative portal link both resolve). Locally they do not
+resolve, and skipping this is why a page can render its shell with no data —
+"Failed to load data" — while the banner looks perfect. Add a gitignored
+`.env.local` per module:
+
+```
+VITE_PORTAL_URL=http://localhost:5180
+VITE_API_URL=http://localhost:3000
+```
+
+See `docs/CHROME.md` for the rest of what these carry across origins.
 
 ---
 

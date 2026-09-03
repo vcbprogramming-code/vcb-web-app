@@ -120,6 +120,7 @@ instead.
 | [TECH_STACK.md](TECH_STACK.md) | The stack, and what is deliberately excluded |
 | [`docs/ACCESS_MODEL.md`](FOR%20DEPLOYMENT%20TEAM/docs/ACCESS_MODEL.md) | Roles, grants, what is not wired |
 | [`docs/ONE_DOMAIN.md`](FOR%20DEPLOYMENT%20TEAM/docs/ONE_DOMAIN.md) | Deployment topology |
+| [`docs/CHROME.md`](FOR%20DEPLOYMENT%20TEAM/docs/CHROME.md) | The shared bar every module wears, and its measurements |
 | `<module>/PORT_NOTES.md` | What each port covers and what it does not |
 | `supabase/migrations/` | Schema, one file per app, traps noted inline |
 

@@ -8,7 +8,7 @@ export type Era = 'ce' | 'be'
 export interface Strings {
   add_doc: string; search_placeholder: string; all_doc_types: string; all_statuses: string
   flt_pending: string; flt_commented: string; flt_approved: string; flt_rejected: string
-  all_projects: string; date_received: string; date_short: string; last_7: string; last_30: string; last_month: string
+  all_projects: string; date_received: string; last_7: string; last_30: string; last_month: string
   clear_filters: string; showing: string; empty: string; loading: string
   col_num: string; col_date: string; col_project: string; col_code: string
   col_document: string; col_status: string; col_open: string
@@ -25,7 +25,6 @@ export const I18N: Record<Lang, Strings> = {
     flt_pending: 'Pending', flt_commented: 'Comments', flt_approved: 'Approved', flt_rejected: 'Rejected',
     all_projects: 'All Projects',
     date_received: 'Date received:',
-    date_short: 'Date',
     last_7: 'Last 7 days', last_30: 'Last 30 days', last_month: 'Last month',
     clear_filters: '✕ Clear all filters',
     showing: 'Showing {n} of {m} documents',
@@ -47,7 +46,6 @@ export const I18N: Record<Lang, Strings> = {
     flt_pending: 'รอดำเนินการ', flt_commented: 'ความเห็น', flt_approved: 'อนุมัติแล้ว', flt_rejected: 'ไม่อนุมัติ',
     all_projects: 'ทุกโครงการ',
     date_received: 'วันที่รับเอกสาร:',
-    date_short: 'วันที่',
     last_7: '7 วันล่าสุด', last_30: '30 วันล่าสุด', last_month: 'เดือนที่แล้ว',
     clear_filters: '✕ ล้างตัวกรองทั้งหมด',
     showing: 'แสดง {n} จาก {m} เอกสาร',

@@ -851,9 +851,7 @@ html.is-mobile .dlbl{
   display:flex;align-items:center;justify-content:center;
   font-size:12px;color:#333;white-space:nowrap;
 }
-html.is-mobile .dlbl.dph{background:none;font-size:11px;color:#888;font-weight:600}
 html.dark.is-mobile .dlbl{color:#cdd2e1}
-html.dark.is-mobile .dlbl.dph{color:#9aa0b2}
 html.is-mobile .datebar > span{color:#bbb;font-size:11px;flex-shrink:0;padding:0 1px}
 html.is-mobile .datebar .divider{display:none}
 /* Clutter — remove all the preset chips on mobile per user request. */

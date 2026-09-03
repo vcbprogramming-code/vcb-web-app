@@ -272,12 +272,15 @@ export default function App() {
       <div className="datebar">
         <span className="dwrap1">
           <input type="date" className="dfld" value={d1} onChange={(e) => setD1(e.target.value)} />
-          <span className={'dlbl' + (d1 ? '' : ' dph')}>{d1 ? shortDate(d1) : t('date_short')}</span>
+          {/* Only once a date is picked. The empty input already renders
+              mm/dd/yyyy, so a "Date" label beside it said nothing the control
+              was not already saying. */}
+          {d1 ? <span className="dlbl">{shortDate(d1)}</span> : null}
         </span>
         <span style={{ color: '#aaa', fontSize: 12 }}>→</span>
         <span className="dwrap1">
           <input type="date" className="dfld" value={d2} onChange={(e) => setD2(e.target.value)} />
-          <span className={'dlbl' + (d2 ? '' : ' dph')}>{d2 ? shortDate(d2) : t('date_short')}</span>
+          {d2 ? <span className="dlbl">{shortDate(d2)}</span> : null}
         </span>
         <div className="divider"></div>
         <button className="qbtn" onClick={() => setQuick(7)}>{t('last_7')}</button>

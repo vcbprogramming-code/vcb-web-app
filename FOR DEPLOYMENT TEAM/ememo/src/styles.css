@@ -11,7 +11,11 @@ html{overflow-y:scroll;scrollbar-gutter:stable}
    wrapping. This guarantees the page itself never scrolls sideways no
    matter which layout is active. */
 html,body{max-width:100vw;overflow-x:hidden}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:13px}
+/* The shared VCB Connect stack. Sarabun leads: it covers Thai and Latin in
+   one face, so a mixed line does not change weight mid-string, and it is what
+   every other module renders. This said 'Segoe UI' first, which is why the
+   brand looked wider and heavier here than anywhere else. */
+body{font-family:Sarabun,'Noto Sans Thai','Leelawadee UI',Inter,'Segoe UI',Tahoma,system-ui,-apple-system,sans-serif;background:#f0f2f5;color:#1a1a2e;font-size:13px}
 
 header{background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);color:white;padding:16px 28px;display:flex;align-items:center;justify-content:space-between}
 header h1{font-size:17px;font-weight:600;letter-spacing:.3px}
@@ -146,7 +150,7 @@ td.lk{width:72px;text-align:center}
   background:var(--rv-surface);border:1px solid var(--rv-line);border-radius:10px;
   box-shadow:0 1px 2px rgba(15,20,36,.04),0 8px 24px rgba(15,20,36,.05);
   padding:22px 24px 24px;position:sticky;top:0;
-  font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;
+  font-family:Sarabun,'Noto Sans Thai','Leelawadee UI',Inter,'Segoe UI',Tahoma,system-ui,-apple-system,sans-serif;
   /* Cap the whole card to the viewport and let only the comment thread
      scroll inside it — with many comments the card used to just keep
      growing taller than the page (nothing to scroll it independently),
@@ -373,7 +377,9 @@ td.lk{width:72px;text-align:center}
 
 
 /* ───────── Demo polish layer (visual only) ───────── */
-body{font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;background:#eef1f6;color:#1f2433;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* The later of two body rules, and the one that actually wins. Same shared
+   stack as above. */
+body{font-family:Sarabun,'Noto Sans Thai','Leelawadee UI',Inter,'Segoe UI',Tahoma,system-ui,-apple-system,sans-serif;background:#eef1f6;color:#1f2433;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 
 /* Header / brand */
 /* 28px, the padding every other module's bar uses. This override set 30 and

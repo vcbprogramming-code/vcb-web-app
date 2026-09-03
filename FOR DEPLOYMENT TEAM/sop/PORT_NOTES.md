@@ -99,3 +99,14 @@ those ship with the app rather than living in the database.
 Server-only helpers with no client-visible effect are not mirrored. If you find
 something in `Code.js` missing here, check whether it produces anything the user
 can see before rebuilding it.
+
+## `app.title` was missing
+
+`TopBar.jsx` passed the same key to `AppBar`'s `title` and `subtitle` props,
+because `app.title` did not exist — only `app.subtitle` and a separate
+`app.subtitleTH`, both holding one fixed string regardless of the selected
+language. An English reader got the Thai name twice.
+
+There is now one `app.title` (the module name, shown uppercase beside the
+brand) and one `app.subtitle` (what the module does), each resolved by
+language like every other key in the dictionary. See `docs/CHROME.md`.

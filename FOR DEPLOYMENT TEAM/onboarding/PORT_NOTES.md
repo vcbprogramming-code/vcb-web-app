@@ -183,3 +183,16 @@ extracted; an unreferenced key is not a missing image.
 Nothing. The three items previously listed here — the sidebar journey stepper,
 the embedded photographs, and the org chart being on a route rather than
 inline on Home — have all been ported.
+
+## The sidebar has to stay pinned to the viewport
+
+`<aside>` in `Layout.jsx` is `md:sticky md:top-0 md:h-screen`, not an ordinary
+flex child. Left to size itself it stretches to the full document height —
+2,821px on the home page — which pushes anything anchored to its bottom
+(Settings, Admin, the signed-in email) down by the same amount. On a page that
+tall, that footer sat around y=2700: present in the DOM, invisible without
+scrolling the entire page first.
+
+The original has the same shape for the same reason:
+`position: fixed; top: 0; bottom: 0; overflow-y: auto`. Below `md` the sidebar
+stays a normal stacked block, matching the original's mobile drawer behaviour.

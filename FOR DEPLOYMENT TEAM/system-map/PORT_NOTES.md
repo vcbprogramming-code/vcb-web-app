@@ -35,19 +35,28 @@ in `src/index.css`. Three things could not become utilities and must stay:
 The old rule "never hand-edit `styles.css`, re-extract it" is retired with the
 file. Styling now lives on the elements.
 
-## Providers: theme and i18n only — deliberately no auth
+## Providers: theme, i18n and auth — auth for identity only, still no gate
 
-`src/main.jsx` wires `ThemeProvider` and `I18nProvider`. It does **not** wire
-`AuthProvider`, and that is a decision, not an omission:
+`src/main.jsx` wires `ThemeProvider`, `I18nProvider` and `AuthProvider`.
 
-- This module stores nothing. There is no API client, no `fetch`, no database.
-  `supabase/README.md` says the same thing from the data side.
+`AuthProvider` was added so the shared bar can say who is signed in, matching
+every other module. It gates nothing: the provider renders its children
+unconditionally, and its one request (`/api/auth/me`) fires only when a token
+already exists and is caught if it fails.
+
+The reasoning that kept it out originally still holds for everything else:
+
+- This module stores nothing of its own. There is no module API client, no
+  module-specific `fetch`, no database table. `supabase/README.md` says the
+  same thing from the data side.
 - Nothing in it is role-gated. The only match for "role" in the entire source
-  was `role="button"` — an ARIA attribute on a clickable span.
-- Every user sees the same map, so an auth wrapper would add a login wall in
-  front of a page with nothing to protect and nothing to fetch.
+  is `role="button"` — an ARIA attribute on a clickable span.
+- Every user sees the same map. If access control is ever wanted, it belongs
+  on the portal tile that links here, not inside this module.
 
-If access control is ever wanted, it belongs on the portal tile that links here.
+`AppBar` reads auth through `useAuthOptional()`, which returns `null` instead
+of throwing — see `docs/CHROME.md`. A component that genuinely needs to gate
+on identity must still use `useAuth()` and get the throw.
 
 **No `BrowserRouter` either.** The app is one view. What look like separate
 screens — the L0 overview, the trace overlay, the function registry — are
@@ -125,3 +134,43 @@ Both diagrams are hand-written SVG and stay that way:
 
 Both stay imperative because each is a measure-then-paint pass: the geometry is
 only knowable after layout, so it cannot be expressed as JSX in the same commit.
+
+## The overlay's origin has to be pinned to the lanes wrapper
+
+`SvgEdges.jsx` computes every path in coordinates local to `#lanesWrap`
+(`r.left - wrapRect.left`). That only lands correctly if the SVG overlay's own
+top-left starts where the wrapper's does.
+
+In the original the two are adjacent siblings inside `.map-scroll`, so the
+overlay's `top: 0` already coincided with the wrapper — free, by construction.
+This port renders `<StageCrumb />` between them, and `.map-scroll` was
+`position: static`, so the absolutely-positioned overlay had no containing
+block, resolved against `<body>`, and sat well above the wrapper it was
+measuring against. Every connector was drawn too high — arrows through boxes,
+arches escaping above the first row.
+
+Two things fix it, and both matter: `.map-scroll` is `position: relative` so it
+becomes the containing block, and `drawArrows` sets the overlay's `left`/`top`
+from `wrapRect` on every redraw, not once at mount — so the origin
+re-establishes itself whenever anything above the canvas changes height,
+including the shared bar.
+
+## Light mode: the dashed border is the legend, not decoration
+
+Dashed border means manual work; solid fill means ERP — the module's whole
+legend keys off this one visual distinction (`Legend.jsx`). Manual nodes are
+`#eef4fb` on light mode's `#f6f8fa` canvas, near enough to the ground that a
+2px dash in a pale department hue nearly disappeared. Light mode gives manual
+nodes a white fill, a 3px dash, and a faint outer ring; dark mode is
+unchanged — its dash already reads clearly against the darker fill there.
+
+A 2.5px dash measured and looked identical to 2px: at `deviceScaleFactor: 1` a
+half-pixel border is rounded away, so the value has to actually cross a whole
+pixel to be visible.
+
+## `app.subtitle` held the wrong language
+
+It carried the *opposite* language to `app.title` — Thai mode read the English
+name, English mode read the Thai one. Every i18n key in this codebase resolves
+`{ th, en }` to the reader's own language; this was the one exception, and
+nothing about its shape marked it as one.

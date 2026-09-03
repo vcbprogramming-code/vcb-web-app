@@ -46,8 +46,12 @@
     --map-sunk: #f1f5f9;
     --map-card: #ffffff;
     --map-card2: #f8fafc;
-    --map-doc: #f2f7fc;
-    --map-manual: #eef4fb;
+    /* Manual nodes are WHITE in light mode, against the #f6f8fa canvas. The
+       dashed border is the legend - dashed means manual work, solid means ERP -
+       so it has to be readable, and a near-canvas fill (#eef4fb) left the
+       dashes with almost nothing to sit against. */
+    --map-doc: #ffffff;
+    --map-manual: #ffffff;
     --map-detail: #ffffff;
     --map-hair: #dde3ec;
     --map-hair2: #d5dbe6;
@@ -107,6 +111,7 @@
 }
 
 @layer components {
+
   /* ── 1. body-class cross-cutting filters ──────────────────────────────── */
 
   /* Direct / indirect connector visibility. The paths are created imperatively

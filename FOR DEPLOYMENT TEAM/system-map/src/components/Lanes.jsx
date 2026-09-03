@@ -62,7 +62,11 @@ function NodeBox({ node, connected }) {
     NODE_BASE,
     isErp
       ? 'node-erp border-t-[3px] border-white/20 shadow-node'
-      : 'node-manual border-2 border-dashed bg-map-manual',
+      : // The dashed edge IS the legend - dashed means manual work, solid
+        // means ERP - so it has to read in both themes. On the dark fill 2px
+        // is enough; on a white light-mode panel the paler department hues
+        // wash out, so light mode gets a heavier dash and a faint ring.
+        'node-manual border-[3px] border-dashed bg-map-manual shadow-[0_0_0_1px_rgba(30,41,59,0.10)] dark:border-2 dark:shadow-none',
     isSelected ? 'selected z-20 outline outline-[3px] outline-offset-2 outline-white' : '',
     isHighlighted ? 'highlighted z-20 outline outline-[3px] outline-offset-2 outline-alt' : '',
     isDimmed ? 'dimmed pointer-events-none opacity-[.18] grayscale-[.7]' : '',

@@ -24,7 +24,9 @@ export const dictionary = createDictionary({
   /* ── brand / shell ─────────────────────────────────────────────────────── */
   'app.brand': { th: 'VCB Group', en: 'VCB Group' },
   'app.title': { th: 'แผนผังการทำงานของระบบ', en: 'System Operating Map' },
-  'app.subtitle': { th: 'System Operating Map', en: 'แผนผังการทำงานของระบบ' },
+  // Each language gets its own words. This held the OTHER language, so the
+  // bar read "System Operating Map" in Thai mode and the Thai name in English.
+  'app.subtitle': { th: 'แผนผังการทำงานของระบบ', en: 'System Operating Map' },
   'app.backToPortal': { th: 'กลับสู่ VCB Connect', en: 'Back to VCB Connect portal' },
   'app.version': { th: 'v8.86 · มิ.ย. 2026', en: 'v8.86 · Jun 2026' },
 

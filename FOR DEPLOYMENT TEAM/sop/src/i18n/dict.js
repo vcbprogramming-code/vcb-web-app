@@ -26,13 +26,19 @@ import { createDictionary } from '@vcb/shared';
 export const sopDict = createDictionary({
   /* ------------------------------- chrome -------------------------------- */
   'app.brand': { th: 'VCB Group', en: 'VCB Group' },
-  'app.subtitle': {
-    th: 'Standard Operating Procedure',
+  // The module name, which AppBar sets in uppercase beside the brand. SOP had
+  // no app.title at all, so TopBar passed the subtitle for both slots.
+  'app.title': {
+    th: 'ระเบียบปฏิบัติงานมาตรฐาน',
     en: 'Standard Operating Procedure',
   },
-  'app.subtitleTH': {
-    th: 'ระเบียบปฏิบัติงานมาตรฐาน',
-    en: 'ระเบียบปฏิบัติงานมาตรฐาน',
+  // One key, resolved by language, like every other module. These held a
+  // fixed English and a fixed Thai string regardless of the language chosen,
+  // and TopBar passed the Thai one as the subtitle - so English readers got
+  // Thai and Thai readers got it twice.
+  'app.subtitle': {
+    th: 'มาตรฐานการใช้งานระบบ',
+    en: 'System operating standards',
   },
   'app.backToPortal': {
     th: 'กลับไปหน้าหลัก VCB Connect',

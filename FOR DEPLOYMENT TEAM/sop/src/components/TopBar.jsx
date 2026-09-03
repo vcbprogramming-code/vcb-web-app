@@ -26,8 +26,8 @@ export default function TopBar({ onSettings }) {
 
   return (
     <AppBar
-      title={t('app.subtitle')}
-      subtitle={t('app.subtitleTH')}
+      title={t('app.title')}
+      subtitle={t('app.subtitle')}
       settingsExtra={
         onSettings ? (
           <button

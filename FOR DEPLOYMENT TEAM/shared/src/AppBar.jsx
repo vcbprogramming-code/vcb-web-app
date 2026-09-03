@@ -245,8 +245,8 @@ export default function AppBar({
               bar was 72px in most modules and 77px in Meeting Minutes — the
               kind of difference nobody can name but everybody sees when moving
               between two tabs. leading-tight keeps both lines inside it. */}
-          <div className="flex h-10 min-w-0 flex-col justify-center gap-1.5 overflow-hidden">
-            <span className="truncate text-[12.5px] font-bold uppercase leading-none tracking-[2.5px] text-white">
+          <div className="flex min-h-10 min-w-0 flex-col justify-center gap-0.5">
+            <span className="truncate text-[12.5px] font-bold uppercase leading-[1.35] tracking-[2.5px] text-white">
               {title}
             </span>
             {/* The company name comes from the shared dictionary, so it is
@@ -255,7 +255,10 @@ export default function AppBar({
                 carried its own copy of the company name inside its subtitle
                 string, which is how "Vichitphan" reached two banners while the
                 rest said "Vichitbhan". */}
-            <span className="truncate text-[13px] font-medium leading-none tracking-[.5px] text-white">
+            {/* leading-[1.35], not leading-none. A 13px line box for a 13px
+                face leaves no room for descenders - the g in "meeting" and
+                "Log" lost its tail against the parent overflow-hidden. */}
+            <span className="truncate text-[13px] font-medium leading-[1.35] tracking-[.5px] text-white">
               {t('app.company')}
               {descriptor ? ` · ${descriptor}` : ''}
             </span>

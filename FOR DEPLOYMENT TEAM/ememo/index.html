@@ -18,6 +18,20 @@
     // before paint so there is no flash of the wrong theme. 'auto' (the shared
     // default) follows the OS.
     try {
+      // ?theme= wins over the stored value: localStorage is per-origin, so a
+      // module on another port cannot see the portal's choice. The link that
+      // brought us here carries it. Persist it immediately, so the rest of the
+      // visit — and the next one — uses it.
+      var qs = null;
+      try { qs = new URLSearchParams(location.search); } catch (e) {}
+      var q = qs && qs.get('theme');
+      if (q === 'light' || q === 'dark' || q === 'auto') {
+        localStorage.setItem('vcb_theme', q);
+      }
+      var l = qs && qs.get('lang');
+      if (l === 'th' || l === 'en') {
+        localStorage.setItem('vcb_lang', l);
+      }
       var t = localStorage.getItem('vcb_theme') || 'auto';
       var d = t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       if (d) document.documentElement.classList.add('dark');

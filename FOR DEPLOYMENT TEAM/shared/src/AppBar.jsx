@@ -224,7 +224,11 @@ export default function AppBar({
           padding 16px 28px, brand 17px, subtitle 11px. The 9.5px title the
           other modules had was too small to read at a glance. */}
       <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 bg-brand-bar px-7 py-4 text-white shadow-topbar dark:bg-brand-bar-dark">
-        <div className="order-1 flex min-w-0 flex-1 items-center gap-2.5 lg:flex-none">
+        {/* gap-4 (16px), matching E-Memo .brandwrap. At gap-2.5 the divider sat
+            10px from the brand and 10px from the title, which reads as cramped
+            next to a 24px brand; 16px gives the rule room to separate two
+            things rather than just interrupt one. */}
+        <div className="order-1 flex min-w-0 flex-1 items-center gap-4 lg:flex-none">
           {/* The brand is the way back to the portal — the convention everywhere
               else on the web, and it means no module needs its own "back"
               button competing for space in the bar. */}

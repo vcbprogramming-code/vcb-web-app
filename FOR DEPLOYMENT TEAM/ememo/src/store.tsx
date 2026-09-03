@@ -1,7 +1,7 @@
 // Cross-cutting client state: display prefs (lang / era / theme) persisted to
 // the same localStorage keys as the GAS app, plus mock auth. Mirrors the
 // LANG / DATE_ERA / html.dark / _authToken / _verifiedEmail / _rvManager globals.
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, {createContext, useCallback, useContext, useEffect, useMemo, useState, useRef } from 'react'
 import { makeT, type Lang, type Era, type Strings } from './i18n'
 import { mockSignIn, PREVIEW_OWNER } from './api'
 
@@ -40,7 +40,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   })
   const [auth, setAuth] = useState<Auth | null>(null)
 
-  useEffect(() => { document.documentElement.classList.toggle('dark', dark); lsSet('vcb_theme', dark ? 'dark' : 'light') }, [dark])
+  // Apply the class on every change, but only WRITE vcb_theme when someone
+  // actually picks a theme here. Writing it on mount collapsed 'auto' into a
+  // hard 'light' or 'dark' the moment this module loaded - so E-Memo pinned
+  // itself to one theme while the other modules stayed on auto, and then
+  // carried that wrong value to the portal on the way back.
+  const firstRun = useRef(true)
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    if (firstRun.current) { firstRun.current = false; return }
+    lsSet('vcb_theme', dark ? 'dark' : 'light')
+  }, [dark])
   useEffect(() => { lsSet('vcb_lang', lang); document.documentElement.lang = lang }, [lang])
   useEffect(() => { lsSet('vcb-era', era) }, [era])
 

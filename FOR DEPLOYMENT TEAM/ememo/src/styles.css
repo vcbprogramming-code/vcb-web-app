@@ -519,9 +519,12 @@ html.dark .rvCmtDel{color:#ff8c84}
 
 /* Settings gear chip — same 40px height as the other header chips.
    Glyph 18px so the gear fills the same proportion of its frame. */
+/* The settings gear: a 40px SQUARE, matching every other VCB Connect module.
+   It was 40px tall with 13px side padding and no width, so it came out 43px
+   wide - a rounded rectangle next to everyone else's square. */
 .dm-btn{
   display:inline-flex;align-items:center;justify-content:center;
-  height:40px;padding:0 13px;
+  height:40px;width:40px;padding:0;
   background:rgba(255,255,255,.10);
   color:#fff;
   border:1px solid rgba(255,255,255,.18);
@@ -531,7 +534,7 @@ html.dark .rvCmtDel{color:#ff8c84}
   transition:background .14s,border-color .14s;
 }
 .dm-btn:hover{background:rgba(255,255,255,.24)}
-html.dark .dm-btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
+html.dark .dm-btn{background:rgba(255,255,255,.10);color:#fff;border-color:rgba(255,255,255,.18)}
 html.dark .dm-btn:hover{background:rgba(255,255,255,.24)}
 
 /* Settings modal — centered card with sections for account / theme /
@@ -777,7 +780,7 @@ html.is-mobile .brand-th{display:block !important;font-size:10.5px !important;fo
 html.is-mobile .hdr-right{gap:6px;flex-shrink:0}
 html.is-mobile #hdr{display:none}                    /* counts move to .stat line */
 html.is-mobile .add-btn{display:none}                /* Add Document becomes the FAB on phones */
-html.is-mobile .dm-btn{height:36px;padding:0 10px;font-size:16px;flex-shrink:0;border-radius:8px}
+html.is-mobile .dm-btn{height:36px;width:36px;padding:0;font-size:16px;flex-shrink:0;border-radius:8px}
 html.is-mobile .user-as{display:none}                /* email + role moved into Settings modal on mobile */
 
 /* Floating Add-Document button — phone-only. Bottom-right, above the

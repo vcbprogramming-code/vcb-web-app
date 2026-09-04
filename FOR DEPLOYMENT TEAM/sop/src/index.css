@@ -63,6 +63,18 @@
   .mc-ring {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--mc, #1D4E89) 28%, transparent);
   }
+  /* A case card's extra-module tag chip — the original's .lc-badge-tag: a
+     light tint of the module colour, not a solid fill or an outline, so a
+     card can carry several tags without them reading as loud as the primary
+     module number beside them. */
+  .tag-chip {
+    background: color-mix(in srgb, var(--mc, #999) 16%, #fff);
+    color: var(--mc, #666);
+  }
+  html.dark .tag-chip {
+    background: color-mix(in srgb, var(--mc, #999) 28%, #0e1726);
+    color: color-mix(in srgb, var(--mc, #999) 70%, #fff);
+  }
 
   /* --- 2. procedure steps ------------------------------------------------- */
   /* Numbered steps count themselves. Sub-bullets and captions are inside the

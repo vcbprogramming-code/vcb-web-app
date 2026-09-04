@@ -18,6 +18,7 @@ import React, { useMemo } from 'react';
 import { useT } from '@vcb/shared';
 import { useData } from '../lib/DataContext.jsx';
 import { useFilters } from '../lib/FilterContext.jsx';
+import { useDashPrefs } from '../lib/useDashPrefs.js';
 import { money } from '../lib/format.js';
 import { dueBucket, isDueWithin7 } from '../lib/format.js';
 import { matchCompany } from '../lib/lookups.js';
@@ -28,63 +29,131 @@ export default function Dashboard({ onDrill }) {
   const t = useT();
   const { facilities, transactions, projects } = useData();
   const { filters } = useFilters();
+  const { prefs } = useDashPrefs();
 
   const stats = useMemo(
     () => computeStats({ facilities, transactions, projects, filters }),
     [facilities, transactions, projects, filters]
   );
 
+  // Data-driven, so the prefs checkboxes in Settings (Display > Dashboard)
+  // can gate each card by the same 'tl'/'bg'/'ml'/'be'/'pn' key the original
+  // used — legacy's LINES array, ported directly rather than reinvented.
+  const lineCards = [
+    {
+      key: 'bg',
+      label: 'BG',
+      agg: stats.bg,
+      parts: stats.bgParts,
+      accent: '#1D4E89',
+      onClick: () => onDrill({ type: 'LG' }),
+      title: t('dash.creditLines'),
+    },
+    {
+      key: 'tl',
+      label: 'T/L',
+      agg: stats.agg[4],
+      accent: '#C2410C',
+      onClick: () => onDrill({ type: 'TL' }),
+      title: t('dash.longTerm'),
+    },
+    {
+      key: 'ml',
+      label: 'M/L',
+      agg: stats.agg[8],
+      accent: '#9333EA',
+      onClick: () => onDrill({ type: 'ML' }),
+      title: 'M/L',
+    },
+    {
+      key: 'be',
+      label: 'B/E',
+      agg: stats.agg[6],
+      parts: stats.beParts,
+      accent: '#1F9D55',
+      onClick: () => onDrill({ type: 'AVAL' }),
+      title: t('dash.viewBE'),
+    },
+    {
+      key: 'pn',
+      label: 'P/N',
+      agg: stats.agg[7],
+      accent: '#3A5BFF',
+      onClick: () => onDrill({ type: 'PN' }),
+      title: t('dash.revolving'),
+    },
+  ].filter((c) => prefs.lines[c.key]);
+
+  const dueCards = [
+    {
+      key: 'week',
+      label: t('set.within1Week'),
+      amount: stats.due7,
+      count: stats.cnt7,
+      accent: '#B3261E',
+      onClick: () => onDrill({ due: 'week' }),
+      title: t('set.within1Week'),
+    },
+    {
+      key: 'this',
+      label: t('dash.dueThisMonth'),
+      amount: stats.dueThis,
+      count: stats.cntThis,
+      extra: stats.due7 > 0 ? `${t('filter.due7')} ฿${money(stats.due7)}` : '',
+      accent: '#C2410C',
+      onClick: () => onDrill({ due: 'this' }),
+      title: t('dash.viewDueThis'),
+    },
+    {
+      key: 'next',
+      label: t('dash.dueNextMonth'),
+      amount: stats.dueNext,
+      count: stats.cntNext,
+      extra: stats.dueOver > 0 ? `${t('dash.overdueOutstanding')} ฿${money(stats.dueOver)}` : '',
+      accent: '#B3261E',
+      onClick: () => onDrill({ due: 'next' }),
+      title: t('dash.viewDueNext'),
+    },
+  ].filter((c) => prefs.due[c.key]);
+
+  const statusCards = [
+    {
+      key: 'new',
+      label: t('status.new'),
+      count: stats.cNew,
+      amount: stats.aNew,
+      accent: '#B3261E',
+      onClick: () => onDrill({ status: STATUS.NEW }),
+    },
+    {
+      key: 'proposed',
+      label: t('set.proposed'),
+      count: stats.cWait,
+      amount: stats.aWait,
+      accent: '#C2410C',
+      onClick: () => onDrill({ status: STATUS.PENDING }),
+    },
+    {
+      key: 'approved',
+      label: t('status.approved'),
+      count: stats.cAppr,
+      amount: stats.aAppr,
+      accent: '#1F9D55',
+      onClick: () => onDrill({ status: STATUS.APPROVED }),
+    },
+  ].filter((c) => prefs.status[c.key]);
+
   return (
     <div className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-6 md:grid-cols-3 xl:grid-cols-6">
-      <FacilityCard
-        label="BG"
-        agg={stats.bg}
-        parts={stats.bgParts}
-        accent="#1D4E89"
-        onClick={() => onDrill({ type: 'LG' })}
-        title={t('dash.creditLines')}
-      />
-      <FacilityCard
-        label="T/L"
-        agg={stats.agg[4]}
-        accent="#C2410C"
-        onClick={() => onDrill({ type: 'TL' })}
-        title={t('dash.longTerm')}
-      />
-      <FacilityCard
-        label="B/E"
-        agg={stats.agg[6]}
-        parts={stats.beParts}
-        accent="#1F9D55"
-        onClick={() => onDrill({ type: 'AVAL' })}
-        title={t('dash.viewBE')}
-      />
-      <FacilityCard
-        label="P/N"
-        agg={stats.agg[7]}
-        accent="#3A5BFF"
-        onClick={() => onDrill({ type: 'PN' })}
-        title={t('dash.revolving')}
-      />
-
-      <DueCard
-        label={t('dash.dueThisMonth')}
-        amount={stats.dueThis}
-        count={stats.cntThis}
-        extra={stats.due7 > 0 ? `${t('filter.due7')} ฿${money(stats.due7)}` : ''}
-        accent="#C2410C"
-        onClick={() => onDrill({ due: 'this' })}
-        title={t('dash.viewDueThis')}
-      />
-      <DueCard
-        label={t('dash.dueNextMonth')}
-        amount={stats.dueNext}
-        count={stats.cntNext}
-        extra={stats.dueOver > 0 ? `${t('dash.overdueOutstanding')} ฿${money(stats.dueOver)}` : ''}
-        accent="#B3261E"
-        onClick={() => onDrill({ due: 'next' })}
-        title={t('dash.viewDueNext')}
-      />
+      {lineCards.map((c) => (
+        <FacilityCard key={c.key} {...c} />
+      ))}
+      {dueCards.map((c) => (
+        <DueCard key={c.key} {...c} />
+      ))}
+      {statusCards.map((c) => (
+        <StatusCard key={c.key} {...c} />
+      ))}
     </div>
   );
 }
@@ -193,6 +262,38 @@ function DueCard({ label, amount, count, extra, accent, onClick, title }) {
   );
 }
 
+function StatusCard({ label, count, amount, accent, onClick }) {
+  const t = useT();
+  return (
+    <Card className="flex flex-col p-3 transition-shadow hover:shadow-card-hover">
+      <button
+        type="button"
+        onClick={onClick}
+        title={label}
+        className="focusable flex h-full w-full flex-col rounded-[inherit] text-left"
+      >
+        <div
+          className="-mx-3 -mt-3 mb-2.5 h-[3px] rounded-t-card"
+          style={{ backgroundColor: accent }}
+          aria-hidden="true"
+        />
+        <div className="text-xs font-bold uppercase tracking-wide text-ink-muted dark:text-ink-dark-muted">
+          {label}
+        </div>
+        <div className="tabular mt-1 text-lg font-extrabold text-ink dark:text-ink-dark">
+          ฿{money(amount)}
+        </div>
+        <div className="mt-1 text-[11px] text-ink-muted dark:text-ink-dark-muted">
+          {count} {t('misc.items')}
+        </div>
+        <div className="mt-1.5 text-[11px] font-semibold text-brand-700 dark:text-accent-dark">
+          {t('dash.viewList')}
+        </div>
+      </button>
+    </Card>
+  );
+}
+
 /* ------------------------------- the numbers ------------------------------ */
 
 function computeStats({ facilities, transactions, projects, filters }) {
@@ -250,14 +351,25 @@ function computeStats({ facilities, transactions, projects, filters }) {
   let cNew = 0;
   let cWait = 0;
   let cAppr = 0;
+  let aNew = 0;
+  let aWait = 0;
+  let aAppr = 0;
 
   for (const tr of transactions || []) {
     if (filters.proj && tr.project !== filters.proj) continue;
     if (!matchCompany(projects, tr.project, filters)) continue;
 
-    if (tr.status === STATUS.NEW) cNew += 1;
-    else if (tr.status === STATUS.PENDING) cWait += 1;
-    else if (isAuthorized(tr.status)) cAppr += 1;
+    const trAmt = Number(tr.amount) || 0;
+    if (tr.status === STATUS.NEW) {
+      cNew += 1;
+      aNew += trAmt;
+    } else if (tr.status === STATUS.PENDING) {
+      cWait += 1;
+      aWait += trAmt;
+    } else if (isAuthorized(tr.status)) {
+      cAppr += 1;
+      aAppr += trAmt;
+    }
 
     const low = String(tr.status).toLowerCase();
     // Settled and cancelled rows are not owing.
@@ -297,5 +409,8 @@ function computeStats({ facilities, transactions, projects, filters }) {
     cNew,
     cWait,
     cAppr,
+    aNew,
+    aWait,
+    aAppr,
   };
 }

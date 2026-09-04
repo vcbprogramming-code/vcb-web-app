@@ -128,19 +128,27 @@ export default function CaseListPane() {
                     style={{ '--mc': moduleColor(sc.module) }}
                     className="mc-border-l block rounded-card border border-l-4 border-line bg-surface-card p-3 shadow-card transition hover:shadow-card-hover dark:border-line-dark dark:bg-surface-dark-card dark:shadow-card-dark"
                   >
-                    <div className="flex items-center gap-1.5">
+                    {/* Matches the original's lc-top/lc-tags exactly: the case
+                        number sits left, and margin-left:auto on the tag group
+                        pushes extra-module chips to the right edge of the card
+                        instead of crowding them right after the number. */}
+                    <div className="flex items-center gap-2">
                       <span className="mc-text text-[11px] font-extrabold tracking-wide">
                         {sc.displayNo || sc.no}
                       </span>
-                      {tags.map((m) => (
-                        <span
-                          key={m}
-                          style={{ '--mc': moduleColor(m) }}
-                          className="mc-text rounded-pill border border-current px-1.5 py-px text-[10px] font-bold opacity-80"
-                        >
-                          {m}
+                      {tags.length ? (
+                        <span className="ml-auto flex flex-wrap gap-1">
+                          {tags.map((m) => (
+                            <span
+                              key={m}
+                              style={{ '--mc': moduleColor(m) }}
+                              className="tag-chip rounded-pill px-2 py-0.5 text-[10.5px] font-bold tracking-wide"
+                            >
+                              {m}
+                            </span>
+                          ))}
                         </span>
-                      ))}
+                      ) : null}
                     </div>
                     <div className="mt-1 text-sm font-semibold leading-snug break-thai">{title}</div>
                     {sc.when && sc.when !== '-' && (

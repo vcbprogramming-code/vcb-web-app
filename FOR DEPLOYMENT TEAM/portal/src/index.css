@@ -41,9 +41,10 @@
   }
 
   /* Thai and Latin share one face (Sarabun) so a mixed line keeps one weight;
-     Orbitron is display-only, for the wordmark. */
+     Manrope is display-only, for the wordmark — a clean geometric sans that
+     reads as professional at a large display size, not a game/sci-fi face. */
   .font-wordmark {
-    font-family: 'Orbitron', 'Inter', system-ui, sans-serif;
+    font-family: 'Manrope', 'Inter', system-ui, sans-serif;
   }
 }
 

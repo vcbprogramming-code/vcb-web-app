@@ -77,7 +77,14 @@ export default function Dashboard({
   const showBanner = hasAnnouncement && !bannerDismissed;
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6">
+    // max-w-[1600px] and px-9 (36px), matching the live portal's .content
+    // (padding: 26px 36px 56px; max-width: 1600px). At 1400px/px-6 the extra
+    // ~1600-1400=200px of unused width inside .main was split evenly by
+    // mx-auto, opening an ~88px gap between the sidebar and the greeting
+    // card that the live portal does not have — the live app hugs the
+    // sidebar much more closely because its column is both wider and its
+    // own side padding is smaller than that leftover centering margin.
+    <div className="mx-auto w-full max-w-[1600px] px-5 py-6 sm:px-9">
 
       {/* 2.3fr / 1fr, matching the live portal .dash-grid. A fixed 320px was
           narrower than the live column at every width above ~1200px, which is
@@ -213,11 +220,13 @@ export default function Dashboard({
                   href={appLink(a.url, { theme, lang, token })}
                   target="_blank"
                   rel="noopener noreferrer"
-                  // The per-tile accent is a database column, so it has to be an
-                  // inline style — Tailwind cannot generate a class for a value
-                  // it never sees at build time.
-                  style={{ borderTopColor: a.accent || undefined, animationDelay: `${i * 45}ms` }}
-                  className={`${CARD_CLASS} reveal group flex flex-col gap-3.5 rounded-2xl border-t-2 p-[22px] transition-shadow hover:shadow-card-hover`}
+                  // animationDelay only — the live .app-card never colours its
+                  // own border (only its icon and "Launch" text pick up
+                  // a.accent, both further down). It is a uniform card-border
+                  // on every edge, same as any other card; a coloured top
+                  // stripe was never part of the design being ported.
+                  style={{ animationDelay: `${i * 45}ms` }}
+                  className={`${CARD_CLASS} reveal group flex flex-col gap-3.5 rounded-2xl p-[22px] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-card-hover`}
                   {...bindTooltip({
                     key: `card-${a.key}`,
                     name: copy.name,

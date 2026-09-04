@@ -34,12 +34,16 @@ function Topbar() {
     [t, canEntry, isAdmin]
   );
 
-  // title is the module's fixed English name; subtitle is app.title, which
-  // already resolves per language. Passing subtitle AND subtitleTh printed the
-  // same words twice, because app.title IS the translated string.
+  // Both rows must track the current language — a banner reading "HR DAILY
+  // WORK LOG" over "บันทึกการทำงานรายวัน" in Thai mode is half-translated.
+  // title was a hardcoded English literal; app.title already resolves per
+  // language and is exactly what the top row (the module's own name,
+  // uppercased by AppBar) needs. Passing it to subtitle too, unchanged from
+  // before this fix, is what AppBar's own descriptor line (company name +
+  // this string) is built from.
   return (
     <AppBar
-      title="HR DAILY WORK LOG"
+      title={t('app.title')}
       subtitle={t('app.title')}
       settingsExtra={
         <NavLink

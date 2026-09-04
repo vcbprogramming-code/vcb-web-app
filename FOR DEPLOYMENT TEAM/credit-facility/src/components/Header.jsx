@@ -23,7 +23,7 @@ export default function Header({ onOpenSettings }) {
 
   return (
     <AppBar
-      title="CREDIT FACILITY MANAGER"
+      title={t('app.title')}
       subtitle={t('app.subtitle')}
       settingsExtra={
         <button

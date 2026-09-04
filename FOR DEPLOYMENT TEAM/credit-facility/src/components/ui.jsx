@@ -233,9 +233,12 @@ export function Select({ className = '', children, ...rest }) {
   );
 }
 
-export function Input({ className = '', ...rest }) {
-  return <input className={`field focusable ${className}`} {...rest} />;
-}
+// forwardRef: CostCategoryPicker anchors a portal panel off this input's own
+// on-screen rect, which needs a real DOM ref — a plain function component
+// silently drops one.
+export const Input = React.forwardRef(function Input({ className = '', ...rest }, ref) {
+  return <input ref={ref} className={`field focusable ${className}`} {...rest} />;
+});
 
 export function Textarea({ className = '', ...rest }) {
   return <textarea className={`field focusable resize-y ${className}`} {...rest} />;

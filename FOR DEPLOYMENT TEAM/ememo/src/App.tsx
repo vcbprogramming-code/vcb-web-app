@@ -183,10 +183,11 @@ export default function App() {
             </a>
             <span className="brand-div"></span>
             <div className="brand-stack">
-              <span className="brand-sub">Document Control · e-Memo</span>
-              {/* One line, in the reader's language, and the company name in
-                  the form the rest of VCB Connect uses. This showed the English
-                  and Thai lines stacked together regardless of language. */}
+              {/* Both lines now track lang — brand-sub was a permanent English
+                  literal that stayed "Document Control · e-Memo" even in Thai
+                  mode, the same half-translated-banner bug every other module
+                  had from a hardcoded AppBar title prop. */}
+              <span className="brand-sub">{t('brand_sub')}</span>
               <span className="brand-th">
                 {lang === 'th'
                   ? 'วิจิตรภัณฑ์ก่อสร้าง จำกัด · ติดตามสถานะเอกสารภายใน'

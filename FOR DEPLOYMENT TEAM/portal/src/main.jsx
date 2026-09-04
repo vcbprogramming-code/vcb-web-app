@@ -22,7 +22,15 @@ if (!rootEl) throw new Error('Root element #root not found');
 createRoot(rootEl).render(
   <StrictMode>
     <ThemeProvider>
-      <I18nProvider dictionary={dictionary}>
+      {/* English by default: readStoredLang() still wins once anyone has
+          actually chosen a language (from here or from any other module —
+          the choice is shared, see vcb_lang in shared/src/i18n.jsx), and the
+          in-app toggle is one click away. This only decides what a person
+          with no stored preference and an ambiguous/undetected browser
+          language sees on their very first visit to the portal, which is
+          the entrance to the whole thing — English reads as the more
+          professional default there than falling back to Thai. */}
+      <I18nProvider dictionary={dictionary} defaultLang="en">
         <AuthProvider api={api}>
           <BrowserRouter>
             <App />

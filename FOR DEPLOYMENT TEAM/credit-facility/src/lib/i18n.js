@@ -27,7 +27,7 @@ import { createDictionary } from '@vcb/shared';
 
 export const dictionary = createDictionary({
   /* ---------------------------------- app --------------------------------- */
-  'app.title': { th: 'VCB Credit Facility Manager', en: 'VCB Credit Facility Manager' },
+  'app.title': { th: 'ระบบวงเงินสินเชื่อ', en: 'Credit Facility Manager' },
   'app.subtitle': {
     th: 'ติดตามวงเงินสินเชื่อทุกโครงการ',
     en: 'Track credit facilities across all projects',
@@ -413,8 +413,8 @@ export const dictionary = createDictionary({
   },
 
   /* -------------------------------- settings ------------------------------ */
-  'set.title': { th: 'ตั้งค่า / Settings', en: 'Settings' },
-  'set.open': { th: 'ตั้งค่า', en: 'Settings' },
+  'set.title': { th: 'ตั้งค่าขั้นสูง', en: 'Advanced Settings' },
+  'set.open': { th: 'ตั้งค่าขั้นสูง', en: 'Advanced Settings' },
   'set.display': { th: 'การแสดงผล / Display', en: 'Display' },
   'set.theme': { th: 'โหมดสี / Theme', en: 'Theme' },
   'set.light': { th: '☀ สว่าง', en: '☀ Light' },

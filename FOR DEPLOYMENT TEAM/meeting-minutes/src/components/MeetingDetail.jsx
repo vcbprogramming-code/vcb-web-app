@@ -151,21 +151,6 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
     }
   }
 
-  async function toggleVisibility() {
-    const next = !meeting.visible;
-    onBusy(next ? t('meeting.publishing') : t('meeting.hiding'));
-    try {
-      const { visible } = await minutesApi.setMeetingVisible(meeting.id, next);
-      applyUpdate({ ...meeting, visible });
-      await refresh();
-      onToast(visible ? t('meeting.nowVisible') : t('meeting.nowHidden'));
-    } catch (err) {
-      onToast(errorMessage(err, t));
-    } finally {
-      onBusy(null);
-    }
-  }
-
   /**
    * Re-fetch before opening the editor rather than trusting the cache.
    *
@@ -271,12 +256,6 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
         <h2 className="m-0 min-w-[200px] flex-1 text-base font-semibold text-ink dark:text-ink-dark">
           {meeting.title}
         </h2>
-
-        {isAdmin ? (
-          <Button variant={meeting.visible ? 'default' : 'danger'} onClick={toggleVisibility}>
-            {meeting.visible ? t('meeting.visibleToStaff') : t('meeting.hidden')}
-          </Button>
-        ) : null}
 
         {isAdmin ? (
           <Button onClick={togglePin} title={t('meeting.pin')}>

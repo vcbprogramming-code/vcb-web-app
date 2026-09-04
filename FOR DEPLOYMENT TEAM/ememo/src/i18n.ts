@@ -14,6 +14,7 @@ export interface Strings {
   col_document: string; col_status: string; col_open: string
   status_pending: string; status_approved: string; status_rejected: string; status_commented: string
   open_btn: string; dark_mode: string; light_mode: string; lang_menu: string
+  brand_sub: string
 }
 
 export const I18N: Record<Lang, Strings> = {
@@ -37,6 +38,7 @@ export const I18N: Record<Lang, Strings> = {
     open_btn: 'Open ↗',
     dark_mode: 'Dark mode', light_mode: 'Light mode',
     lang_menu: 'Language · English',
+    brand_sub: 'Document Control · e-Memo',
   },
   th: {
     add_doc: '＋ เพิ่มเอกสาร',
@@ -58,6 +60,7 @@ export const I18N: Record<Lang, Strings> = {
     open_btn: 'เปิด ↗',
     dark_mode: 'โหมดมืด', light_mode: 'โหมดสว่าง',
     lang_menu: 'ภาษา · ไทย',
+    brand_sub: 'ระบบควบคุมเอกสาร · อีเมโม',
   },
 }
 

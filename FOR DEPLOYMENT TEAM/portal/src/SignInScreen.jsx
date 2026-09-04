@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth, useI18n } from '@vcb/shared';
 import { CARD_CLASS } from './ui.jsx';
+import GlobeBackground from './GlobeBackground.jsx';
 
 /**
  * The door to the portal.
@@ -22,10 +23,15 @@ export default function SignInScreen() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  // GlobeBackground fills this in once its animation loop mounts. A ref, not
+  // state: the globe's own click-to-break-apart is a fire-and-forget visual
+  // cue, not something a re-render needs to know about.
+  const globeRef = React.useRef(null);
 
   async function submitPassword(e) {
     e.preventDefault();
     setBusy(true);
+    globeRef.current?.startLogin();
     try {
       await signInWithPassword(email, password);
     } catch {
@@ -37,6 +43,7 @@ export default function SignInScreen() {
 
   async function google() {
     setBusy(true);
+    globeRef.current?.startLogin();
     try {
       await signInWithGoogle();
     } catch {
@@ -50,34 +57,32 @@ export default function SignInScreen() {
 
 
   return (
-    <div className="relative grid min-h-screen place-items-center overflow-hidden bg-surface p-4 dark:bg-surface-dark">
-      {/* The rendered globe, not the canvas one.
-
-          object-cover is the whole reason this works: it fills the viewport and
-          crops from the centre at any aspect ratio, so the sphere is centred on
-          a phone and on an ultrawide without a single measurement. The canvas
-          version needed its size, its DOM overlays and its offsets kept in step
-          by hand, and they came apart every time one of them moved.
-
-          muted is what makes autoplay legal in every browser; playsInline stops
-          iOS taking it fullscreen. The poster covers the moment before the first
-          frame decodes, so the page never flashes an empty black box. */}
-      <video
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full scale-[1.08] select-none object-cover opacity-100 dark:opacity-95"
-        src="/globe.mp4"
-        poster="/globe-poster.jpg"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
-      {/* Darkens the video enough for white text to hold up over the bright
-          continents, without dimming the globe into mud. */}
+    <div className="relative grid min-h-screen place-items-center overflow-hidden p-4">
+      {/* The canvas globe draws only its own particles/glow — its backdrop is
+          transparent, so this deep-space gradient behind it is what actually
+          paints the "space" the globe floats in. It stays the same in both
+          themes on purpose: the globe was tuned entirely against a near-black
+          backdrop (every alpha in GlobeBackground assumes it), and the app's
+          own light/dark surface tokens would either wash it out or fight its
+          own vignette below. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-surface/25 dark:bg-surface-dark/35"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(105% 78% at 50% 50%, #05203a 0%, #02101f 34%, #000913 58%, #000308 82%, #000205 100%)',
+        }}
+      />
+      <GlobeBackground apiRef={globeRef} />
+      {/* Vignette: darkens the globe's edges so white text over the card holds
+          up without a separate flat dimming layer competing with the glow. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(135% 105% at 50% 50%, rgba(0,0,0,0) 74%, rgba(0,0,0,.22) 88%, rgba(0,0,0,.62) 100%)',
+        }}
       />
       {/* A soft pool of shadow directly behind the card. Without it the card
           sits on the brightest part of the globe and the edges disappear. */}
@@ -87,21 +92,30 @@ export default function SignInScreen() {
         style={{ background: "radial-gradient(ellipse 38% 42% at 50% 50%, rgba(0,0,0,0.32), transparent 72%)" }}
       />
 
-      <div className="relative w-full max-w-sm">
+      <div className="relative flex w-full flex-col items-center">
         {/* Brand block, not a card — the portal is the product, and the sign-in
-            page is the first thing anyone sees of it. */}
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-brand-900 to-brand-500 text-2xl">
-            <span aria-hidden="true">🌐</span>
-          </div>
-          <h1 className="m-0 text-xl font-bold tracking-tight text-ink dark:text-ink-dark">
+            page is the first thing anyone sees of it. No icon badge here: the
+            globe IS the badge, animating across the whole page behind this —
+            a second, smaller globe sitting on top of it just competed with it.
+            The wordmark carries the entrance instead, sized to read as the
+            page's own title rather than a caption above the form.
+
+            Deliberately NOT inside the card's max-w-sm below: at that width
+            "VCB CONNECT" wrapped onto two lines, which read as an accident of
+            the card's own width rather than a considered one-line masthead.
+            The wider max-w-2xl here keeps it on one line down to a normal
+            desktop width; it still wraps gracefully on a narrow phone rather
+            than being forced onto one line and clipped. */}
+        <div className="mb-8 w-full max-w-2xl px-4 text-center">
+          <h1 className="font-wordmark m-0 text-5xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_24px_rgba(56,132,255,0.45)] sm:text-6xl">
             VCB CONNECT
           </h1>
-          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-ink-muted dark:text-ink-dark-muted">
+          <p className="mt-3 text-sm uppercase tracking-[0.3em] text-white/70">
             {t('portal.subtitle')}
           </p>
         </div>
 
+        <div className="relative w-full max-w-sm">
         {/* backdrop-blur so the globe reads as depth behind the card rather
             than as texture through the middle of the form */}
         {/* Solid, not translucent. At /90 the globe read straight through the
@@ -203,6 +217,7 @@ export default function SignInScreen() {
         <p className="mt-6 text-center text-xs text-ink-muted dark:text-ink-dark-muted">
           {t('portal.internalOnly')}
         </p>
+        </div>
       </div>
     </div>
   );

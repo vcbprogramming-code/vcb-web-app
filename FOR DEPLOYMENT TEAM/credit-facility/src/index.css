@@ -18,6 +18,14 @@
     /* Thai sits taller than Latin — the preset's fontSize steps already carry
        looser leading; this keeps long-form blocks consistent with them. */
     -webkit-text-size-adjust: 100%;
+    /* Reserve the scrollbar's width on every page, not just the ones tall
+       enough to need it. Content is centred with mx-auto max-w-[1600px] —
+       without this, a short tab (Cost summary, with far fewer rows than
+       Ledger or Facilities) has no vertical scrollbar, so the whole centred
+       column shifts right by the scrollbar's width the moment you land on
+       it, and shifts back on a taller tab. Reserving the gutter always keeps
+       the content column at the same horizontal position on every tab. */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -43,5 +51,18 @@
     @apply placeholder:text-ink-muted;
     @apply focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20;
     @apply dark:border-line-dark dark:bg-surface-dark-card dark:text-ink-dark dark:placeholder:text-ink-dark-muted;
+  }
+
+  /* Cost-category picker chip: one of a fixed 6-colour cycle (CostCategoryPicker
+     sets --chip-bg/--chip-fg/-dark as inline custom properties per item), so
+     the panel reads as a colour-coded set the way the original spreadsheet's
+     category picker did, not a plain list of text buttons. */
+  .cost-cat-chip {
+    background: var(--chip-bg);
+    color: var(--chip-fg);
+  }
+  html.dark .cost-cat-chip {
+    background: var(--chip-bg-dark);
+    color: var(--chip-fg-dark);
   }
 }

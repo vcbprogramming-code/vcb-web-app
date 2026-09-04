@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n, useTheme } from '@vcb/shared';
 import { useData } from '../lib/DataContext.jsx';
+import { useDashPrefs } from '../lib/useDashPrefs.js';
 import * as apiCredit from '../lib/api.js';
 import { Button, Field, Input, Modal, Select } from './ui.jsx';
 
@@ -17,6 +18,7 @@ export default function SettingsDialog({ open, onClose }) {
   const { t, lang, setLang } = useI18n();
   const { theme, setTheme, themes } = useTheme();
   const { costCategories, isManager, mutate, notify } = useData();
+  const { prefs, setGroup } = useDashPrefs();
 
   const [list, setList] = useState([]);
   const [draft, setDraft] = useState('');
@@ -104,6 +106,65 @@ export default function SettingsDialog({ open, onClose }) {
         </section>
 
         <section>
+          <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-ink-muted dark:text-ink-dark-muted">
+            {t('set.dashboard')}
+          </h4>
+
+          {/* Applies instantly, like the original — no Save button gates
+              these, unlike the cost-category list below, since this is a
+              pure display preference (localStorage), not server state. */}
+          <div className="grid gap-4 sm:grid-cols-3">
+            <DashGroup heading={t('dash.creditLines')}>
+              <Check label="T/L" checked={prefs.lines.tl} onChange={(v) => setGroup('lines', 'tl', v)} />
+              <Check label="BG" checked={prefs.lines.bg} onChange={(v) => setGroup('lines', 'bg', v)} />
+              <Check label="M/L" checked={prefs.lines.ml} onChange={(v) => setGroup('lines', 'ml', v)} />
+              <Check
+                label={`B/E ${t('set.inclDLC')}`}
+                checked={prefs.lines.be}
+                onChange={(v) => setGroup('lines', 'be', v)}
+              />
+              <Check label="P/N" checked={prefs.lines.pn} onChange={(v) => setGroup('lines', 'pn', v)} />
+            </DashGroup>
+
+            <DashGroup heading={t('set.dueDates')}>
+              <Check
+                label={t('set.within1Week')}
+                checked={prefs.due.week}
+                onChange={(v) => setGroup('due', 'week', v)}
+              />
+              <Check
+                label={t('dash.dueThisMonth')}
+                checked={prefs.due.this}
+                onChange={(v) => setGroup('due', 'this', v)}
+              />
+              <Check
+                label={t('dash.dueNextMonth')}
+                checked={prefs.due.next}
+                onChange={(v) => setGroup('due', 'next', v)}
+              />
+            </DashGroup>
+
+            <DashGroup heading={t('set.status')}>
+              <Check
+                label={t('status.new')}
+                checked={prefs.status.new}
+                onChange={(v) => setGroup('status', 'new', v)}
+              />
+              <Check
+                label={t('set.proposed')}
+                checked={prefs.status.proposed}
+                onChange={(v) => setGroup('status', 'proposed', v)}
+              />
+              <Check
+                label={t('status.approved')}
+                checked={prefs.status.approved}
+                onChange={(v) => setGroup('status', 'approved', v)}
+              />
+            </DashGroup>
+          </div>
+        </section>
+
+        <section>
           <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-muted dark:text-ink-dark-muted">
             {t('set.costCategories')}
           </h4>
@@ -166,6 +227,31 @@ export default function SettingsDialog({ open, onClose }) {
         </section>
       </div>
     </Modal>
+  );
+}
+
+function DashGroup({ heading, children }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold text-ink-muted dark:text-ink-dark-muted">
+        {heading}
+      </div>
+      <div className="flex flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+function Check({ label, checked, onChange }) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-ink dark:text-ink-dark">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-line accent-brand-600 dark:border-line-dark"
+      />
+      {label}
+    </label>
   );
 }
 

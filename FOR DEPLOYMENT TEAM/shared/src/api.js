@@ -17,6 +17,38 @@
 export const TOKEN_KEY = 'vcb_token';
 
 /**
+ * Carrying a session across modules, the same way appLink() already carries
+ * theme and language: each module runs on its own origin (its own port in
+ * dev, and — this is the part that matters — its own subdomain in
+ * production), so `vcb_token` in localStorage on the portal is invisible to
+ * hr-worklog's origin. Without this, signing into the portal never reached
+ * any other module, and each one asked to sign in again on its own.
+ *
+ * Consumed once and written to storage, then stripped from the address bar —
+ * exactly readUrlTheme()/stripUrlTheme()'s shape in theme.jsx — so a bearer
+ * token never lingers in browser history or a bookmark past the one
+ * navigation that carried it in.
+ */
+function readUrlToken() {
+  try {
+    return new URLSearchParams(window.location.search).get('vt') || null;
+  } catch {
+    return null;
+  }
+}
+
+function stripUrlToken() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('vt')) return;
+    url.searchParams.delete('vt');
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  } catch {
+    /* a browser that refuses replaceState still has the token stored */
+  }
+}
+
+/**
  * localStorage throws — it is not merely empty — in a Safari private window,
  * when a browser is set to block site data, and inside some embedded webviews.
  * An uncaught throw here happens during module init and takes the whole app
@@ -24,6 +56,15 @@ export const TOKEN_KEY = 'vcb_token';
  * session is an acceptable degradation; a white page is not.
  */
 export function readStoredToken() {
+  // URL first: it is the more recent instruction. Arriving from a portal
+  // that is signed in means to arrive signed in, whatever this origin
+  // remembers — or does not remember — from an earlier visit.
+  const fromUrl = readUrlToken();
+  if (fromUrl) {
+    writeStoredToken(fromUrl);
+    stripUrlToken();
+    return fromUrl;
+  }
   try {
     return localStorage.getItem(TOKEN_KEY);
   } catch {

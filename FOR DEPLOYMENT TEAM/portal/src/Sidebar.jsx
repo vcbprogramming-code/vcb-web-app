@@ -1,4 +1,4 @@
-import { useI18n, useTheme } from '@vcb/shared';
+import { useAuth, useI18n, useTheme } from '@vcb/shared';
 import {
   AiTavernIcon,
   AppIcon,
@@ -33,6 +33,7 @@ export default function Sidebar({
 }) {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
+  const { token } = useAuth();
 
   // Pulled out of the applications list and rendered under "More" instead. It
   // is a ported module like the others - its URL comes from portal.apps, not a
@@ -90,7 +91,7 @@ export default function Sidebar({
               <a
                 key={a.key}
                 className={NAV_ITEM}
-                href={appLink(a.url, { theme, lang })}
+                href={appLink(a.url, { theme, lang, token })}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onClose}
@@ -151,7 +152,7 @@ export default function Sidebar({
           {onboardingApp ? (
             <a
               className={NAV_ITEM}
-              href={appLink(onboardingApp.url, { theme, lang })}
+              href={appLink(onboardingApp.url, { theme, lang, token })}
               onClick={onClose}
               {...bindTooltip({
                 key: 'nav-onboarding',

@@ -267,6 +267,7 @@ export default function Entry() {
               onJump={jump}
               activityByCode={activityByCode}
               costByCode={costByCode}
+              activities={activities}
             />
           ) : (
             <WeekGrid

@@ -127,7 +127,7 @@ export function Meter({ pct }) {
  * is open — both were global listeners in legacy.js, now scoped to the dialog
  * that owns them so two open dialogs cannot fight over the same handler.
  */
-export function Modal({ open, onClose, title, children, footer, wide = false }) {
+export function Modal({ open, onClose, title, children, footer, wide = false, bodyMaxHeight = '70vh' }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -172,7 +172,9 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
             ✕
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto px-5 py-4" style={{ maxHeight: bodyMaxHeight }}>
+          {children}
+        </div>
         {footer ? (
           <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3.5 dark:border-line-dark">
             {footer}

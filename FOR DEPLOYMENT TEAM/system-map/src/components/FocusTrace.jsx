@@ -513,20 +513,20 @@ export default function FocusTrace() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 top-[var(--header-h)] z-[65] flex flex-col bg-map-bg">
-      <div className="flex flex-shrink-0 items-center gap-3 border-b border-map-head px-[18px] py-[11px]">
-        <div className="text-[15px] font-extrabold text-slate-200">
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-map-head bg-map-panel px-[18px] py-[11px]">
+        <div className="text-[15px] font-extrabold text-map-ink">
           🎯 {label}{' '}
-          <span className="ml-2 text-base2 font-normal text-slate-500">{t('focus.subtitle')}</span>
+          <span className="ml-2 text-base2 font-normal text-map-rail2">{t('focus.subtitle')}</span>
         </div>
         <div className="ml-auto flex gap-2">
           <button
-            className="cursor-pointer rounded-[7px] border-[1.5px] border-map-rail bg-transparent px-3 py-1.5 text-base2 font-bold text-slate-400 hover:border-flow hover:text-slate-200"
+            className="cursor-pointer rounded-[7px] border-[1.5px] border-map-rail bg-transparent px-3 py-1.5 text-base2 font-bold text-map-rail2 hover:border-flow hover:text-map-ink"
             onClick={s.showOnBigMap}
           >
             {t('focus.showOnMap')}
           </button>
           <button
-            className="cursor-pointer rounded-[7px] border-[1.5px] border-map-rail bg-transparent px-3 py-1.5 text-base2 font-bold text-slate-400 hover:border-flow hover:text-slate-200"
+            className="cursor-pointer rounded-[7px] border-[1.5px] border-map-rail bg-transparent px-3 py-1.5 text-base2 font-bold text-map-rail2 hover:border-flow hover:text-map-ink"
             onClick={s.closeFocus}
           >
             {t('focus.close')}
@@ -534,7 +534,7 @@ export default function FocusTrace() {
         </div>
       </div>
 
-      <div className="focus-trail flex flex-shrink-0 flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap border-b border-map-head px-[18px] py-1.5 text-cap">
+      <div className="focus-trail flex flex-shrink-0 flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap border-b border-map-head bg-map-panel px-[18px] py-1.5 text-cap">
         {s.focusTrail.map((id, i) => {
           const n = NODE_INDEX[id];
           if (!n || !isLaneNode(n)) return null;
@@ -548,7 +548,7 @@ export default function FocusTrace() {
                   'whitespace-nowrap rounded-md border px-2 py-[3px] ' +
                   (cur
                     ? 'cursor-default border-transparent font-bold text-alt'
-                    : 'cursor-pointer border-transparent text-slate-400 hover:border-map-rail hover:bg-map-card hover:text-slate-200')
+                    : 'cursor-pointer border-transparent text-map-rail2 hover:border-map-rail hover:bg-map-card hover:text-map-ink')
                 }
                 onClick={() => s.openFocus(n)}
               >
@@ -563,7 +563,7 @@ export default function FocusTrace() {
         <div className="relative" id="focusCanvas" />
       </div>
 
-      <div className="flex-shrink-0 border-t border-map-head px-[18px] py-1.5 text-nano text-map-rail">
+      <div className="flex-shrink-0 border-t border-map-head bg-map-panel px-[18px] py-1.5 text-nano text-map-rail2">
         {t('focus.hint')}
       </div>
     </div>

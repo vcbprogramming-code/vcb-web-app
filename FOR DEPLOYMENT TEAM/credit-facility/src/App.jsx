@@ -34,9 +34,9 @@ const TABS = [
   { to: '/ledger', key: 'tab.ledger', hint: 'tab.ledgerHint' },
   { to: '/requests', key: 'req.add', hint: null },
   { to: '/cost', key: 'tab.cost', hint: null },
-  { to: '/plan', key: 'tab.plan', hint: 'tab.planHint', divider: true },
-  { to: '/actual', key: 'tab.actual', hint: null },
-  { to: '/variance', key: 'tab.variance', hint: 'tab.varianceHint' },
+  { to: '/plan', key: 'tab.plan', hint: 'tab.planHint', divider: true, devNote: 'tab.planDevNote' },
+  { to: '/actual', key: 'tab.actual', hint: null, devNote: 'tab.planDevNote' },
+  { to: '/variance', key: 'tab.variance', hint: 'tab.varianceHint', devNote: 'tab.planDevNote' },
 ];
 
 export default function App() {
@@ -118,6 +118,7 @@ function Shell() {
                 ) : null}
                 <NavLink
                   to={tab.to}
+                  title={tab.devNote ? t(tab.devNote) : undefined}
                   className={({ isActive }) =>
                     'focusable -mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ' +
                     (isActive

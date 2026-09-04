@@ -50,16 +50,15 @@
     @apply text-[0.58rem] text-ink-muted/60 dark:text-ink-dark-muted/60;
   }
 
-  /* The main slot of an editable, empty, non-weekend day invites a click. The
-     hover state swaps in the longer label — again attr(), again no utility. */
+  /* The main slot of an editable, empty, non-weekend day invites a click.
+     What clicking does lives in the button's own title attribute — the
+     browser's native tooltip — not a second swapped-in CSS string; a real
+     tooltip has room to say "Click a cell to choose Activity → Work Category"
+     stacked over "+ Task 2" without cramming both into a thumbnail-sized
+     cell. */
   .cell-pick:empty::before {
     content: '+';
     @apply text-base font-bold text-brand-600/60;
-  }
-
-  .cell-pick:hover:empty::before {
-    content: attr(data-ph-hover);
-    @apply text-[0.62rem] font-semibold text-brand-700/80 dark:text-brand-300/80;
   }
 
   /* A locked day carries a padlock in the corner. Decorative only — the real

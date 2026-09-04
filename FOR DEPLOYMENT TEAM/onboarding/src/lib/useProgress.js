@@ -89,16 +89,25 @@ export function useProgress() {
     };
   }, [name]);
 
-  /** Register the employee and their department. Upsert, so a returning
-   *  employee lands back on their own record instead of being reset. */
+  /** Register the employee, and their department if it is already known.
+   *  Upsert, so a returning employee lands back on their own record instead
+   *  of being reset.
+   *
+   *  deptId is OPTIONAL — a pre-boarding action (a Required Documents
+   *  checkbox, say) happens before Department Selection in the journey, and
+   *  the original app's own promptForNameOnly() never asked for a department
+   *  at that point: forcing the choice early would just make the person pick
+   *  it twice, once here and once for real at Department Selection. */
   const identify = useCallback(async (employeeName, deptId) => {
     const trimmed = employeeName.trim();
     persistName(trimmed);
-    persistDepartment(deptId);
     setNameState(trimmed);
-    setDepartmentState(deptId);
+    if (deptId) {
+      persistDepartment(deptId);
+      setDepartmentState(deptId);
+    }
     try {
-      await saveEmployee({ name: trimmed, department: deptId });
+      await saveEmployee({ name: trimmed, department: deptId || undefined });
     } catch {
       // The name is already in localStorage and the progress effect will run;
       // a failed upsert here surfaces on the first checkbox instead, where

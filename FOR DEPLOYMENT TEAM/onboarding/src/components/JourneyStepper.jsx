@@ -197,8 +197,11 @@ export default function JourneyStepper({
           String(i + 1)
         );
 
+        // 26x26, matching the original's .stepper-dot exactly (h-6/w-6 = 24px
+        // was 2px short on each axis, which also threw off the connector
+        // line's center — see left-[16px] below).
         const dotClass = [
-          'relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold',
+          'relative z-10 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold',
           step.done
             ? 'bg-emerald-500 text-white'
             : isCurrent
@@ -208,12 +211,15 @@ export default function JourneyStepper({
                 : 'bg-white/15 text-sidebar-text',
         ].join(' ');
 
+        // 13px with a 3px top offset, matching .stepper-label — the row's
+        // items are align-items:flex-start in the original, not centered, so
+        // a single-line label needs its own nudge to sit level with the dot.
         const labelClass = [
-          'min-w-0 flex-1 truncate text-sm',
+          'min-w-0 flex-1 truncate pt-[3px] text-[13px] leading-[1.35]',
           step.done
             ? 'text-sidebar-text'
             : isCurrent
-              ? 'font-semibold text-white'
+              ? 'font-bold text-white'
               : step.locked
                 ? 'text-sidebar-dim'
                 : 'text-sidebar-text',
@@ -227,14 +233,27 @@ export default function JourneyStepper({
         );
 
         return (
-          <div key={step.id} className="relative">
+          // pb-3 (12px), matching .stepper-item:not(:last-child)'s own
+          // bottom padding — the original gives each item real breathing room
+          // rather than letting rows touch, which is a large part of why this
+          // column read as cramped next to the live app.
+          <div key={step.id} className={`relative ${!isLast ? 'pb-3' : ''}`}>
             {/* The connecting line runs the full height of the item, sub-steps
                 included, so it reaches the next dot instead of stopping at the
-                bottom of the row. */}
+                bottom of the row.
+
+                left-[16px]: the dot's true horizontal center. Row padding is
+                px-2 (8px) + half the 26px dot (13px) - half the 2px line
+                (1px) = 20px... except the original's own comment derives 16px
+                from ITS OWN 4px left padding, not 8px, so match the source
+                spacing (pl-1, not px-2) below rather than recomputing this
+                from a different padding value. top-[28px]: the dot's own
+                26px height plus the original's 2px gap before the line
+                starts, not top-6 (24px), which sat the line inside the dot. */}
             {!isLast && (
               <span
                 aria-hidden="true"
-                className={`absolute left-[23px] top-6 bottom-0 w-px ${
+                className={`absolute left-[16px] top-[28px] bottom-[-12px] w-px ${
                   step.done ? 'bg-emerald-500/50' : 'bg-white/12'
                 }`}
               />
@@ -244,13 +263,13 @@ export default function JourneyStepper({
               <NavLink
                 to={step.to}
                 onClick={onNavigate}
-                className="flex items-center gap-3 rounded-control px-2 py-1.5 transition-colors hover:bg-white/10"
+                className="flex items-start gap-3 rounded-control py-2.5 pl-1 pr-2.5 transition-colors hover:bg-white/[.05]"
               >
                 {row}
               </NavLink>
             ) : (
               <div
-                className="flex items-center gap-3 px-2 py-1.5"
+                className="flex items-start gap-3 py-2.5 pl-1 pr-2.5"
                 aria-disabled={step.locked ? 'true' : undefined}
                 title={step.locked ? t('stepper.lockedHint') : undefined}
               >
@@ -261,7 +280,8 @@ export default function JourneyStepper({
             {/* Sub-steps deep-link into one checklist block, so "Reading" opens
                 Required Reading rather than the top of the phase page. */}
             {step.subSteps?.length ? (
-              <div className="ml-[34px] flex flex-col gap-0.5 pb-1">
+              // mt-1.5 ml-[38px] (6px / 38px), matching .stepper-substeps.
+              <div className="relative z-10 ml-[38px] mt-1.5 flex flex-col gap-0.5">
                 {step.subSteps.map((sub) => (
                   <NavLink
                     key={sub.to}
@@ -269,7 +289,7 @@ export default function JourneyStepper({
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [
-                        'flex items-center gap-2 rounded-control px-2 py-1 text-xs transition-colors hover:bg-white/10',
+                        'flex items-center gap-2 rounded-control px-2 py-1 text-[11.5px] transition-colors hover:bg-white/[.05]',
                         isActive && hash === new URL(sub.to, 'http://x').hash
                           ? 'text-white'
                           : sub.done
@@ -280,10 +300,10 @@ export default function JourneyStepper({
                   >
                     <span
                       className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full ${
-                        sub.done ? 'bg-emerald-500 text-white' : 'border border-white/25'
+                        sub.done ? 'bg-emerald-500 text-white' : 'border border-white/[.16] bg-white/[.08]'
                       }`}
                     >
-                      {sub.done ? <CheckIcon className="h-2 w-2" /> : null}
+                      {sub.done ? <CheckIcon className="h-[9px] w-[9px]" /> : null}
                     </span>
                     <span className="truncate">{sub.label}</span>
                   </NavLink>

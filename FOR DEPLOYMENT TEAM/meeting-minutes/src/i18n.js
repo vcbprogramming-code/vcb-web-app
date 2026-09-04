@@ -144,6 +144,11 @@ export const dictionary = createDictionary({
     en: 'See who edited this and when',
   },
   'meeting.comments': { th: 'ความคิดเห็น', en: 'Comments' },
+  'meeting.activity': { th: 'กิจกรรม', en: 'Activity' },
+  'meeting.activityHint': {
+    th: 'การแก้ไขและความคิดเห็น เรียงจากล่าสุด',
+    en: 'Edits and comments, newest first',
+  },
   'meeting.shareLink': { th: 'คัดลอกลิงก์', en: 'Share link' },
   'meeting.shareCopied': { th: 'คัดลอกลิงก์แล้ว', en: 'Share link copied to clipboard' },
   'meeting.sharePrompt': { th: 'คัดลอกลิงก์นี้เพื่อแชร์:', en: 'Copy this link to share:' },

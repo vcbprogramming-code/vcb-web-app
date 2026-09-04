@@ -8,9 +8,8 @@ import { buildMeetingSrcdoc, buildMeetingSrcdocForPrint } from '../lib/docCss';
 import { fmtDate, fmtThaiDate, pdfDateSuffix, timeSuffix } from '../lib/dates';
 import { Button, Dot, Empty, Loading } from '../ui';
 import AttachmentsBar from './AttachmentsBar';
-import CommentsPanel from './CommentsPanel';
+import ActivityPanel from './ActivityPanel';
 import TagPickerModal from './TagPickerModal';
-import EditHistoryModal from './EditHistoryModal';
 import VersionPreviewModal from './VersionPreviewModal';
 
 /**
@@ -29,9 +28,8 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
   const [error, setError] = useState('');
 
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [previewSeq, setPreviewSeq] = useState(null);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const frameRef = useRef(null);
 
@@ -317,17 +315,12 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
           </Button>
         ) : null}
 
-        {isAdmin ? (
-          <Button onClick={() => setHistoryOpen(true)} title={t('meeting.historyHint')}>
-            🕘 {t('meeting.history')}
-          </Button>
-        ) : null}
-
         <Button
-          onClick={() => setCommentsOpen((v) => !v)}
-          className={commentsOpen ? 'ring-2 ring-brand-600/30' : ''}
+          onClick={() => setActivityOpen((v) => !v)}
+          className={activityOpen ? 'ring-2 ring-brand-600/30' : ''}
+          title={t('meeting.activityHint')}
         >
-          💬 {t('meeting.comments')}
+          🕘 {t('meeting.activity')}
           {meeting.comments?.length ? ` (${meeting.comments.length})` : ''}
         </Button>
 
@@ -442,13 +435,6 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
         onBusy={onBusy}
       />
 
-      <EditHistoryModal
-        open={historyOpen}
-        meeting={meeting}
-        onClose={() => setHistoryOpen(false)}
-        onViewVersion={setPreviewSeq}
-      />
-
       <VersionPreviewModal
         seq={previewSeq}
         meeting={meeting}
@@ -456,13 +442,14 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
         onClose={() => setPreviewSeq(null)}
       />
 
-      {commentsOpen ? (
-        <CommentsPanel
+      {activityOpen ? (
+        <ActivityPanel
           meeting={meeting}
-          onClose={() => setCommentsOpen(false)}
+          onClose={() => setActivityOpen(false)}
           onUpdated={applyUpdate}
           onToast={onToast}
           onBusy={onBusy}
+          onViewVersion={setPreviewSeq}
         />
       ) : null}
     </>

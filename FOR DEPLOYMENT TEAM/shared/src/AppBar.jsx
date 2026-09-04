@@ -204,14 +204,33 @@ export default function AppBar({
     return (namesCompany ? parts.slice(1).join('·') : String(raw)).trim();
   })();
 
-  // Carry appearance and language home, so returning to the portal does not
-  // flip it back — the same reason module links carry them outward. See
-  // appLink() in the portal.
+  // Carry appearance, language, and the session home, so returning to the
+  // portal does not flip the theme back or ask for a sign-in it already has —
+  // the same reason module links carry all three outward. See appLink() in
+  // the portal.
   const home = (() => {
     try {
       const u = new URL(PORTAL_URL, window.location.origin);
       if (theme) u.searchParams.set('theme', theme);
       if (lang) u.searchParams.set('lang', lang);
+      if (auth?.token && u.origin !== window.location.origin) u.searchParams.set('vt', auth.token);
+      return u.origin === window.location.origin ? u.pathname + u.search : u.toString();
+    } catch {
+      return PORTAL_URL;
+    }
+  })();
+
+  // "The portal is the only place anyone signs in; a module never asks for a
+  // password itself" (auth.signInAtPortal's own note). So the identity chip's
+  // click while signed out is a link to the portal, not a settings popover
+  // with nothing in it to sign in with. It carries this module's own address
+  // back as `return`, for the portal to send them back to once they are in.
+  const signInHref = (() => {
+    try {
+      const u = new URL(PORTAL_URL, window.location.origin);
+      if (theme) u.searchParams.set('theme', theme);
+      if (lang) u.searchParams.set('lang', lang);
+      u.searchParams.set('return', window.location.href);
       return u.origin === window.location.origin ? u.pathname + u.search : u.toString();
     } catch {
       return PORTAL_URL;
@@ -294,30 +313,41 @@ export default function AppBar({
               person unable to tell whether they are signed in or the bar
               simply has no room for it.
 
-              Both states open settings. There is no single signIn() to call
-              from here — the provider exposes signInWithGoogle and
-              signInWithPassword, and choosing between them is not the app
-              bar's decision to make; settings is where that choice lives.
+              Signed in opens settings — the only account action from here is
+              sign-out. Signed out, this is a plain link to the portal, not a
+              settings popover with nothing in it to sign in with: "the portal
+              is the only place anyone signs in; a module never asks for a
+              password itself" (see auth.signInAtPortal). Once someone signs
+              in there, appLink()'s `vt` parameter carries the session back
+              into every module they open — including this one, on return.
               Always visible, at every width. It was hidden below lg, which
               meant most windows showed no identity at all — the one thing this
               element exists to say. It truncates instead: a shortened address
               still tells you an account is signed in, where nothing does not. */}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            title={signedIn ? user?.email : t('auth.signIn')}
-            className="inline-flex min-w-0 max-w-[140px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] transition-colors hover:text-white sm:max-w-[200px] lg:max-w-[260px]"
-          >
-            <span className="max-w-[220px] truncate">
-              {signedIn && user?.email ? user.email : t('auth.signIn')}
-            </span>
-            {signedIn && identityNote ? (
-              <>
-                <span className="shrink-0 opacity-[.55]">·</span>
-                <span className="shrink-0 opacity-[.85]">{identityNote}</span>
-              </>
-            ) : null}
-          </button>
+          {signedIn ? (
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              title={user?.email}
+              className="inline-flex min-w-0 max-w-[140px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] transition-colors hover:text-white sm:max-w-[200px] lg:max-w-[260px]"
+            >
+              <span className="max-w-[220px] truncate">{user?.email}</span>
+              {identityNote ? (
+                <>
+                  <span className="shrink-0 opacity-[.55]">·</span>
+                  <span className="shrink-0 opacity-[.85]">{identityNote}</span>
+                </>
+              ) : null}
+            </button>
+          ) : (
+            <a
+              href={signInHref}
+              title={t('auth.portalHandlesSignIn')}
+              className="inline-flex min-w-0 max-w-[140px] items-center gap-1.5 whitespace-nowrap px-1 py-1.5 text-[13px] font-medium leading-none text-[#dbe0f1] no-underline transition-colors hover:text-white sm:max-w-[200px] lg:max-w-[260px]"
+            >
+              <span className="max-w-[220px] truncate">{t('auth.signIn')}</span>
+            </a>
+          )}
         </div>
       </header>
 

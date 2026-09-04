@@ -29,24 +29,52 @@ import { dayNum, isoMinus, isoPlus } from './lib/dates';
  * from the hr.mandays view.
  */
 
-function Slot({ value, field, isExtra, weekend, locked, onOpen, activityByCode, costByCode }) {
+function Slot({
+  value,
+  field,
+  isExtra,
+  weekend,
+  locked,
+  onOpen,
+  activityByCode,
+  costByCode,
+  mainFilled,
+}) {
   const { t } = useI18n();
   const { cellNames } = usePrefs();
   const text = cellDisplay(value, cellNames, activityByCode);
+
+  // "+ Task 2" is an add-on to an already-logged day, never a way in on its
+  // own: the original hides the second slot entirely until the first has a
+  // value (a filled second slot stays visible regardless, so nothing already
+  // saved ever disappears). Gating on disabled alone would still show a live
+  // "+" that just refuses the click; hiding it is what tells someone there is
+  // nothing to click yet.
+  if (isExtra && !value && !mainFilled) return null;
 
   // The placeholder is rendered by a CSS pseudo-element reading data-ph (see
   // index.css): a real <input> per slot would be 31 x 2 x N focusable nodes in
   // one screen, and this grid has to stay scrollable on a site tablet.
   const placeholder = isExtra ? t('entry.addSecond') : weekend ? t('entry.dayOff') : '';
 
+  // The empty main slot's hover hint is the browser's own tooltip, not a CSS
+  // swap crammed into the slot's own thumbnail-sized footprint — the original
+  // shows "Click a cell to choose Activity → Work Category" stacked over
+  // "+ Task 2" as one floating box, which is exactly what a native title
+  // attribute with a newline renders, and nothing this small needs a custom
+  // tooltip component for.
+  const hintTitle =
+    !value && !isExtra && !weekend && !locked
+      ? `${t('entry.weeklyHint')}\n${t('entry.addSecond')}`
+      : undefined;
+
   return (
     <button
       type="button"
       disabled={locked}
       onClick={(ev) => !locked && onOpen(field, ev.currentTarget)}
-      title={value ? cellTitle(value, activityByCode, costByCode) : undefined}
+      title={value ? cellTitle(value, activityByCode, costByCode) : hintTitle}
       data-ph={!value && placeholder ? placeholder : undefined}
-      data-ph-hover={!value && !isExtra && !weekend ? t('entry.weeklyHint') : undefined}
       className={
         'block w-full truncate rounded px-1 py-0.5 text-left text-[0.68rem] leading-tight ' +
         (locked ? 'cursor-default' : 'cursor-pointer hover:bg-brand-50 dark:hover:bg-brand-900/30') +
@@ -54,8 +82,7 @@ function Slot({ value, field, isExtra, weekend, locked, onOpen, activityByCode, 
         (isExtra
           ? 'cell-ph border-t border-dashed border-line/70 text-ink-muted dark:border-line-dark/70 dark:text-ink-dark-muted'
           : 'font-semibold text-ink dark:text-ink-dark') +
-        (!value && !isExtra && !weekend && !locked ? ' cell-pick' : '') +
-        (!value && isExtra ? '' : '')
+        (!value && !isExtra && !weekend && !locked ? ' cell-pick' : '')
       }
     >
       {text}
@@ -170,6 +197,7 @@ export default function WeekGrid({
                           onOpen={onOpen}
                           activityByCode={activityByCode}
                           costByCode={costByCode}
+                          mainFilled={Boolean(mainValue(cell))}
                         />
                         {/* An approval writes a plain Z-2 — byte-identical to a
                             hand-typed one — so without this marker the request

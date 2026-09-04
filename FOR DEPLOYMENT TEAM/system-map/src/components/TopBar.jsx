@@ -19,10 +19,16 @@ const DEPT_ORDER = ['eng', 'pm', 'proc', 'fin', 'acc', 'asset', 'hr'];
 // defaults to the root because on one domain the portal IS the root.
 const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || '/';
 
-/** The header's small pill button. `tone` picks the accent ring. */
+/** The header's small pill button. `tone` picks the accent ring.
+ *
+ * outline-none + a focus-visible ring: without it, the browser's default
+ * focus outline sat on top of these pills after a click — most visible on
+ * "— เส้นประ" (indirect), whose dashed amber border made a stray blue/orange
+ * ring read as a stuck-active state rather than plain keyboard focus. */
 const BTN =
   'inline-flex flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-md border-[1.5px] ' +
-  'px-[9px] py-1 text-nano font-semibold transition-all duration-150';
+  'px-[9px] py-1 text-nano font-semibold transition-all duration-150 ' +
+  'outline-none focus-visible:ring-2 focus-visible:ring-flow/50 focus-visible:ring-offset-1 focus-visible:ring-offset-map-head';
 
 function Btn({ active, tone = 'plain', className = '', ...rest }) {
   const tones = {

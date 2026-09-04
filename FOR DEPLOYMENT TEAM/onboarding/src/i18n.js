@@ -114,6 +114,7 @@ export const dictionary = createDictionary({
   'name.fullName': { th: 'ชื่อ-นามสกุลของคุณ', en: 'Your full name' },
   'name.selectDepartment': { th: 'เลือกแผนกของคุณ', en: 'Select your department' },
   'name.continue': { th: 'ดำเนินการต่อ', en: 'Continue' },
+  'name.cancel': { th: 'ยกเลิก', en: 'Cancel' },
 
   /* ------------------------------- documents ----------------------------- */
   'doc.intro': {
@@ -121,16 +122,13 @@ export const dictionary = createDictionary({
     en: 'View, download, complete, and upload these eight documents before the first working day:',
   },
   'doc.upload': { th: 'อัปโหลด', en: 'Upload' },
+  'doc.download': { th: 'ดาวน์โหลด', en: 'Download' },
   'doc.uploading': { th: 'กำลังอัปโหลด…', en: 'Uploading…' },
   'doc.complete': { th: 'เสร็จสิ้น', en: 'Complete' },
   'doc.youUploaded': { th: 'คุณอัปโหลดแล้ว', en: 'You uploaded' },
   'doc.replaceHint': {
     th: '(อัปโหลดอีกครั้งจะแทนที่ไฟล์เดิม)',
     en: '(uploading again replaces this)',
-  },
-  'doc.nameFirst': {
-    th: 'กรุณากรอกชื่อของคุณในหน้ารายการตรวจสอบก่อน เพื่อบันทึกสถานะเอกสาร',
-    en: 'Enter your name on a checklist page first to track document completion.',
   },
   'doc.errorType': {
     th: 'ไม่รองรับไฟล์ประเภทนี้ กรุณาอัปโหลด PDF รูปภาพ หรือไฟล์ Word',

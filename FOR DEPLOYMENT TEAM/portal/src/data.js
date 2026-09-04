@@ -90,7 +90,7 @@ export const SHORTCUT_LINKS = {
  * shared/src/theme.jsx - so they do not linger in a bookmark and re-force a
  * preference the person has since changed.
  */
-export function appLink(url, { theme, lang } = {}) {
+export function appLink(url, { theme, lang, token } = {}) {
   if (!url) return url;
   try {
     // Relative paths are the production shape ('/hr'); absolute ones are the
@@ -98,6 +98,12 @@ export function appLink(url, { theme, lang } = {}) {
     const u = new URL(url, window.location.origin);
     if (theme) u.searchParams.set('theme', theme);
     if (lang) u.searchParams.set('lang', lang);
+    // Cross-origin only (dev's separate ports; docs/ONE_DOMAIN.md § "the
+    // serious case"): a same-origin destination already shares localStorage,
+    // so it already has the session and does not need it repeated in the
+    // address bar. Off-origin is where "signed in at the portal, asked to
+    // sign in again by every app" actually happens.
+    if (token && u.origin !== window.location.origin) u.searchParams.set('vt', token);
     // Same-origin links stay relative so they do not look like they leave the
     // site, and so a rewrite in front of them keeps working.
     return u.origin === window.location.origin ? u.pathname + u.search + u.hash : u.toString();

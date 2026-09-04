@@ -48,6 +48,10 @@ export const dictionary = createDictionary({
   'tab.cost': { th: 'สรุปค่าใช้จ่าย', en: 'Cost summary' },
   'tab.plan': { th: 'แผนการเงิน', en: 'Cash Plan' },
   'tab.planHint': { th: '(T-bar)', en: '(T-bar)' },
+  'tab.planDevNote': {
+    th: 'อยู่ระหว่างการพัฒนา',
+    en: 'Under development',
+  },
   'tab.actual': { th: 'หักค่างานตามจริง', en: 'Actual deductions' },
   'tab.variance': { th: 'ผลต่าง', en: 'Variance' },
   'tab.varianceHint': { th: '(Variance)', en: '' },

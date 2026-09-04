@@ -328,7 +328,13 @@ export default function PhasePage() {
         </div>
       )}
 
-      {pendingTaskId && <NameModal onSubmit={handleNameSubmit} />}
+      {pendingTaskId && (
+        <NameModal
+          onSubmit={handleNameSubmit}
+          onCancel={() => setPendingTaskId(null)}
+          knownDepartmentId={dept.id}
+        />
+      )}
     </Page>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useI18n, useTheme } from '@vcb/shared';
+import { useAuth, useI18n, useTheme } from '@vcb/shared';
 import { AnnouncementIcon, AppIcon } from './icons';
 import HolidayCalendar from './HolidayCalendar';
 import { SAMPLE_BIRTHDAYS, SAMPLE_LEAVE, appLink } from './data';
@@ -34,9 +34,11 @@ export default function Dashboard({
   bindTooltip,
 }) {
   const { t, lang } = useI18n();
-  // Passed to appLink() so a tile carries the current appearance across to the
-  // module it opens — see the note on appLink in data.js.
+  // Passed to appLink() so a tile carries the current appearance — and the
+  // signed-in session — across to the module it opens; see the note on
+  // appLink in data.js.
   const { theme } = useTheme();
+  const { token } = useAuth();
 
   // The clock ticks every 30s, as index.html's did — a minute-resolution
   // display does not need a per-second render.
@@ -208,7 +210,7 @@ export default function Dashboard({
               return (
                 <a
                   key={a.key}
-                  href={appLink(a.url, { theme, lang })}
+                  href={appLink(a.url, { theme, lang, token })}
                   target="_blank"
                   rel="noopener noreferrer"
                   // The per-tile accent is a database column, so it has to be an

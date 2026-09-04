@@ -103,17 +103,25 @@ export default function FilterBar({ onAddRequest, onAddTxn, onExport }) {
         className="min-w-[10rem] flex-1"
       />
 
-      {isManager ? (
-        <>
-          <Button onClick={onAddRequest}>{t('action.addRequest')}</Button>
-          <Button variant="ghost" onClick={onAddTxn}>
-            {t('action.addTxn')}
-          </Button>
-        </>
-      ) : null}
-      <Button variant="ghost" onClick={onExport}>
-        {t('action.exportExcel')}
-      </Button>
+      {/* One group so the three action buttons wrap together onto their own
+          line rather than Export Excel wrapping alone after the other two —
+          the filters above can wrap freely, but these read as one unit.
+          ml-auto pushes the whole group to the right on that line, matching
+          the original — left-aligned read as if it belonged with the filters
+          rather than as the row's own distinct action bar. */}
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        {isManager ? (
+          <>
+            <Button onClick={onAddRequest}>{t('action.addRequest')}</Button>
+            <Button variant="ghost" onClick={onAddTxn}>
+              {t('action.addTxn')}
+            </Button>
+          </>
+        ) : null}
+        <Button variant="ghost" onClick={onExport}>
+          {t('action.exportExcel')}
+        </Button>
+      </div>
     </div>
   );
 }

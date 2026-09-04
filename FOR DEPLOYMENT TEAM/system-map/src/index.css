@@ -239,8 +239,8 @@
     color: #fff;
   }
   .fnode-manual {
-    background: #0e1626;
-    border: 1.5px dashed #334155;
+    background: var(--map-manual);
+    border: 1.5px dashed var(--map-rail);
   }
   .fnode.is-focus {
     outline: 3px solid #fbbf24;

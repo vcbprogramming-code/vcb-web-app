@@ -7,6 +7,7 @@ import { useProgress } from '../lib/useProgress.js';
 import { useDocUpload } from '../lib/useDocUpload.js';
 import { useContentText } from '../lib/contentText.js';
 import { ErrorBanner, Page, PageTitle } from '../components/ui.jsx';
+import NameModal from '../components/NameModal.jsx';
 
 // Ported from the original app's PAGES['required-documents'] (content.html) —
 // the doc list plus the Department Selection grid, which lived on one page.
@@ -16,9 +17,16 @@ import { ErrorBanner, Page, PageTitle } from '../components/ui.jsx';
 // convention: either action marks the same task done.
 
 export default function RequiredDocuments() {
-  const { isTaskDone, toggleTask, name } = useProgress();
+  const { isTaskDone, toggleTask, name, identify } = useProgress();
   const { t } = useI18n();
   const tc = useContentText();
+
+  // Same pattern as PhasePage: an anonymous employee reaching this page
+  // before any phase page has no way to set their name, so Complete/Upload
+  // were permanently disabled here. Intercept the action, collect the name,
+  // then finish what was asked for.
+  const [pendingTaskId, setPendingTaskId] = useState(null);
+  const [pendingUploadDocId, setPendingUploadDocId] = useState(null);
 
   // Per-employee upload receipts, localStorage only and deliberately so: the
   // authoritative copy is the object in Supabase Storage, and this only lets
@@ -55,6 +63,34 @@ export default function RequiredDocuments() {
     handleUploaded
   );
 
+  function handleToggle(taskId) {
+    if (!name) {
+      setPendingTaskId(taskId);
+      return;
+    }
+    toggleTask(taskId);
+  }
+
+  function handleUploadClick(docId) {
+    if (!name) {
+      setPendingUploadDocId(docId);
+      return;
+    }
+    triggerUpload(docId);
+  }
+
+  async function handleNameSubmit(employeeName, departmentId) {
+    await identify(employeeName, departmentId);
+    if (pendingTaskId) {
+      toggleTask(pendingTaskId);
+      setPendingTaskId(null);
+    }
+    if (pendingUploadDocId) {
+      triggerUpload(pendingUploadDocId);
+      setPendingUploadDocId(null);
+    }
+  }
+
   return (
     <Page>
       <PageTitle>{t('nav.requiredDocuments')}</PageTitle>
@@ -69,52 +105,99 @@ export default function RequiredDocuments() {
             <div
               key={doc.id}
               className={[
-                'flex flex-col gap-3 rounded-card border bg-surface-card p-4 shadow-card transition-colors dark:bg-surface-dark-card dark:shadow-card-dark',
+                'flex flex-col overflow-hidden rounded-card border shadow-card transition-colors dark:shadow-card-dark',
                 done
-                  ? 'border-ok/50 dark:border-ok-dark/50'
+                  ? 'border-ok/60 dark:border-ok-dark/60'
                   : 'border-line dark:border-line-dark',
               ].join(' ')}
             >
-              <div>
-                <h3 className="text-base font-bold">{tc(doc.title)}</h3>
-                <p className="mt-1 text-sm text-ink-muted dark:text-ink-dark-muted">
-                  {tc(doc.desc)}
-                </p>
-              </div>
-
-              <div className="mt-auto flex flex-wrap items-center gap-3">
+              <div className="flex items-start gap-3 bg-surface-card p-4 dark:bg-surface-dark-card">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-accent dark:text-accent-dark"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 2.5h6.5L16 7v9.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.5 2.5V7H16" />
+                </svg>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold">{tc(doc.title)}</h3>
+                  <p className="mt-1 text-sm text-ink-muted dark:text-ink-dark-muted">
+                    {tc(doc.desc)}
+                  </p>
+                </div>
+                {/* The document's own action ("View Application Form", "View
+                    Employment Contract" — per-document text, not a generic
+                    label) as a compact arrow rather than a full sentence, so
+                    the title row stays one line. The footer's Download button
+                    below points at the same file. */}
                 {doc.viewUrl && (
                   <a
                     href={doc.viewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-accent underline underline-offset-2 dark:text-accent-dark"
+                    title={tc(doc.action)}
+                    aria-label={tc(doc.action)}
+                    className="mt-0.5 shrink-0 text-accent hover:opacity-75 dark:text-accent-dark"
                   >
-                    {tc(doc.action)}
+                    →
                   </a>
                 )}
-                <button
-                  type="button"
-                  disabled={!name || uploadingDocId === doc.id}
-                  onClick={() => triggerUpload(doc.id)}
-                  className="rounded-control border border-line px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50 dark:border-line-dark dark:hover:bg-surface-dark-sunken"
-                >
-                  {uploadingDocId === doc.id ? t('doc.uploading') : t('doc.upload')}
-                </button>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
+              </div>
+
+              <div
+                className={[
+                  'flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3',
+                  done
+                    ? 'border-ok/30 bg-ok/10 dark:border-ok-dark/30 dark:bg-ok-dark/10'
+                    : 'border-line bg-surface-sunken dark:border-line-dark dark:bg-surface-dark-sunken',
+                ].join(' ')}
+              >
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
                   <input
                     type="checkbox"
                     checked={done}
-                    disabled={!name}
-                    onChange={() => toggleTask(taskId)}
-                    className="h-4 w-4 accent-accent dark:accent-accent-dark"
+                    onChange={() => handleToggle(taskId)}
+                    className="h-4 w-4 accent-ok dark:accent-ok-dark"
                   />
-                  {t('doc.complete')}
+                  <span
+                    className={done ? 'text-ok dark:text-ok-dark' : 'text-ink-muted dark:text-ink-dark-muted'}
+                  >
+                    {t('doc.complete')}
+                  </span>
                 </label>
+
+                <div className="flex items-center gap-2">
+                  {doc.viewUrl && (
+                    <a
+                      href={doc.viewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-control border border-line bg-surface-card px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-surface-sunken dark:border-line-dark dark:bg-surface-dark-card dark:hover:bg-surface-dark-sunken"
+                    >
+                      {t('doc.download')}
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    disabled={uploadingDocId === doc.id}
+                    onClick={() => handleUploadClick(doc.id)}
+                    className="rounded-control border border-line bg-surface-card px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50 dark:border-line-dark dark:bg-surface-dark-card dark:hover:bg-surface-dark-sunken"
+                  >
+                    {uploadingDocId === doc.id ? t('doc.uploading') : t('doc.upload')}
+                  </button>
+                </div>
               </div>
 
               {receipt && (
-                <p className="text-xs text-ink-muted dark:text-ink-dark-muted">
+                <p className="border-t border-line px-4 py-2 text-xs text-ink-muted dark:border-line-dark dark:text-ink-dark-muted">
                   <span className="font-semibold">{t('doc.youUploaded')}:</span>{' '}
                   {receipt.url ? (
                     <a
@@ -142,10 +225,6 @@ export default function RequiredDocuments() {
         </ErrorBanner>
       )}
 
-      {!name && (
-        <p className="text-sm text-ink-muted dark:text-ink-dark-muted">{t('doc.nameFirst')}</p>
-      )}
-
       <div>
         <h2 className="text-2xl font-bold">{t('doc.departmentSelection')}</h2>
         <p className="mt-1 text-ink-subtle dark:text-ink-dark-muted">
@@ -164,6 +243,16 @@ export default function RequiredDocuments() {
           </Link>
         ))}
       </div>
+
+      {(pendingTaskId || pendingUploadDocId) && (
+        <NameModal
+          onSubmit={handleNameSubmit}
+          onCancel={() => {
+            setPendingTaskId(null);
+            setPendingUploadDocId(null);
+          }}
+        />
+      )}
     </Page>
   );
 }

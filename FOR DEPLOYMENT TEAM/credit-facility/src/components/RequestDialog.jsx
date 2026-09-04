@@ -26,6 +26,7 @@ import {
 import { projCompany, projName } from '../lib/lookups.js';
 import { STATUS, facAvail } from '../lib/domain.js';
 import { Button, Field, Input, Modal, Select, Textarea } from './ui.jsx';
+import CostCategoryPicker from './CostCategoryPicker.jsx';
 
 const BLANK = {
   project: '',
@@ -165,6 +166,7 @@ export default function RequestDialog({ open, request, onClose }) {
       open={open}
       onClose={onClose}
       wide
+      bodyMaxHeight="min(78vh, 46rem)"
       title={editing ? t('req.edit') : t('req.add')}
       footer={
         <>
@@ -177,9 +179,9 @@ export default function RequestDialog({ open, request, onClose }) {
         </>
       }
     >
-      <div className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('filter.project')} required>
+      <div className="flex flex-col gap-3">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label={t('filter.project')} required className="sm:col-span-2">
             <Select value={form.project} onChange={(e) => set({ project: e.target.value })}>
               <option value="">{t('req.selectProject')}</option>
               {projects.map((p) => (
@@ -190,15 +192,15 @@ export default function RequestDialog({ open, request, onClose }) {
             </Select>
           </Field>
 
-          <Field label={t('filter.company')}>
+          <Field label={t('filter.company')} className="sm:col-span-2">
             {/* Derived from the project, exactly as reqProjChange() did — the
                 company is a property of the project, not a free choice. */}
             <Input value={projCompany(projects, form.project)} disabled readOnly />
           </Field>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('req.creditType')} required>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label={t('req.creditType')} required className="sm:col-span-2">
             <Select value={form.facilityNo} onChange={(e) => set({ facilityNo: e.target.value })}>
               <option value="">{t('req.selectType')}</option>
               {facTypes.map((ft) => (
@@ -209,7 +211,7 @@ export default function RequestDialog({ open, request, onClose }) {
             </Select>
           </Field>
 
-          <Field label={t('req.amountTHB')} required>
+          <Field label={t('req.amountTHB')} required className="sm:col-span-2">
             <Input
               value={form.amount}
               inputMode="decimal"
@@ -299,32 +301,14 @@ export default function RequestDialog({ open, request, onClose }) {
             {t('req.attachStatus')}
           </legend>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={t('req.attachment')}>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label={t('req.attachment')} className="sm:col-span-2">
               <Input
                 value={form.source}
                 placeholder={t('req.attachmentPlaceholder')}
                 onChange={(e) => set({ source: e.target.value })}
               />
             </Field>
-            <Field label={t('req.costCategory')}>
-              {/* The list is credit.cost_categories, editable in Settings. A
-                  free-typed value is allowed — the column is plain text. */}
-              <Input
-                list="credit-cost-categories"
-                value={form.costCategory}
-                placeholder={t('req.costCategoryPlaceholder')}
-                onChange={(e) => set({ costCategory: e.target.value })}
-              />
-              <datalist id="credit-cost-categories">
-                {costCategories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </Field>
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label={t('req.attachRange')}>
               <Input
                 value={form.docFrom}
@@ -340,25 +324,41 @@ export default function RequestDialog({ open, request, onClose }) {
               />
             </Field>
           </div>
+
+          {/* The list is credit.cost_categories, editable in Settings. A
+              free-typed value is still allowed — the column is plain text —
+              but the two-column panel makes picking one a click instead of a
+              full retype. */}
+          <div className="mt-3">
+            <Field label={t('req.costCategory')}>
+              <CostCategoryPicker
+                value={form.costCategory}
+                onChange={(v) => set({ costCategory: v })}
+                categories={costCategories}
+                placeholder={t('req.costCategoryPlaceholder')}
+              />
+            </Field>
+          </div>
         </fieldset>
 
-        <Field label={t('filter.status')}>
-          <Select value={form.status} onChange={(e) => set({ status: e.target.value })}>
-            <option value={STATUS.NEW}>{t('status.newOpt')}</option>
-            <option value={STATUS.PENDING}>{t('status.pendingOpt')}</option>
-            <option value={STATUS.APPROVED}>{t('status.approvedOpt')}</option>
-            <option value={STATUS.SETTLED}>{t('status.settledOpt')}</option>
-          </Select>
-        </Field>
-
-        <Field label={t('req.note')}>
-          <Textarea
-            rows={2}
-            value={form.note}
-            placeholder={t('req.notePlaceholder')}
-            onChange={(e) => set({ note: e.target.value })}
-          />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('filter.status')}>
+            <Select value={form.status} onChange={(e) => set({ status: e.target.value })}>
+              <option value={STATUS.NEW}>{t('status.newOpt')}</option>
+              <option value={STATUS.PENDING}>{t('status.pendingOpt')}</option>
+              <option value={STATUS.APPROVED}>{t('status.approvedOpt')}</option>
+              <option value={STATUS.SETTLED}>{t('status.settledOpt')}</option>
+            </Select>
+          </Field>
+          <Field label={t('req.note')}>
+            <Textarea
+              rows={1}
+              value={form.note}
+              placeholder={t('req.notePlaceholder')}
+              onChange={(e) => set({ note: e.target.value })}
+            />
+          </Field>
+        </div>
       </div>
     </Modal>
   );

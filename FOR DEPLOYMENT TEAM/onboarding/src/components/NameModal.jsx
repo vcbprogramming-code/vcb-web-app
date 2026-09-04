@@ -1,20 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '@vcb/shared';
 import { DEPARTMENTS } from '../data/departments.js';
 import { useContentText } from '../lib/contentText.js';
 
-// Name + department, shown the first time a checklist task is touched.
-// Ported from the original app's promptForEmployeeName (progress.html).
+// Name (+ department, when the page already knows it), shown the first time
+// a checklist task is touched. Ported from the original app's
+// promptForEmployeeName / promptForNameOnly (progress.html).
 //
 // This is the module's identity prompt, NOT a sign-in. See lib/identity.js —
 // new hires reach this page before anyone has created an account for them, so
 // asking them to authenticate here would lock out the people it exists for.
-
-export default function NameModal({ onSubmit }) {
+//
+// THE DEPARTMENT FIELD IS NOT ALWAYS THERE
+//
+// A pre-boarding action (Required Documents, say) happens before Department
+// Selection in the journey — the original's promptForNameOnly() asked for a
+// name only there, "since requiring a department this early would force that
+// step out of order." Once a page IS already scoped to a department (a phase
+// page under /finance-day-1-30, say), the original pre-filled and locked that
+// field instead of asking blind (departmentFromTaskId()) — the person is not
+// choosing here, they are confirming what the page already knows.
+//
+// Pass knownDepartmentId for that second case. For the pre-boarding, name-
+// only case, pass NEITHER prop — the department question does not belong on
+// that page at all, not even as an open choice.
+export default function NameModal({ onSubmit, onCancel, knownDepartmentId }) {
   const { t } = useI18n();
   const tc = useContentText();
   const [name, setName] = useState('');
-  const [departmentId, setDepartmentId] = useState(DEPARTMENTS[0]?.id ?? '');
+  // '' when there is no known department — never DEPARTMENTS[0], which would
+  // silently submit a made-up department for the name-only case below.
+  const [departmentId, setDepartmentId] = useState(knownDepartmentId || '');
+  // Only the phase-page case (knownDepartmentId set) shows the field at all —
+  // pre-filled from route context, matching the original's
+  // departmentFromTaskId() pre-fill. There is currently no caller that wants
+  // an OPEN department choice at this modal; RequiredDocuments passes neither
+  // prop and gets name-only, exactly as promptForNameOnly() did.
+  const askDepartment = Boolean(knownDepartmentId);
+
+  useEffect(() => {
+    if (!onCancel) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
 
   return (
     <div
@@ -22,6 +53,9 @@ export default function NameModal({ onSubmit }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="name-modal-title"
+      onMouseDown={(e) => {
+        if (onCancel && e.target === e.currentTarget) onCancel();
+      }}
     >
       <div className="w-full max-w-md rounded-card border border-line bg-surface-card p-6 shadow-card-hover dark:border-line-dark dark:bg-surface-dark-card">
         <h2 id="name-modal-title" className="mb-4 text-xl font-bold">
@@ -32,7 +66,8 @@ export default function NameModal({ onSubmit }) {
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = name.trim();
-            if (!trimmed || !departmentId) return;
+            if (!trimmed) return;
+            if (askDepartment && !departmentId) return;
             onSubmit(trimmed, departmentId);
           }}
         >
@@ -51,21 +86,30 @@ export default function NameModal({ onSubmit }) {
             className="w-full rounded-control border border-line bg-surface-card px-3 py-2 text-base outline-none focus:border-brand-600 focus:shadow-focus dark:border-line-dark dark:bg-surface-dark-sunken"
           />
 
-          <label className="sr-only" htmlFor="name-modal-dept">
-            {t('name.selectDepartment')}
-          </label>
-          <select
-            id="name-modal-dept"
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-            className="w-full rounded-control border border-line bg-surface-card px-3 py-2 text-base outline-none focus:border-brand-600 focus:shadow-focus dark:border-line-dark dark:bg-surface-dark-sunken"
-          >
-            {DEPARTMENTS.map((d) => (
-              <option key={d.id} value={d.id}>
-                {tc(d.label)}
-              </option>
-            ))}
-          </select>
+          {askDepartment ? (
+            <>
+              <label className="sr-only" htmlFor="name-modal-dept">
+                {t('name.selectDepartment')}
+              </label>
+              <select
+                id="name-modal-dept"
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                // Locked, matching the original: the page already knows its
+                // department (departmentFromTaskId()) — showing an editable
+                // select here would read as a choice that changing it here
+                // does nothing to honour.
+                disabled={Boolean(knownDepartmentId)}
+                className="w-full rounded-control border border-line bg-surface-card px-3 py-2 text-base outline-none focus:border-brand-600 focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-70 dark:border-line-dark dark:bg-surface-dark-sunken"
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {tc(d.label)}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
 
           <button
             type="submit"
@@ -73,6 +117,16 @@ export default function NameModal({ onSubmit }) {
           >
             {t('name.continue')}
           </button>
+
+          {onCancel ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-pill px-6 py-2 text-sm font-semibold text-ink-muted transition-colors hover:text-ink dark:text-ink-dark-muted dark:hover:text-ink-dark"
+            >
+              {t('name.cancel')}
+            </button>
+          ) : null}
         </form>
       </div>
     </div>

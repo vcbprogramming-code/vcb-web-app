@@ -146,6 +146,10 @@ export interface AccessConfigResult {
   email?: string
   rules?: AccessRules
   codeLabels?: Record<string, string>
+  // Every project key with at least one document — renderAccessConfig()'s own
+  // "โครงการ / Projects" group in the original scans RAW/PROJ_NAMES for this;
+  // the mock returns the equivalent list rather than the UI re-deriving it.
+  projectKeys?: string[]
   defaultPublicPrefixes?: string[]
   error?: string
 }

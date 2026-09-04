@@ -160,6 +160,16 @@ export default function Entry() {
     setPicker({ eid, date, field, anchor });
   }, []);
 
+  // Stable across renders (unlike an inline `() => setPicker(null)` prop
+  // would be) — Picker's own outside-click effect depends on this reference,
+  // and Entry re-renders on nearly every keystroke/save (entries, flash), so
+  // a fresh closure here retriggered that effect constantly: tearing down and
+  // reattaching the document mousedown listener could land squarely between
+  // a step-1 item's mousedown and its own React dispatch, silently eating
+  // the click that was supposed to advance to step 2. See also the belt-and
+  // -suspenders ref fix inside Picker itself.
+  const closePicker = useCallback(() => setPicker(null), []);
+
   const jump = useCallback(
     (eid, date) => {
       const idx = days.findIndex((d) => d.date === date);
@@ -294,7 +304,7 @@ export default function Entry() {
             applyCell(picker.eid, picker.date, picker.field, value);
             setPicker(null);
           }}
-          onClose={() => setPicker(null)}
+          onClose={closePicker}
         />
       )}
     </>

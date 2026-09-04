@@ -3,7 +3,7 @@ import { useI18n } from '@vcb/shared';
 import * as minutesApi from '../lib/minutesApi';
 import { errorMessage } from '../lib/errors';
 import { fmtTimestamp } from '../lib/dates';
-import { Button, Empty, Loading, Modal } from '../ui';
+import { Button, Empty, IconButton, Loading, Modal, useConfirm } from '../ui';
 
 /**
  * Who changed this meeting, when, and what it looked like before.
@@ -23,8 +23,9 @@ import { Button, Empty, Loading, Modal } from '../ui';
  * Admin only, at the API. The panel is opened from an admin-only button, but
  * both requests would 403 for anyone else regardless.
  */
-export default function EditHistoryModal({ open, meeting, onClose, onViewVersion }) {
+export default function EditHistoryModal({ open, meeting, onClose, onViewVersion, isAdmin, onBusy, onToast }) {
   const { t, lang } = useI18n();
+  const { confirm, node: confirmNode } = useConfirm();
 
   const [versions, setVersions] = useState(null);
   const [audit, setAudit] = useState(null);
@@ -62,6 +63,52 @@ export default function EditHistoryModal({ open, meeting, onClose, onViewVersion
       ac.abort();
     };
   }, [open, meeting, t]);
+
+  async function deleteEntry(e) {
+    const ok = await confirm(t('history.deleteEntryTitle'), { okLabel: t('common.delete') });
+    if (!ok) return;
+    onBusy?.(t('comment.deleting'));
+    try {
+      await minutesApi.deleteAuditEntry(meeting.id, e.id);
+      setAudit((prev) => (prev || []).filter((x) => x.id !== e.id));
+    } catch (err) {
+      onToast?.(errorMessage(err, t));
+    } finally {
+      onBusy?.(null);
+    }
+  }
+
+  async function deleteVersion(seq) {
+    const ok = await confirm(t('history.deleteVersionTitle'), { okLabel: t('common.delete') });
+    if (!ok) return;
+    onBusy?.(t('comment.deleting'));
+    try {
+      await minutesApi.deleteVersion(meeting.id, seq);
+      setVersions((prev) => (prev || []).filter((v) => v.seq !== seq));
+    } catch (err) {
+      onToast?.(errorMessage(err, t));
+    } finally {
+      onBusy?.(null);
+    }
+  }
+
+  async function clearAll() {
+    const ok = await confirm(`${t('history.clearAllTitle')} ${t('history.clearAllHint')}`, {
+      title: t('history.clearAll'),
+      okLabel: t('common.delete'),
+    });
+    if (!ok) return;
+    onBusy?.(t('comment.deleting'));
+    try {
+      await minutesApi.clearMeetingAudit(meeting.id);
+      setAudit([]);
+      setVersions([]);
+    } catch (err) {
+      onToast?.(errorMessage(err, t));
+    } finally {
+      onBusy?.(null);
+    }
+  }
 
   if (!open || !meeting) return null;
 
@@ -105,6 +152,16 @@ export default function EditHistoryModal({ open, meeting, onClose, onViewVersion
             </Button>
           </div>
 
+          {isAdmin && (versions?.length || activity.length) ? (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="mb-2 self-end text-[11.5px] font-medium text-ink-muted underline-offset-2 hover:text-danger hover:underline dark:text-ink-dark-muted dark:hover:text-danger-dark"
+            >
+              {t('history.clearAll')}
+            </button>
+          ) : null}
+
           {versions?.length ? (
             <div className="mb-2">
               {versions.map((v) => (
@@ -117,9 +174,21 @@ export default function EditHistoryModal({ open, meeting, onClose, onViewVersion
                       {fmtTimestamp(v.takenAt, lang)}
                     </span>
                   </span>
-                  <Button onClick={() => onViewVersion(v.seq)} title={t('history.viewHint')}>
-                    {t('history.view')}
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button onClick={() => onViewVersion(v.seq)} title={t('history.viewHint')}>
+                      {t('history.view')}
+                    </Button>
+                    {isAdmin ? (
+                      <IconButton
+                        onClick={() => deleteVersion(v.seq)}
+                        title={t('history.deleteVersion')}
+                        aria-label={t('history.deleteVersion')}
+                        className="text-ink-muted hover:text-danger dark:text-ink-dark-muted dark:hover:text-danger-dark"
+                      >
+                        ✕
+                      </IconButton>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -139,6 +208,16 @@ export default function EditHistoryModal({ open, meeting, onClose, onViewVersion
                     {fmtTimestamp(e.when, lang)}
                   </span>
                 </span>
+                {isAdmin ? (
+                  <IconButton
+                    onClick={() => deleteEntry(e)}
+                    title={t('history.deleteEntry')}
+                    aria-label={t('history.deleteEntry')}
+                    className="text-ink-muted hover:text-danger dark:text-ink-dark-muted dark:hover:text-danger-dark"
+                  >
+                    ✕
+                  </IconButton>
+                ) : null}
               </div>
             ))
           ) : versions?.length ? null : (
@@ -148,6 +227,7 @@ export default function EditHistoryModal({ open, meeting, onClose, onViewVersion
           )}
         </>
       )}
+      {confirmNode}
     </Modal>
   );
 }

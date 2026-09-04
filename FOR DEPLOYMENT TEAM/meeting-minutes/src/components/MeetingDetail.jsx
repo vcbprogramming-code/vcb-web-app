@@ -273,17 +273,6 @@ export default function MeetingDetail({ id, onEdit, onToast, onBusy }) {
           </Button>
         ) : null}
 
-        {meeting.fathomUrl ? (
-          <a
-            href={meeting.fathomUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface-card px-[11px] py-[7px] text-[12.5px] font-medium text-ink no-underline hover:bg-surface-sunken dark:border-line-dark dark:bg-surface-dark-card dark:text-ink-dark dark:hover:bg-surface-dark-sunken"
-          >
-            {t('meeting.recording')}
-          </a>
-        ) : null}
-
         {/* A doc-import is never editable: its content is a one-way import and
             the Doc it came from stopped being authoritative on 2026-07-19, so
             there is nothing coherent to save back into. For everything else the

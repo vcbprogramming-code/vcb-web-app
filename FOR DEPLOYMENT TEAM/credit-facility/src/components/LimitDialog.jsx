@@ -34,12 +34,12 @@ export default function LimitDialog({ facility, onClose }) {
 
   const save = async () => {
     const limRaw = String(limit).trim();
-    if (limRaw === '' || !Number.isFinite(moneyVal(limRaw))) {
+    if (limRaw === '' || !Number.isFinite(moneyVal(limRaw)) || moneyVal(limRaw) < 0) {
       notify(t('fac.badLimit'));
       return;
     }
     const usedRaw = String(used).trim();
-    if (usedRaw !== '' && !Number.isFinite(moneyVal(usedRaw))) {
+    if (usedRaw !== '' && (!Number.isFinite(moneyVal(usedRaw)) || moneyVal(usedRaw) < 0)) {
       notify(t('fac.badUsed'));
       return;
     }

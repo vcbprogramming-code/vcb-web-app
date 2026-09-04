@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
 import { AppSettings, useAuthOptional, useI18n } from '@vcb/shared';
 import JourneyStepper from './JourneyStepper.jsx';
+import ProgressBar from './ProgressBar.jsx';
 import { useProgress } from '../lib/useProgress.js';
 import { REQUIRED_DOCUMENTS } from '../data/requiredDocuments.js';
 
@@ -45,7 +46,7 @@ export default function Layout() {
   // The stepper needs to know who this is and what they have finished. This is
   // the same hook every page uses; useProgress keeps one cache per employee, so
   // reading it here does not fetch a second time.
-  const { department, level, isTaskDone } = useProgress();
+  const { name, department, level, isTaskDone } = useProgress();
 
   // The same rule as the original's areRequiredDocsComplete(): every required
   // document ticked. RequiredDocuments.jsx records an upload as the task
@@ -88,6 +89,8 @@ export default function Layout() {
             The department landing pages are still reachable: the stepper links
             straight to the phase pages, which is where the work actually is,
             and the department name is in the step label. */}
+        <ProgressBar name={name} department={department} level={level} isTaskDone={isTaskDone} />
+
         <JourneyStepper
           department={department}
           level={level}

@@ -27,16 +27,28 @@ export const DECISION = {
  *
  * 'active' (lower case) appears in older imported rows and means approved;
  * 'void' means cancelled. Both are matched case-insensitively, as in legacy.js.
+ *
+ * A DECIDED REQUEST'S STATUS IS A DECISION STRING, NOT A FACILITY STATUS
+ *
+ * POST /requests/:id/decide (decideRequest, matching Code.js) writes the bare
+ * decision literal — DECISION.APPROVE ('อนุมัติ') or DECISION.REJECT
+ * ('ไม่อนุมัติ') — into the request row's own status column. That is a
+ * different string from STATUS.APPROVED ('อนุมัติแล้ว'), the status a
+ * *transaction* gets. Without these two branches, a decided request fell
+ * through to the generic "new request" tone with its own raw Thai decision
+ * word for a label — every approved or rejected request kept showing as a
+ * blue "new" pill.
  */
 export function statusMeta(s) {
   const v = String(s ?? '');
   const low = v.toLowerCase();
   if (v === STATUS.NEW) return { tone: 'new', key: 'status.new', raw: v };
   if (v === STATUS.PENDING) return { tone: 'pending', key: 'status.pending', raw: v };
-  if (v === STATUS.APPROVED || low === 'active') {
+  if (v === STATUS.APPROVED || v === DECISION.APPROVE || low === 'active') {
     return { tone: 'approved', key: 'status.approved', raw: STATUS.APPROVED };
   }
   if (v === STATUS.SETTLED) return { tone: 'approved', key: 'status.settled', raw: v };
+  if (v === DECISION.REJECT) return { tone: 'rejected', key: 'status.rejected', raw: v };
   if (low === 'void') return { tone: 'rejected', key: 'status.void', raw: v };
   return { tone: 'new', key: null, raw: v || '—' };
 }
@@ -44,7 +56,7 @@ export function statusMeta(s) {
 /** Approved-and-outstanding, i.e. the amount counts against the facility. */
 export function isAuthorized(s) {
   const v = String(s ?? '');
-  return v === STATUS.APPROVED || v.toLowerCase() === 'active';
+  return v === STATUS.APPROVED || v === DECISION.APPROVE || v.toLowerCase() === 'active';
 }
 
 /* ---------------------------- facility type kinds ------------------------- */

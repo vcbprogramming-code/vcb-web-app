@@ -155,7 +155,7 @@ export default function Home() {
         <CompanyStructure />
       </Section>
 
-      <div>
+      <div className="text-center">
         <CtaLink to="/required-documents">{t('home.continueToDocuments')}</CtaLink>
       </div>
     </Page>

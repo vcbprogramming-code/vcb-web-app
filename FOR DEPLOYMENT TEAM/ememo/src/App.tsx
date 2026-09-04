@@ -145,12 +145,20 @@ export default function App() {
     return () => document.removeEventListener('click', onClick)
   }, [pfmsOpen])
 
+  // Same header cycles: ascending -> descending -> cleared (default order),
+  // matching sort()/clearSort() in the original — a third click on the same
+  // header returns to sortCol=-1 (commented-first, then newest), not another
+  // toggle forever.
   const onSort = useCallback((col: number) => {
     setSortCol((prev) => {
-      if (prev === col) { setSortDir((d) => (d === 1 ? -1 : 1)); return col }
+      if (prev === col) {
+        if (sortDir === 1) { setSortDir(-1); return col }
+        setSortDir(1)
+        return -1
+      }
       setSortDir(1); return col
     })
-  }, [])
+  }, [sortDir])
 
   const setQuick = (days: number | 'lm') => {
     const today = new Date()

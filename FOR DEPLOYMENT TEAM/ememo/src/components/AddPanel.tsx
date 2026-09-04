@@ -246,7 +246,24 @@ export default function AddPanel({ open, onClose, rows, onSubmitted }: Props) {
               <div className="dz-i">📄</div>
               <div className="dz-t">Click or drag file here</div>
               <div className="dz-s">PDF, Word, Excel, Image · max 7 MB</div>
-              <input type="file" style={{ display: 'none' }} onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')} />
+              <input
+                type="file"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) { setFileName(''); return }
+                  // Ported from the original's file-picker handler — dropped
+                  // in the port, so any size was silently accepted despite
+                  // the "max 7 MB" hint still shown right above.
+                  if (f.size > 7 * 1024 * 1024) {
+                    setErr({ kind: 'e', html: 'File too large — max 7 MB.' })
+                    e.target.value = ''
+                    setFileName('')
+                    return
+                  }
+                  setFileName(f.name)
+                }}
+              />
             </label>
             {fileName && (
               <div className="fc" style={{ display: 'flex' }}>

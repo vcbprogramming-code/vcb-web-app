@@ -6,28 +6,20 @@
 // directly with the anon key. The browser no longer holds Supabase
 // credentials, so the bytes go to a PRESIGNED URL the API signs:
 //
-//   1. GET /api/onboarding/documents/:name/path?doc_id=&ext=  ->  { bucket, path, uploadUrl }
-//   2. PUT the file straight at uploadUrl (Supabase Storage, via S3)
+//   1. GET /api/onboarding/documents/:name/path?doc_id=&ext=  ->  { bucket, path, uploadUrl, downloadUrl }
+//   2. PUT the file straight at uploadUrl (S3-compatible storage)
 //
 // Step 2 never touches Express, so a 10MB scan does not occupy a worker for
 // the length of the transfer or hit the 2MB JSON body limit — see
 // api/src/lib/storage.js, which explains the same reasoning server-side.
 //
-// ---------------------------------------------------------------------------
-// KNOWN GAP — the API does not sign this URL yet.
-// ---------------------------------------------------------------------------
-// api/src/routes/onboarding.js's /documents/:name/path returns { bucket, path }
-// ONLY. api/src/lib/storage.js exports presignUpload(), but no onboarding route
-// calls it, so there is currently no way for this browser to obtain an upload
-// URL. Every other path in this module works; this one cannot until the API
-// adds `uploadUrl` (and, for the receipt link, `downloadUrl`) to that response.
-//
-// This hook is written against that intended contract and degrades honestly:
-// when the field is absent it reports uploadUnavailable rather than appearing
-// to upload and silently discarding the file. Do NOT "fix" this by putting a
-// Supabase key back in the browser — that is the exact coupling TECH_STACK.md
-// forbids. See KNOWN_ISSUES.md.
-// ---------------------------------------------------------------------------
+// api/src/routes/onboarding.js's /documents/:name/path signs both directions
+// via presignUpload()/presignDownload() and returns uploadUrl/downloadUrl
+// alongside bucket/path — this path is live end-to-end. `uploadUrl` still
+// comes back null if storage itself is misconfigured (missing credentials at
+// the API), which the check below reports as uploadUnavailable rather than
+// silently discarding the file — that is a real, if rarer, failure mode worth
+// keeping a graceful path for, not a sign the feature is unbuilt.
 
 import { useCallback, useState } from 'react';
 import {

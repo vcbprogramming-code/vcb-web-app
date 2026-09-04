@@ -36,9 +36,6 @@ const BLANK = {
   days: '',
   maturity: '',
   beneficiary: '',
-  ref: '',
-  refDocFrom: '',
-  refDocTo: '',
   source: '',
   costCategory: '',
   docFrom: '',
@@ -91,8 +88,12 @@ export default function RequestDialog({ open, request, onClose }) {
 
   const onDays = (v) => {
     const next = { days: v };
-    if (form.start) next.maturity = matFromStartDays(form.start, v);
-    else if (form.maturity) next.start = startFromMatDays(form.maturity, v);
+    // A blank days field is a no-op on its linked date, matching the
+    // original: clearing the count should not snap start/maturity together.
+    if (v.trim() !== '') {
+      if (form.start) next.maturity = matFromStartDays(form.start, v);
+      else if (form.maturity) next.start = startFromMatDays(form.maturity, v);
+    }
     set(next);
   };
 
@@ -120,10 +121,6 @@ export default function RequestDialog({ open, request, onClose }) {
     }
     if (!isDMYOrBlank(form.docFrom) || !isDMYOrBlank(form.docTo)) {
       notify(t('req.attachDateFormat'));
-      return;
-    }
-    if (!isDMYOrBlank(form.refDocFrom) || !isDMYOrBlank(form.refDocTo)) {
-      notify(t('req.refDateFormat'));
       return;
     }
 
@@ -262,39 +259,13 @@ export default function RequestDialog({ open, request, onClose }) {
           </Field>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('req.beneficiary')} required>
-            <Input
-              value={form.beneficiary}
-              placeholder={t('req.beneficiaryPlaceholder')}
-              onChange={(e) => set({ beneficiary: e.target.value })}
-            />
-          </Field>
-          <Field label={t('req.refDocNo')}>
-            <Input
-              value={form.ref}
-              placeholder={t('req.refDocNoPlaceholder')}
-              onChange={(e) => set({ ref: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t('req.refDocRange')}>
-            <Input
-              value={form.refDocFrom}
-              placeholder="dd/mm/yyyy"
-              onChange={(e) => set({ refDocFrom: e.target.value })}
-            />
-          </Field>
-          <Field label="&nbsp;">
-            <Input
-              value={form.refDocTo}
-              placeholder={t('req.dmyTo')}
-              onChange={(e) => set({ refDocTo: e.target.value })}
-            />
-          </Field>
-        </div>
+        <Field label={t('req.beneficiary')} required>
+          <Input
+            value={form.beneficiary}
+            placeholder={t('req.beneficiaryPlaceholder')}
+            onChange={(e) => set({ beneficiary: e.target.value })}
+          />
+        </Field>
 
         <fieldset className="rounded-card border border-line p-3 dark:border-line-dark">
           <legend className="px-1 text-xs font-bold text-ink-muted dark:text-ink-dark-muted">

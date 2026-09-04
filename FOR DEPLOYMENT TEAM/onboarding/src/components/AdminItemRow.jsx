@@ -20,6 +20,10 @@ export default function AdminItemRow({
   blockIndex,
   onSave,
   onDelete,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }) {
   const { t } = useI18n();
   const [draftText, setDraftText] = useState(text);
@@ -85,6 +89,30 @@ export default function AdminItemRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {(onMoveUp || onMoveDown) && (
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              title={t('admin.moveUp')}
+              aria-label={t('admin.moveUp')}
+              className="px-1.5 text-ink-muted hover:text-ink disabled:opacity-30 dark:text-ink-dark-muted dark:hover:text-ink-dark"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              title={t('admin.moveDown')}
+              aria-label={t('admin.moveDown')}
+              className="px-1.5 text-ink-muted hover:text-ink disabled:opacity-30 dark:text-ink-dark-muted dark:hover:text-ink-dark"
+            >
+              ↓
+            </button>
+          </div>
+        )}
         <button
           type="button"
           onClick={handleSave}

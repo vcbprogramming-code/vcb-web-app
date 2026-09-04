@@ -1,5 +1,4 @@
 import { useStore } from '../store'
-import { PREVIEW_OWNER } from '../api'
 import AccessControl from './AccessControl'
 
 // การตั้งค่า · Settings (#stModal): theme / language / date-era, signed-in-as,
@@ -8,7 +7,10 @@ import AccessControl from './AccessControl'
 export default function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { lang, setLang, era, setEra, dark, setDark, auth, signIn, signOut } = useStore()
   const seg = (active: boolean) => 'st-seg-btn' + (active ? ' active' : '')
-  const isOwner = auth?.email === PREVIEW_OWNER
+  // Same gate as getAccessConfig/setAccessConfig — Code.js's isManager_ is one
+  // check reused for both approve/reject authority and Access Control admin
+  // rights, so anyone with management authority sees this, not owner-only.
+  const isManager = !!auth?.manager
 
   return (
     <div className={'st-modal' + (open ? ' show' : '')} role="dialog" aria-modal="true"
@@ -52,7 +54,7 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
               <button className={seg(era === 'ce')} onClick={() => setEra('ce')}>ค.ศ. (2026)</button>
             </div>
           </div>
-          {isOwner && <AccessControl />}
+          {isManager && <AccessControl />}
           {auth && <button className="st-signout" onClick={() => { signOut(); onClose() }}>Sign out</button>}
         </div>
       </div>

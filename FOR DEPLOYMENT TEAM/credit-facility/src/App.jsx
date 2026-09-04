@@ -11,6 +11,7 @@ import { useT } from '@vcb/shared';
 
 import { DataProvider, useData } from './lib/DataContext.jsx';
 import { FilterProvider, useFilters } from './lib/FilterContext.jsx';
+import { DashPrefsProvider } from './lib/DashPrefsContext.jsx';
 import { exportWorkbook } from './lib/exportExcel.js';
 import { applyFilters as filterRows, filterFacilities } from './lib/lookups.js';
 
@@ -49,7 +50,9 @@ export default function App() {
   return (
     <DataProvider>
       <FilterProvider>
-        <Shell />
+        <DashPrefsProvider>
+          <Shell />
+        </DashPrefsProvider>
       </FilterProvider>
     </DataProvider>
   );

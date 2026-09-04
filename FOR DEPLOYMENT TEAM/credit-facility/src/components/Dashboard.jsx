@@ -18,7 +18,7 @@ import React, { useMemo } from 'react';
 import { useT } from '@vcb/shared';
 import { useData } from '../lib/DataContext.jsx';
 import { useFilters } from '../lib/FilterContext.jsx';
-import { useDashPrefs } from '../lib/useDashPrefs.js';
+import { useDashPrefs } from '../lib/DashPrefsContext.jsx';
 import { money } from '../lib/format.js';
 import { dueBucket, isDueWithin7 } from '../lib/format.js';
 import { matchCompany } from '../lib/lookups.js';

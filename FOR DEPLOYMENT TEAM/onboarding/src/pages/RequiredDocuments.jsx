@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@vcb/shared';
 import { REQUIRED_DOCUMENTS } from '../data/requiredDocuments.js';
 import { ALL_DEPARTMENTS } from '../data/allDepartments.js';
+import { DEPARTMENTS } from '../data/departments.js';
 import { useProgress } from '../lib/useProgress.js';
 import { useDocUpload } from '../lib/useDocUpload.js';
 import { useContentText } from '../lib/contentText.js';
+import { areRequiredDocsComplete, missingRequiredDocs } from '../lib/requiredDocsGate.js';
 import { ErrorBanner, Page, PageTitle } from '../components/ui.jsx';
+import { DeptIcon } from '../components/deptIcons.jsx';
 import NameModal from '../components/NameModal.jsx';
+import RequiredDocsGateModal from '../components/RequiredDocsGateModal.jsx';
 
 // Ported from the original app's PAGES['required-documents'] (content.html) —
 // the doc list plus the Department Selection grid, which lived on one page.
@@ -20,6 +24,8 @@ export default function RequiredDocuments() {
   const { isTaskDone, toggleTask, name, identify } = useProgress();
   const { t } = useI18n();
   const tc = useContentText();
+  const navigate = useNavigate();
+  const [showDocsGate, setShowDocsGate] = useState(false);
 
   // Same pattern as PhasePage: an anonymous employee reaching this page
   // before any phase page has no way to set their name, so Complete/Upload
@@ -233,16 +239,71 @@ export default function RequiredDocuments() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {ALL_DEPARTMENTS.map((dept) => (
-          <Link
-            key={dept.id}
-            to={`/${dept.landingPageKey}`}
-            className="rounded-card border border-line bg-surface-card p-4 font-semibold shadow-card transition-colors hover:border-accent hover:text-accent dark:border-line-dark dark:bg-surface-dark-card dark:hover:border-accent-dark dark:hover:text-accent-dark"
-          >
-            {tc(dept.content.title)}
-          </Link>
-        ))}
+        {DEPARTMENTS.map((dept, index) => {
+          const target = ALL_DEPARTMENTS.find((d) => d.id === dept.id);
+          const card = dept.deptCard;
+          return (
+            <div
+              key={dept.id}
+              className="flex flex-col rounded-card border border-line bg-surface-card p-5 shadow-card transition-colors hover:border-accent dark:border-line-dark dark:bg-surface-dark-card dark:hover:border-accent-dark"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent/10 text-accent dark:bg-accent-dark/10 dark:text-accent-dark">
+                  <DeptIcon icon={card.icon} className="h-5 w-5" />
+                </span>
+                <span className="text-xs font-bold text-ink-subtle dark:text-ink-dark-muted">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+              </div>
+
+              <h3 className="mt-3 text-lg font-bold">{tc(card.label)}</h3>
+              <p className="mt-1 flex-1 text-sm text-ink-muted dark:text-ink-dark-muted">
+                {tc(card.desc)}
+              </p>
+
+              <dl className="mt-3 space-y-1.5 text-xs">
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 font-semibold uppercase tracking-wide text-ink-subtle dark:text-ink-dark-muted">
+                    {t('doc.ledBy')}
+                  </dt>
+                  <dd className="text-ink-muted dark:text-ink-dark-muted">{tc(dept.headOfDept)}</dd>
+                </div>
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 font-semibold uppercase tracking-wide text-ink-subtle dark:text-ink-dark-muted">
+                    {t('doc.focus')}
+                  </dt>
+                  <dd className="text-ink-muted dark:text-ink-dark-muted">{tc(card.focus)}</dd>
+                </div>
+              </dl>
+
+              <button
+                type="button"
+                onClick={() => {
+                  // Hard-gated on Required Documents, checked before
+                  // navigating — ported from app.html's dept-card click
+                  // handler, so an employee who hasn't finished pre-boarding
+                  // docs never actually lands on a department page.
+                  // isPhasePageUnlocked enforces the same requirement a
+                  // second time on the department's own first phase (see
+                  // PhasePage.jsx), matching the original's double
+                  // enforcement.
+                  if (!areRequiredDocsComplete(isTaskDone)) {
+                    setShowDocsGate(true);
+                    return;
+                  }
+                  navigate(`/${target.landingPageKey}`);
+                }}
+                className="mt-4 flex items-center justify-between rounded-control bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 dark:bg-accent-dark"
+              >
+                <span>{t('doc.chooseDepartment')}</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      <p className="text-xs text-ink-subtle dark:text-ink-dark-muted">{t('doc.switchNote')}</p>
 
       {(pendingTaskId || pendingUploadDocId) && (
         <NameModal
@@ -251,6 +312,14 @@ export default function RequiredDocuments() {
             setPendingTaskId(null);
             setPendingUploadDocId(null);
           }}
+        />
+      )}
+
+      {showDocsGate && (
+        <RequiredDocsGateModal
+          missing={missingRequiredDocs(isTaskDone)}
+          onGoToDocs={() => setShowDocsGate(false)}
+          onClose={() => setShowDocsGate(false)}
         />
       )}
     </Page>

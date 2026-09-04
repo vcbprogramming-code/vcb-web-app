@@ -83,6 +83,7 @@ export const dictionary = createDictionary({
   'status.approved': { th: 'อนุมัติแล้ว', en: 'Approved' },
   'status.settled': { th: 'ชำระแล้ว', en: 'Settled' },
   'status.void': { th: 'ยกเลิก', en: 'Cancelled' },
+  'status.rejected': { th: 'ไม่อนุมัติ', en: 'Rejected' },
   'status.newOpt': { th: '🔵 คำขอใหม่', en: '🔵 New' },
   'status.pendingOpt': { th: '🟡 อยู่ระหว่างเสนออนุมัติ', en: '🟡 Pending approval' },
   'status.approvedOpt': { th: '🟢 อนุมัติแล้ว', en: '🟢 Approved' },

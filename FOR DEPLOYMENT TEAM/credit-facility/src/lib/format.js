@@ -128,10 +128,21 @@ export function isDMYOrBlank(s) {
 // The request form keeps three fields consistent: start date, a day count, and
 // the maturity date. Editing any two recomputes the third.
 
+// A blank days field must be a no-op, not "0 days" — Number('') is 0, which
+// is finite, so clearing the field used to snap the linked date to match its
+// counterpart instead of leaving it alone. The original's parseInt+isNaN
+// guard rejected blank input naturally; Number.isFinite alone does not.
+function parseDays(days) {
+  const s = String(days ?? '').trim();
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function matFromStartDays(startIso, days) {
   const d = parseIso(startIso);
-  const n = Number(days);
-  if (!d || !Number.isFinite(n)) return '';
+  const n = parseDays(days);
+  if (!d || n === null) return '';
   d.setDate(d.getDate() + n);
   return toIso(d);
 }
@@ -145,8 +156,8 @@ export function daysFromStartMat(startIso, matIso) {
 
 export function startFromMatDays(matIso, days) {
   const d = parseIso(matIso);
-  const n = Number(days);
-  if (!d || !Number.isFinite(n)) return '';
+  const n = parseDays(days);
+  if (!d || n === null) return '';
   d.setDate(d.getDate() - n);
   return toIso(d);
 }

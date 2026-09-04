@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useI18n } from '@vcb/shared';
 import { getDepartmentByPhasePrefix } from '../data/allDepartments.js';
 import { useProgress } from '../lib/useProgress.js';
 import { useChecklistOverrides } from '../lib/useChecklistOverrides.js';
 import { applyOverridesToBlock } from '../lib/applyOverrides.js';
+import { areRequiredDocsComplete } from '../lib/requiredDocsGate.js';
 import { useContentText } from '../lib/contentText.js';
 import NameModal from '../components/NameModal.jsx';
+import DepartmentSwitchModal from '../components/DepartmentSwitchModal.jsx';
+import { useRewardToast } from '../components/RewardToast.jsx';
 import { CtaLink, ErrorBanner, Eyebrow, Notice, Page, PageTitle } from '../components/ui.jsx';
 
 // Ported from the original app's phasePage() builder + checklist rendering
@@ -19,6 +22,7 @@ function isItemVisible(item, level) {
 
 export default function PhasePage() {
   const { pageKey } = useParams();
+  const navigate = useNavigate();
   const { t } = useI18n();
   const tc = useContentText();
 
@@ -36,13 +40,20 @@ export default function PhasePage() {
     loadError,
     saveError,
     dismissSaveError,
+    department,
     isTaskDone,
     toggleTask,
     identify,
     setLevel,
+    switchDepartment,
   } = useProgress();
   const { overrides } = useChecklistOverrides();
   const [pendingTaskId, setPendingTaskId] = useState(null);
+  // Set when identify() reports the employee already has progress in a
+  // DIFFERENT department than this phase page's own — mirrors
+  // promptDepartmentSwitchConfirm in the original, asked before anything is
+  // discarded rather than switching silently.
+  const [pendingSwitch, setPendingSwitch] = useState(null);
 
   /* Phase-completion celebration, ported from the original app's
      celebratePhaseComplete (progress.html). Finishing a 30-day phase is the
@@ -59,13 +70,20 @@ export default function PhasePage() {
   const [isFinalPhase, setIsFinalPhase] = useState(false);
   const wasPhaseDone = useRef(false);
   const [showPhaseComplete, setShowPhaseComplete] = useState(false);
+  // The bigger, one-time celebration for finishing the whole 90-day
+  // programme — ported from celebrateOnboardingComplete. Takes over the
+  // false -> true transition INSTEAD of the phase-complete popup precisely
+  // when the phase that just finished is also the final one.
+  const [showOnboardingComplete, setShowOnboardingComplete] = useState(false);
+  const { showReward, node: rewardToastNode } = useRewardToast();
 
   useEffect(() => {
     // Fires only on the false -> true TRANSITION, so it does not replay every
-    // time a finished page is revisited. Suppressed on the last phase, where
-    // finishing means the whole programme is done and the Completion page owns
-    // that moment.
-    if (phaseDone && !wasPhaseDone.current && !isFinalPhase) setShowPhaseComplete(true);
+    // time a finished page is revisited.
+    if (phaseDone && !wasPhaseDone.current) {
+      if (isFinalPhase) setShowOnboardingComplete(true);
+      else setShowPhaseComplete(true);
+    }
     wasPhaseDone.current = phaseDone;
   }, [phaseDone, isFinalPhase]);
 
@@ -73,6 +91,7 @@ export default function PhasePage() {
   // after phase 1 already did.
   useEffect(() => {
     setShowPhaseComplete(false);
+    setShowOnboardingComplete(false);
     wasPhaseDone.current = false;
   }, [pageKey]);
 
@@ -106,14 +125,28 @@ export default function PhasePage() {
   const page = effectivePhases[phaseIndex].page;
 
   // Every prior phase in this department must be fully complete before this
-  // one unlocks — ported from getPrevPhaseMap/isPhasePageUnlocked.
+  // one unlocks — ported from getPrevPhaseMap/isPhasePageUnlocked. The first
+  // phase (phaseIndex === 0) additionally requires Required Documents —
+  // isPhasePageUnlocked's own first check — so a typed-URL visit here can't
+  // bypass the same gate the Department Selection click already enforces.
+  //
+  // Unlike an earlier version of this port, `unlocked` does NOT gate the
+  // whole page: the original's isPhasePageUnlocked only gates checkbox
+  // *toggling* (see performToggle in progress.html) — every phase page is
+  // freely viewable/readable once Required Documents is done, even ahead of
+  // where the employee has actually reached. Locked checkboxes render
+  // disabled in place, with a single banner above the checklist explaining
+  // why (renderPhaseLockNotice), not a page that replaces all its content.
+  const docsComplete = areRequiredDocsComplete(isTaskDone);
   const previousPhases = effectivePhases.slice(0, phaseIndex);
-  const unlocked = previousPhases.every((prevPhase) =>
+  const previousPhasesComplete = previousPhases.every((prevPhase) =>
     prevPhase.page.blocks
       .flatMap((b) => b.items)
       .filter((item) => isItemVisible(item, level))
       .every((item) => isTaskDone(item.id))
   );
+  const unlocked = docsComplete && previousPhasesComplete;
+  const lockReason = !docsComplete ? 'checklist.lockedDocs' : 'checklist.lockedPhase';
 
   if (!loaded) {
     // A failed load deliberately leaves `loaded` false (see useProgress) so it
@@ -131,28 +164,44 @@ export default function PhasePage() {
   }
 
   function handleToggle(taskId) {
+    // Mirrors performToggle's own guard: a locked checkbox that somehow still
+    // received a click (already `disabled`, but belt-and-suspenders) is a
+    // silent no-op, not an error — the click never happened as far as saved
+    // state is concerned.
+    if (!unlocked) return;
     if (!name) {
       setPendingTaskId(taskId);
       return;
     }
+    // Read before toggling: the reward toast fires only on the off -> on
+    // transition, matching the original's `if (newState) showRewardToast()`
+    // — unchecking a mistaken tick shouldn't celebrate.
+    if (!isTaskDone(taskId)) showReward();
     toggleTask(taskId);
   }
 
   async function handleNameSubmit(employeeName, departmentId) {
-    await identify(employeeName, departmentId);
+    const result = await identify(employeeName, departmentId);
+    if (result === 'confirm-switch') {
+      // identify() deliberately left the department unchanged — the pending
+      // task stays pending until the switch is confirmed or cancelled below.
+      setPendingSwitch({ from: department, to: departmentId });
+      return;
+    }
     if (pendingTaskId) {
       toggleTask(pendingTaskId);
       setPendingTaskId(null);
     }
   }
 
-  if (!unlocked) {
-    return (
-      <Page>
-        <PageTitle>{tc(page.title)}</PageTitle>
-        <Notice>{t('checklist.locked')}</Notice>
-      </Page>
-    );
+  async function confirmSwitch() {
+    const { from, to } = pendingSwitch;
+    setPendingSwitch(null);
+    await switchDepartment(from, to);
+    if (pendingTaskId) {
+      toggleTask(pendingTaskId);
+      setPendingTaskId(null);
+    }
   }
 
   const allDone = page.blocks
@@ -160,10 +209,11 @@ export default function PhasePage() {
     .filter((item) => isItemVisible(item, level))
     .every((item) => isTaskDone(item.id));
 
-  // Whole-department completion unlocks the Completion page link — ported from
-  // isEmployeeOnboardingComplete. Reaching this point already implies every
-  // prior phase is done (the `unlocked` check above would have returned
-  // early), so this is just "is this the last phase, and is IT also done".
+  // Whole-department completion unlocks the Completion page link — ported
+  // from isEmployeeOnboardingComplete: just "is this the last phase, and is
+  // IT also done" (allDone already only reflects this phase's own items;
+  // reaching a done last phase implies every prior one was completed too,
+  // since finishing a phase is what unlocks the next).
   const isLastPhase = phaseIndex === content.phases.length - 1;
   const departmentComplete = isLastPhase && allDone;
 
@@ -210,6 +260,15 @@ export default function PhasePage() {
         </div>
       </div>
 
+      {/* renderPhaseLockNotice, ported: one banner above the checklist
+          explaining why locked items are disabled — not repeated per block,
+          and never a substitute for showing the checklist itself. */}
+      {!unlocked && (
+        <Notice>
+          <span aria-hidden="true">🔒</span> {t(lockReason)}
+        </Notice>
+      )}
+
       {page.blocks.map((block) => (
         <section
           key={block.heading}
@@ -222,11 +281,22 @@ export default function PhasePage() {
               .map((item) => {
                 const done = isTaskDone(item.id);
                 return (
-                  <li key={item.id} className="border-b border-line/60 py-2 last:border-0 dark:border-line-dark/60">
-                    <label className="flex cursor-pointer items-start gap-3">
+                  <li
+                    key={item.id}
+                    className={[
+                      'border-b border-line/60 py-2 last:border-0 dark:border-line-dark/60',
+                      !unlocked ? 'opacity-60' : '',
+                    ].join(' ')}
+                  >
+                    <label
+                      className={['flex items-start gap-3', !unlocked ? 'cursor-not-allowed' : 'cursor-pointer'].join(
+                        ' '
+                      )}
+                    >
                       <input
                         type="checkbox"
                         checked={done}
+                        disabled={!unlocked}
                         onChange={() => handleToggle(item.id)}
                         className="mt-1 h-4 w-4 shrink-0 accent-accent dark:accent-accent-dark"
                       />
@@ -328,11 +398,78 @@ export default function PhasePage() {
         </div>
       )}
 
-      {pendingTaskId && (
+      {/* One-time celebration for finishing the entire 90-day programme —
+          ported from celebrateOnboardingComplete. Bigger and more final than
+          the per-phase popup above: no "next phase" choice, just Print or
+          Continue, and Continue lands on the dedicated Completion page
+          rather than reopening in place. */}
+      {showOnboardingComplete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowOnboardingComplete(false);
+              navigate('/completion');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-card border border-line bg-surface-card p-6 text-center shadow-card-hover dark:border-line-dark dark:bg-surface-dark-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="onboarding-complete-title"
+          >
+            <div className="mx-auto mb-1 text-4xl" aria-hidden="true">
+              🎉
+            </div>
+            <Eyebrow>{t('completion.eyebrow')}</Eyebrow>
+            <h3 id="onboarding-complete-title" className="mb-2 mt-1 text-2xl font-bold">
+              {t('completion.welcome')}
+            </h3>
+            <p className="mb-5 text-sm text-ink-muted dark:text-ink-dark-muted">
+              {t('content.youVeCompletedTheFull90Day')}
+              {dept ? ` — ${tc(dept.content.title)}` : ''}. {t('content.everyChecklistEveryDocumentEveryPhaseThat')}
+            </p>
+            {/* No auto-dismiss timer — this moment waits for the employee to
+                close it themselves rather than being rushed. */}
+            <div className="flex flex-col gap-2">
+              <CtaLink to="/completion?print=1" onClick={() => setShowOnboardingComplete(false)}>
+                {t('completion.print')}
+              </CtaLink>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnboardingComplete(false);
+                  navigate('/completion');
+                }}
+                className="rounded-pill px-6 py-2 text-sm font-semibold text-ink-muted hover:text-ink dark:text-ink-dark-muted dark:hover:text-ink-dark"
+              >
+                {t('name.continue')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rewardToastNode}
+
+      {pendingTaskId && !pendingSwitch && (
         <NameModal
           onSubmit={handleNameSubmit}
           onCancel={() => setPendingTaskId(null)}
           knownDepartmentId={dept.id}
+        />
+      )}
+
+      {pendingSwitch && (
+        <DepartmentSwitchModal
+          fromDeptId={pendingSwitch.from}
+          toDeptId={pendingSwitch.to}
+          onConfirm={confirmSwitch}
+          onCancel={() => {
+            setPendingSwitch(null);
+            setPendingTaskId(null);
+          }}
         />
       )}
     </Page>

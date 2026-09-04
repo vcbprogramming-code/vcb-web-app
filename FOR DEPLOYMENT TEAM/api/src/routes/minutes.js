@@ -908,11 +908,18 @@ router.put(
   })
 );
 
-/** Delete. Admin only — "minutes deletable by admins". */
+/**
+ * Delete. Editor or admin — the original's deleteMeeting(id, token) in
+ * Code.js guards with isEditorOrAdmin_(token), and the access page's own copy
+ * spells it out: "Editors can edit meeting content, add/remove attachments,
+ * create/delete meetings, and file Fathom/Transkriptor recordings into
+ * projects." Admin-only here was a port regression, not a deliberate
+ * tightening — it silently took away a capability editors already had.
+ */
 router.delete(
   '/meetings/:id',
   requireAuth,
-  requireRole('minutes', 'admin'),
+  requireRole('minutes', 'editor', 'admin'),
   asyncRoute(async (req, res) => {
     const ok = await tx(async (c) => {
       const { rows: r } = await c.query(
@@ -1314,7 +1321,7 @@ router.get(
   requireRole('minutes', 'admin'),
   asyncRoute(async (req, res) => {
     const list = await rows(
-      `select at, actor, action, target, target_id, changes, note
+      `select id, at, actor, action, target, target_id, changes, note
          from minutes.audit_log
         where target_id = $1
         order by at desc, id desc`,
@@ -1322,6 +1329,7 @@ router.get(
     );
     res.json(
       list.map((e) => ({
+        id: String(e.id),
         when: e.at,
         who: e.actor || '(anonymous)',
         action: e.action,
@@ -1331,6 +1339,65 @@ router.get(
         note: e.note || '',
       }))
     );
+  })
+);
+
+/**
+ * Delete one audit-log entry for a meeting. Admin only.
+ *
+ * Ported from deleteAuditEntries(targetId, whens, token) in Code.js — the
+ * original deleted by a list of `when` timestamps in one call (its sheet had
+ * no row id); this schema's audit_log has a real primary key, so each row is
+ * deleted individually instead, matching this API's REST conventions
+ * elsewhere. "Clear all" (below) is the bulk case the original also offered.
+ *
+ * The original additionally deleted any version snapshot the entry's
+ * `details.versionSeq` pointed at, so pruning noisy edit-history entries did
+ * not leave orphaned, unreachable snapshots behind. This schema's
+ * minutes.versions rows are not linked from audit_log at all — they are
+ * their own independent list, exactly as EditHistoryModal.jsx already shows
+ * them — so there is nothing here to cascade; a version is deleted with its
+ * own DELETE /versions/:seq route instead.
+ */
+router.delete(
+  '/meetings/:id/audit/:entryId',
+  requireAuth,
+  requireRole('minutes', 'admin'),
+  asyncRoute(async (req, res) => {
+    const deleted = await rows(
+      `delete from minutes.audit_log where id = $1 and target_id = $2 returning id`,
+      [req.params.entryId, req.params.id]
+    );
+    if (!deleted.length) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ok: true });
+  })
+);
+
+/** Delete every audit-log entry for a meeting. Admin only. */
+router.delete(
+  '/meetings/:id/audit',
+  requireAuth,
+  requireRole('minutes', 'admin'),
+  asyncRoute(async (req, res) => {
+    await rows('delete from minutes.audit_log where target_id = $1', [req.params.id]);
+    res.json({ ok: true });
+  })
+);
+
+/** Delete one content snapshot. Admin only. */
+router.delete(
+  '/meetings/:id/versions/:seq',
+  requireAuth,
+  requireRole('minutes', 'admin'),
+  asyncRoute(async (req, res) => {
+    const n = Number(req.params.seq);
+    if (!Number.isInteger(n)) return res.status(400).json({ error: 'BAD_VERSION' });
+    const deleted = await rows(
+      `delete from minutes.versions where id = $1 and minute_id = $2 returning id`,
+      [n, req.params.id]
+    );
+    if (!deleted.length) return res.status(404).json({ error: 'NOT_FOUND' });
+    res.json({ ok: true });
   })
 );
 

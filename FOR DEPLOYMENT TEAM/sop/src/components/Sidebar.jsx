@@ -81,9 +81,17 @@ export default function Sidebar() {
   const { scenarios, reports, meta } = useStore();
   const { pathname } = useLocation();
 
+  // A case tagged into a module only via extraModules must still count there
+  // — buildSidebar() in the original increments every extra module too, and
+  // CaseListPane's own caseInModule() already matches on primary OR extra.
+  // Counting primary only undercounted the badge and could show count===0
+  // (dimmed/"empty") for a module that in fact had visible, filterable cases.
   const scenarioCounts = useMemo(() => {
     const n = {};
-    for (const s of scenarios) n[s.module] = (n[s.module] || 0) + 1;
+    for (const s of scenarios) {
+      n[s.module] = (n[s.module] || 0) + 1;
+      for (const m of s.extraModules || []) n[m] = (n[m] || 0) + 1;
+    }
     return n;
   }, [scenarios]);
 

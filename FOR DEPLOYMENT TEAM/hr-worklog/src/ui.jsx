@@ -197,12 +197,20 @@ const FLASH_TONES = {
   error: 'border-danger/30 bg-danger-bg text-danger-fg dark:bg-danger/15 dark:text-danger-dark',
 };
 
+/**
+ * Fixed, not inline: an inline flash pushed the grid below it down when it
+ * appeared and pulled everything back up when the 1.8s timer cleared it —
+ * on the weekly grid that meant the whole table (and the exact cell the
+ * person was about to click next) visibly jumped on every single save. A
+ * transient status message reporting on an action already taken should
+ * float over the page, not resize it.
+ */
 export function Flash({ kind = 'ok', children }) {
   if (!children) return null;
   return (
     <div
       role="status"
-      className={`rounded-control border px-3 py-2 text-sm font-medium ${FLASH_TONES[kind] ?? FLASH_TONES.ok}`}
+      className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-control border px-4 py-2.5 text-sm font-medium shadow-card-hover ${FLASH_TONES[kind] ?? FLASH_TONES.ok}`}
     >
       {children}
     </div>

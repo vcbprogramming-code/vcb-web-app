@@ -406,6 +406,26 @@ export function getMeetingAudit(id, { signal } = {}) {
 }
 
 /**
+ * Prune one activity entry, or a whole meeting's history/version snapshots.
+ * Admin only — ported from deleteAuditEntries/clearAuditHistory in Code.js:
+ * "an admin editing their own minutes can produce twenty entries in an
+ * afternoon and legitimately want that noise gone."
+ */
+export function deleteAuditEntry(id, entryId) {
+  return api.del(
+    `${BASE}/meetings/${encodeURIComponent(id)}/audit/${encodeURIComponent(entryId)}`
+  );
+}
+
+export function clearMeetingAudit(id) {
+  return api.del(`${BASE}/meetings/${encodeURIComponent(id)}/audit`);
+}
+
+export function deleteVersion(id, seq) {
+  return api.del(`${BASE}/meetings/${encodeURIComponent(id)}/versions/${encodeURIComponent(seq)}`);
+}
+
+/**
  * The whole audit log. Admin only.
  *
  * NO UI CALLS THIS YET. The per-meeting log (getMeetingAudit) is what the Edit

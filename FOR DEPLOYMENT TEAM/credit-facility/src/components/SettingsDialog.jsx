@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n, useTheme } from '@vcb/shared';
 import { useData } from '../lib/DataContext.jsx';
-import { useDashPrefs } from '../lib/useDashPrefs.js';
+import { useDashPrefs } from '../lib/DashPrefsContext.jsx';
 import * as apiCredit from '../lib/api.js';
 import { Button, Field, Input, Modal, Select } from './ui.jsx';
 

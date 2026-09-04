@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useI18n } from '@vcb/shared';
 import { useProgress } from '../lib/useProgress.js';
 import { ALL_DEPARTMENTS } from '../data/allDepartments.js';
@@ -18,6 +20,24 @@ export default function CompletionPage() {
   const { name, department, level, loaded, isTaskDone } = useProgress();
   const { t } = useI18n();
   const tc = useContentText();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // The onboarding-complete popup's "Print Completion Form" button (see
+  // celebrateOnboardingComplete's #completion-print in the original, which
+  // opened the certificate directly) lands here first — this page is the
+  // only place window.print() actually has the certificate to print. The
+  // param is stripped right after so navigating Back doesn't reprint.
+  const autoPrint = searchParams.get('print') === '1';
+  useEffect(() => {
+    if (!autoPrint) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('print');
+      return next;
+    }, { replace: true });
+    const id = setTimeout(() => window.print(), 300);
+    return () => clearTimeout(id);
+  }, [autoPrint, setSearchParams]);
 
   if (!loaded) {
     return (

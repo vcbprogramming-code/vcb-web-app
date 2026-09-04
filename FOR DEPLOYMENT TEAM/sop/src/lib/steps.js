@@ -17,10 +17,28 @@
  *   neither                                    → plain caption
  */
 
+/**
+ * Repair arrow artifacts a paste from Word/Excel/Confluence leaves behind —
+ * rendered LaTeX ($\rightarrow$, \Rightarrow, …) and a bare "->" — into a
+ * real →/← character. Ported verbatim from normalizePastedText() in the
+ * original apps-script/index.html: applied to every steps line and to the
+ * "when" (problem) field on save, so pasted content reads the same as it did
+ * in the sheet instead of keeping the literal escape sequence forever.
+ */
+export function normalizePastedText(text) {
+  return String(text == null ? '' : text)
+    .replace(/\$\s*\\(?:rightarrow|to|Rightarrow)\s*\$/g, '→')
+    .replace(/\\(?:rightarrow|Rightarrow)\b\s*/g, '→')
+    .replace(/\$\s*\\(?:leftarrow|Leftarrow)\s*\$/g, '←')
+    .replace(/\\(?:leftarrow|Leftarrow)\b\s*/g, '←')
+    .replace(/-->?>/g, '→')
+    .replace(/(^|[\s(])->(?=\s|$)/g, '$1→');
+}
+
 /** Convert textarea content → storage steps[] array. */
 export function stepsToStorage(text) {
   let stepNo = 0;
-  return text
+  return normalizePastedText(text)
     .split(/\r?\n/)
     .map((line) => {
       const trimmed = line.trim();

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth, useI18n } from '@vcb/shared';
 import { CARD_CLASS } from './ui.jsx';
 import GlobeBackground from './GlobeBackground.jsx';
+import { useGoogleIdToken } from './lib/googleIdentity.js';
 
 /**
  * The door to the portal.
@@ -23,6 +24,10 @@ export default function SignInScreen() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  // Set only by requestIdToken()'s own rejection (no client ID configured,
+  // popup closed) — kept separate from AuthProvider's `error`, which is a
+  // failed sign-in attempt, not a failure to even reach one.
+  const [googleError, setGoogleError] = React.useState(null);
   // GlobeBackground fills this in once its animation loop mounts. A ref, not
   // state: the globe's own click-to-break-apart is a fire-and-forget visual
   // cue, not something a re-render needs to know about.
@@ -41,13 +46,34 @@ export default function SignInScreen() {
     }
   }
 
+  // The button was previously wired to signInWithGoogle() with no idToken —
+  // the API's /auth/google always needs a real, verified one (auth.js's
+  // verifyGoogleIdToken checks it against Google, server-side), so every
+  // click failed silently. requestIdToken() actually runs Google Identity
+  // Services' One Tap / popup flow to get one.
+  //
+  // The button stays visible even when VITE_GOOGLE_CLIENT_ID is not yet
+  // configured for this deployment — Google is the intended primary path,
+  // not a feature to hide until finished; a click says exactly what is
+  // missing instead of doing nothing.
+  const { requestIdToken } = useGoogleIdToken();
+
   async function google() {
     setBusy(true);
+    setGoogleError(null);
     globeRef.current?.startLogin();
     try {
-      await signInWithGoogle();
-    } catch {
-      /* same */
+      const idToken = await requestIdToken();
+      await signInWithGoogle(idToken);
+    } catch (err) {
+      // requestIdToken's own rejection (no client ID configured, popup
+      // closed) vs. a real sign-in failure AuthProvider already surfaces —
+      // only the former needs a message from here.
+      if (err?.message === 'VITE_GOOGLE_CLIENT_ID is not configured') {
+        setGoogleError('auth.googleNotConfigured');
+      } else if (err?.message === 'Google sign-in was not shown' || err?.message === 'No credential returned') {
+        setGoogleError('auth.googleCancelled');
+      }
     } finally {
       setBusy(false);
     }
@@ -140,6 +166,12 @@ export default function SignInScreen() {
                 </svg>
                 {t('auth.signInWithGoogle')}
               </button>
+
+              {googleError ? (
+                <p role="alert" className="text-xs text-danger">
+                  {t(googleError)}
+                </p>
+              ) : null}
 
               <div className="flex items-center gap-3 py-1">
                 <span className="h-px flex-1 bg-line dark:bg-line-dark" />

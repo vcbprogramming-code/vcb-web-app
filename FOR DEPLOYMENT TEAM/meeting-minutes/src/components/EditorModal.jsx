@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, useI18n } from '@vcb/shared';
 import * as minutesApi from '../lib/minutesApi';
 import { errorMessage } from '../lib/errors';
-import { Button, Field, TextInput, useConfirm, usePrompt } from '../ui';
+import { Button, Field, TextInput, useConfirm } from '../ui';
 import EditHistoryModal from './EditHistoryModal';
 import VersionPreviewModal from './VersionPreviewModal';
 
@@ -42,7 +42,6 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
   const { t } = useI18n();
   const { hasRole } = useAuth();
   const { confirm, node: confirmNode } = useConfirm();
-  const { prompt, node: promptNode } = usePrompt();
 
   const areaRef = useRef(null);
   const snapshotRef = useRef(null);
@@ -54,6 +53,9 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
   const [historyOpen, setHistoryOpen] = useState(false);
   const [previewSeq, setPreviewSeq] = useState(null);
 
+  // Delete is editor-or-admin, matching deleteMeeting's isEditorOrAdmin_
+  // guard in the original — not admin-only.
+  const canDelete = hasRole('minutes', 'editor', 'admin');
   const isAdmin = hasRole('minutes', 'admin');
 
   /**
@@ -404,33 +406,6 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
     focusArea();
   }
 
-  async function addLink() {
-    // The selection is lost the moment the dialog takes focus, so it is
-    // captured now and restored before execCommand runs.
-    const sel = window.getSelection();
-    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
-    const url = await prompt(t('editor.linkUrl'), {
-      title: t('editor.linkTitle'),
-      placeholder: 'https://',
-      okLabel: t('common.add'),
-    });
-    if (!url) {
-      focusArea();
-      return;
-    }
-    if (!/^(https?:|mailto:)/i.test(url.trim())) {
-      onToast(t('common.error'));
-      focusArea();
-      return;
-    }
-    if (range && sel) {
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-    document.execCommand('createLink', false, url.trim());
-    focusArea();
-  }
-
   async function handleCancel() {
     if (snapshotRef.current !== null && snapshot() !== snapshotRef.current) {
       const ok = await confirm(t('editor.discardHint'), {
@@ -530,6 +505,9 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
           >
             {/* onMouseDown preventDefault everywhere: without it the button
                 takes focus and the selection the command acts on is gone. */}
+            {/* Sweeping-arrow glyphs, matching the left/right orientation
+                every other editor (Word, Google Docs) uses — ↶/↷ curl
+                upward out of the loop and read as vertical, not as undo. */}
             <button
               type="button"
               title={t('editor.undo')}
@@ -537,7 +515,10 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
               onClick={doUndo}
               className={toolBtn}
             >
-              ↶
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+              </svg>
             </button>
             <button
               type="button"
@@ -546,7 +527,10 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
               onClick={doRedo}
               className={toolBtn}
             >
-              ↷
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m15 14 5-5-5-5" />
+                <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+              </svg>
             </button>
             <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-line dark:bg-line-dark" />
             <button
@@ -566,6 +550,15 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
               className={toolBtn}
             >
               <i>I</i>
+            </button>
+            <button
+              type="button"
+              title={t('editor.underline')}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => cmd('underline')}
+              className={toolBtn}
+            >
+              <u>U</u>
             </button>
             <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-line dark:bg-line-dark" />
             <button
@@ -595,25 +588,6 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
             >
               {t('editor.tickListBtn')}
             </button>
-            <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-line dark:bg-line-dark" />
-            <button
-              type="button"
-              title={t('editor.addLink')}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={addLink}
-              className={toolBtn}
-            >
-              {t('editor.addLinkBtn')}
-            </button>
-            <button
-              type="button"
-              title={t('editor.unlink')}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => cmd('unlink')}
-              className={toolBtn}
-            >
-              {t('editor.unlinkBtn')}
-            </button>
           </div>
 
           {/* .ed-area's descendant rules live in index.css: its children are
@@ -639,7 +613,7 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
             >
               {t('editor.editHistory')}
             </Button>
-            {isAdmin ? (
+            {canDelete ? (
               <Button variant="danger" onClick={handleDelete}>
                 {t('modal.deleteMeeting')}
               </Button>
@@ -657,6 +631,9 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
         meeting={meeting}
         onClose={() => setHistoryOpen(false)}
         onViewVersion={setPreviewSeq}
+        isAdmin={isAdmin}
+        onBusy={onBusy}
+        onToast={onToast}
       />
       <VersionPreviewModal
         seq={previewSeq}
@@ -665,7 +642,6 @@ export default function EditorModal({ meeting, onClose, onSaved, onDeleted, onTo
         onClose={() => setPreviewSeq(null)}
       />
       {confirmNode}
-      {promptNode}
     </>
   );
 }

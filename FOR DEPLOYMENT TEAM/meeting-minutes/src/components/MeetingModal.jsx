@@ -24,7 +24,10 @@ export default function MeetingModal({ open, meeting, onClose, onSaved, onDelete
   const { projects } = useMinutesData();
   const { confirm, node: confirmNode } = useConfirm();
 
-  const isAdmin = hasRole('minutes', 'admin');
+  // Delete is editor-or-admin, matching deleteMeeting's isEditorOrAdmin_
+  // guard in the original — not admin-only, which would only produce a 403
+  // for an editor who has every other right this modal already grants them.
+  const canDelete = hasRole('minutes', 'editor', 'admin');
 
   const [projectId, setProjectId] = useState('');
   const [title, setTitle] = useState('');
@@ -111,9 +114,7 @@ export default function MeetingModal({ open, meeting, onClose, onSaved, onDelete
         title={meeting ? t('modal.editMeeting') : t('modal.newMeeting')}
         actions={
           <>
-            {/* Delete is admin-only in the API; showing it to an editor would
-                only produce a 403 they cannot act on. */}
-            {meeting && isAdmin ? (
+            {meeting && canDelete ? (
               <Button variant="danger" className="mr-auto" onClick={remove}>
                 {t('common.delete')}
               </Button>

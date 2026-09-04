@@ -131,7 +131,10 @@ export default function Dashboard({
               the greeting it belongs with and pushed the calendar down by its
               whole height. */}
         {showBanner && (
-          <div className={`${CARD_CLASS} mb-4 flex items-start gap-3.5 px-4 py-3.5`}>
+          // Same padding/rounding as the greeting card above (px-8 py-6,
+          // rounded-card) so the two read as one matched pair, not a big
+          // banner over a noticeably smaller strip.
+          <div className={`${CARD_CLASS} mb-4 flex items-start gap-3.5 px-8 py-6`}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-accent/10 text-accent dark:bg-accent-dark/15 dark:text-accent-dark">
               <AnnouncementIcon className="h-4 w-4" />
             </span>
@@ -140,7 +143,12 @@ export default function Dashboard({
                 <p className="font-semibold text-ink dark:text-ink-dark">{announcement.title}</p>
               )}
               {announcement.body && (
-                <p className="mt-0.5 whitespace-pre-line text-sm text-ink-muted dark:text-ink-dark-muted">
+                // Hard-capped at 2 lines — line-clamp-2, not whitespace-pre-line:
+                // an announcement that ran long or kept its own line breaks used
+                // to grow the card as tall as its text, which read as messy next
+                // to every other fixed-height card on the dashboard. The admin
+                // editor is the place to keep it short, not this card's height.
+                <p className="mt-0.5 line-clamp-2 text-sm text-ink-muted dark:text-ink-dark-muted">
                   {announcement.body}
                 </p>
               )}

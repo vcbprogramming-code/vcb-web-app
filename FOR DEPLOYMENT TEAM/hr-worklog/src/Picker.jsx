@@ -55,9 +55,36 @@ export default function Picker({ anchor, activities, costs, onApply, onClose }) 
     searchRef.current?.focus();
   }, [step]);
 
+  // onClose is read through a ref rather than as a direct effect dependency,
+  // so a caller passing an inline `() => ...` prop (a fresh reference on
+  // every one of ITS OWN renders, unrelated to anything happening in here)
+  // doesn't retrigger this effect and tear down/reattach the listener for no
+  // reason.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // CAPTURE phase, not bubble — this is the actual fix for "the orange
+  // [one-to-many] items aren't clickable/close the picker instead of
+  // advancing to step 2".
+  //
+  // An item button's own onMouseDown calls pick(it), which for a
+  // one-to-many activity calls setStep(2) — a synchronous state update
+  // inside a discrete DOM event handler, which React 18 flushes
+  // synchronously rather than batching. That re-render replaces step 1's
+  // item list with step 2's (different data, different keys), so the
+  // ORIGINAL click target node is removed from the document as part of
+  // React's own bubble-phase dispatch — before a bubble-phase listener on
+  // `document` ever runs. By the time this effect's bubble-phase onDown
+  // used to fire, e.target was a detached node: genuinely no longer inside
+  // boxRef.current (which is unchanged and still in the document), because
+  // it was no longer inside ANYTHING. `.contains()` was answering honestly;
+  // the question arrived too late. Capture fires on `document` on the way
+  // DOWN to the target, before React's synthetic bubble-phase dispatch has
+  // run at all, so it always sees the DOM as it existed when the mouse
+  // actually went down.
   useEffect(() => {
     function onDown(e) {
-      if (boxRef.current && !boxRef.current.contains(e.target)) onClose();
+      if (boxRef.current && !boxRef.current.contains(e.target)) onCloseRef.current();
     }
     function onKey(e) {
       if (e.key !== 'Escape') return;
@@ -67,15 +94,15 @@ export default function Picker({ anchor, activities, costs, onApply, onClose }) 
       if (step === 2) {
         setStep(1);
         setQuery('');
-      } else onClose();
+      } else onCloseRef.current();
     }
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('mousedown', onDown, true);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('mousedown', onDown, true);
       document.removeEventListener('keydown', onKey);
     };
-  }, [step, onClose]);
+  }, [step]);
 
   const items = step === 1 ? activities : costs;
 

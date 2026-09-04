@@ -3,11 +3,23 @@
 // Ported from getDashPrefs()/saveDashPrefs() in legacy.js: the original never
 // routed this through google.script.run, only localStorage, and applied a
 // toggle immediately (no "Save" button gates it, unlike the cost-category
-// list). Kept as its own hook rather than folded into FilterContext.jsx,
+// list). Kept as its own context rather than folded into FilterContext.jsx,
 // which is a different concern (what the table below is scoped to, not which
 // summary cards are visible).
+//
+// A CONTEXT, NOT A BARE HOOK
+//
+// This used to be a standalone useDashPrefs() called separately by both
+// SettingsDialog and Dashboard. Each call created its OWN useState, so
+// ticking a box in Settings updated only that instance's copy — it wrote to
+// localStorage, but Dashboard's own state never learned about it, and the
+// cards stayed exactly as they were until a full reload. React state is not
+// shared just because two components read the same localStorage key; only
+// one source of truth, held above both of them, actually is.
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+
+const DashPrefsContext = createContext(null);
 
 const KEY = 'vcb_credit_dashprefs';
 
@@ -36,7 +48,7 @@ function readStored() {
   }
 }
 
-export function useDashPrefs() {
+export function DashPrefsProvider({ children }) {
   const [prefs, setPrefs] = useState(() => readStored() || DEFAULT);
 
   useEffect(() => {
@@ -51,5 +63,13 @@ export function useDashPrefs() {
     setPrefs((p) => ({ ...p, [group]: { ...p[group], [key]: value } }));
   }, []);
 
-  return { prefs, setGroup };
+  return (
+    <DashPrefsContext.Provider value={{ prefs, setGroup }}>{children}</DashPrefsContext.Provider>
+  );
+}
+
+export function useDashPrefs() {
+  const ctx = useContext(DashPrefsContext);
+  if (!ctx) throw new Error('useDashPrefs must be used inside <DashPrefsProvider>');
+  return ctx;
 }

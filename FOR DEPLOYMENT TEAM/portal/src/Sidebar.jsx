@@ -33,7 +33,12 @@ export default function Sidebar({
 }) {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
-  const { token } = useAuth();
+  const { token, hasRole } = useAuth();
+  // Ported from applyRoleLabel() in the original — "Admin" under the name for
+  // a portal admin, "Staff" otherwise. portal.adminRole already existed in
+  // this file's own i18n.js but nothing ever read it; the identity chip
+  // showed "Staff" unconditionally regardless of the signed-in person's role.
+  const isAdmin = hasRole('portal', 'admin');
 
   // Pulled out of the applications list and rendered under "More" instead. It
   // is a ported module like the others - its URL comes from portal.apps, not a
@@ -76,7 +81,9 @@ export default function Sidebar({
             <div className="truncate text-sm font-medium text-white" title={userTitle}>
               {greeting}
             </div>
-            <div className="text-[11px] text-sidebar-dim">{t('portal.staff')}</div>
+            <div className="text-[11px] text-sidebar-dim">
+              {t(isAdmin ? 'portal.adminRole' : 'portal.staff')}
+            </div>
           </div>
         </div>
 
@@ -153,6 +160,8 @@ export default function Sidebar({
             <a
               className={NAV_ITEM}
               href={appLink(onboardingApp.url, { theme, lang, token })}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={onClose}
               {...bindTooltip({
                 key: 'nav-onboarding',

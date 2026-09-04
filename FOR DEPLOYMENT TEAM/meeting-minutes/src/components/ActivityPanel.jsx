@@ -81,6 +81,52 @@ export default function ActivityPanel({ meeting, onClose, onUpdated, onToast, on
     }
   }
 
+  async function deleteEntry(entryId) {
+    const ok = await confirm(t('history.deleteEntryTitle'), { okLabel: t('common.delete') });
+    if (!ok) return;
+    onBusy(t('comment.deleting'));
+    try {
+      await minutesApi.deleteAuditEntry(meeting.id, entryId);
+      setAudit((prev) => (prev || []).filter((e) => e.id !== entryId));
+    } catch (err) {
+      onToast(errorMessage(err, t));
+    } finally {
+      onBusy(null);
+    }
+  }
+
+  async function deleteVersion(seq) {
+    const ok = await confirm(t('history.deleteVersionTitle'), { okLabel: t('common.delete') });
+    if (!ok) return;
+    onBusy(t('comment.deleting'));
+    try {
+      await minutesApi.deleteVersion(meeting.id, seq);
+      setVersions((prev) => (prev || []).filter((v) => v.seq !== seq));
+    } catch (err) {
+      onToast(errorMessage(err, t));
+    } finally {
+      onBusy(null);
+    }
+  }
+
+  async function clearAll() {
+    const ok = await confirm(`${t('history.clearAllTitle')} ${t('history.clearAllHint')}`, {
+      title: t('history.clearAll'),
+      okLabel: t('common.delete'),
+    });
+    if (!ok) return;
+    onBusy(t('comment.deleting'));
+    try {
+      await minutesApi.clearMeetingAudit(meeting.id);
+      setAudit([]);
+      setVersions([]);
+    } catch (err) {
+      onToast(errorMessage(err, t));
+    } finally {
+      onBusy(null);
+    }
+  }
+
   async function removeComment(commentId) {
     const ok = await confirm(t('attach.removeHint'), {
       title: t('comment.deleteTitle'),
@@ -103,11 +149,16 @@ export default function ActivityPanel({ meeting, onClose, onUpdated, onToast, on
   // something were created after a later edit.
   const editEntries = (audit || [])
     .filter((e) => !e.action.startsWith('create_'))
-    .map((e) => ({ kind: 'edit', when: e.when, node: (
-      <span>
-        <b className="text-ink dark:text-ink-dark">{t(`audit.${e.action}`)}</b> · {e.who}
-      </span>
-    ) }));
+    .map((e) => ({
+      kind: 'edit',
+      when: e.when,
+      entryId: e.id,
+      node: (
+        <span>
+          <b className="text-ink dark:text-ink-dark">{t(`audit.${e.action}`)}</b> · {e.who}
+        </span>
+      ),
+    }));
 
   const versionByWhen = new Map((versions || []).map((v) => [v.takenAt, v]));
 
@@ -181,6 +232,16 @@ export default function ActivityPanel({ meeting, onClose, onUpdated, onToast, on
             </div>
           ) : null}
 
+          {isAdmin && (editEntries.length || (versions || []).length) ? (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="self-end text-[11.5px] font-medium text-ink-muted underline-offset-2 hover:text-danger hover:underline dark:text-ink-dark-muted dark:hover:text-danger-dark"
+            >
+              {t('history.clearAll')}
+            </button>
+          ) : null}
+
           {historyError ? (
             <div className="text-[13px] text-danger dark:text-danger-dark">{historyError}</div>
           ) : historyLoading ? (
@@ -203,10 +264,25 @@ export default function ActivityPanel({ meeting, onClose, onUpdated, onToast, on
                       {fmtTimestamp(entry.when, lang)}
                     </div>
                   </div>
-                  {version ? (
-                    <Button onClick={() => onViewVersion(version.seq)} title={t('history.viewHint')}>
-                      {t('history.view')}
-                    </Button>
+                  {entry.kind === 'edit' && isAdmin ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {version ? (
+                        <Button onClick={() => onViewVersion(version.seq)} title={t('history.viewHint')}>
+                          {t('history.view')}
+                        </Button>
+                      ) : null}
+                      <IconButton
+                        onClick={() => {
+                          deleteEntry(entry.entryId);
+                          if (version) deleteVersion(version.seq);
+                        }}
+                        title={t('history.deleteEntry')}
+                        aria-label={t('history.deleteEntry')}
+                        className="text-ink-muted hover:text-danger dark:text-ink-dark-muted dark:hover:text-danger-dark"
+                      >
+                        ✕
+                      </IconButton>
+                    </div>
                   ) : null}
                 </div>
               );

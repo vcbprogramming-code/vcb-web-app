@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@vcb/shared';
 
 import { MODULE_ORDER, moduleLabel } from '../data/config.js';
-import { stepsFromStorage, stepsToStorage } from '../lib/steps.js';
+import { normalizePastedText, stepsFromStorage, stepsToStorage } from '../lib/steps.js';
 import { errorKey } from '../lib/sopApi.js';
 import { useStore } from '../store.jsx';
 import AttachmentRows, {
@@ -107,7 +107,11 @@ export default function EditCaseModal({ mode, scenario, onClose }) {
   }
 
   async function save() {
-    if (!titleTH.trim()) {
+    // Required only when creating — doSave() in the original guards this on
+    // isNew, and editScenario() server-side treats an empty titleTH as "omit
+    // the Thai title paragraph," not an error. Requiring it on every edit
+    // blocked clearing titleTH on an existing case, which the original allowed.
+    if (isNew && !titleTH.trim()) {
       setErr({ code: 'TITLE_REQUIRED' });
       return;
     }
@@ -117,11 +121,17 @@ export default function EditCaseModal({ mode, scenario, onClose }) {
     // displayNo is deliberately NOT sent: the API recomputes it from row order
     // on every read, and a client copy would be stale the moment anything is
     // reordered. `no` is not sent either — it is the address, not a field.
+    //
+    // titleTH is omitted rather than sent as '' when blanked on an edit: the
+    // API's edit schema treats a PRESENT titleTH as required non-empty (an
+    // omitted key means "leave alone," matching editScenario()'s original
+    // contract) — sending '' would trade this bug for a 400 from the server
+    // instead of actually clearing the field the way the original did.
     const payload = {
       module,
-      titleTH: titleTH.trim(),
+      ...(isNew || titleTH.trim() ? { titleTH: titleTH.trim() } : {}),
       titleEN: titleEN.trim(),
-      when: when.trim(),
+      when: normalizePastedText(when).trim(),
       steps: stepsToStorage(steps),
       note: note.trim(),
       ref: ref.trim(),

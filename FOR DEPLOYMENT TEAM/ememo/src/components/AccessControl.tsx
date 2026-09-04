@@ -25,6 +25,7 @@ export default function AccessControl() {
 
   const isAdmin = !!cfg?.isAdmin
   const codeKeys = Object.keys(cfg?.codeLabels ?? {})
+  const projectKeys = cfg?.projectKeys ?? []
 
   const ruleOf = (kind: 'codes' | 'projects', key: string) =>
     rules?.[kind][key] ?? { conf: false, allow: [] }
@@ -79,6 +80,22 @@ export default function AccessControl() {
                       </label>
                       <input type="text" placeholder="allow emails (comma-separated)" defaultValue={r.allow.join(', ')}
                         disabled={!r.conf} onChange={(e) => setAllow('codes', c, e.target.value)}
+                        style={{ flex: 1, minWidth: 200, padding: '6px 9px', border: '1.5px solid #e1e4ee', borderRadius: 7, fontSize: 12 }} />
+                    </div>
+                  )
+                })}
+
+                <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: '.6px', color: '#6b7280', margin: '16px 0 6px' }}>BY PROJECT</div>
+                {projectKeys.map((p) => {
+                  const r = ruleOf('projects', p)
+                  return (
+                    <div key={p} className="acc-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 150 }}>
+                        <input type="checkbox" checked={r.conf} onChange={(e) => setConf('projects', p, e.target.checked)} />
+                        <b>{p}</b>
+                      </label>
+                      <input type="text" placeholder="allow emails (comma-separated)" defaultValue={r.allow.join(', ')}
+                        disabled={!r.conf} onChange={(e) => setAllow('projects', p, e.target.value)}
                         style={{ flex: 1, minWidth: 200, padding: '6px 9px', border: '1.5px solid #e1e4ee', borderRadius: 7, fontSize: 12 }} />
                     </div>
                   )

@@ -92,7 +92,10 @@ const LH_DEFAULTS: Record<string, string> = {
   LPB: 'ผู้จัดการโครงการ', BV: 'ผู้จัดการโครงการ', PN4: 'ผู้จัดการโครงการ',
   EP: 'ผู้จัดการโครงการ', 'V&K': 'ผู้จัดการโครงการ',
 }
-const LH_PREFIX: Record<string, string> = { BT1: 'BT', VC: 'VC', VK2: 'VK', CVE: 'CVE', LPB: 'LPB', BV: 'BV', PN4: 'PN4', EP: 'EP', 'V&K': 'V&K' }
+// Ported verbatim from LETTERHEAD's own `prefix` field in Code.js — several
+// don't match the project code (LPB is 'VC-LBP', PN4 and VK2 both share
+// 'BP', 'V&K' is 'VK'), so this must not be derived from the project key.
+const LH_PREFIX: Record<string, string> = { BT1: 'BT', VC: 'VC', VK2: 'BP', CVE: 'CVE', LPB: 'VC-LBP', BV: 'BV', PN4: 'BP', EP: 'EP', 'V&K': 'VK' }
 const LH_COMPANY: Record<string, string> = {
   CVE: 'บริษัท ชวนา เอ็นจิเนียร์ริ่ง จำกัด',
   LPB: 'กลุ่มวิจิตรภัณฑ์ก่อสร้าง — โครงการหลวงพระบาง',
@@ -129,7 +132,10 @@ function statusFromEntries(entries: ReviewEntry[]): Status {
   for (const e of entries) {
     if (e.action === 'approve') status = 'approved'
     else if (e.action === 'reject') status = 'rejected'
-    else if (e.action === 'reopen') status = 'pending'
+    // Reactivated, not reset — matches readDiscussions_ in Code.js. A reopened
+    // document floats back to the top (App.tsx's sort ranks 'commented' first)
+    // and shows the same "needs another look" badge a fresh comment would.
+    else if (e.action === 'reopen') status = 'commented'
     else if (e.action === 'comment' && status === 'pending') status = 'commented'
   }
   return status
@@ -285,7 +291,14 @@ export const mockApi: Api = {
     const email = emailFor(a.authToken)
     if (!email || !MANAGERS.has(email)) return { ok: false, error: 'Not authorised' }
     for (const p of Object.keys(RAW)) RAW[p] = RAW[p]!.filter((r) => r.id !== a.docId)
-    delete THREADS[a.docId]
+    // Preserve the thread as an audit trail, matching deleteDocument in
+    // Code.js: it trashes the register row but never clears Discussions —
+    // it appends a 'delete' entry instead, so the history of who commented,
+    // approved, or rejected before deletion survives even though the row
+    // itself is gone. review()'s own read path already filters 'delete'
+    // entries back out (see the action !== 'delete' filter above), so this
+    // is a pure append with no other reader affected.
+    ; (THREADS[a.docId] ??= []).push({ action: 'delete', email, time: now(), text: 'Document deleted' })
     return { ok: true }
   },
   async previewLetter(a: PreviewLetterArgs): Promise<PreviewLetterResult> {
@@ -327,21 +340,27 @@ export const mockApi: Api = {
     await wait(160)
     return { ok: true, atts: [], threadId: '' }
   },
+  // Same gate as approve/reject/delete/mango — Code.js reuses one isManager_
+  // check for both instead of a separate admin-only concept, so anyone
+  // granted management authority automatically gets Access Control rights
+  // too. A narrower `=== OWNER` check here would silently diverge the moment
+  // a second name is ever added to MANAGERS.
   async getAccessConfig(authToken): Promise<AccessConfigResult> {
     await wait(180)
     const email = emailFor(authToken)
-    if (!email || email !== OWNER) return { ok: false, isAdmin: false, error: 'Sign in as an admin to manage access.' }
+    if (!email || !MANAGERS.has(email)) return { ok: false, isAdmin: false, error: 'Sign in as an admin to manage access.' }
     return {
       ok: true, isAdmin: true, email,
       rules: ACCESS_RULES,
       codeLabels: { '01': 'บริหาร', '02A': 'วิศวะ', '02B': 'วิศวะ', '02C': 'วิศวะ', '08': 'บุคคล', '09': 'บัญชี', '10': 'ขอหนังสือรับรอง' },
+      projectKeys: Object.keys(RAW).sort(),
       defaultPublicPrefixes: ['01', '02', '03', '04', '05', '06', '07', '09', '10'],
     }
   },
   async setAccessConfig(authToken, jsonPayload): Promise<SetAccessConfigResult> {
     await wait(220)
     const email = emailFor(authToken)
-    if (!email || email !== OWNER) return { ok: false, error: 'Not authorised' }
+    if (!email || !MANAGERS.has(email)) return { ok: false, error: 'Not authorised' }
     try { ACCESS_RULES = JSON.parse(jsonPayload) as AccessRules } catch { return { ok: false, error: 'Bad payload' } }
     return { ok: true, rules: ACCESS_RULES }
   },

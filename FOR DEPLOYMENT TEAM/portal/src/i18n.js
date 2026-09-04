@@ -26,6 +26,14 @@ export const dictionary = createDictionary({
   'auth.back': { th: '← กลับไปเลือกวิธีเข้าสู่ระบบ', en: '← Back to sign-in options' },
   'auth.badCredentials': { th: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', en: 'That email and password do not match.' },
   'auth.failed': { th: 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', en: 'Sign-in failed. Please try again.' },
+  'auth.googleNotConfigured': {
+    th: 'ยังไม่ได้ตั้งค่าการเข้าสู่ระบบด้วย Google สำหรับระบบนี้ — กรุณาใช้อีเมลและรหัสผ่านแทน',
+    en: 'Google sign-in is not yet configured for this deployment — use email and password for now.',
+  },
+  'auth.googleCancelled': {
+    th: 'การเข้าสู่ระบบด้วย Google ถูกยกเลิก กรุณาลองอีกครั้ง',
+    en: 'Google sign-in was cancelled — try again.',
+  },
   'common.loading': { th: 'กำลังโหลด…', en: 'Loading…' },
 
   /* ------------------------------- chrome -------------------------------- */

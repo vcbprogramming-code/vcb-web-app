@@ -18,7 +18,7 @@
 // Error state is exposed as TRANSLATION KEYS, not prose: the API returns
 // machine-readable codes and the UI renders Thai or English through t().
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getProgress,
   saveEmployee,
@@ -35,6 +35,7 @@ import {
   setEmployeeLevel as persistLevel,
   setEmployeeName as persistName,
 } from './identity.js';
+import { getDepartmentTaskIds, hasStartedDepartment } from './departmentTasks.js';
 
 export function useProgress() {
   const [name, setNameState] = useState(getEmployeeName);
@@ -50,6 +51,13 @@ export function useProgress() {
   const [loaded, setLoaded] = useState(() => !getEmployeeName());
   const [loadError, setLoadError] = useState(null);
   const [saveError, setSaveError] = useState(null);
+
+  // identify() needs the latest progress to decide whether a department
+  // switch would discard anything, but must stay a stable callback (its
+  // identity is depended on elsewhere) — a ref sidesteps adding `progress`
+  // as a dependency, which would recreate it on every task toggle.
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
 
   useEffect(() => {
     if (!name) return undefined;
@@ -97,11 +105,32 @@ export function useProgress() {
    *  checkbox, say) happens before Department Selection in the journey, and
    *  the original app's own promptForNameOnly() never asked for a department
    *  at that point: forcing the choice early would just make the person pick
-   *  it twice, once here and once for real at Department Selection. */
+   *  it twice, once here and once for real at Department Selection.
+   *
+   *  If deptId names a DIFFERENT department than the one already on record,
+   *  AND the employee has actual progress there, this does NOT switch —
+   *  ported from selectDepartment()'s own currentDept!==deptId guard, which
+   *  hands off to promptDepartmentSwitchConfirm rather than overwriting
+   *  silently. Returns 'confirm-switch' so the caller can show that prompt
+   *  and, only on confirmation, call switchDepartment() itself; an employee
+   *  who hasn't started the old department yet is switched immediately, same
+   *  as the original (no progress to lose, nothing to confirm). */
   const identify = useCallback(async (employeeName, deptId) => {
     const trimmed = employeeName.trim();
     persistName(trimmed);
     setNameState(trimmed);
+
+    const currentDept = getEmployeeDepartment();
+    const isDone = (taskId) => !!progressRef.current[taskId];
+    if (deptId && currentDept && currentDept !== deptId && hasStartedDepartment(currentDept, isDone)) {
+      try {
+        await saveEmployee({ name: trimmed });
+      } catch {
+        setSaveError('progress.saveFailed');
+      }
+      return 'confirm-switch';
+    }
+
     if (deptId) {
       persistDepartment(deptId);
       setDepartmentState(deptId);
@@ -114,6 +143,7 @@ export function useProgress() {
       // there is somewhere to show it.
       setSaveError('progress.saveFailed');
     }
+    return 'ok';
   }, []);
 
   const setLevel = useCallback(async (newLevel) => {
@@ -184,12 +214,16 @@ export function useProgress() {
   /**
    * Switch department, discarding the old department's progress.
    *
-   * `oldDeptTaskIds` comes from the old department's own content because the
-   * API does not have it. See onboardingApi.switchDepartment for why prefix
-   * matching must not come back.
+   * The old department's task ids come from its own content (getDepartmentTaskIds)
+   * because the API does not have them. See onboardingApi.switchDepartment for
+   * why prefix matching must not come back.
    */
-  const switchDepartment = useCallback(async (nextDeptId, oldDeptTaskIds = []) => {
+  const switchDepartment = useCallback(async (fromDeptId, nextDeptId) => {
     const employeeName = getEmployeeName();
+    // 'senior': every id that could possibly be marked done, regardless of
+    // the employee's current level, so a stray senior-only checkmark can't
+    // survive the switch and reappear later if they're ever promoted.
+    const oldDeptTaskIds = getDepartmentTaskIds(fromDeptId, 'senior');
     persistDepartment(nextDeptId);
     setDepartmentState(nextDeptId);
     setProgress((prev) => {

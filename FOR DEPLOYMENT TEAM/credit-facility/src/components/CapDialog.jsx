@@ -28,7 +28,7 @@ export default function CapDialog({ cap, onClose }) {
 
   const save = async () => {
     const raw = String(amount).trim();
-    if (raw !== '' && !Number.isFinite(moneyVal(raw))) {
+    if (raw !== '' && (!Number.isFinite(moneyVal(raw)) || moneyVal(raw) < 0)) {
       notify(t('cost.badBudget'));
       return;
     }

@@ -50,7 +50,15 @@ function Slot({
   // saved ever disappears). Gating on disabled alone would still show a live
   // "+" that just refuses the click; hiding it is what tells someone there is
   // nothing to click yet.
-  if (isExtra && !value && !mainFilled) return null;
+  //
+  // Hidden via `invisible` (keeps its layout box, just not painted or
+  // clickable) rather than unmounted — an unmounted slot meant every row's
+  // height changed the instant its FIRST cell picked up a value, which
+  // visibly reflowed the entire table on every single save (every other
+  // row's "+ Task 2" hints appearing/disappearing at once, not just the
+  // edited cell). A row's height must not depend on which of its cells
+  // happen to be filled in.
+  const hideExtra = isExtra && !value && !mainFilled;
 
   // The placeholder is rendered by a CSS pseudo-element reading data-ph (see
   // index.css): a real <input> per slot would be 31 x 2 x N focusable nodes in
@@ -71,12 +79,15 @@ function Slot({
   return (
     <button
       type="button"
-      disabled={locked}
-      onClick={(ev) => !locked && onOpen(field, ev.currentTarget)}
-      title={value ? cellTitle(value, activityByCode, costByCode) : hintTitle}
-      data-ph={!value && placeholder ? placeholder : undefined}
+      disabled={locked || hideExtra}
+      tabIndex={hideExtra ? -1 : undefined}
+      aria-hidden={hideExtra || undefined}
+      onClick={(ev) => !locked && !hideExtra && onOpen(field, ev.currentTarget)}
+      title={hideExtra ? undefined : value ? cellTitle(value, activityByCode, costByCode) : hintTitle}
+      data-ph={!hideExtra && !value && placeholder ? placeholder : undefined}
       className={
         'block w-full truncate rounded px-1 py-0.5 text-left text-[0.68rem] leading-tight ' +
+        (hideExtra ? 'invisible pointer-events-none ' : '') +
         (locked ? 'cursor-default' : 'cursor-pointer hover:bg-brand-50 dark:hover:bg-brand-900/30') +
         ' ' +
         (isExtra

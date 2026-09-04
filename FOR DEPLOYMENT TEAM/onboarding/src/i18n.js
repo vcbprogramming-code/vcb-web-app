@@ -89,9 +89,13 @@ export const dictionary = createDictionary({
   'checklist.track': { th: 'สายงาน', en: 'Track' },
   'checklist.junior': { th: 'ระดับต้น', en: 'Junior' },
   'checklist.senior': { th: 'ระดับอาวุโส', en: 'Senior' },
-  'checklist.locked': {
-    th: 'กรุณาทำเฟสก่อนหน้าให้เสร็จก่อนเริ่มเฟสนี้',
-    en: 'Complete the previous phase before starting this one.',
+  'checklist.lockedDocs': {
+    th: 'กรอกเอกสารที่จำเป็นให้ครบเพื่อปลดล็อกเฟสนี้',
+    en: 'Complete all Required Documents to unlock this phase.',
+  },
+  'checklist.lockedPhase': {
+    th: 'ทำเฟสก่อนหน้าให้เสร็จเพื่อปลดล็อกงานเหล่านี้ คุณยังอ่านเนื้อหาด้านล่างได้ตามปกติ',
+    en: 'Complete the previous phase to unlock these tasks. You can still read everything below.',
   },
   'checklist.phaseNotFound': { th: 'ไม่พบเฟสนี้', en: 'Phase not found' },
   'checklist.nextPhase': { th: 'เฟสถัดไป', en: 'Next Phase' },
@@ -130,6 +134,19 @@ export const dictionary = createDictionary({
     th: '(อัปโหลดอีกครั้งจะแทนที่ไฟล์เดิม)',
     en: '(uploading again replaces this)',
   },
+  'doc.gateTitle': { th: 'กรอกเอกสารที่จำเป็นให้ครบก่อน', en: 'Finish Required Documents first' },
+  'doc.gateBody': {
+    th: 'การเลือกแผนกถูกล็อกไว้จนกว่าเอกสารที่จำเป็นทุกฉบับจะถูกทำเครื่องหมายว่าเสร็จสิ้น ยังขาดอยู่:',
+    en: 'Choosing a department is locked until every required document is marked complete. Still missing:',
+  },
+  'doc.gateGoTo': { th: 'ไปที่เอกสารที่จำเป็น', en: 'Go to Required Documents' },
+  'dept.switchTitle': { th: 'เปลี่ยนแผนกหรือไม่?', en: 'Switch department?' },
+  'dept.switchBody': {
+    th: 'คุณมีความคืบหน้าใน {from} อยู่แล้ว การเริ่มงานใน {to} จะลบความคืบหน้าที่บันทึกไว้ใน {from} ทั้งหมดอย่างถาวร พนักงานหนึ่งคนสามารถอยู่ระหว่างการปฐมนิเทศได้เพียงแผนกเดียวในแต่ละครั้ง',
+    en: 'You already have progress in {from}. Starting tasks in {to} will permanently delete all your saved progress in {from}. An employee can only be onboarding in one department at a time.',
+  },
+  'dept.switchConfirm': { th: 'ลบความคืบหน้าและเปลี่ยนแผนก', en: 'Delete progress and switch' },
+  'dept.switchCancel': { th: 'อยู่ที่ {from} ต่อไป', en: 'Stay in {from}' },
   'doc.errorType': {
     th: 'ไม่รองรับไฟล์ประเภทนี้ กรุณาอัปโหลด PDF รูปภาพ หรือไฟล์ Word',
     en: 'Unsupported file type. Please upload a PDF, image, or Word document.',
@@ -154,8 +171,15 @@ export const dictionary = createDictionary({
   },
   'doc.departmentSelection': { th: 'เลือกแผนก', en: 'Department Selection' },
   'doc.departmentSelectionSub': {
-    th: 'เลือกแผนกที่คุณจะปฏิบัติงานใน 90 วันแรก',
-    en: 'Choose the department you will spend your first 90 days in.',
+    th: 'เลือกแผนกที่คุณจะใช้เวลา 90 วันแรกด้วย การเลือกนี้จะกำหนดรายการตรวจสอบ เป้าหมาย และผู้ที่คุณจะร่วมงานด้วยตั้งแต่นี้ไป — เลือกอย่างรอบคอบ',
+    en: 'Choose the department you will spend your first 90 days in. This sets the checklists, milestones, and people you’ll work with from here on — choose carefully.',
+  },
+  'doc.ledBy': { th: 'หัวหน้าแผนก', en: 'Led by' },
+  'doc.focus': { th: 'จุดเน้น', en: 'Focus' },
+  'doc.chooseDepartment': { th: 'เลือกแผนกนี้', en: 'Choose this department' },
+  'doc.switchNote': {
+    th: 'เมื่อเลือกแล้ว แผนกนี้จะเป็นแผนกที่คุณทำครบทั้งสามช่วงของการปฐมนิเทศ — การเปลี่ยนแผนกในภายหลังหมายถึงการเริ่มรายการตรวจสอบใหม่ตั้งแต่วันแรก',
+    en: 'Once selected, this becomes the department you complete all three onboarding phases in — switching later means starting your checklist over from day one.',
   },
 
   /* ------------------------------- completion ---------------------------- */
@@ -243,6 +267,10 @@ export const dictionary = createDictionary({
     th: 'โหลดรายการที่แก้ไขไว้ไม่สำเร็จ กำลังแสดงเนื้อหาเริ่มต้น',
     en: 'Could not load checklist edits — showing the default content.',
   },
+  'admin.moveUp': { th: 'เลื่อนขึ้น', en: 'Move up' },
+  'admin.moveDown': { th: 'เลื่อนลง', en: 'Move down' },
+  'admin.addItem': { th: '+ เพิ่มรายการ', en: '+ Add item' },
+  'admin.addItemPrompt': { th: 'ข้อความรายการตรวจสอบใหม่:', en: 'New checklist item text:' },
   'admin.phase1': { th: 'เฟส 1 (วันที่ 1–30)', en: 'Phase 1 (Day 1–30)' },
   'admin.phase2': { th: 'เฟส 2 (วันที่ 31–60)', en: 'Phase 2 (Day 31–60)' },
   'admin.phase3': { th: 'เฟส 3 (วันที่ 61–90)', en: 'Phase 3 (Day 61–90)' },

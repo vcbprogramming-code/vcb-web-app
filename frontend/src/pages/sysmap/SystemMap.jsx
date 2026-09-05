@@ -93,13 +93,13 @@ export default function SystemMap() {
       />
 
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.map((tab) => (
-          <button key={tab.key} onClick={() => { setTab(tab.key); if (tab.key !== 'map') setSelected(null); }}
+        {TABS.map((it) => (
+          <button key={it.key} onClick={() => { setTab(it.key); if (it.key !== 'map') setSelected(null); }}
             className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-            <Icon name={tab.icon} className="h-4 w-4" /> {tab.label}
+              tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            <Icon name={it.icon} className="h-4 w-4" /> {it.label}
             <span className="ml-1 text-xs text-slate-400">
-              {tab.key === 'map' ? counts.nodes : tab.key === 'functions' ? fns.length : ai.length}
+              {it.key === 'map' ? counts.nodes : it.key === 'functions' ? fns.length : ai.length}
             </span>
           </button>
         ))}

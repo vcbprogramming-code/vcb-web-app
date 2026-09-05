@@ -359,8 +359,8 @@ suite('ข้อ 7 ค่าเดิม → ค่าใหม่ ในปร�
   });
   await settle(3000);
 
-  await clickText('รายงานและตรวจสอบ'); await settle(3000);
-  happy('เปิดแท็บรายงานและตรวจสอบได้', (await body()).includes('ประวัติการแก้ไข') || (await body()).includes('ผู้ทำรายการ'), '');
+  await clickText('รายงาน'); await settle(3000);
+  happy('เปิดแท็บรายงานได้', (await body()).includes('ประวัติการแก้ไข') || (await body()).includes('ผู้ทำรายการ'), '');
 
   const cells = await page.evaluate(() => {
     const table = [...document.querySelectorAll('table')]

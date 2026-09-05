@@ -224,11 +224,12 @@ suite('§5 ผู้ตรวจสอบกดยืนยันข้อมู
 }
 
 // ── §1 ช่องเลือกบทบาทต้องมีครบ 5 ระดับ ────────────────────────────────────
-suite('§1 หน้าจอผู้ใช้ให้เลือกบทบาทได้ครบ 5 ระดับ');
+suite('§1 หน้าจอผู้ใช้ให้เลือกบทบาทได้ตามระบบจริง');
 {
-  // เปิดของบัญชีทดสอบที่สร้างเอง ไม่แตะบัญชีจริง — รอบก่อนเคยเผลอเปลี่ยนบทบาท
-  // ของบัญชีผู้ดูแลจริงจนชุดทดสอบอื่นล้ม
-  // เก็บกวาดของรอบก่อนที่อาจค้างไว้ ไม่งั้นชุดทดสอบล้มตั้งแต่บรรทัดแรก
+  // เอกสารเกณฑ์ตรวจรับระบุห้าระดับ แต่ระบบที่ลูกค้าใช้จริงมีสาม (admin /
+  // manager / staff) และไม่มีบัญชีไหนเคยใช้สองระดับที่เกินมา จึงตัดออกตาม
+  // มติที่ตกลงกันว่าให้ยึดระบบจริงเป็นหลัก — ชื่อของสามระดับที่เหลือคงไว้
+  // เพราะ E-Memo ผูกสิทธิ์ไว้กับชื่อเหล่านี้
   const probeEmail = `${MARK.toLowerCase()}-role@vcb.local`;
   await query('delete from profiles where lower(email) = lower($1)', [probeEmail]);
   const probe = (await query(
@@ -248,21 +249,14 @@ suite('§1 หน้าจอผู้ใช้ให้เลือกบทบ
     const sel = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'admin'));
     return sel ? [...sel.options].map((o) => ({ v: o.value, t: o.text.trim() })) : [];
   });
-  happy(`ช่องบทบาทมีให้เลือก 5 ระดับ (พบ ${roles.length})`, roles.length === 5, roles.map((r) => r.t).join(' · '));
-  for (const [v, th] of [['recorder', 'ผู้บันทึกข้อมูลหน้างาน'], ['verifier', 'ผู้ตรวจสอบโครงการ'],
-    ['hr', 'เจ้าหน้าที่ HR'], ['executive', 'ผู้บริหาร'], ['admin', 'ผู้ดูแลระบบ']]) {
+  happy(`ช่องบทบาทมีให้เลือกสามระดับ (พบ ${roles.length})`, roles.length === 3, roles.map((r) => r.t).join(' · '));
+  for (const [v, th] of [['hr', 'เจ้าหน้าที่ HR'], ['executive', 'ผู้บริหาร'], ['admin', 'ผู้ดูแลระบบ']]) {
     happy(`มีบทบาท "${th}"`, roles.some((r) => r.v === v && r.t.includes(th)), '');
   }
-  // เลือกบทบาทใหม่แล้วต้องมีคำอธิบายกำกับ ไม่ให้เดา
-  const hint = await page.evaluate(() => {
-    const sel = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'recorder'));
-    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, 'recorder');
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
-  });
-  await settle(900);
+  bad('ไม่มีบทบาทที่ระบบจริงไม่มีหลงเหลือ',
+    !roles.some((r) => r.v === 'recorder' || r.v === 'verifier'), roles.map((r) => r.v).join(', '));
   happy('เลือกบทบาทแล้วมีคำอธิบายว่าทำอะไรได้',
-    hint && (await body()).includes('ยืนยันข้อมูลของตัวเองไม่ได้'), '');
+    (await body()).includes('ตามโครงการที่รับผิดชอบ'), '');
   await shot('19-เลือกบทบาท');
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'ยกเลิก');
@@ -312,7 +306,7 @@ suite('§8 ดาวน์โหลดรายงานจากหน้าจ
 {
   await as(A);
   await pickSite(); await settle(1200);
-  happy('เปิดแท็บ "รายงานและตรวจสอบ" ได้', await clickText('รายงานและตรวจสอบ'), '');
+  happy('เปิดแท็บ "รายงาน" ได้', await clickText('รายงาน'), '');
   await settle(3200);
   const t = await body();
   happy('เห็นยอดรวมแรงงาน-วัน', /รวมแรงงาน-วัน/.test(t), '');

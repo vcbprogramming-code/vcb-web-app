@@ -7,6 +7,7 @@ import Icon from '../../components/Icon.jsx';
 import ScenariosView from './ScenariosView.jsx';
 import FlowsView from './FlowsView.jsx';
 import ReportsView from './ReportsView.jsx';
+import VersionsView from './VersionsView.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
@@ -18,6 +19,8 @@ const TABS = [
   { key: 'cases', label: 'กรณีศึกษา', icon: 'document' },
   { key: 'flows', label: 'ผังกระบวนการ', icon: 'flow' },
   { key: 'reports', label: 'เมนูรายงาน', icon: 'chart' },
+  // ประวัติเวอร์ชันเปิดให้เฉพาะผู้แก้ไข — เอกสารข้อกำหนดฟังก์ชัน §2.7
+  { key: 'versions', label: 'ประวัติเวอร์ชัน', icon: 'clock', editorOnly: true },
 ];
 
 export default function Sop() {
@@ -89,10 +92,11 @@ export default function Sop() {
 
       {/* view switch */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.map((tab) => (
+        {TABS.filter((x) => !x.editorOnly || canEdit).map((tab) => (
           <button key={tab.key} onClick={() => {
             pickTab(tab.key);
             // don'tab carry a filter into a tab where that module has nothing
+            if (tab.key === 'versions') { setModule(''); return; }
             const next = tab.key === 'flows' ? counts.flows : counts.scenarios;
             if (module && !next[module]) setModule('');
           }}
@@ -100,11 +104,15 @@ export default function Sop() {
               tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
             <Icon name={tab.icon} className="h-4 w-4" /> {tab.label}
-            <span className="ml-1 text-xs text-slate-400">
-              {tab.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
-                : tab.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
-                : counts.reports}
-            </span>
+            {/* แท็บประวัติเวอร์ชันไม่มีจำนวนกำกับ — เลขจะเปลี่ยนทุกครั้งที่แก้คู่มือ
+                และไม่ได้บอกอะไรที่คนอ่านต้องรู้ก่อนกดเข้าไป */}
+            {tab.key !== 'versions' && (
+              <span className="ml-1 text-xs text-slate-400">
+                {tab.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
+                  : tab.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
+                  : counts.reports}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -137,6 +145,7 @@ export default function Sop() {
       {tab === 'cases' && <ScenariosView modules={modules} module={module} canEdit={canEdit} onChanged={load} sharedNo={sharedCase} />}
       {tab === 'flows' && <FlowsView module={module} sharedId={sharedFlow} />}
       {tab === 'reports' && <ReportsView canEdit={canEdit} onChanged={load} />}
+      {tab === 'versions' && <VersionsView canEdit={canEdit} onRestored={load} />}
     </div>
   );
 }

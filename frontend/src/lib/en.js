@@ -1494,4 +1494,27 @@ export const EN = {
   'กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น หรือกด “แสดงทุกเส้นเชื่อม” เพื่อดูภาพรวมทั้ง':
     'Click a step for its detail and the links around it, or use “Show all links” to see all',
   'เส้นพร้อมกัน': 'at once.',
+
+  // ── SOP: ประวัติเวอร์ชัน ──────────────────────────────────────────────────
+  'ประวัติเวอร์ชัน': 'Version history',
+  'ประวัติเวอร์ชันเปิดให้เฉพาะผู้มีสิทธิ์แก้ไขคู่มือ': 'Version history is for manual editors only.',
+  'กู้คืนคู่มือกลับไปเป็นเวอร์ชันนี้': 'Restore the manual to this version',
+  'ระบบจะเก็บภาพของฉบับปัจจุบันไว้ก่อน จึงย้อนกลับได้อีกถ้ากู้ผิดเวอร์ชัน':
+    'The current version is saved first, so this can be undone if you restore the wrong one.',
+  'กู้คืน': 'Restore',
+  'กู้คืนคู่มือแล้ว': 'Manual restored',
+  'ทุกครั้งที่มีการแก้ไขคู่มือ ระบบจะเก็บภาพของฉบับก่อนหน้าไว้ที่นี่ กู้คืนได้ทุกเวอร์ชัน และการกู้คืนก็ย้อนกลับได้':
+    'Every edit saves the manual as it was, here. Any version can be restored, and a restore can itself be undone.',
+  'ยังไม่มีการแก้ไขคู่มือ จึงยังไม่มีเวอร์ชันย้อนหลัง': 'The manual has not been edited yet, so there is nothing to restore.',
+  'เมื่อ': 'When',
+  'การแก้ไข': 'Change',
+  'เนื้อหาในเวอร์ชันนั้น': 'Contents at the time',
+  'กรณี': 'cases',
+  'เพิ่มกรณีศึกษาใหม่': 'Case added',
+  'แก้ไขเนื้อหากรณีศึกษา': 'Case edited',
+  'ลบกรณีศึกษาออก': 'Case deleted',
+  'สลับลำดับกรณีศึกษา': 'Cases reordered',
+  'เพิ่มรายการรายงาน': 'Report added',
+  'แก้ไขรายการรายงาน': 'Report edited',
+  'ลบรายการรายงานออก': 'Report deleted',
 };

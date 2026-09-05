@@ -37,6 +37,44 @@ async function allScenariosOrdered() {
   return withDisplayNo(rows);
 }
 
+// ── ประวัติเวอร์ชัน ─────────────────────────────────────────────────────────
+
+/**
+ * เอกสาร SOP ทั้งฉบับเป็นก้อนเดียว — ใช้ทั้งตอนเก็บ snapshot และตอนกู้คืน
+ * รูปร่างตรงกับที่เอกสารข้อกำหนดฟังก์ชัน §4.1 อธิบายไว้ ({meta, scenarios, reports})
+ * บวก flows และ modules ที่ระบบเรามีเพิ่ม
+ */
+async function readWholeDocument() {
+  const [meta, scenarios, steps, tags, reports, flows, modules] = await Promise.all([
+    queryOne('select * from sop_meta where id = true'),
+    query('select * from sop_scenarios order by module, sort_order, no'),
+    query('select * from sop_scenario_steps order by scenario_no, step_order'),
+    query('select * from sop_scenario_modules order by scenario_no, module'),
+    query('select * from sop_reports order by id'),
+    query('select * from sop_flows order by module, id'),
+    query('select * from sop_modules order by sort_order, code'),
+  ]);
+  return {
+    meta: meta || null,
+    scenarios: scenarios.rows, steps: steps.rows, tags: tags.rows,
+    reports: reports.rows, flows: flows.rows, modules: modules.rows,
+  };
+}
+
+/**
+ * เก็บภาพเอกสารก่อนการแก้ไข — ต้องเรียกก่อนทุกเส้นทางที่เขียนข้อมูล
+ *
+ * ระบบของลูกค้าใช้ database trigger เพราะเอกสารเขาเป็น JSON แถวเดียว ของเรา
+ * แยกเป็นเจ็ดตาราง trigger รายตารางจะได้ snapshot คนละครึ่งใบ จึงเก็บเป็น
+ * ภาพรวมทั้งเอกสารตรงนี้แทน และมีชุดทดสอบไล่ทุก route ที่เขียนข้อมูลว่าสร้าง
+ * เวอร์ชันไว้จริง — ทำหน้าที่แทนสิ่งที่ trigger รับประกันให้เขา
+ */
+async function snapshot(profile, note) {
+  const data = await readWholeDocument();
+  await query('insert into sop_versions (data, note, taken_by) values ($1,$2,$3)',
+    [JSON.stringify(data), note, profile?.id || null]);
+}
+
 // ── read ────────────────────────────────────────────────────────────────────
 
 /** GET /api/sop/bootstrap — modules, doc meta and per-module counts. */
@@ -166,6 +204,7 @@ async function writeChildren(client, no, steps, extraModules, primaryModule) {
 }
 
 router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'เพิ่มกรณีศึกษาใหม่');
   const p = scenarioSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const f = p.data;
@@ -190,6 +229,7 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
 }));
 
 router.patch('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'แก้ไขเนื้อหากรณีศึกษา');
   const no = Number(req.params.no);
   if (!Number.isInteger(no)) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
   const p = scenarioSchema.partial().safeParse(req.body);
@@ -218,6 +258,7 @@ router.patch('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'ลบกรณีศึกษาออก');
   const no = Number(req.params.no);
   if (!Number.isInteger(no)) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
   // steps/tags cascade; reports keep their row but lose the link (set null)
@@ -228,6 +269,7 @@ router.delete('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
 
 /** POST /api/sop/scenarios/:no/move — swap position with the neighbour (up/down). */
 router.post('/scenarios/:no/move', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'สลับลำดับกรณีศึกษา');
   const no = Number(req.params.no);
   const dir = req.body?.direction;
   if (!Number.isInteger(no) || !['up', 'down'].includes(dir)) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง');
@@ -261,6 +303,7 @@ const reportSchema = z.object({
 });
 
 router.post('/reports', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'เพิ่มรายการรายงาน');
   const p = reportSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   // both numbers continue the register; the editor may override case_no.
@@ -274,6 +317,7 @@ router.post('/reports', canEdit, asyncHandler(async (req, res) => {
 }));
 
 router.patch('/reports/:id', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'แก้ไขรายการรายงาน');
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) throw new ApiError(404, 'ไม่พบรายการ');
   const p = reportSchema.partial().safeParse(req.body);
@@ -294,11 +338,104 @@ router.patch('/reports/:id', canEdit, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/reports/:id', canEdit, asyncHandler(async (req, res) => {
+  await snapshot(req.profile, 'ลบรายการรายงานออก');
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) throw new ApiError(404, 'ไม่พบรายการ');
   const row = await queryOne('delete from sop_reports where id = $1 returning id', [id]);
   if (!row) throw new ApiError(404, 'ไม่พบรายการ');
   res.json({ data: { deleted: true } });
+}));
+
+// ── ประวัติเวอร์ชันและการกู้คืน ─────────────────────────────────────────────
+
+/** GET /api/sop/versions — รายการ snapshot ล่าสุด (ไม่ส่งเนื้อหาเต็มมาด้วย) */
+router.get('/versions', canEdit, asyncHandler(async (req, res) => {
+  // เนื้อหาแต่ละเวอร์ชันคือเอกสารทั้งฉบับ ดึงมา 50 ชุดเพื่อวาดตารางจะเปลืองเปล่า
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+  const { rows } = await query(
+    `select v.id, v.note, v.taken_at, p.full_name as taken_by_name,
+            jsonb_array_length(coalesce(v.data->'scenarios','[]'::jsonb)) as scenarios,
+            jsonb_array_length(coalesce(v.data->'reports','[]'::jsonb)) as reports
+       from sop_versions v left join profiles p on p.id = v.taken_by
+      order by v.taken_at desc limit $1`, [limit]);
+  res.json({ data: rows });
+}));
+
+/** GET /api/sop/versions/:id — เวอร์ชันเดียวพร้อมเนื้อหาเต็ม */
+router.get('/versions/:id', canEdit, asyncHandler(async (req, res) => {
+  const row = await queryOne(
+    `select v.*, p.full_name as taken_by_name from sop_versions v
+       left join profiles p on p.id = v.taken_by where v.id = $1`, [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
+  res.json({ data: row });
+}));
+
+/**
+ * POST /api/sop/versions/:id/restore — เขียนเอกสารจากเวอร์ชันนี้กลับเป็นฉบับปัจจุบัน
+ *
+ * ตัวการกู้คืนเองก็เก็บ snapshot ของฉบับปัจจุบันไว้ก่อน แปลว่ากู้คืนผิดเวอร์ชัน
+ * ก็ย้อนกลับได้อีก ไม่มีทางที่ข้อมูลจะหายไปเพราะกดปุ่มนี้
+ */
+router.post('/versions/:id/restore', canEdit, asyncHandler(async (req, res) => {
+  const v = await queryOne('select * from sop_versions where id = $1', [req.params.id]);
+  if (!v) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
+  await snapshot(req.profile, `ก่อนกู้คืนเวอร์ชัน #${v.id}`);
+
+  const d = v.data || {};
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    // เขียนทับทั้งเอกสารในทรานแซกชันเดียว — กู้คืนครึ่งใบแย่กว่าไม่กู้คืนเลย
+    for (const t of ['sop_scenario_steps', 'sop_scenario_modules', 'sop_reports', 'sop_flows', 'sop_scenarios']) {
+      await client.query(`delete from ${t}`);
+    }
+    for (const r of d.scenarios || []) {
+      await client.query(
+        `insert into sop_scenarios (no, module, sort_order, title_th, title_en, problem, ref, note, date_added)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [r.no, r.module, r.sort_order, r.title_th, r.title_en, r.problem, r.ref, r.note, r.date_added]);
+    }
+    for (const r of d.steps || []) {
+      await client.query(
+        'insert into sop_scenario_steps (scenario_no, step_order, is_substep, text) values ($1,$2,$3,$4)',
+        [r.scenario_no, r.step_order, r.is_substep, r.text]);
+    }
+    for (const r of d.tags || []) {
+      await client.query('insert into sop_scenario_modules (scenario_no, module) values ($1,$2) on conflict do nothing',
+        [r.scenario_no, r.module]);
+    }
+    for (const r of d.reports || []) {
+      await client.query(
+        'insert into sop_reports (id, case_no, scenario_text, report_path, sort_order) values ($1,$2,$3,$4,$5)',
+        [r.id, r.case_no, r.scenario_text, r.report_path, r.sort_order]);
+    }
+    for (const r of d.flows || []) {
+      await client.query(
+        `insert into sop_flows (id, module, title_th, title_en, sort_order, lanes, nodes, edges)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [r.id, r.module, r.title_th, r.title_en, r.sort_order,
+         JSON.stringify(r.lanes ?? []), JSON.stringify(r.nodes ?? []), JSON.stringify(r.edges ?? [])]);
+    }
+    // ลำดับ id ของ sop_reports เป็น serial — ดันให้พ้นค่าที่เพิ่งเขียนกลับไป
+    // ไม่งั้นการเพิ่มรายงานถัดไปจะชนกับ id ที่กู้คืนมา
+    await client.query(
+      `select setval(pg_get_serial_sequence('sop_reports','id'),
+                     greatest(coalesce((select max(id) from sop_reports), 0), 1))`);
+    if (d.meta) {
+      await client.query(
+        `update sop_meta set title=$1, subtitle=$2, manual=$3, version=$4, effective=$5,
+                             scope=$6, purpose=$7, notes=$8, updated_at=now() where id = true`,
+        [d.meta.title, d.meta.subtitle, d.meta.manual, d.meta.version, d.meta.effective,
+         d.meta.scope, d.meta.purpose, d.meta.notes]);
+    }
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  } finally {
+    client.release();
+  }
+  res.json({ data: { ok: true, restoredFrom: v.id, takenAt: v.taken_at } });
 }));
 
 export default router;

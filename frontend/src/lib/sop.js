@@ -23,6 +23,11 @@ export const sopApi = {
   createReport: (body) => api('/sop/reports', { method: 'POST', body }),
   updateReport: (id, body) => api(`/sop/reports/${id}`, { method: 'PATCH', body }),
   deleteReport: (id) => api(`/sop/reports/${id}`, { method: 'DELETE' }),
+
+  // ประวัติเวอร์ชัน — รายการไม่ส่งเนื้อหาเต็มมาด้วย เพราะแต่ละเวอร์ชันคือเอกสารทั้งฉบับ
+  versions: (limit) => api(`/sop/versions${qs({ limit })}`),
+  version: (id) => api(`/sop/versions/${id}`),
+  restoreVersion: (id) => api(`/sop/versions/${id}/restore`, { method: 'POST' }),
 };
 
 /** Per-module accent, so a case/flow reads as belonging to its area at a glance. */

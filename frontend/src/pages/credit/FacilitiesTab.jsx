@@ -111,7 +111,7 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เลขที่สัญญา / อ้างอิงธนาคาร')}</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมายเหตุ / เลขที่สัญญาธนาคาร')}</label>
             <input value={form.notes} onChange={(e) => set('notes', e.target.value)} className="field"
               placeholder={t('เช่น เลขที่วงเงินตามหนังสือธนาคาร')} />
           </div>
@@ -135,10 +135,6 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันครบกำหนด')}</label>
             <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
           </div>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมายเหตุ')}</label>
-          <input value={form.notes} onChange={(e) => set('notes', e.target.value)} className="field" />
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
       </form>
@@ -302,7 +298,7 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setDrawdown(f)} className="mr-2 text-sm text-brand hover:underline">{t('เบิกใช้')}</button>
-                  <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700"><Icon name="edit" className="inline h-4 w-4" /></button>
+                  <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700" title={t('แก้ไขวงเงิน')} aria-label={t('แก้ไขวงเงิน')}><Icon name="edit" className="inline h-4 w-4" /></button>
                 </td>
               </tr>
             ))}

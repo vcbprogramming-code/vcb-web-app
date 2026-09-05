@@ -35,7 +35,7 @@ function FileCell({ files, canEdit, open, onToggle, onAttach, onOpen, onDownload
     <div className="relative">
       <div className={`flex items-center gap-1 ${tall ? 'h-11' : ''}`}>
         {files.length > 0 && (
-          <button type="button" onClick={onToggle}
+          <button type="button" onClick={onToggle} title={t('ไฟล์แนบของวันนี้')} aria-label={t('ไฟล์แนบของวันนี้')}
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-sm text-brand hover:bg-slate-50">
             <Icon name="paperclip" className="h-4 w-4" /> {files.length}
           </button>

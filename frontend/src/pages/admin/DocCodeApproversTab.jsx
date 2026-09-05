@@ -221,7 +221,7 @@ export default function DocCodeApproversTab() {
                       <input value={r.name} onChange={(e) => updateRow(i, 'name', e.target.value)} placeholder={t('ชื่อ (ไม่บังคับ)')} className={`${field} w-36`} />
                       <input value={r.email} onChange={(e) => updateRow(i, 'email', e.target.value)} placeholder={t('อีเมล')} type="email" className={`${field} flex-1`} />
                       {rows.length > 1 && (
-                        <button onClick={() => removeRow(i)} className="px-1 text-slate-400 hover:text-red-600"><Icon name="x" className="h-4 w-4" /></button>
+                        <button onClick={() => removeRow(i)} className="px-1 text-slate-400 hover:text-red-600" title={t('ลบแถวนี้')} aria-label={t('ลบแถวนี้')}><Icon name="x" className="h-4 w-4" /></button>
                       )}
                     </div>
                   ))}

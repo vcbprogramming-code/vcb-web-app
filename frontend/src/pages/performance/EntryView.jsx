@@ -317,9 +317,9 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
   return (
     <div className="card !p-3">
       <div className="mb-2 flex items-center gap-2">
-        <button onClick={() => setWeekStart(Math.max(0, start - 7))} disabled={start <= 0} className="btn-outline !px-2 !py-1 disabled:opacity-40"><Icon name="arrowLeft" className="h-4 w-4" /></button>
+        <button onClick={() => setWeekStart(Math.max(0, start - 7))} disabled={start <= 0} className="btn-outline !px-2 !py-1 disabled:opacity-40" title={t('สัปดาห์ก่อนหน้า')} aria-label={t('สัปดาห์ก่อนหน้า')}><Icon name="arrowLeft" className="h-4 w-4" /></button>
         <span className="text-sm font-semibold text-slate-700">{t('วันที่')} {wkLabel}</span>
-        <button onClick={() => setWeekStart(Math.min(Math.max(0, d.days.length - 1), start + 7))} disabled={start + 7 >= d.days.length} className="btn-outline !px-2 !py-1 disabled:opacity-40"><Icon name="arrowRight" className="h-4 w-4" /></button>
+        <button onClick={() => setWeekStart(Math.min(Math.max(0, d.days.length - 1), start + 7))} disabled={start + 7 >= d.days.length} className="btn-outline !px-2 !py-1 disabled:opacity-40" title={t('สัปดาห์ถัดไป')} aria-label={t('สัปดาห์ถัดไป')}><Icon name="arrowRight" className="h-4 w-4" /></button>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-separate" style={{ borderSpacing: '3px' }}>

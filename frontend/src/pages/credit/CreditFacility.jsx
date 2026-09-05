@@ -15,9 +15,6 @@ const TABS = [
   { key: 'cashplan', label: 'วางแผนสินเชื่อ (Cash Plan)' },
 ];
 
-// type → which group it belongs to in the headline cards
-const LONG_TERM = ['T/L', 'L/G (BG)', 'LGM (L/G)'];
-
 function FacilityStat({ label, item }) {
   const t = useT();
   if (!item) {
@@ -35,6 +32,18 @@ function FacilityStat({ label, item }) {
         <Icon name="arrowRight" className="h-4 w-4 text-slate-300" />
       </div>
       <div className="mt-1 text-xl font-bold text-slate-900">{formatMoney(item.used)}</div>
+      {/* กล่องนี้อาจรวมวงเงินหลายประเภทที่ธนาคารให้เป็นก้อนเดียว — บอกว่ามาจากอะไรบ้าง
+          ไม่งั้นยอดที่เห็นจะกระทบยอดกับเอกสารธนาคารไม่ได้ */}
+      {(item.parts || []).length > 1 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {item.parts.map((p) => (
+            <li key={p.no} className="flex items-baseline justify-between gap-2 text-[11px] text-slate-400">
+              <span className="truncate">{p.name}</span>
+              <span className="tabular-nums">{formatMoney(p.used)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
         <div
           className={`h-full rounded-full ${item.pct >= 90 ? 'bg-red-500' : item.pct >= 70 ? 'bg-amber-400' : 'bg-brand'}`}
@@ -137,14 +146,15 @@ export default function CreditFacility() {
         <div className="card">
           <h3 className="mb-3 font-bold text-slate-800">{t('วงเงินสินเชื่อ (วงเงินกู้ระยะยาว)')}</h3>
           <div className="grid grid-cols-2 gap-3">
+            {/* ป้ายกล่องใช้ doc_kind ของทะเบียนประเภทวงเงิน ไม่ใช่ข้อความที่พิมพ์ไว้เอง */}
             <FacilityStat label="T/L" item={byType['T/L']} />
-            <FacilityStat label="L/G (BG)" item={byType['L/G (BG)']} />
+            <FacilityStat label="BG" item={byType.BG} />
           </div>
         </div>
         <div className="card">
           <h3 className="mb-3 font-bold text-slate-800">{t('วงเงินสินเชื่อ (วงเงินหมุนเวียน)')}</h3>
           <div className="grid grid-cols-2 gap-3">
-            <FacilityStat label="B/E (AVAL)" item={byType['B/E (AVAL)']} />
+            <FacilityStat label="B/E" item={byType['B/E']} />
             <FacilityStat label="P/N" item={byType['P/N']} />
           </div>
         </div>

@@ -4,24 +4,28 @@ import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
-const TYPES = ['L/G (BG)', 'LGM (L/G)', 'T/L', 'B/E (AVAL)', 'P/N'];
+// ป้ายสีตามป้ายสั้นบนเอกสาร (doc_kind) ของทะเบียนประเภทวงเงิน
 const TYPE_CHIP = {
-  'L/G (BG)': 'bg-pink-50 text-pink-700',
-  'LGM (L/G)': 'bg-fuchsia-50 text-fuchsia-700',
+  BG: 'bg-pink-50 text-pink-700',
+  'L/G': 'bg-fuchsia-50 text-fuchsia-700',
   'T/L': 'bg-amber-50 text-amber-700',
-  'B/E (AVAL)': 'bg-blue-50 text-blue-700',
+  'B/E': 'bg-blue-50 text-blue-700',
   'P/N': 'bg-violet-50 text-violet-700',
+  'M/L': 'bg-teal-50 text-teal-700',
+  DLC: 'bg-sky-50 text-sky-700',
+  'PN-post': 'bg-indigo-50 text-indigo-700',
 };
 
-function FacilityModal({ facility, projects, onClose, onSaved }) {
+function FacilityModal({ facility, projects, types, onClose, onSaved }) {
   const t = useT();
   const editing = Boolean(facility);
   const [form, setForm] = useState({
     projectId: facility?.project_id || projects[0]?.id || '',
     company: facility?.company || '',
     bank: facility?.bank || '',
-    facilityNo: facility?.facility_no || '',
-    type: facility?.type || TYPES[0],
+    // ประเภทวงเงินคือเลขในทะเบียน ไม่ใช่ข้อความที่พิมพ์เอง — เลขนี้เป็นตัวบอกว่า
+    // วงเงินก้อนนี้ไปรวมอยู่กล่องไหนบนหน้าภาพรวม
+    facilityNo: facility?.facility_no ?? (types[0]?.no ?? 1),
     limit: facility?.limit ?? '',
     usedBaseline: facility ? '' : '',
     interestRate: facility?.interest_rate ?? '',
@@ -41,8 +45,7 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
         projectId: form.projectId,
         company: form.company || null,
         bank: form.bank || null,
-        facilityNo: form.facilityNo || null,
-        type: form.type,
+        facilityNo: Number(form.facilityNo),
         limit: Number(form.limit) || 0,
         interestRate: form.interestRate === '' ? null : Number(form.interestRate),
         dueDate: form.dueDate || null,
@@ -81,9 +84,19 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทวงเงิน')} <span className="text-red-500">*</span></label>
-            <select value={form.type} onChange={(e) => set('type', e.target.value)} className="field">
-              {TYPES.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
+            <select value={form.facilityNo} onChange={(e) => set('facilityNo', e.target.value)} className="field">
+              {types.map((ty) => (
+                <option key={ty.no} value={ty.no}>{ty.no}. {ty.name_th}</option>
+              ))}
             </select>
+            {/* วงเงินหลายประเภทใช้ก้อนเดียวกับธนาคาร — บอกไว้ตรงนี้ ไม่ให้ไปเซอร์ไพรส์
+                ตอนเห็นยอดรวมบนหน้าภาพรวม */}
+            {(() => {
+              const cur = types.find((x) => String(x.no) === String(form.facilityNo));
+              if (!cur || cur.foldsInto === cur.no) return null;
+              const box = types.find((x) => x.no === cur.foldsInto);
+              return <p className="mt-1 text-xs text-amber-700">{t('ใช้วงเงินร่วมกับ')} {box?.doc_kind} — {t('หน้าภาพรวมจะรวมยอดไว้ในกล่องเดียวกัน')}</p>;
+            })()}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -98,8 +111,9 @@ function FacilityModal({ facility, projects, onClose, onSaved }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เลขที่วงเงิน')}</label>
-            <input value={form.facilityNo} onChange={(e) => set('facilityNo', e.target.value)} className="field" />
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('เลขที่สัญญา / อ้างอิงธนาคาร')}</label>
+            <input value={form.notes} onChange={(e) => set('notes', e.target.value)} className="field"
+              placeholder={t('เช่น เลขที่วงเงินตามหนังสือธนาคาร')} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('อัตราดอกเบี้ย (%/ปี)')}</label>
@@ -198,6 +212,9 @@ function DrawdownModal({ facility, onClose, onSaved }) {
 }
 
 export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
+  // ทะเบียนประเภทวงเงินโหลดครั้งเดียว — ใช้ทั้งช่องเลือก ตัวกรอง และป้ายกำกับ
+  const [types, setTypes] = useState([]);
+  useEffect(() => { creditApi.facilityTypes().then((r) => setTypes(r.data || [])).catch(() => setTypes([])); }, []);
   const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
@@ -229,7 +246,8 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)} className="field !w-auto">
           <option value="">{t('ทุกประเภท')}</option>
-          {TYPES.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
+          {/* กรองด้วยกล่องที่พับรวมแล้ว — เลือก B/E ต้องได้ทุกวงเงินที่ใช้ก้อนนั้นร่วมกัน */}
+          {[...new Set(types.map((x) => x.doc_kind))].map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
         <div className="relative min-w-[200px] flex-1">
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -293,7 +311,7 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
       </div>
 
       {edit !== undefined && (
-        <FacilityModal facility={edit} projects={projects} onClose={() => setEdit(undefined)} onSaved={refresh} />
+        <FacilityModal facility={edit} projects={projects} types={types} onClose={() => setEdit(undefined)} onSaved={refresh} />
       )}
       {drawdown && (
         <DrawdownModal facility={drawdown} onClose={() => setDrawdown(null)} onSaved={refresh} />

@@ -1517,4 +1517,10 @@ export const EN = {
   'เพิ่มรายการรายงาน': 'Report added',
   'แก้ไขรายการรายงาน': 'Report edited',
   'ลบรายการรายงานออก': 'Report deleted',
+
+  // ── วงเงินสินเชื่อ: ทะเบียนประเภทและการพับรวมกล่อง ────────────────────────
+  'ใช้วงเงินร่วมกับ': 'Shares its limit with',
+  'หน้าภาพรวมจะรวมยอดไว้ในกล่องเดียวกัน': 'the overview totals them in one card.',
+  'เลขที่สัญญา / อ้างอิงธนาคาร': 'Contract / bank reference',
+  'เช่น เลขที่วงเงินตามหนังสือธนาคาร': "e.g. the facility number on the bank's letter",
 };

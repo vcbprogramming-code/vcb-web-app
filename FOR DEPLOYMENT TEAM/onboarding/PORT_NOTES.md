@@ -191,94 +191,24 @@ overall-progress bar, the per-task reward toast, and the 90-day completion
 celebration (see below), which had been missed even though their content
 strings were already migrated.
 
-## A locked phase page is still fully readable — only the checkboxes disable
+## Four later additions — see the source comments for the why
 
-An earlier version of this port gated the whole page: visiting a phase whose
-prerequisite wasn't done rendered nothing but a "complete the previous phase"
-notice, discarding the checklist entirely. The original never does this —
-`isPhasePageUnlocked` (progress.html) only gates checkbox *toggling*
-(`performToggle` reverts the click and returns), and its own comment says so
-explicitly: every phase page can be viewed and read ahead of where the
-employee has actually reached; the checkboxes just don't respond, with a
-`renderPhaseLockNotice` banner above the checklist explaining why (worded
-differently depending on whether Required Documents or the previous phase is
-the blocker).
+Added after the sections above were written; each is explained in full where
+it lives in code, not repeated here:
 
-`PhasePage.jsx` now matches that: `unlocked` still exists as a check, but the
-early return that swapped the page for a `Notice` is gone. Instead a `Notice`
-banner renders above the checklist blocks when locked, and each checkbox gets
-`disabled={!unlocked}` — the item text, descriptions and layout are identical
-to the unlocked state, matching `pageLocked ? ' locked'`/`disabled` on
-`<input>` in `app.html`.
-
-## The 90-day completion celebration and per-task reward toast
-
-Two pieces the original always had that this port didn't, until a later pass:
-
-- **`showRewardToast`** (progress.html) — a small "Nice work!" / "Great job!" /
-  etc. toast on every task checked ON (not off), randomly chosen from five
-  messages. `components/RewardToast.jsx` + its `useRewardToast()` hook are the
-  port; `PhasePage.jsx`'s `handleToggle` calls it right before `toggleTask`
-  when the task is transitioning to done. All five message strings were
-  already migrated content (`content.niceWork` etc.) with nothing rendering
-  them.
-- **`celebrateOnboardingComplete`** — the bigger, one-time popup for finishing
-  all three phases (as opposed to `celebratePhaseComplete`'s per-phase one,
-  which this port already had). `PhasePage.jsx` now tracks `isFinalPhase` and
-  shows this overlay instead of the phase-complete one when the LAST phase's
-  last task is ticked. Confetti is not ported (canvas-drawn in the original,
-  `runConfetti`); the popup itself, its copy, and its Print/Continue actions
-  are. "Print Completion Form" navigates to `/completion?print=1` —
-  `CompletionPage.jsx` reads that param and calls `window.print()` after a
-  short delay, then strips the param, because printing only works from that
-  page (it's the only place the hidden `print:block` certificate exists).
-
-## Overall progress bar
-
-`renderOverallProgress` (progress.html) — "Your Onboarding Progress — NAME
-(DEPARTMENT) NN%", with a fill bar and "X / Y tasks complete" — is now
-`components/ProgressBar.jsx`, rendered in `Layout.jsx` above the journey
-stepper. It renders nothing until both a name and a department exist, matching
-the original. The fill transitions on mount/change via a one-frame delay
-(`requestAnimationFrame`) rather than snapping, which is what gives it the
-"has to slowly fill" behaviour the original's CSS transition provides for
-free.
-
-Building this exposed a real bug in `lib/departmentTasks.js`'s
-`getDepartmentTaskIds`: it counted every task including Senior-only ones
-regardless of the employee's own level, which is the exact bug the
-*original's own comment* on its version of this function documents fixing —
-a Junior who finished everything actually required of them would be stuck
-below 100% because the denominator kept counting tasks they were never asked
-to do. `getDepartmentTaskIds` now takes a `level` argument and filters by
-`isItemVisible`, defaulting to `'junior'` (the strictest filter, so an
-omitted level can't silently over-count). Its other two callers
-(`hasStartedDepartment`, and `switchDepartment`'s progress-clearing) pass
-`'senior'` explicitly instead, since both need the widest possible id set
-regardless of the employee's actual level — "has this department been
-started at all" and "delete every trace of the old department" are both
-superset-safe operations that must not miss a stray senior-only id.
-
-## Department Selection is rich cards, not plain buttons
-
-The department grid on Required Documents was a plain button per department
-(label only) — the original (`content.html`'s `deptgrid` section) is a
-numbered card per department: an icon, a one-line description, "Led by
-<head>", "Focus: <words>", and a "Choose this department →" CTA, plus a
-footer note below the grid about switching later. `data/departments.js` now
-carries a `deptCard` field per entry (icon key, desc, focus) copied verbatim
-from `content.html`'s `depts` array, and `components/deptIcons.jsx` redraws
-the five icons as simple line SVGs (the original's icon sprite isn't
-portable, so these are redrawn, not traced — close enough to read the same at
-a glance). `RequiredDocuments.jsx` renders the cards from `DEPARTMENTS`
-joined with `ALL_DEPARTMENTS` (for routing), keeping the existing
-`areRequiredDocsComplete` gate check in the card's click handler unchanged.
-
-One deliberate discrepancy carried over intact: the "property" department's
-card label is "Asset Management Team", while its own outer `label` field
-(used elsewhere, e.g. page titles) is "Property & Asset Management" — this
-is not a bug, `content.html`'s own `depts` array has the same split for this
-one department.
+- **A locked phase page stays fully readable; only its checkboxes disable.**
+  The original never blocks the whole page — see the comment on `unlocked` /
+  `lockReason` in `pages/PhasePage.jsx`.
+- **Per-task reward toast + the 90-day completion celebration.** Both existed
+  in the original and were missing from this port. See the header comment in
+  `components/RewardToast.jsx`, and the `showOnboardingComplete` block and
+  its surrounding comments in `pages/PhasePage.jsx`.
+- **Overall progress bar.** See the header comment in
+  `components/ProgressBar.jsx`. Building it surfaced a real level-filtering
+  bug in `lib/departmentTasks.js`'s `getDepartmentTaskIds` — see that file's
+  header comment.
+- **Department Selection is rich cards, not plain buttons.** See the header
+  comments in `data/departments.js` and `components/deptIcons.jsx`.
 
 ## The sidebar has to stay pinned to the viewport
 

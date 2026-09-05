@@ -121,7 +121,7 @@ export async function verifyGoogleIdToken(idToken) {
  *
  * Shape:
  *   {
- *     hr:        'admin' | 'manager' | 'user' | null,
+ *     hr:        'admin' | 'manager' | 'staff' | null,
  *     credit:    'manager' | null,
  *     minutes:   'admin' | 'editor' | null,
  *     sop:       'editor' | null,

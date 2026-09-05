@@ -52,7 +52,7 @@ export default function LedgerTab({ projects, onChanged }) {
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      <div className="card !p-0 overflow-hidden">
+      <div className="card !p-0 overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr className="tbl-head">

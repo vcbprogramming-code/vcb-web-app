@@ -71,6 +71,10 @@ await query('insert into profile_units (profile_id, unit_id) values ($1,$2) on c
 // Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
 // ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-worklog-feedback`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: false, userDataDir: `${ROOT}/chrome-worklog-feedback`,

@@ -2,6 +2,7 @@
  * PG — ชุดที่ 2 บนหน้าจอจริง: เลือกผู้รับสำเนาเป็นคน · ผู้รับสำเนา comment ได้ · tag ด้วย @
  */
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import { execSync } from 'node:child_process';
 import { call, newDoc, cleanup, suite, happy, bad, report, U, warm, APP, tok, query } from './harness.mjs';
@@ -15,6 +16,10 @@ execSync(`mkdir -p ${ROOT}/cc`);
 // Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
 // ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-cc-and-mentions`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: CHROME, headless: false, userDataDir: `${ROOT}/chrome-cc-and-mentions`,
   defaultViewport: { width: 1600, height: 1000 }, args: ['--no-first-run', '--no-default-browser-check'],

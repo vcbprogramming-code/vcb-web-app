@@ -38,10 +38,13 @@ export const env = {
   // Public URL of the frontend, used to build approval links in emails.
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:5173',
 
-  // Modules turned off for the current soft launch — their APIs return 404 until
-  // enabled (defence in depth; the frontend also hides them in config/nav.js).
-  // Comma-separated; set DISABLED_MODULES='' to enable everything.
-  disabledModules: (process.env.DISABLED_MODULES ?? 'onboarding')
+  // Modules turned off — their APIs return 404 until enabled (defence in depth;
+  // the frontend also hides them in config/nav.js). Comma-separated.
+  //
+  // onboarding came off this list on 2026-09-05 when the 90-day programme was
+  // rebuilt to the client's own design. Set DISABLED_MODULES=onboarding to put
+  // it back without a deploy.
+  disabledModules: (process.env.DISABLED_MODULES ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),

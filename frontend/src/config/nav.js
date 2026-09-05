@@ -35,12 +35,14 @@ export const apps = [
     enabled: true,            // and grantable per person from ตั้งค่า → ผู้ใช้
   },
   {
-    to: '/onboarding',
-    title: 'แนะแนวพนักงานใหม่ 90 วัน',
-    desc: 'คลังข้อมูล แผน 30-60-90 วัน และแบบประเมินทดลองงาน',
+    // การ์ดพาไปที่ "โปรแกรม" ที่พนักงานใหม่เดินเอง ไม่ใช่เครื่องมือฝั่ง HR ที่
+    // /onboarding — อันนั้นยังอยู่ แต่คนที่กดจากหน้าแรกคือพนักงานใหม่
+    to: '/onboarding/program',
+    title: 'ปฐมนิเทศพนักงานใหม่',
+    desc: 'โปรแกรม 90 วัน · เอกสารที่ต้องส่ง แผนกที่สังกัด และรายการที่ต้องทำแต่ละช่วง',
     icon: 'cap',
     color: 'bg-violet-50 text-violet-600',
-    enabled: false,
+    enabled: true,
   },
   // Settings is now ONE page for everything (system + per-module + your own
   // signature), so the Portal shows a single card instead of one per screen.
@@ -94,6 +96,7 @@ export const moduleTitles = {
   '/performance': 'บันทึกงานฝ่ายบุคคล',
   '/credit': 'วงเงินสินเชื่อโครงการ',
   '/onboarding': 'แนะแนวพนักงานใหม่',
+  '/onboarding/program': 'ปฐมนิเทศพนักงานใหม่',
   '/settings': 'ตั้งค่า',
   '/sop': 'คู่มือปฏิบัติงาน (SOP)',
   '/dashboard': 'ภาพรวม E-Memo',

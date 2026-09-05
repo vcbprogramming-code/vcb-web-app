@@ -119,24 +119,34 @@ suite('3. อนุมัติแล้ววันลาไปขึ้นใ�
   happy('ผู้อนุมัติคนละคนกับผู้ยื่นอนุมัติได้', dec.status === 200 && dec.row.status === 'approved', dec.row?.status || dec.error);
   happy('บันทึกว่าใครเป็นผู้ตัดสิน', Boolean(dec.row?.decided_by_name), dec.row?.decided_by_name);
 
-  const away = await query('select ymd from employee_away where leave_request_id = $1 order by ymd', [r.row.id]);
-  happy('เขียนวันลาลงตารางงานครบทุกวัน', away.rows.length === 3, `${away.rows.length} วัน`);
-  // The driver builds a Date from a date column in the CLIENT's timezone, so
-  // toISOString() shifts it a day back east of UTC. Format from the local parts,
-  // the same way the app's own dateStr() does.
-  const ymd = (d) => { const x = new Date(d); const p2 = (n) => String(n).padStart(2, '0');
-    return `${x.getFullYear()}-${p2(x.getMonth() + 1)}-${p2(x.getDate())}`; };
-  happy('วันแรกตรงกับวันที่ขอ', ymd(away.rows[0]?.ymd) === '2026-11-03', ymd(away.rows[0]?.ymd));
-  happy('วันสุดท้ายตรงกับวันที่ขอ', ymd(away.rows[2]?.ymd) === '2026-11-05', ymd(away.rows[2]?.ymd));
+  // การอนุมัติเขียนรหัส Z-2 ลงช่องงานหลักเหมือนที่ HR พิมพ์มือ พร้อมโน้ต [LV]
+  // ให้กริดแยกออกว่าวันนี้มาจากคำขอที่อนุมัติแล้ว — ข้อกำหนดฟังก์ชัน §3.2.2
+  // (เดิมเขียนลง employee_away ซึ่งทำให้กริดขึ้นเป็นช่องเทาและวันลาหายไปจากรายงาน)
+  const kind = (await query('select kind from employees where id = $1', [emp])).rows[0].kind;
+  const slot1 = kind === 'operation' ? 'team' : 'detail';
+  const logs = await query(
+    `select ymd::text ymd, ${slot1} as slot1, pm, note from work_logs
+      where employee_id = $1 and deleted_at is null order by ymd`, [emp]);
+  happy('เขียนวันลาลงตารางงานครบทุกวัน', logs.rows.length === 3, `${logs.rows.length} วัน`);
+  happy('วันแรกตรงกับวันที่ขอ', logs.rows[0]?.ymd === '2026-11-03', logs.rows[0]?.ymd);
+  happy('วันสุดท้ายตรงกับวันที่ขอ', logs.rows[2]?.ymd === '2026-11-05', logs.rows[2]?.ymd);
+  happy('ลงเป็นรหัส Z-2 ในช่องงานหลักตามสายงาน',
+    logs.rows.every((x) => x.slot1 === 'Z-2'), logs.rows.map((x) => x.slot1).join(','));
+  happy('มีโน้ต [LV] กำกับว่ามาจากคำขอลา',
+    logs.rows.every((x) => String(x.note || '').startsWith('[LV] ลาป่วย')), logs.rows[0]?.note || '');
+  bad('วันลาไม่มีงานเสริมค้างอยู่', logs.rows.every((x) => !x.pm), '');
 
-  // and the grid must be able to say WHY the day is blank
+  // และต้องนับเป็นแรงงาน-วันในกลุ่ม "ไม่ปฏิบัติงาน" ไม่ใช่หายไปจากรายงาน
+  const rep = (await call('/performance/report/manday?from=2026-11-03&to=2026-11-05&groupBy=worktype', { user: A })).data;
+  const z2 = (rep?.rows || []).find((x) => x.key === 'Z-2');
+  happy('วันลาไปโผล่ในรายงานเป็นรหัส Z-2', Boolean(z2) && z2.manday >= 3, JSON.stringify(z2 || rep?.rows));
+
+  // หน้าจอต้องได้ note ไปวาดป้ายกำกับ
   const site = (await query('select code from units where id = (select unit_id from employees where id = $1)', [emp])).rows[0];
   const sm = await call(`/performance/site-month?site=${site.code}&year=2026&month=11`, { user: A });
-  const me = (sm.employees || sm.roster || []).find((x) => x.eid === emp);
-  happy('ตารางงานบอกประเภทการลาของวันนั้น',
-    me && me.leave && me.leave['2026-11-03'] === 'ลาป่วย', JSON.stringify(me?.leave || {}));
-  happy('และยังนับเป็นวันไม่มาทำงานเหมือนเดิม',
-    me && (me.away || []).includes('2026-11-03'), JSON.stringify(me?.away || []));
+  const cell = (sm.entries?.[emp] || {})['2026-11-03'];
+  happy('หน้าจอได้รับโน้ตไปแสดงป้ายวันลา',
+    String(cell?.note || '').startsWith('[LV]'), JSON.stringify(cell || {}));
 
   bad('ตัดสินซ้ำอีกครั้งไม่ได้',
     (await call(`/performance/leave/${r.row.id}/decide`, { method: 'POST', user: A, body: { approve: false } })).status === 409, '');

@@ -123,8 +123,16 @@ suite('3. อนุมัติแล้ววันลาเข้าตาร�
   await call(`/performance/leave/${reqId}/decide`, { method: 'POST', user: U.exec, body: { approve: true } });
   // ปลดการผูกทันที ไม่ให้กระทบข้อถัดไปที่ตรวจว่ายังมีพนักงานที่ไม่มีหัวหน้า
   await query('delete from leave_approvers where approver_id = $1 and employee_id = $2', [U.exec.id, emp.id]);
-  const away = await query('select ymd from employee_away where leave_request_id = $1', [reqId]);
-  happy('เขียนวันลาลงตารางงาน 3 วัน', away.rows.length === 3, `${away.rows.length}`);
+  // การอนุมัติเขียนรหัส Z-2 ลงตารางงานพร้อมโน้ต [LV] ไม่ใช่ทำเครื่องหมาย away
+  // (ข้อกำหนดฟังก์ชัน §3.2.2) — สายปฏิบัติการลงช่อง team สายสนับสนุนลงช่อง detail
+  const logs = await query(
+    `select w.ymd::text ymd, case when e.kind = 'operation' then w.team else w.detail end slot1, w.note
+       from work_logs w join employees e on e.id = w.employee_id
+      where w.employee_id = $1 and w.deleted_at is null order by w.ymd`, [emp.id]);
+  happy('เขียนวันลาลงตารางงาน 3 วัน', logs.rows.length === 3, `${logs.rows.length}`);
+  happy('ลงเป็นรหัส Z-2 พร้อมโน้ต [LV]',
+    logs.rows.every((x) => x.slot1 === 'Z-2' && String(x.note || '').startsWith('[LV]')),
+    logs.rows.map((x) => `${x.slot1}|${x.note}`).join(' · '));
 
   await as(A);
   await clickText('การลา');

@@ -1482,4 +1482,5 @@ export const EN = {
     'A day with any task logged is 1 man-day; two tasks on one day split 0.5/0.5.',
   'จำนวนรายการในรายงาน': 'Rows in report',
   'รายหมวดต้นทุน': 'By cost category',
+  'จากคำขอลาเลขที่': 'From leave request',
 };

@@ -368,7 +368,7 @@ router.get('/site-month', asyncHandler(async (req, res) => {
   const month = `${Y}-${pad(M)}`;
   const employees = await employeesForUnit(unit.id, month);
   const logs = (await query(
-    `select employee_id, ymd, team, detail, pm, man_day, hours, work_status, entry_at, updated_at, verified_at
+    `select employee_id, ymd, team, detail, pm, note, man_day, hours, work_status, entry_at, updated_at, verified_at
        from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null`,
     [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
   const entries = {};
@@ -378,6 +378,9 @@ router.get('/site-month', asyncHandler(async (req, res) => {
     if (l.team) cell.team = l.team;
     if (l.detail) cell.detail = l.detail;
     if (l.pm) cell.pm = l.pm;
+    // โน้ตขึ้นต้นด้วย [LV] คือวันที่มาจากการอนุมัติคำขอลา ไม่ใช่คนพิมพ์เอง
+    // กริดใช้ marker นี้ขึ้นป้ายกำกับ — ข้อกำหนดฟังก์ชัน §3.2.2
+    if (l.note) cell.note = l.note;
     if (l.man_day != null) cell.manDay = Number(l.man_day);
     if (l.hours != null) cell.hours = Number(l.hours);
     if (l.work_status) cell.workStatus = l.work_status;
@@ -817,16 +820,43 @@ router.post('/leave/:id/decide', asyncHandler(async (req, res) => {
     [row.id, status, req.profile.id, p.data.note]
   );
 
-  // Approval is what puts the days into the work log. Tagged with the request id
-  // so reversing the decision takes back exactly these days and leaves any an
-  // admin marked by hand alone.
+  // การอนุมัติคือสิ่งที่เขียนวันลาลงตารางงาน
+  //
+  // เขียนเป็นรหัส Z-2 (ลา) ลงช่องงานหลักเหมือนที่ HR พิมพ์มือทุกประการ พร้อม
+  // โน้ตโครงสร้าง "[LV] <ประเภท> · <เลขที่คำขอ>" ให้กริดขึ้นป้ายกำกับได้ว่าวันนี้
+  // มาจากคำขอที่อนุมัติแล้ว ไม่ใช่คนพิมพ์เอง — ข้อกำหนดฟังก์ชัน §3.2.2
+  //
+  // ทำไมไม่ใช้ employee_away อย่างเดิม: วันที่ทำเครื่องหมาย away จะถูกกริดแสดง
+  // เป็นช่องเทาและซ่อนช่องงาน วันลาจึงหายไปจากรายงานทั้งหมดแทนที่จะไปโผล่ในกลุ่ม
+  // "ไม่ปฏิบัติงาน" ตามที่ทะเบียนงานออกแบบไว้
   if (p.data.approve) {
-    await query(
-      `insert into employee_away (employee_id, ymd, leave_request_id)
-       select $1, d::date, $2 from generate_series($3::date, $4::date, interval '1 day') d
-       on conflict do nothing`,
-      [row.employee_id, row.id, row.from_date, row.to_date]
-    );
+    const emp = await queryOne('select id, unit_id, kind from employees where id = $1', [row.employee_id]);
+    const slot1 = emp?.kind === 'operation' ? 'team' : 'detail';
+    const note = `[LV] ${LEAVE_TH[row.leave_type] || row.leave_type || 'ลา'} · ${row.id}`;
+    const days = (await query(
+      `select d::date::text ymd from generate_series($1::date, $2::date, interval '1 day') d`,
+      [row.from_date, row.to_date])).rows;
+    for (const { ymd: day } of days) {
+      const before = await queryOne(
+        'select id, team, detail, pm from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+        [row.employee_id, day]);
+      // วันลาไม่มีงานเสริม — ล้าง pm ทิ้ง ไม่งั้นแรงงาน-วันจะถูกแบ่งครึ่งให้งานที่
+      // ไม่ได้เกิดขึ้น ค่าเดิมยังตามอ่านได้จากประวัติการแก้ไข
+      await query(
+        `insert into work_logs (employee_id, unit_id, ymd, kind, ${slot1}, pm, note, status, updated_by)
+         values ($1,$2,$3,$4,'Z-2',null,$5,'',$6)
+         on conflict (employee_id, ymd) do update set
+           unit_id = excluded.unit_id, kind = excluded.kind,
+           ${slot1} = 'Z-2', pm = null, note = excluded.note,
+           deleted_at = null, deleted_by = null, updated_by = excluded.updated_by, updated_at = now()`,
+        [row.employee_id, emp.unit_id, day, emp.kind, note, req.profile.id]);
+      const after = await queryOne(
+        'select id, team, detail, pm from work_logs where employee_id = $1 and ymd = $2', [row.employee_id, day]);
+      await logWork({ actor: req.profile, workLogId: after?.id, employeeId: row.employee_id,
+        unitId: emp.unit_id, ymd: day, action: before ? 'edit' : 'create',
+        before: before ? workFields(before) : null, after: workFields(after),
+        reason: `อนุมัติคำขอลา ${row.id}` });
+    }
   }
 
   const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);

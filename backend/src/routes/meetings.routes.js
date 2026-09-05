@@ -288,13 +288,23 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
     return String(p.data[k] ?? '') !== String(before ?? '');
   });
   if (changed && cur.content) {
-    const seq = await queryOne(
-      'select coalesce(max(seq), 0) + 1 as n from mtg_versions where meeting_id = $1', [cur.id]);
-    await query(
-      `insert into mtg_versions (meeting_id, seq, content, title, meeting_date, time_label, saved_by)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
-      [cur.id, seq.n, cur.content, cur.title, cur.meeting_date, cur.time_label, req.profile.id]
-    );
+    // (meeting_id, seq) มีดัชนีไม่ซ้ำ ถ้าสองคนแก้รายงานฉบับเดียวกันพร้อมกัน
+    // ทั้งคู่อ่าน max ได้เลขเดียวกันแล้วคนหลังชนกุญแจซ้ำ — ชนเมื่อไรก็คำนวณ
+    // เลขใหม่แล้วลองอีกครั้ง เก็บประวัติไว้ได้ทั้งสองฉบับ ไม่ใช่ให้คนหลังเห็น 500
+    for (let attempt = 0; ; attempt += 1) {
+      const seq = await queryOne(
+        'select coalesce(max(seq), 0) + 1 as n from mtg_versions where meeting_id = $1', [cur.id]);
+      try {
+        await query(
+          `insert into mtg_versions (meeting_id, seq, content, title, meeting_date, time_label, saved_by)
+           values ($1,$2,$3,$4,$5,$6,$7)`,
+          [cur.id, seq.n, cur.content, cur.title, cur.meeting_date, cur.time_label, req.profile.id]
+        );
+        break;
+      } catch (e) {
+        if (e?.code !== '23505' || attempt >= 4) throw e;   // 23505 = กุญแจซ้ำ
+      }
+    }
   }
 
   const html = p.data.content !== undefined ? sanitizeHtml(p.data.content) : null;

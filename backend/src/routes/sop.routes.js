@@ -230,6 +230,10 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // เลขที่กรณีศึกษาเป็นกุญแจหลัก อ่าน max แล้วเขียนพร้อมกันสองคนจะได้เลข
+    // เดียวกันและคนหลังชนกุญแจซ้ำ → 500 (ทดสอบพร้อมกัน 8 คน สำเร็จแค่คนเดียว)
+    // ล็อกเฉพาะช่วงจองเลข ปล่อยเองเมื่อจบทรานแซกชัน คนอ่านไม่ถูกกระทบ
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', ['sop_scenarios.no']);
     const { rows: nx } = await client.query('select coalesce(max(no),0)+1 as no from sop_scenarios');
     const no = nx[0].no;
     const { rows: so } = await client.query(

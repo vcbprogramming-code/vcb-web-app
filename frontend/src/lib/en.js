@@ -1483,4 +1483,15 @@ export const EN = {
   'จำนวนรายการในรายงาน': 'Rows in report',
   'รายหมวดต้นทุน': 'By cost category',
   'จากคำขอลาเลขที่': 'From leave request',
+
+  // ── แผนผังระบบ: คำอธิบายสัญลักษณ์และการแสดงเส้นเชื่อม ────────────────────
+  'อยู่ในระบบ ERP': 'In ERP',
+  'ทำด้วยมือ': 'Manual',
+  'แสดงทุกเส้นเชื่อม': 'Show all links',
+  'กำลังแสดงเส้นเชื่อมทั้งหมด': 'Showing all',
+  'เส้น — กดที่กล่องงานเพื่อเน้นเฉพาะเส้นของกล่องนั้น':
+    'links — click a step to bring its own links forward.',
+  'กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น หรือกด “แสดงทุกเส้นเชื่อม” เพื่อดูภาพรวมทั้ง':
+    'Click a step for its detail and the links around it, or use “Show all links” to see all',
+  'เส้นพร้อมกัน': 'at once.',
 };

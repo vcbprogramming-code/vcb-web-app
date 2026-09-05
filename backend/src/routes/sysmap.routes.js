@@ -21,7 +21,21 @@ const router = Router();
 router.use(requireAuth);
 
 const canView = requirePermission('sysmap', 'view');
-const canEdit = requirePermission('sysmap', 'edit');
+/**
+ * แผนผังระบบเป็นตัวแสดงผลอย่างเดียว
+ *
+ * เอกสารข้อกำหนดฟังก์ชัน §1 ระบุว่าโมดูลนี้ "ไม่มีฐานข้อมูล ไม่มี API ของตัวเอง"
+ * — ข้อมูลทั้งหมด (10 เลน · 79 กล่องงาน · 129 เส้นเชื่อม · 158 ฟังก์ชัน)
+ * เป็นค่าคงที่ในซอร์สโค้ด ผู้ใช้ทุกคนเห็นแผนผังเดียวกันทุกประการ
+ *
+ * ของเราเก็บชุดข้อมูลเดียวกันไว้ในฐานข้อมูลซึ่งเปลี่ยนเนื้อหาได้โดยไม่ต้อง deploy
+ * แต่หน้าจอแก้ไขเป็นสิ่งที่ระบบของลูกค้าไม่มี จึงปิดไว้เป็นค่าเริ่มต้น
+ * เปิดกลับด้วย SYSMAP_EDIT=on เมื่อตกลงกันแล้ว
+ */
+const EDITABLE = String(process.env.SYSMAP_EDIT || '').toLowerCase() === 'on';
+const canEdit = EDITABLE
+  ? requirePermission('sysmap', 'edit')
+  : (req, res, next) => next(new ApiError(404, 'แผนผังระบบเป็นข้อมูลอ้างอิง แก้ไขจากหน้าจอไม่ได้'));
 
 /** Ids are author-supplied text ('n-bd-pipeline'), so keep them to a safe shape. */
 const idRe = /^[a-zA-Z0-9._-]{1,64}$/;
@@ -52,7 +66,7 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
       nodes: nodes.rows,
       conns: conns.rows,
       // via the resolver: a right granted by the role is not in the override map
-      canEdit: hasPermission(req.profile, 'sysmap', 'edit'),
+      canEdit: EDITABLE && hasPermission(req.profile, 'sysmap', 'edit'),
       counts: { lanes: lanes.rows.length, nodes: nodes.rows.length, conns: conns.rows.length },
     },
   });

@@ -11,6 +11,11 @@ import { call, suite, happy, bad, report, U, warm, query } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 await warm();
+
+// แผนผังระบบเป็นข้อมูลอ้างอิงอย่างเดียวตามเอกสารข้อกำหนดฟังก์ชัน §1 — หน้าจอ
+// แก้ไขปิดไว้เป็นค่าเริ่มต้น ส่วนที่ตรวจการแก้ไขจึงข้ามไป เว้นแต่รัน API ด้วย
+// SYSMAP_EDIT=on ซึ่งยังทำได้ถ้าตกลงกับลูกค้าว่าจะเปิดคืน
+const EDITABLE = (await call('/sysmap/bootstrap', { user: U.admin })).data?.canEdit === true;
 const { admin: A, exec: C, hr: H } = U;
 const MARK = 'ZZTEST';
 const made = { lanes: [], nodes: [], fns: [], ai: [] };
@@ -53,18 +58,21 @@ suite('2. สิทธิ์ — ทุกคนดูได้ เฉพาะ�
     happy(`${who}ไม่ได้สิทธิ์แก้ไข`, r.data?.canEdit === false, String(r.data?.canEdit));
   }
   const b = await call('/sysmap/bootstrap', { user: A });
-  happy('ผู้ดูแลได้สิทธิ์แก้ไข', b.data.canEdit === true, '');
+  if (EDITABLE) happy('ผู้ดูแลได้สิทธิ์แก้ไข', b.data.canEdit === true, '');
+  else bad('แม้แต่ผู้ดูแลก็แก้ไขจากหน้าจอไม่ได้ (เป็นข้อมูลอ้างอิง)', b.data.canEdit === false, '');
 
+  const denied = EDITABLE ? 403 : 404;
   bad('ฝ่ายบุคคลเพิ่มเลนไม่ได้',
-    (await call('/sysmap/lanes', { method: 'POST', user: H, body: { id: 'zz', label_en: 'X' } })).status === 403, '');
+    (await call('/sysmap/lanes', { method: 'POST', user: H, body: { id: 'zz', label_en: 'X' } })).status === denied, '');
   bad('ผู้บริหารลบกล่องงานไม่ได้',
-    (await call('/sysmap/nodes/n-gl', { method: 'DELETE', user: C })).status === 403, '');
+    (await call('/sysmap/nodes/n-gl', { method: 'DELETE', user: C })).status === denied, '');
   bad('ไม่ล็อกอินเปิดไม่ได้', (await call('/sysmap/bootstrap', { user: null })).status === 401, '');
 }
 
 // ── 3. แก้ไขข้อมูลผ่านฟอร์ม ────────────────────────────────────────────────
 suite('3. ผู้ดูแลแก้ไขข้อมูลแผนผังได้');
-{
+if (!EDITABLE) console.log('  ข้าม — แผนผังเป็นข้อมูลอ้างอิง (ตั้ง SYSMAP_EDIT=on เพื่อทดสอบส่วนนี้)');
+else {
   const laneId = `zz-lane-${Date.now().toString(36)}`;
   const lane = await call('/sysmap/lanes', { method: 'POST', user: A,
     body: { id: laneId, label_en: `${MARK} Lane`, label_th: `${MARK} เลนทดสอบ` } });
@@ -118,7 +126,8 @@ suite('3. ผู้ดูแลแก้ไขข้อมูลแผนผั�
 
 // ── 4. ทะเบียนฟังก์ชันและโอกาส AI ──────────────────────────────────────────
 suite('4. ทะเบียนฟังก์ชันและโอกาสใช้ AI');
-{
+if (!EDITABLE) console.log('  ข้าม — เพิ่ม/แก้ไขทะเบียนปิดอยู่');
+else {
   const code = `ZZ-${Date.now().toString(36)}`;
   const f = await call('/sysmap/functions', { method: 'POST', user: A,
     body: { code, dept: 'fin', name_en: `${MARK} Function`, name_th: `${MARK} ฟังก์ชันทดสอบ`, at_site: true } });

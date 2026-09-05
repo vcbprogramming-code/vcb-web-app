@@ -35,6 +35,8 @@ export default function SystemMap() {
   const [lang, setLang] = useState(() => localStorage.getItem('sysmap_lang') || 'th');
   const [dept, setDept] = useState('');
   const [layer, setLayer] = useState('all'); // all | erp | manual
+  // ดูทั้งผังทีเดียว หรือไล่ทีละกล่อง — เอกสารข้อกำหนดฟังก์ชันวาดครบทั้ง 129 เส้น
+  const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState(sp.get('node') || null);
   const [edit, setEdit] = useState(null); // { kind, row }
 
@@ -114,8 +116,12 @@ export default function SystemMap() {
             ))}
             <span className="mx-1 h-5 w-px bg-slate-200" />
             {[['all', 'ทั้งหมด'], ['erp', 'เฉพาะที่อยู่ใน ERP'], ['manual', 'เฉพาะที่ทำมือ']].map(([k, l]) => (
-              <button key={k} onClick={() => setLayer(k)} className={chip(layer === k)}>{l}</button>
+              <button key={k} onClick={() => setLayer(k)} className={chip(layer === k)}>{t(l)}</button>
             ))}
+            <span className="mx-1 h-5 w-px bg-slate-200" />
+            <button onClick={() => setShowAll((v) => !v)} className={chip(showAll)}>
+              {t('แสดงทุกเส้นเชื่อม')}
+            </button>
             {canEdit && (
               <div className="ml-auto flex gap-2">
                 <button onClick={() => setEdit({ kind: 'lane' })} className="btn-outline !py-1.5 !text-sm"><Icon name="plus" className="h-4 w-4" /> {t('เลน')}</button>
@@ -125,12 +131,15 @@ export default function SystemMap() {
           </div>
 
           <p className="text-xs text-slate-500">
-            {t('กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น — เส้นทั้ง')} {counts.conns} {t('เส้นถ้าวาดพร้อมกันจะอ่านไม่ออก จึงแสดงเฉพาะของกล่องที่เลือก')}
+            {showAll
+              ? <>{t('กำลังแสดงเส้นเชื่อมทั้งหมด')} {counts.conns} {t('เส้น — กดที่กล่องงานเพื่อเน้นเฉพาะเส้นของกล่องนั้น')}</>
+              : <>{t('กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น หรือกด “แสดงทุกเส้นเชื่อม” เพื่อดูภาพรวมทั้ง')} {counts.conns} {t('เส้นพร้อมกัน')}</>}
           </p>
 
           <LaneMap
             lanes={lanes} nodes={nodes} conns={conns} depts={depts} lang={lang}
             selected={selected} onSelect={setSelected} filterDept={dept} layer={layer}
+            showAll={showAll}
           />
 
           {node && (

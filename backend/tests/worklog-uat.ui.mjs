@@ -27,8 +27,9 @@ await warm();
   const off = need.filter((f) => !boot.features?.[f]);
   if (off.length) {
     console.log(`\nข้าม ${off.length} ความสามารถที่ปิดอยู่: ${off.join(', ')}`);
-    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้\n');
-    process.exit(0);
+    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้');
+    // พิมพ์บรรทัดสรุปด้วย ไม่งั้นตัวรันรวมอ่านผลไม่เจอแล้วนับว่าชุดนี้ล้ม
+    process.exit(report());
   }
 }
 

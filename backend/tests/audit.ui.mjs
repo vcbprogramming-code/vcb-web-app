@@ -65,9 +65,16 @@ let errors = [];
 let failed = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
 page.on('pageerror', (e) => errors.push(`อุบัติเหตุสคริปต์: ${String(e).slice(0, 160)}`));
-page.on('requestfailed', (r) => failed.push(`${r.method()} ${r.url().slice(0, 90)}`));
+// นับเฉพาะคำขอที่หน้าเว็บของเราเป็นคนยิง — chrome-extension:// เป็นของตัว
+// เบราว์เซอร์เอง (เช่นตัวเปิด PDF ในตัว) เราควบคุมไม่ได้และไม่ใช่ข้อบกพร่องของระบบ
+const ourRequest = (u) => !u.startsWith('chrome-extension://') && !u.startsWith('devtools://');
+page.on('requestfailed', (r) => {
+  if (ourRequest(r.url())) failed.push(`${r.method()} ${r.url().slice(0, 90)}`);
+});
 page.on('response', (r) => {
-  if (r.status() >= 400 && !r.url().includes('favicon')) failed.push(`${r.status()} ${r.url().slice(0, 90)}`);
+  if (r.status() >= 400 && !r.url().includes('favicon') && ourRequest(r.url())) {
+    failed.push(`${r.status()} ${r.url().slice(0, 90)}`);
+  }
 });
 
 async function open(user, path) {

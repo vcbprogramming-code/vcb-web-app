@@ -1,0 +1,1509 @@
+{
+ "departments": [
+  {
+   "slug": "accounting",
+   "phases": [
+    {
+     "key": "accounting-day-1-30",
+     "range": "1-30",
+     "eyebrow": "Accounting · Phase 1 (Day 1–30)",
+     "title": "Foundation: Documentation & Recording Discipline",
+     "closing": null,
+     "next": "accounting-day-31-60",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "acct-p1-read-1",
+         "text": "Chart of Accounts Structure",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-read-2",
+         "text": "PR → PO → AP Recording Flow (ERP Posting Rules)",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-read-3",
+         "text": "VAT & Withholding Tax Compliance",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-read-4",
+         "text": "AP Credit Note (ลดหนี้) Procedure",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "acct-p1-know-1",
+         "text": "Debit/credit logic and expense vs asset classification",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-know-2",
+         "text": "VAT calculation and recording",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-know-3",
+         "text": "AP/AR posting and journal entries in Mango",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-know-4",
+         "text": "Reversing a payable for returns, over-billing, or disputes",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "acct-p1-out-1",
+         "text": "15 accurate ERP postings",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-out-2",
+         "text": "1 sample journal entry set",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-out-3",
+         "text": "VAT reconciliation example",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p1-out-4",
+         "text": "1 reviewed AP credit note case",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "accounting-day-31-60",
+     "range": "31-60",
+     "eyebrow": "Accounting · Phase 2 (Day 31–60)",
+     "title": "Control: Reconciliation & Compliance",
+     "closing": null,
+     "next": "accounting-day-61-90",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "acct-p2-read-1",
+         "text": "Bank Reconciliation Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-read-2",
+         "text": "AP/AR Aging Review Standards",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-read-3",
+         "text": "Monthly Accrual & Depreciation Policy",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-read-4",
+         "text": "IC Inventory Accounting Standard",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "acct-p2-know-1",
+         "text": "Bank reconciliation structure (complements GL Reconcile)",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-know-2",
+         "text": "AP/AR aging review",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-know-3",
+         "text": "Accrual entry logic & depreciation recording",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-know-4",
+         "text": "IC inventory accounting and cost-transfer postings to GL",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "acct-p2-out-1",
+         "text": "Bank reconciliation report",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-out-2",
+         "text": "Accrual journal summary",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-out-3",
+         "text": "AR/AP aging summary",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p2-out-4",
+         "text": "1 IC inventory accounting review memo",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "accounting-day-61-90",
+     "range": "61-90",
+     "eyebrow": "Accounting · Phase 3 (Day 61–90)",
+     "title": "Ownership: Reporting Accuracy & Audit Readiness",
+     "closing": "You have completed all three onboarding phases for this department.",
+     "next": null,
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "acct-p3-read-1",
+         "text": "Financial Statement Structure",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-read-2",
+         "text": "Revenue Recognition Standards",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-read-3",
+         "text": "Audit Documentation Requirements",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-read-4",
+         "text": "External Audit Coordination Guidelines",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "acct-p3-know-1",
+         "text": "Month-end GL closing procedure",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-know-2",
+         "text": "Trial balance review",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-know-3",
+         "text": "VAT/WHT/CIT filing requirements",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-know-4",
+         "text": "External audit coordination and management cost-per-project reporting",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "acct-p3-out-1",
+         "text": "Trial balance review sheet",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-out-2",
+         "text": "Financial statement draft",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-out-3",
+         "text": "Internal audit readiness checklist",
+         "level": "junior"
+        },
+        {
+         "id": "acct-p3-out-4",
+         "text": "1 management cost-per-project report",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "landingKey": "accounting-team",
+   "name": "Accounting Team"
+  },
+  {
+   "slug": "finance",
+   "phases": [
+    {
+     "key": "finance-day-1-30",
+     "range": "1-30",
+     "eyebrow": "Finance · Phase 1 (Day 1–30)",
+     "title": "Foundation: Liquidity Awareness & Cashflow Discipline",
+     "closing": null,
+     "next": "finance-day-31-60",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "fin-p1-read-1",
+         "text": "Company Cash Cycle Structure — project-based cashflow model driven by certified progress payments from government projects.",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-read-2",
+         "text": "Advance & Retention Mechanism — advance payments are progressively deducted from claims; retention is withheld until completion milestones.",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-read-3",
+         "text": "ERP Documentation Flow — all payments must follow PR → PO → AP → Approval → Payment.",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-read-4",
+         "text": "Inter-JV Group Transfers Guide (VCB/CVE/VN JV)",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "fin-p1-know-1",
+         "text": "Operating vs financing cashflow",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-know-2",
+         "text": "Retention’s impact on liquidity",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-know-3",
+         "text": "Advance deduction process",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-know-4",
+         "text": "Inter-JV fund transfers and AR-Without-Invoice postings",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "fin-p1-out-1",
+         "text": "10 accurate PL postings",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-out-2",
+         "text": "1 complete bank reconciliation",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-out-3",
+         "text": "Identification of 3 liquidity risks",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p1-out-4",
+         "text": "1 reviewed inter-JV transfer entry",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "finance-day-31-60",
+     "range": "31-60",
+     "eyebrow": "Finance · Phase 2 (Day 31–60)",
+     "title": "Control: Forecasting Accuracy & Funding Risk Monitoring",
+     "closing": null,
+     "next": "finance-day-61-90",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "fin-p2-read-1",
+         "text": "Loan Amortization Structure",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-read-2",
+         "text": "Promissory Note Interest Calculation",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-read-3",
+         "text": "Retention Ledger Monitoring Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-read-4",
+         "text": "AVAL Discounting (B/E Sale) Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "fin-p2-know-1",
+         "text": "Project-level cashflow tracking",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-know-2",
+         "text": "Liquidity forecasting method",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-know-3",
+         "text": "Credit Facility register basics (P/N, AVAL, BG, LC)",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-know-4",
+         "text": "Shopping AVAL bills across banks for best discount rate",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "fin-p2-out-1",
+         "text": "3-month cash projection",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-out-2",
+         "text": "Retention tracking sheet",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-out-3",
+         "text": "Cost variance analysis",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p2-out-4",
+         "text": "1 AVAL discounting rate comparison",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "finance-day-61-90",
+     "range": "61-90",
+     "eyebrow": "Finance · Phase 3 (Day 61–90)",
+     "title": "Ownership: Financial Stability & Strategic Liquidity Control",
+     "closing": "You have completed all three onboarding phases for this department.",
+     "next": null,
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "fin-p3-read-1",
+         "text": "Break-Even Analysis Method",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-read-2",
+         "text": "Debt Servicing Capacity Guidelines",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-read-3",
+         "text": "Liquidity Stress Testing Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-read-4",
+         "text": "Credit Facility Management & Bank Account Inquiry Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "fin-p3-know-1",
+         "text": "Debt servicing capacity",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-know-2",
+         "text": "Liquidity stress testing",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-know-3",
+         "text": "Margin sensitivity",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-know-4",
+         "text": "Selecting which facility to draw per payment batch",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "fin-p3-out-1",
+         "text": "Independent monthly financial report",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-out-2",
+         "text": "Liquidity stress scenario",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-out-3",
+         "text": "Financial risk memo",
+         "level": "junior"
+        },
+        {
+         "id": "fin-p3-out-4",
+         "text": "1 credit facility utilisation review",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "landingKey": "finance-team",
+   "name": "Finance Team"
+  },
+  {
+   "slug": "procurement",
+   "phases": [
+    {
+     "key": "procurement-day-1-30",
+     "range": "1-30",
+     "eyebrow": "Procurement · Phase 1 (Day 1–30)",
+     "title": "Foundation: Process Control & Approval Discipline",
+     "closing": null,
+     "next": "procurement-day-31-60",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "proc-p1-read-1",
+         "text": "PR → PO → IC → AP Workflow",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-read-2",
+         "text": "Authority Matrix (two-level PR approval)",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-read-3",
+         "text": "Vendor Registration Process",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-read-4",
+         "text": "Vendor & Subcontractor Pre-qualification (AVL) Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "proc-p1-know-1",
+         "text": "Approval hierarchy (site PM → HQ Engineer)",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-know-2",
+         "text": "Compare Price process",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-know-3",
+         "text": "Budget validation vs BOQ",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-know-4",
+         "text": "AVL capability/financial/safety pre-qualification criteria",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "proc-p1-out-1",
+         "text": "5 compliant PR/PO cycles",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-out-2",
+         "text": "Vendor comparison report",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-out-3",
+         "text": "Documentation compliance checklist",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p1-out-4",
+         "text": "1 draft vendor pre-qualification scorecard",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "procurement-day-31-60",
+     "range": "31-60",
+     "eyebrow": "Procurement · Phase 2 (Day 31–60)",
+     "title": "Control: Cost Efficiency & Supplier Risk Management",
+     "closing": null,
+     "next": "procurement-day-61-90",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "proc-p2-read-1",
+         "text": "Cost Benchmarking Guidelines",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-read-2",
+         "text": "Delivery Schedule Alignment Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-read-3",
+         "text": "Supplier Risk Assessment Criteria",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-read-4",
+         "text": "Supplier Tier Classification (Tier 1–4) Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "proc-p2-know-1",
+         "text": "Cost benchmarking method",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-know-2",
+         "text": "Delivery schedule alignment",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-know-3",
+         "text": "Supplier risk assessment",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-know-4",
+         "text": "Tier classification and market price database maintenance",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "proc-p2-out-1",
+         "text": "Cost saving analysis",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-out-2",
+         "text": "Supplier risk summary",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-out-3",
+         "text": "Delivery alignment plan",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p2-out-4",
+         "text": "1 supplier tier classification review",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "procurement-day-61-90",
+     "range": "61-90",
+     "eyebrow": "Procurement · Phase 3 (Day 61–90)",
+     "title": "Ownership: Strategic Procurement Planning & Liquidity Alignment",
+     "closing": "You have completed all three onboarding phases for this department.",
+     "next": null,
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "proc-p3-read-1",
+         "text": "Procurement Liquidity Impact Guide",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-read-2",
+         "text": "Inventory Overstock Risk Policy",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-read-3",
+         "text": "Supplier Concentration Exposure Standard",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-read-4",
+         "text": "Creditor Debt Restructuring & AVAL Offset Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "proc-p3-know-1",
+         "text": "Procurement’s impact on liquidity",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-know-2",
+         "text": "Inventory overstock risk",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-know-3",
+         "text": "Supplier concentration exposure",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-know-4",
+         "text": "Creditor debt restructuring and AVAL offset arrangements",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "proc-p3-out-1",
+         "text": "Procurement phase forecast",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-out-2",
+         "text": "Supplier concentration analysis",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-out-3",
+         "text": "Over-purchase prevention memo",
+         "level": "junior"
+        },
+        {
+         "id": "proc-p3-out-4",
+         "text": "1 creditor debt restructuring proposal",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "landingKey": "procurement-team",
+   "name": "Procurement Team"
+  },
+  {
+   "slug": "property",
+   "phases": [
+    {
+     "key": "property-day-1-30",
+     "range": "1-30",
+     "eyebrow": "Property & Asset Management · Phase 1 (Day 1–30)",
+     "title": "Foundation: Asset Registration & Control Discipline",
+     "closing": null,
+     "next": "property-day-31-60",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "prop-p1-read-1",
+         "text": "Asset Classification Policy",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-read-2",
+         "text": "Warehouse Coding Standard",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-read-3",
+         "text": "Tagging & Serialization Guide",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-read-4",
+         "text": "Fleet Management & GPS Monitoring Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "prop-p1-know-1",
+         "text": "Asset classification logic (FA masters: Type/Depreciation/Location/Rate)",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-know-2",
+         "text": "Warehouse coding structure",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-know-3",
+         "text": "Transfer documentation requirements",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-know-4",
+         "text": "Fleet/GPS monitoring and machine-hours utilisation tracking",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "prop-p1-out-1",
+         "text": "10 registered assets",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-out-2",
+         "text": "Asset transfer documentation",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-out-3",
+         "text": "Serial verification checklist",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p1-out-4",
+         "text": "1 fleet utilisation summary",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "property-day-31-60",
+     "range": "31-60",
+     "eyebrow": "Property & Asset Management · Phase 2 (Day 31–60)",
+     "title": "Control: Inventory Reconciliation & Traceability Enforcement",
+     "closing": null,
+     "next": "property-day-61-90",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "prop-p2-read-1",
+         "text": "Physical vs ERP Reconciliation Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-read-2",
+         "text": "Depreciation Basics",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-read-3",
+         "text": "Site Allocation Control Policy",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-read-4",
+         "text": "Preventive Maintenance (PM) Scheduling Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "prop-p2-know-1",
+         "text": "Physical vs ERP reconciliation (month-end Count Asset)",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-know-2",
+         "text": "Depreciation recording basics",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-know-3",
+         "text": "Site allocation control (inter-project IC Transfer)",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-know-4",
+         "text": "Preventive maintenance scheduling and repair-cost recording",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "prop-p2-out-1",
+         "text": "Inventory audit report",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-out-2",
+         "text": "Reconciliation sheet",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-out-3",
+         "text": "Depreciation schedule review",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p2-out-4",
+         "text": "1 preventive maintenance schedule",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "property-day-61-90",
+     "range": "61-90",
+     "eyebrow": "Property & Asset Management · Phase 3 (Day 61–90)",
+     "title": "Ownership: Asset Integrity & Governance Assurance",
+     "closing": "You have completed all three onboarding phases for this department.",
+     "next": null,
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "prop-p3-read-1",
+         "text": "Asset Lifecycle Management Guide",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-read-2",
+         "text": "Disposal Procedure",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-read-3",
+         "text": "Audit Preparation Checklist",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-read-4",
+         "text": "Project Insurance (CAR) Management Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "prop-p3-know-1",
+         "text": "Asset lifecycle stages (registration → transfer → write-off)",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-know-2",
+         "text": "Disposal/scrap sale procedure",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-know-3",
+         "text": "Audit preparation standards",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-know-4",
+         "text": "CAR insurance premium tracking, expiry/renewal, and claims handling",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "prop-p3-out-1",
+         "text": "Warehouse audit report",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-out-2",
+         "text": "Asset risk assessment memo",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-out-3",
+         "text": "Surplus/scrap disposal summary",
+         "level": "junior"
+        },
+        {
+         "id": "prop-p3-out-4",
+         "text": "1 project insurance renewal review",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "landingKey": "property-asset-management",
+   "name": "Property & Asset Management"
+  },
+  {
+   "slug": "engineering",
+   "phases": [
+    {
+     "key": "engineering-day-1-30",
+     "range": "1-30",
+     "eyebrow": "Engineering · Phase 1 (Day 1–30)",
+     "title": "Foundation: Measurement Accuracy & Site Reporting Discipline",
+     "closing": null,
+     "next": "engineering-day-31-60",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "eng-p1-read-1",
+         "text": "Engineering Operations Manual with document examples",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-read-2",
+         "text": "Mango Module Study — BD/PM modules relevant to role",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-read-3",
+         "text": "Company Organization Chart, Departments & Projects",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-read-4",
+         "text": "BD Tender Pipeline & e-Bidding Overview",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "eng-p1-know-1",
+         "text": "Position responsibilities and Engineering department overview",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-know-2",
+         "text": "Standard software operation (Microsoft suite, PDF, email)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-know-3",
+         "text": "Mango module use within responsibility area (New Project Registration, Budget Control)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-know-4",
+         "text": "e-GP tender screening and bid/no-bid decision criteria",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "eng-p1-out-1",
+         "text": "Execute Doc 02/03 flow within job scope",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-out-2",
+         "text": "Enter data into Mango system",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-out-3",
+         "text": "Answer master plan questions across departments",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p1-out-4",
+         "text": "1 draft e-GP tender screening note",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "engineering-day-31-60",
+     "range": "31-60",
+     "eyebrow": "Engineering · Phase 2 (Day 31–60)",
+     "title": "Control: Productivity Monitoring & Revenue Documentation",
+     "closing": null,
+     "next": "engineering-day-61-90",
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "eng-p2-read-1",
+         "text": "Mango Manual — relevant module complete",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-read-2",
+         "text": "Master Plans of various projects (progress to 80%)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-read-3",
+         "text": "Branch-submission documents",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-read-4",
+         "text": "Additional Work (Variation Order · BD) Processing Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "eng-p2-know-1",
+         "text": "Project bidding submission documents",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-know-2",
+         "text": "Branch-submission document study",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-know-3",
+         "text": "Variation Order (VO) processing basics",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-know-4",
+         "text": "Linking a VO to the main BOQ and merging cost codes",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "eng-p2-out-1",
+         "text": "Perform Phase 1 tasks at 80% accuracy",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-out-2",
+         "text": "Draft one bidding submission package",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-out-3",
+         "text": "Track one Variation Order end to end",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p2-out-4",
+         "text": "1 VO cost-code merge processed end to end",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "engineering-day-61-90",
+     "range": "61-90",
+     "eyebrow": "Engineering · Phase 3 (Day 61–90)",
+     "title": "Ownership: Section Performance & Cost Variance Control",
+     "closing": "You have completed all three onboarding phases for this department.",
+     "next": null,
+     "blocks": [
+      {
+       "heading": "Required Reading",
+       "items": [
+        {
+         "id": "eng-p3-read-1",
+         "text": "Master Plans of various projects (complete 100%)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-read-2",
+         "text": "Project bidding documents (complete study)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-read-3",
+         "text": "Project Closure requirements (final budget revision, reports)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-read-4",
+         "text": "PM Module Dashboard — Project Status Overview Guide",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Knowledge Requirements",
+       "items": [
+        {
+         "id": "eng-p3-know-1",
+         "text": "Project bidding documents — full command",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-know-2",
+         "text": "Contractor grade/PQ renewal evidence requirements",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-know-3",
+         "text": "Project Closure process",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-know-4",
+         "text": "Reading the PM Dashboard across BD/PO/OF/AR/AP/GL/IC convergence",
+         "level": "senior"
+        }
+       ]
+      },
+      {
+       "heading": "Required Outputs",
+       "items": [
+        {
+         "id": "eng-p3-out-1",
+         "text": "Perform Phase 1 tasks at 100% accuracy (minor errors acceptable)",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-out-2",
+         "text": "Complete one Project Status Overview review",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-out-3",
+         "text": "Prepare one Project Closure documentation set",
+         "level": "junior"
+        },
+        {
+         "id": "eng-p3-out-4",
+         "text": "1 independent PM Dashboard health summary",
+         "level": "senior"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "landingKey": "engineering-team",
+   "name": "Engineering Team"
+  }
+ ],
+ "requiredDocuments": [
+  {
+   "id": "application-form",
+   "title": "Employment Application Form",
+   "action": "View Application Form",
+   "desc": "Your personal, education, and work-history details on record before the contract is drawn up.",
+   "viewUrl": "https://drive.google.com/file/d/1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C"
+  },
+  {
+   "id": "employment-contract",
+   "title": "Employment Contract",
+   "action": "View Employment Contract",
+   "desc": "The formal agreement covering your role, compensation, and terms of employment with VCB.",
+   "viewUrl": "https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/edit",
+   "downloadUrl": "https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/export?format=docx"
+  },
+  {
+   "id": "nda",
+   "title": "Confidentiality Agreement",
+   "action": "View NDA Form",
+   "desc": "Your commitment to keep company, project, and client information confidential.",
+   "viewUrl": "https://drive.google.com/file/d/1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3"
+  },
+  {
+   "id": "pdpa-consent",
+   "title": "Personal Data Consent Form (PDPA)",
+   "action": "View PDPA Consent Form",
+   "desc": "Your consent for VCB to collect, use, and store your personal data as an employee.",
+   "viewUrl": "https://drive.google.com/file/d/1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK"
+  },
+  {
+   "id": "pdpa-policy",
+   "title": "PDPA Data Protection Policy (Reference)",
+   "action": "View PDPA Policy",
+   "desc": "Acknowledgement that you have read the company’s policy on how personal data is protected.",
+   "viewUrl": "https://drive.google.com/file/d/1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw"
+  },
+  {
+   "id": "anti-corruption",
+   "title": "Anti-Corruption Policy Acknowledgement",
+   "action": "View Anti-Corruption Form",
+   "desc": "Acknowledgement of VCB’s zero-tolerance policy on bribery and corruption.",
+   "viewUrl": "https://drive.google.com/file/d/1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF"
+  },
+  {
+   "id": "reporting-form",
+   "title": "New Employee Reporting Form",
+   "action": "View Reporting Form",
+   "desc": "Confirms your official start date and reports you as active to HR on day one.",
+   "viewUrl": "https://drive.google.com/file/d/10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA/view",
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA"
+  },
+  {
+   "id": "tax-form",
+   "title": "Tax Registration Form",
+   "action": "View Tax Form",
+   "desc": "Your tax ID and withholding details for payroll registration."
+  }
+ ],
+ "nav": [
+  {
+   "label": "Home",
+   "page": "home"
+  },
+  {
+   "label": "Accounting Team",
+   "page": "accounting-team",
+   "children": [
+    {
+     "label": "Day 1–30",
+     "page": "accounting-day-1-30"
+    },
+    {
+     "label": "Day 31–60",
+     "page": "accounting-day-31-60"
+    },
+    {
+     "label": "Day 61–90",
+     "page": "accounting-day-61-90"
+    }
+   ]
+  },
+  {
+   "label": "Finance Team",
+   "page": "finance-team",
+   "children": [
+    {
+     "label": "Day 1–30",
+     "page": "finance-day-1-30"
+    },
+    {
+     "label": "Day 31–60",
+     "page": "finance-day-31-60"
+    },
+    {
+     "label": "Day 61–90",
+     "page": "finance-day-61-90"
+    }
+   ]
+  },
+  {
+   "label": "Procurement Team",
+   "page": "procurement-team",
+   "children": [
+    {
+     "label": "Day 1–30",
+     "page": "procurement-day-1-30"
+    },
+    {
+     "label": "Day 31–60",
+     "page": "procurement-day-31-60"
+    },
+    {
+     "label": "Day 61–90",
+     "page": "procurement-day-61-90"
+    }
+   ]
+  },
+  {
+   "label": "Property & Asset Management",
+   "page": "property-asset-management",
+   "children": [
+    {
+     "label": "Day 1–30",
+     "page": "property-day-1-30"
+    },
+    {
+     "label": "Day 31–60",
+     "page": "property-day-31-60"
+    },
+    {
+     "label": "Day 61–90",
+     "page": "property-day-61-90"
+    }
+   ]
+  },
+  {
+   "label": "Engineering Team",
+   "page": "engineering-team",
+   "children": [
+    {
+     "label": "Day 1–30",
+     "page": "engineering-day-1-30"
+    },
+    {
+     "label": "Day 31–60",
+     "page": "engineering-day-31-60"
+    },
+    {
+     "label": "Day 61–90",
+     "page": "engineering-day-61-90"
+    }
+   ]
+  },
+  {
+   "label": "Meet Our Team",
+   "page": "meet-our-team"
+  },
+  {
+   "label": "Life on Site",
+   "page": "life-on-site"
+  }
+ ],
+ "pageKeys": [
+  "completion",
+  "home",
+  "required-documents",
+  "accounting-team",
+  "finance-team",
+  "procurement-team",
+  "property-asset-management",
+  "engineering-team",
+  "accounting-day-1-30",
+  "accounting-day-31-60",
+  "accounting-day-61-90",
+  "finance-day-1-30",
+  "finance-day-31-60",
+  "finance-day-61-90",
+  "procurement-day-1-30",
+  "procurement-day-31-60",
+  "procurement-day-61-90",
+  "property-day-1-30",
+  "property-day-31-60",
+  "property-day-61-90",
+  "engineering-day-1-30",
+  "engineering-day-31-60",
+  "engineering-day-61-90",
+  "meet-our-team",
+  "life-on-site"
+ ]
+}

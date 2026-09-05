@@ -120,6 +120,19 @@ moduleColor, moduleLabel), `src/data/flows.js` (SOP_FLOWS)
     (ด้วย regex 3 รูปแบบ) มาสร้าง thumbnail preview; ถ้าดึงไม่ได้ (404) จะซ่อนรูปแล้วเหลือแค่ลิงก์
 - case ที่ไม่พบเลขที่ (`no`) ที่ระบุ จะแสดงข้อความ "ไม่พบ" (`error.NOT_FOUND`) แทนหน้าเปล่า
 
+**การคัดลอกลงคลิปบอร์ด — `copyText(text)` ใน `src/lib/copy.js`:** ตัวช่วยกลางตัวเดียวที่ทั้ง `ShareButton.jsx`
+(คัดลอกลิงก์ case) และ `SettingsModal.jsx` (คัดลอกอีเมลผู้พัฒนา ดูหัวข้อ 2.8) เรียกใช้ คืน `Promise<boolean>`
+ที่ **ไม่มีวัน reject** — ผู้เรียกจึงเช็คแค่ค่า `ok` เพื่อสลับป้ายปุ่มเป็น "คัดลอกแล้ว" หรือคงเดิม
+
+Logic ภายในเป็นการ **แข่งกันระหว่างสองวิธี (race)**: เรียก `navigator.clipboard.writeText()` พร้อมกับตั้ง
+`setTimeout` 600ms ไว้ ใครเสร็จก่อนชนะ (มีตัวแปร `settled` กัน resolve ซ้ำ) ถ้าครบ 600ms แล้ว Clipboard API
+ยังไม่ตอบ จะข้ามไปใช้วิธีสำรอง `document.execCommand('copy')` ผ่าน `<textarea>` ที่สร้างชั่วคราวนอกจอทันที
+และถ้าเบราว์เซอร์ไม่มี `navigator.clipboard` เลยก็ใช้วิธีสำรองตั้งแต่แรก
+
+**เหตุผล**: `navigator.clipboard.writeText()` **ค้างได้จริงโดยไม่ resolve และไม่ reject** เมื่ออยู่ใน iframe
+แซนด์บ็อกซ์ของ Apps Script (กล่องขออนุญาตที่ค้างอยู่ใน frame ข้าม origin) พอร์ตนี้ไม่ได้อยู่ในแซนด์บ็อกซ์นั้นแล้ว
+อาการอาจไม่เกิดซ้ำ แต่การแข่งเวลาปลอดภัยกว่าการเรียกเปล่า ๆ อย่างเคร่งครัด จึงยกมาตามเดิม
+
 **ไฟล์ที่เกี่ยวข้อง:** `src/components/CaseListPane.jsx`, `src/components/CaseDetail.jsx`,
 `src/components/ShareButton.jsx`, `src/lib/copy.js`
 
@@ -172,6 +185,27 @@ moduleColor, moduleLabel), `src/data/flows.js` (SOP_FLOWS)
 **ไฟล์ที่เกี่ยวข้อง:** `src/components/EditCaseModal.jsx`, `src/components/AttachmentRows.jsx`,
 `src/lib/steps.js`, `src/lib/sopApi.js`, `src/store.jsx` (mutate/createScenario/saveScenario/swapScenario/
 deleteScenario), `api/src/routes/sop.js` (POST/PATCH/DELETE `/scenarios`, POST `/scenarios/:no/swap`)
+
+#### 2.3.1 ตัวแปลงรายการไฟล์แนบ — `src/components/AttachmentRows.jsx`
+
+ไฟล์เดียวกับตัวแก้ไขแถวไฟล์แนบ export ฟังก์ชันช่วย 3 ตัวที่ `EditCaseModal.jsx` ใช้แปลงข้อมูลไป-กลับระหว่าง
+รูปแบบที่เก็บในฐานข้อมูล (`{ label, url }`) กับรูปแบบที่ฟอร์มใช้ (`{ key, label, url, named }`):
+
+| ฟังก์ชัน | ทิศทาง | พฤติกรรม |
+|---|---|---|
+| `newAttachmentRow(label, url, named)` | สร้างแถวเปล่า/แถวใหม่ | ใส่ `key` จากตัวนับที่เพิ่มขึ้นเรื่อย ๆ ในไฟล์ (`rowKeySeq`) ใช้ตอนกดปุ่ม "เพิ่มไฟล์แนบ" ด้วย |
+| `attachmentsToRows(atts)` | ฐานข้อมูล → ฟอร์ม | ทิ้งรายการที่ไม่มี `url`; **ถ้า `label` เท่ากับ `url` พอดี ถือว่าเป็นรายการ "ไม่มีชื่อ"** จึงคืนช่องชื่อเป็นค่าว่าง |
+| `rowsToAttachments(rows)` | ฟอร์ม → ฐานข้อมูล | `.trim()` ทั้งสองฟิลด์, ทิ้งแถวที่ไม่มี `url`, และ**ถ้าชื่อว่างจะใส่ `url` ลงในช่อง `label` แทน** ตรงกับ `writeAttachments_()` ของ `Code.js` ต้นฉบับ |
+
+**เหตุผลที่ต้องมี `key` ต่างหาก**: ไฟล์แนบไม่มี id ในตัวเอง ถ้าใช้ index ของ array เป็น React key แถวจะสลับ
+ตำแหน่งผิดทันทีที่ลบแถวกลางออก — ตัวนับที่ไม่ซ้ำจึงเป็นทางเดียวที่แถวยังคงยึดกับช่องกรอกของตัวเองได้
+
+**เหตุผลที่ยังเก็บฟิลด์ `named`**: ข้อมูลเก่าจากระบบเดิมที่ "ไม่มีชื่อ" ถูกบันทึกโดยเอา URL ไปใส่ในช่องชื่อ
+การแปลงกลับจึงต้องแยกกรณีนี้ออก ไม่งั้นผู้แก้ไขจะเห็น URL ยาว ๆ นั่งอยู่ในช่อง "ชื่อไฟล์" ทุกครั้งที่เปิดฟอร์ม
+
+> คู่ฟังก์ชันนี้เป็นสิ่งที่**เหลืออยู่**หลังจากตัดการดึงชื่อไฟล์จาก Google Drive ออก (ดูหัวข้อ 5.4) — ต้นฉบับ
+> เติมชื่อให้อัตโนมัติด้วย `DriveApp.getName()` ซึ่งทำจากเบราว์เซอร์ไม่ได้ ปัจจุบันผู้ใช้พิมพ์ชื่อเอง และเว้นว่าง
+> ไว้ก็จะแสดงเป็น "เอกสารแนบ" ซึ่งเป็นผลลัพธ์เดียวกับที่ auto-fill เดิมให้อยู่แล้ว
 
 ---
 
@@ -261,8 +295,17 @@ stepsToStorage) และ `src/components/CaseDetail.jsx` (classifyStep, compone
 - การลบแถว: ต้องกดยืนยัน (แสดงปุ่ม "ยืนยัน/ยกเลิก" แทนที่ปุ่ม × เมื่อกดครั้งแรก)
 - เช่นเดียวกับ EditCaseModal เมื่อบันทึกล้มเหลว modal จะไม่ปิด ข้อความที่พิมพ์ยังอยู่
 
-**ไฟล์ที่เกี่ยวข้อง:** `src/components/ReportsView.jsx`, `api/src/routes/sop.js` (`/reports`,
-`/reports/:case`)
+**ฟังก์ชันที่ใช้:** `createReport(payload)` และ `deleteReport(caseNo)` ใน `src/lib/sopApi.js` (ยิง
+`POST /reports` และ `DELETE /reports/:case`) `ReportsView.jsx` ไม่ได้เรียกทั้งสองตัวโดยตรง แต่เรียกผ่านตัวห่อ
+ชื่อเดียวกันใน `src/store.jsx` ซึ่งพันไว้ด้วย `mutate()` — ทุกครั้งที่สำเร็จจึงโหลดเอกสารใหม่ทั้งฉบับ และทุกครั้ง
+ที่ล้มเหลวจะตั้ง `writeError` แล้ว throw ต่อ (ดูหัวข้อ 4.6)
+
+- `createReport` ส่ง `{ case, scenario, path }` — ฟิลด์ `case` เป็น **ป้ายข้อความที่ผู้เรียกกำหนดเอง** ไม่ใช่
+  เลขลำดับที่ระบบสร้าง ถ้าไม่ส่งมา server จะเติมเป็นเลขแถวถัดไปให้
+- `deleteReport` อ้างถึงแถวด้วยค่า `case` นั้นเอง (encode ลง URL) ไม่มีเลข id แยกต่างหาก
+
+**ไฟล์ที่เกี่ยวข้อง:** `src/components/ReportsView.jsx`, `src/lib/sopApi.js` (`createReport`, `deleteReport`),
+`src/store.jsx`, `api/src/routes/sop.js` (`/reports`, `/reports/:case`)
 
 ---
 
@@ -617,6 +660,17 @@ Postgres ไม่มีข้อจำกัดนั้น การแบ่�
 | `GET /versions` | editor | รายการ snapshot (ไม่รวม `data`) สูงสุดตาม `?limit=` (default 50, max 200) |
 | `GET /versions/:id` | editor | snapshot เดียวพร้อมเนื้อหาเต็ม |
 | `POST /versions/:id/restore` | editor | เขียนเอกสารจาก snapshot นี้กลับเป็นเอกสารปัจจุบัน |
+
+**สองฟังก์ชันใน `src/lib/sopApi.js` ที่ควรทราบพฤติกรรมเฉพาะ:**
+
+- **`patchMeta(patch)`** → `PATCH /meta` แก้ metadata ของเอกสาร (title, subtitle, manual, version,
+  effective, scope, purpose, notes) **ทุกฟิลด์เป็น optional และ key ที่ไม่ส่งมาจะถูกปล่อยไว้ตามเดิม** ฟังก์ชันนี้
+  ถูก export ออกจาก `store.jsx` (พันด้วย `mutate()` แล้ว) พร้อมใช้งาน แต่**ยังไม่มีหน้าจอใดเรียกใช้** — ปัจจุบัน
+  metadata ยังต้องแก้ที่ฐานข้อมูลโดยตรง (เทียบเคียงกับข้อจำกัดอื่นในหัวข้อ 7)
+- **`editScenario(no, patch)`** → `PATCH /scenarios/:no` แก้ case หนึ่งเรื่องโดยอ้างด้วยเลข `no` ทุกฟิลด์
+  optional เช่นกัน แต่มี**จุดเดียวที่ความต่างระหว่าง "ไม่ส่ง key" กับ "ส่งค่าว่าง" มีผลจริง คือ `attachments`**:
+  ไม่ส่ง key = เก็บไฟล์แนบเดิมไว้ทั้งหมด, ส่ง `[]` = ลบไฟล์แนบทิ้งทั้งหมด — `EditCaseModal.jsx` ส่ง
+  `rowsToAttachments(attRows)` เสมอ (ดูหัวข้อ 2.3.1) การลบแถวสุดท้ายออกจากฟอร์มจึงลบไฟล์แนบจริงตามที่ตั้งใจ
 
 ### 4.5 การ Snapshot อัตโนมัติ (Version History)
 

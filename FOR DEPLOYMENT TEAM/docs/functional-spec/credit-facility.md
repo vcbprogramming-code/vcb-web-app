@@ -24,7 +24,7 @@
 4. **แผนการเงินรายเดือน (Monthly Cash Plan / T-bar)** — แผนกระแสเงินสดแบบ "รับ-จ่าย"
    ต่อโครงการต่อเดือน และมุมมองเทียบ "แผน vs จริง" (Variance)
 
-โค้ดนี้เป็นการ **สร้างใหม่ทั้งหมด** จาก Apps Script เดิม (ดูหัวข้อ 8 "ที่มาและข้อจำกัด") —
+โค้ดนี้เป็นการ **สร้างใหม่ทั้งหมด** จาก Apps Script เดิม (ดูหัวข้อ 11 "ที่มาและข้อจำกัด") —
 Apps Script เดิมไม่มี component React จริง เป็นเพียง `dangerouslySetInnerHTML` ของ HTML/JS
 เก่าที่พ่วง mock backend ในหน่วยความจำ ส่วนโค้ดปัจจุบันคุยกับฐานข้อมูล PostgreSQL จริงผ่าน
 Express API ที่ `api/src/routes/credit.js` เท่านั้น ไม่มี Supabase client ฝั่งเบราว์เซอร์อีกต่อไป
@@ -457,10 +457,33 @@ toast ข้อความสำเร็จ เหตุผลที่ไม�
 จริงได้ จึงเลือก "รีเฟรชทุกครั้ง" แทน "เดาผล"
 
 **Fallback สำหรับ reference data**: ถ้า `GET /projects` หรือ `GET /facility-types`
-คืนค่า 404 (ยังไม่ implement — ดูหัวข้อ 8) จะ derive รายการโครงการแบบง่ายจาก
+คืนค่า 404 (ยังไม่ implement — ดูหัวข้อ 11) จะ derive รายการโครงการแบบง่ายจาก
 `facilities`/`transactions`/`requests` ที่มีอยู่ (`normalizeProjects()`) — โดยใช้รหัส
 โครงการแทนชื่อไทย เพราะไม่มีชื่อให้ใช้จริง ๆ ในกรณีนั้น (แต่ปัจจุบัน route เหล่านี้มีจริง
-แล้วในโค้ด backend ดูหัวข้อ 8 สำหรับสถานะล่าสุด)
+แล้วในโค้ด backend ดูหัวข้อ 11 สำหรับสถานะล่าสุด)
+
+**`useData()` — hook ที่ทุก component ใช้อ่าน store นี้**: `useData()` คือ *ทางเดียว* ที่
+component เข้าถึงข้อมูลของโมดูล — เรียก `useContext(DataContext)` แล้ว **โยน error ทันที
+ถ้าถูกเรียกนอก `<DataProvider>`** (`'useData must be used inside <DataProvider>'`) แทนที่จะ
+คืน `undefined` เงียบ ๆ แล้วไปพังที่บรรทัดที่ destructure ทีหลัง ซึ่งไล่ต้นเหตุยากกว่ามาก
+
+ค่าที่ `useData()` คืน (ประกอบด้วย `useMemo` เพื่อไม่ให้ผู้ใช้ context ถูก re-render โดยไม่จำเป็น):
+
+| ชื่อ | ชนิด | ความหมาย |
+|---|---|---|
+| `me`, `facilities`, `costCategories`, `categoryCaps`, `transactions`, `requests`, `projects`, `facTypes` | array/object | ข้อมูลทั้งโมดูลที่ spread ออกมาจาก state ตรง ๆ (`...data`) |
+| `loading` | boolean | `true` จนกว่า `reload()` ครั้งแรกจะจบ — สำเร็จหรือล้มเหลวก็ตาม (ตั้งค่าใน `finally`) |
+| `error` | Error \| null | error ของการโหลดล่าสุด; ถูกล้างเป็น `null` ทุกครั้งที่เริ่ม `reload()` ใหม่ |
+| `reload` | function | ดึงข้อมูลทั้งหมดใหม่ (ดูด้านบน) |
+| `mutate` | function | รูปแบบการเขียนข้อมูลมาตรฐานของทุก dialog (ดูด้านบน) |
+| `toast` / `notify` | string / function | ข้อความแจ้งเตือนชั่วคราว และตัวสั่งให้แสดง |
+| `saving` | boolean | `savingCount > 0` — เบื้องหลังเป็น **ตัวนับ ไม่ใช่ boolean** เพราะการเขียนหลายรายการซ้อนกันได้ ถ้าใช้ boolean เดียว การเขียนที่เสร็จก่อนจะปิดตัวบ่งชี้ทั้งที่อีกรายการยังทำงานอยู่ |
+| `isManager` | boolean | `Boolean(data.me?.isManager)` — ใช้ซ่อน/แสดงปุ่มเขียนทุกจุด (เป็นเพียง hint ฝั่งจอ; API ตรวจซ้ำด้วย `requireRole` เสมอ ดูหัวข้อ 10) |
+
+**การโหลดครั้งแรกไม่ผูกกับสถานะล็อกอิน** — `useEffect` เรียก `reload()` ทันทีที่ mount โดย
+ไม่รอ `signedIn` (คอมเมนต์ในโค้ดอ้างบทเรียนเดียวกันจาก `hr-worklog/src/HrData.jsx`: การข้าม
+fetch ทำให้ shell เรนเดอร์ dataset ว่างเปล่า ซึ่งผู้ใช้แยกไม่ออกจาก "โมดูลที่ฟีเจอร์หายไป")
+— สอดคล้องกับหมายเหตุเรื่อง `authLoading` ในหัวข้อ 2.1
 
 ### 7.2 FilterContext — ตัวกรองที่ใช้ร่วมกันทุกตาราง (`src/lib/FilterContext.jsx`)
 
@@ -471,6 +494,39 @@ toast ข้อความสำเร็จ เหตุผลที่ไม�
 `resetDrill()` ล้างเฉพาะ `type/due/status/q` **แต่คงค่า** `co`/`proj` ไว้ — ตรงกับ
 `resetDrillFilters()` ในต้นฉบับ: การกระโดดจากการ์ดหนึ่งไปอีกการ์ดหนึ่งไม่ควรแอบคง
 สถานะ/ช่วงเวลาของการ์ดก่อนหน้าไว้ แต่ยังอยู่ใน scope บริษัท/โครงการเดิม
+
+**`useFilters()` — hook ที่ทุกหน้าจอใช้อ่าน/แก้ตัวกรอง**: เช่นเดียวกับ `useData()` มันโยน
+error ถ้าถูกเรียกนอก `<FilterProvider>` (`'useFilters must be used inside <FilterProvider>'`)
+คืนค่า 5 อย่าง:
+
+| ชื่อ | หน้าที่ |
+|---|---|
+| `filters` | object ตัวกรองปัจจุบัน (`{ co, type, proj, due, status, q }`) — ค่าเริ่มต้น `BLANK` คือสตริงว่างทั้งหมด |
+| `setFilter(key, value)` | แก้ตัวกรองทีละตัว — ใช้โดย `FilterBar` |
+| `applyFilters(patch)` | ตั้งหลายตัวพร้อมกันในการอัปเดตเดียว — คือสิ่งที่ drill-down ของ Dashboard เรียก (หัวข้อ 2.2) |
+| `resetDrill()` | ล้างตัวกรอง drill-down โดยคงบริษัท/โครงการ (ดูย่อหน้าด้านบน) |
+| `clearAll()` | ล้างทุกตัวกรองกลับเป็น `BLANK` |
+
+**ชื่อพ้องที่ต้องระวัง**: `applyFilters` ของ context นี้ (ตั้งค่าตัวกรอง) เป็นคนละฟังก์ชันกับ
+`applyFilters()` ใน `lib/lookups.js` (กรอง list ตามค่าที่ตั้งไว้ — ดูหัวข้อ 7.6) ทั้งสองชื่อ
+ซ้ำกันแต่คนละไฟล์และคนละหน้าที่
+
+**การเชื่อมกันของ predicate ทั้งสาม**: `matchQuery` / `matchStatus` / `matchDue` เป็น
+predicate อิสระที่ `applyFilters()` ของ `lookups.js` เอามาต่อกันด้วย `&&` ในตัวกรองเดียว —
+ทุกตัวคืน `true` ทันทีเมื่อตัวกรองนั้นว่าง จึงเป็น "ตัวกรองที่ไม่ได้ตั้ง = ไม่กรอง" โดยไม่ต้อง
+มีเงื่อนไขพิเศษที่ตัวเรียก:
+
+- `matchQuery(row, q)` — ค้นหาอิสระแบบ case-insensitive โดยประกอบฟิลด์ `ref`, `desc`,
+  `purpose`, `beneficiary`, `project`, `note`, `costCategory`, `source`, `id` เป็นสตริงเดียว
+  (คั่นด้วยช่องว่าง ตัดค่าว่างทิ้งก่อน) แล้วเช็ค `includes()` — จึงค้นข้ามคอลัมน์ได้ในช่องเดียว
+- `matchStatus(status, want)` — **รองรับตัวกรองแบบหลายค่าคั่นด้วยจุลภาค**
+  (`String(want).split(',').includes(...)`) เพราะการ์ดสถานะบน Dashboard บางใบ drill-down
+  ด้วยสถานะมากกว่าหนึ่งค่าพร้อมกัน
+- `matchDue(due, want)` — ถ้า `want === 'week'` ใช้ `isDueWithin7()`; กรณีอื่นเทียบกับ
+  `dueBucket(due)` ตรง ๆ (`overdue`/`this`/`next`/`later`) — สองเส้นทางนี้แยกกันเพราะ
+  "ภายใน 7 วัน" ไม่ใช่ bucket แต่เป็นเงื่อนไขคาบเกี่ยว ดูหัวข้อ 7.4
+
+`matchKind` และ `matchCompany` เป็นอีกสองตัวในชุดเดียวกัน — อธิบายไว้ที่หัวข้อ 7.6 และ 3.2
 
 ### 7.3 lib/domain.js — คำศัพท์โดเมนหลัก
 
@@ -522,6 +578,16 @@ toast ข้อความสำเร็จ เหตุผลที่ไม�
 - ชุดฟังก์ชัน start/days/maturity (`matFromStartDays`, `daysFromStartMat`,
   `startFromMatDays`) — ใช้ใน `RequestDialog` (ดูหัวข้อ 5.1)
 
+**ตัวช่วยระดับล่างสุดของงานวันที่** — สามตัวนี้ไม่ได้ถูกเรียกจากหน้าจอโดยตรง แต่เป็นชิ้นส่วน
+ที่ฟังก์ชันข้างบนใช้ภายใน (รูปแบบบนสายยังเป็น dd/mm/yyyy เสมอ ตามที่อธิบายไว้ในย่อหน้า
+`isoToDMY()`/`dmyToISO()` ข้างต้นและหัวข้อ 9.3):
+
+| ฟังก์ชัน | รับ | คืน | ใช้ที่ไหน |
+|---|---|---|---|
+| `parseIso(s)` | `'yyyy-mm-dd'` | `Date` (เที่ยงคืน **เวลาท้องถิ่น** — ต่อท้าย `T00:00:00` โดยตั้งใจ ไม่ให้ถูกตีความเป็น UTC แล้วเลื่อนวันไป 1 วัน) หรือ `null` ถ้าค่าว่าง | `matFromStartDays`, `daysFromStartMat`, `startFromMatDays` |
+| `toIso(dt)` | `Date` | `'yyyy-mm-dd'` สำหรับใส่กลับใน `<input type="date">` | คู่ตรงข้ามของ `parseIso` ในชุดเดียวกัน |
+| `fmtDMY(dt)` | `Date` | `'dd/mm/yyyy'` เติมศูนย์นำหน้าครบ | จัดรูปแบบ `Date` เป็นรูปแบบที่ API รับ โดยไม่ผ่าน ISO |
+
 ### 7.5 lib/exportExcel.js — Export Excel
 
 ใช้ไลบรารี **SheetJS (xlsx)** โหลดแบบ dynamic import (`await import('xlsx')`) เพื่อไม่ให้
@@ -557,16 +623,182 @@ xlsx (xlsx ถูกคงไว้ที่นี่เพราะเป็น
 - `overdueInterest()` — ดูหัวข้อ 5.3
 - `attachText()` — ประกอบข้อความคอลัมน์ "เอกสารแนบ" จาก `source` + ช่วงวันที่เอกสาร
   (`docFrom`–`docTo`)
+- `matchQuery()` / `matchStatus()` / `matchDue()` — predicate ย่อยที่ `applyFilters()`
+  ประกอบเข้าด้วยกัน ดูหัวข้อ 7.2
+
+**ตารางอ้างอิงตัวช่วยขนาดเล็ก** (หนึ่งบรรทัดต่อฟังก์ชัน — ทั้งหมดเป็น pure function ไม่มี
+side effect และทนต่อข้อมูลอ้างอิงที่ยังไม่มา):
+
+| ฟังก์ชัน | ไฟล์ | รับ | คืน / พฤติกรรม |
+|---|---|---|---|
+| `projectOf(projects, code)` | `lib/lookups.js` | list โครงการ + รหัส | แถวโครงการที่ตรงรหัส หรือ `null` — เป็นฐานของ `projTh`/`projName`/`projThShort`/`projCompany` ทั้งหมด |
+| `facTypeOf(facTypes, no)` | `lib/lookups.js` | list ประเภทวงเงิน + หมายเลข | แถวประเภทวงเงินที่ตรง (เทียบแบบ `String()` ทั้งสองฝั่ง เพราะ `facilityNo` มาเป็นได้ทั้งตัวเลขและสตริง) หรือ `null` — เป็นฐานของ `typeName`/`typeKind`/`kindShort` |
+| `companies(projects)` | `lib/lookups.js` | list โครงการ | รายชื่อบริษัทที่ไม่ซ้ำ เรียงตามตัวอักษร (ตัดค่าว่างทิ้ง) — ใช้เติมดรอปดาวน์ "บริษัท" ใน `FilterBar` |
+| `categoryColor(cat)` | `lib/domain.js` | ชื่อหมวดค่าใช้จ่าย | สี hex ของชิปหมวดนั้นจากตาราง `CATEGORY_COLOR`; หมวดที่ไม่รู้จัก (รวมหมวดที่ผู้ใช้พิมพ์เอง) ได้สีเทากลาง `#C5CDD9` |
+| `categoryTextColor(cat)` | `lib/domain.js` | ชื่อหมวดค่าใช้จ่าย | `#fff` สำหรับหมวดที่พื้นเข้ม (`DARK_BG` — เหล็ก, หิน, คอนกรีต, ค่าแรง-ปูยาง, ค่าแรง-เสาเข็ม) ไม่งั้น `#222` — เพื่อคง contrast ของตัวอักษรบนชิป |
+| `parseIso` / `toIso` / `fmtDMY` | `lib/format.js` | — | ดูตารางในหัวข้อ 7.4 |
+
+`categoryColor()`/`categoryTextColor()` ถูกเรียกคู่กันเสมอที่ `CostView.jsx` (ตั้ง
+`backgroundColor` และ `color` ของชิปหมวดในบรรทัดเดียวกัน) ส่วน `companies()` และ
+`projectOf()`/`facTypeOf()` ถูกเรียกทางอ้อมผ่านฟังก์ชันชั้นบนเป็นหลัก
+
+### 7.7 ป้ายสถานะและป้ายประเภท (`src/components/ui.jsx`)
+
+- **`StatusPill({ tone, children })`** — ป้ายสถานะทรงแคปซูล พร้อมจุดสีนำหน้า เลือกชุดสีจาก
+  `STATUS_TONE`/`STATUS_DOT` ตาม `tone` (fallback เป็น `new` เมื่อ tone ไม่รู้จัก) — ตัว
+  component ไม่รู้จักสถานะดิบเลย ผู้เรียกต้องแปลงผ่าน `statusMeta()` ก่อน ซึ่งเป็นจุดที่
+  รองรับทั้งสถานะ transaction และคำตัดสินของคำขอ (ดูหัวข้อ 7.3 และ 4.3)
+- **`KindPill({ kind, children })`** — ป้ายประเภทวงเงิน (BG / T/L / B/E / P/N …) เลือกสีจาก
+  `KIND_PILL_CLASS[kind]` โดย fallback เป็นชุดสีของ `ML` เมื่อ kind ไม่รู้จัก; ข้อความในป้าย
+  มาจาก `kindShort()` ไม่ใช่จาก `kind` ตรง ๆ
 
 ---
 
-## 8. Data Flow: API Endpoints ทั้งหมด (`/api/credit`)
+## 8. ชั้นเรียก API ฝั่ง client (`src/lib/api.js`)
+
+ไฟล์นี้เป็น **จุดเดียวในโมดูลที่คุยกับ HTTP** — ทุกฟังก์ชันเรียกผ่าน `createApi()` จาก
+`@vcb/shared` ซึ่งรับผิดชอบ base URL (`VITE_API_URL`), Bearer token และรูปแบบ error ของ API
+ทั้งหมด ไม่มี Supabase client ในแอปนี้และต้องไม่มี — ตาม `TECH_STACK.md` ฐานข้อมูลอยู่หลัง
+Express API เท่านั้น ทุก path ประกอบจากค่าคงที่ `BASE = '/api/credit'` และ id ทุกตัวถูกห่อด้วย
+`encodeURIComponent()` ก่อนต่อเข้า path เสมอ ส่วน query string สร้างด้วย helper `query()`
+ที่ **ตัดพารามิเตอร์ที่เป็น `undefined`/`null`/สตริงว่างทิ้ง** เพื่อไม่ให้ตัวกรองที่ผู้ใช้ยังไม่ได้
+เลือกถูกส่งไปเป็น `?project=` ว่าง ๆ แล้วกลายเป็นเงื่อนไขจริงฝั่ง backend
+
+### 8.1 ฟังก์ชันอ่านข้อมูล (read wrappers)
+
+ทั้งหมดเป็น wrapper บาง ๆ ของ `api.get()` — ไม่มีการแปลงข้อมูลใด ๆ ในชั้นนี้ (การ normalize
+เกิดที่ `DataContext` ดูหัวข้อ 7.1)
+
+| ฟังก์ชัน | Endpoint | คืนอะไร |
+|---|---|---|
+| `getData()` | `GET /api/credit/data` | ก้อนข้อมูลทั้งโมดูลในคำขอเดียว: `{ me, facilities, costCategories, categoryCaps, transactions, requests }` (และ `projects`/`facTypes` ในเวอร์ชัน backend ปัจจุบัน — ดูหัวข้อ 11.1) — สืบทอดรูปแบบจาก `getData()` ของ Apps Script เดิม |
+| `getProjects()` | `GET /api/credit/projects` | รายการโครงการ — เรียกผ่าน `optional()` |
+| `getFacilityTypes()` | `GET /api/credit/facility-types` | รายการประเภทวงเงิน — เรียกผ่าน `optional()` |
+| `getTransactions(filters)` | `GET /api/credit/transactions?project=&facilityNo=&status=` | รายการ transaction ที่กรองแล้วฝั่งเซิร์ฟเวอร์ |
+| `getRequests(filters)` | `GET /api/credit/requests?project=&status=` | รายการคำขอที่กรองแล้วฝั่งเซิร์ฟเวอร์ |
+| `getCostCategories()` | `GET /api/credit/cost-categories` | array ของชื่อหมวดค่าใช้จ่าย เรียงตาม `sort_order` |
+| `getCashPlan(project, month, variant)` | `GET /api/credit/cash-plan?project=&month=&variant=` | array ของ period (T-bar sections); `variant` default `'plan'` |
+| `getAudit(limit)` | `GET /api/credit/audit?limit=` | ประวัติการเปลี่ยนแปลง — **เฉพาะผู้บริหาร** (`requireRole('credit','manager')` ที่ route); `limit` default 200 |
+
+**`optional(path)` — ตัวห่อพิเศษของ reference data**: `getProjects()` และ
+`getFacilityTypes()` ไม่เรียก `api.get()` ตรง ๆ แต่ผ่าน `optional()` ซึ่ง **กลืนเฉพาะ 404
+เป็น `null`** และโยน error อื่นทั้งหมดต่อ — 404 แปลว่า "route ยังไม่ถูก implement" ซึ่ง
+`DataContext` มี fallback รองรับอยู่แล้ว ส่วน 401/500 เป็นความล้มเหลวจริงที่ต้องไม่ถูกกลืนจน
+กลายเป็นหน้าจอว่างเปล่าแบบเงียบ ๆ (ดูหัวข้อ 7.1 และ 11.1)
+
+**หมายเหตุการใช้งานจริง**: หน้าจอปัจจุบันเรียกใช้ `getData()`, `getProjects()`,
+`getFacilityTypes()` (ทั้งสามผ่าน `reload()` ของ `DataContext`) และ `getCashPlan()`
+(`PlanView.jsx`, `VarianceView.jsx`) เท่านั้น — `getTransactions()`, `getRequests()`,
+`getCostCategories()` และ `getAudit()` **มีอยู่ในชั้น API แต่ยังไม่มีหน้าจอใดเรียก** เพราะ
+ข้อมูลสามชุดแรกมาพร้อม `GET /data` อยู่แล้ว (การกรองทำฝั่ง client ดูหัวข้อ 7.2) ส่วน
+`getAudit()` ยังไม่มีหน้าจอ audit trail — ทั้งสี่ตัวเป็นฐานพร้อมใช้สำหรับหน้าจอในอนาคต ไม่ใช่
+dead code แบบเดียวกับ `SignIn.jsx` (หัวข้อ 11.4)
+
+### 8.2 ฟังก์ชันเขียนข้อมูล (write wrappers)
+
+**ทุกฟังก์ชันในหัวข้อนี้เป็น manager-only ที่ฝั่ง API** — UI ซ่อนปุ่มด้วย `me.isManager` แต่
+นั่นเป็นเพียง hint; `requireRole('credit','manager')` ตรวจซ้ำที่เซิร์ฟเวอร์เสมอ (ดูหัวข้อ 10)
+และการเขียนทุกครั้งถูกห่อด้วย `mutate()` ของ `DataContext` (หัวข้อ 7.1) จึงตามด้วยการ
+`reload()` ข้อมูลทั้งโมดูลเสมอ ไม่มี optimistic update
+
+#### 8.2.1 คำขอสินเชื่อ (requests)
+
+- **`addRequest(payload)`** → `POST /api/credit/requests` — สร้างคำขอใหม่ เรียกจาก `save()`
+  ของ `RequestDialog` (หัวข้อ 5.1) เมื่อไม่ได้อยู่ในโหมดแก้ไข; payload ประกอบด้วย
+  `project`, `company` (มาจาก `projCompany()` ไม่ใช่การเลือกอิสระ), `facilityNo`, `amount`,
+  `purpose`, `beneficiary`, `note`, `maturity` (แปลงเป็น dd/mm/yyyy ด้วย `isoToDMY()` ก่อนส่ง),
+  `source`, `docFrom`, `docTo`, `status` — Validation ทั้งหมดเกิดใน dialog ก่อนเรียก
+  (ดูหัวข้อ 5.1) API ตอบกลับพร้อม id รูปแบบ `REQ-<timestamp>-<random>`
+  **นี่คือฟังก์ชันที่การพอร์ตต้องแก้บั๊กสำคัญ**: `addRequest()` ของ mock เดิมเขียนลง array
+  `transactions` (ผ่าน `insertTxn()`) ขณะที่ `decideRequest()` อ่านจาก array `requests`
+  คนละก้อน — คำขอที่สร้างผ่าน UI จึงไม่มีทางถูกอนุมัติได้เลย (ดูหัวข้อ 4.3 และ 11.3)
+- **`updateRequest(id, payload)`** → `PATCH /api/credit/requests/:id` — แก้ไขคำขอที่ยังไม่ถูก
+  ตัดสิน เรียกจาก `save()` ของ `RequestDialog` ตัวเดียวกันเมื่ออยู่ในโหมดแก้ไข (payload
+  หน้าตาเหมือน `addRequest` ทุกประการ) ฝั่ง backend ใช้ `coalesce($n, column)` จึงแก้เฉพาะ
+  ฟิลด์ที่ส่งมา ฟิลด์ที่ไม่ได้ส่งคงค่าเดิม
+- **`deleteRequest(id)`** → `DELETE /api/credit/requests/:id` — ลบคำขอ เรียกจาก
+  `RequestsView.jsx` ผ่าน `ConfirmDialog` ก่อนเสมอ; ตอบ 404 ถ้าไม่พบ id
+- **`decideRequest(id, decision)`** → `POST /api/credit/requests/:id/decide` — อนุมัติ/ไม่อนุมัติ
+  `decision` ต้องเป็น `'อนุมัติ'` หรือ `'ไม่อนุมัติ'` เท่านั้น (Zod enum ฝั่ง route ปฏิเสธค่าอื่น)
+  **ผลต่อ state machine** และการสร้าง transaction คู่กันในทรานแซกชันเดียว อธิบายเต็มที่
+  หัวข้อ 4.3 (ฟังก์ชันนี้ถูกกล่าวถึงในเอกสารอยู่แล้ว รวมไว้ที่นี่เพื่อความครบของชั้น API)
+
+#### 8.2.2 รายการเบิกใช้วงเงิน (transactions)
+
+- **`addTransaction(payload)`** → `POST /api/credit/transactions` — บันทึก drawdown ตรงโดย
+  ไม่ผ่านคำขอ เรียกจาก `save()` ของ `TxnDialog` (หัวข้อ 5.2); payload คือ `project`,
+  `facilityNo`, `amount` (**รับค่าติดลบได้โดยเจตนา** = การปลด/คืนวงเงิน), `ref`, `desc`,
+  `start`/`due` (แปลงเป็น dd/mm/yyyy ก่อนส่ง), `note` และ `status: STATUS.APPROVED` ที่ส่ง
+  อย่างชัดเจนแม้ route จะ default ค่าเดียวกัน; Validation คือ `project`, `facilityNo` และ
+  `amount ≠ 0`; id ที่ได้กลับมาเป็นรูปแบบ `TXN-<timestamp>-<random>`
+- **`updateTransaction(id, payload)`** → `PATCH /api/credit/transactions/:id` — แก้ไขรายการ
+  ด้วยกลไก `coalesce` เช่นเดียวกับคำขอ **ยังไม่มีหน้าจอใดเรียกใช้** — `TxnDetailDialog`
+  ปัจจุบันมีเพียงปุ่มชำระและลบ ไม่มีโหมดแก้ไข (ดูหัวข้อ 5.3); ฟังก์ชันนี้จึงเป็นฐานพร้อมใช้
+  สำหรับการเพิ่มฟอร์มแก้ไขรายการในอนาคต
+- **`settleTxn(id)`** → `POST /api/credit/transactions/:id/settle` — ชำระ/ปิดรายการ ไม่มี
+  payload; เรียกจาก `TxnDetailDialog` ผ่าน `ConfirmDialog` เสมอ **อาจถูกปฏิเสธด้วย 409
+  `ALREADY_SETTLED` หรือ 409 `NOTHING_OWING`** ซึ่ง client แยกข้อความให้ผู้ใช้คนละแบบ —
+  กลไก guard ที่เขียนไว้ในคำสั่ง UPDATE เดียว (กันการกดชำระซ้อนกัน) อธิบายเต็มที่หัวข้อ 5.3
+  ผลต่อ state machine: `status` → `STATUS.SETTLED` ('ชำระแล้ว') และตั้ง `paid_date` เป็นวันนี้
+  รายการที่ settled แล้วจะไม่ถูกนับเป็นยอดค้างใน `computeStats()` อีก (หัวข้อ 3.2) และ
+  `overdueInterest()` คืน 0 ทันที (หัวข้อ 5.3)
+- **`setTxnStatus(id, status)`** → `POST /api/credit/transactions/:id/status` — ตั้งสถานะของ
+  รายการโดยตรงด้วย `{ status }` (สตริงใด ๆ ที่ยาวไม่เกิน 60 อักขระ — route **ไม่** จำกัดเป็น
+  enum ต่างจาก `decideRequest`) **ยังไม่มีหน้าจอใดเรียกใช้** — เป็นทางหนีสำหรับการแก้สถานะ
+  ด้วยมือ (เช่น ตั้งเป็น 'void') ที่ยังไม่มี UI รองรับ; ผู้ที่จะต่อ UI เข้ากับ endpoint นี้ควร
+  ตระหนักว่าการเขียนสถานะนอกชุด `STATUS`/`DECISION` จะทำให้ `statusMeta()` ตกไปที่ป้าย
+  fallback (ดูหัวข้อ 7.3) และตรรกะการนับยอดค้างจะไม่รู้จักสถานะนั้น
+- **`deleteTxn(id)`** → `DELETE /api/credit/transactions/:id` — ลบรายการ เรียกจาก
+  `TxnDetailDialog` ผ่าน `ConfirmDialog` ("ลบรายการนี้? วงเงินที่ใช้ไปจะถูกปล่อยคืน") — ผลคือ
+  ยอด `used` ที่คำนวณจาก view `credit.facility_used` ลดลงตามหลัง `reload()`
+
+#### 8.2.3 วงเงินและงบประมาณ
+
+- **`setLimit(project, facilityNo, limit)`** → `PUT /api/credit/limits` — ตั้งวงเงินที่เจรจากับ
+  ธนาคาร upsert บนคีย์ `(project, facility_no)`; เรียกจาก `save()` ของ `LimitDialog`
+  โดย `limit` ผ่าน `moneyVal()` แปลงสตริงที่มีจุลภาคเป็นตัวเลขก่อน Validation คือต้องเป็น
+  ตัวเลข ≥ 0 และ **บังคับกรอก** — เหตุผลที่ endpoint นี้แยกจาก `used-override` (ข้อเท็จจริง
+  คนละเรื่องกัน) และเหตุผลที่ทั้งสองถูกเรียกเสมอตอน save อธิบายไว้ที่หัวข้อ 5.4
+- **`setUsedOverride(project, facilityNo, used)`** → `PUT /api/credit/limits/used-override` —
+  pin/unpin ยอดใช้ไป; ส่ง `used: null` เพื่อ **ล้าง override** และคืนหน้าที่คำนวณให้ view
+  `credit.facility_used` (ดูหัวข้อ 5.4 — ฟังก์ชันนี้ถูกกล่าวถึงในเอกสารอยู่แล้ว)
+- **`setCategoryCap(project, costCategory, cap, note)`** → `PUT /api/credit/category-caps` —
+  ตั้ง/ล้างงบของหมวดค่าใช้จ่ายหนึ่งหมวดต่อหนึ่งโครงการ เรียกจาก `save()` ของ `CapDialog`;
+  `cap: null` = ล้างงบ และถ้ายังไม่เคยมีแถวของคีย์ `(project, category)` นั้น การส่ง `null`
+  เป็น **no-op** ไม่สร้างแถวงบเปล่า (หัวข้อ 5.5) Validation ฝั่ง dialog: ช่องว่าง → `null`,
+  ถ้ากรอกต้องเป็นตัวเลข ≥ 0
+- **`setCostCategories(list)`** → `PUT /api/credit/cost-categories` — **แทนที่รายการหมวด
+  ทั้งชุด** ด้วย array ที่ส่งไป (`{ list }`) ฝั่ง backend ลบทั้งหมดแล้ว insert ใหม่ใน
+  ทรานแซกชันเดียวเพื่อรักษาลำดับ — **ลำดับใน array คือลำดับที่แสดงในเมนู** เรียกจาก
+  `save()` ของ `SettingsDialog` ส่วน "หมวดค่าใช้จ่าย" (หัวข้อ 5.7) ซึ่งเป็นส่วนเดียวใน
+  dialog นั้นที่เป็น server state และต้องกด Save จริง ต่างจากส่วนแดชบอร์ดที่มีผลทันที
+  ข้อควรระวัง: เพราะเป็นการเขียนทับทั้งชุด การ Save จากหน้าจอที่โหลดรายการเก่าไว้จะทับ
+  การแก้ไขของผู้อื่นที่เกิดขึ้นระหว่างนั้น (ไม่มีการตรวจ conflict)
+
+#### 8.2.4 แผนการเงิน (cash plan)
+
+- **`saveCashPlanPeriod(period)`** → `PUT /api/credit/cash-plan` — สร้างหรือแก้ไข **หนึ่ง
+  period (section) ทั้งก้อน** upsert บนคีย์ธรรมชาติ `(project, month, period_idx, variant)`
+  เรียกจาก `addPeriod()` ของ `PlanView` ด้วย payload `{ project, month, variant, periodIdx,
+  periodLabel, periodType, income }` โดย `periodIdx` คำนวณเป็น "ช่องว่างถัดไป"
+  (`max(periodIdx) + 1`) ไม่ใช่ความยาว array และถูกปฏิเสธที่ฝั่ง client ถ้า `>= 5`
+  (จำกัด 5 ส่วนต่อเดือนต่อโครงการ) — เหตุผลของทั้งสองข้อดูหัวข้อ 4.5
+  **ข้อจำกัดสำคัญ**: เพราะ endpoint แทนที่ทั้ง period การแก้ไขรายบรรทัดย่อยภายในส่วนจึงยัง
+  ทำไม่ได้ (ดูหัวข้อ 4.5 และ 11.2 ข้อ 2)
+- **`deleteCashPlanPeriod(id)`** → `DELETE /api/credit/cash-plan/:id` — ลบหนึ่งส่วน เรียกจาก
+  `removePeriod()` ของ `PlanView` ผ่าน `ConfirmDialog` เสมอ หลังลบสำเร็จเรียก `load()` ซ้ำ
+  (ไม่ใช่ `mutate()` เพราะข้อมูลแผนการเงินไม่ได้อยู่ใน store กลาง แต่เป็น state ของ view เอง)
+  — ดัชนีที่ว่างจากการลบจะไม่ถูกนำกลับมาใช้ซ้ำ ตามกฎ `periodIdx` ข้างต้น
+
+---
+
+## 9. Data Flow: API Endpoints ทั้งหมด (`/api/credit`)
 
 ทุก endpoint mount ผ่าน `router.use(requireAuth)` — **ต้องล็อกอินเท่านั้น ไม่มีการเช็ค
-role เพิ่มเติมสำหรับการอ่าน** (ดูหัวข้อ 9 สำหรับรายละเอียดสถานะสิทธิ์การเข้าถึง) ส่วนการ
+role เพิ่มเติมสำหรับการอ่าน** (ดูหัวข้อ 10 สำหรับรายละเอียดสถานะสิทธิ์การเข้าถึง) ส่วนการ
 **เขียน** ทั้งหมดผ่าน middleware `manager = requireRole('credit', 'manager')`
 
-### 8.1 อ่านข้อมูล (GET)
+### 9.1 อ่านข้อมูล (GET)
 
 | Endpoint | คืนอะไร | หมายเหตุ |
 |---|---|---|
@@ -580,7 +812,7 @@ role เพิ่มเติมสำหรับการอ่าน** (ด�
 | `GET /cash-plan?project=&month=&variant=` | array ของ period (T-bar sections) | `variant` เป็น `'plan'` หรือ `'actual'`, default `'plan'` |
 | `GET /audit?limit=` | ประวัติการเปลี่ยนแปลงทั้งหมด | **เฉพาะผู้บริหาร** (`manager` middleware) — จำกัด limit สูงสุด 1000 แถว |
 
-### 8.2 เขียนข้อมูล (POST/PATCH/PUT/DELETE) — ทั้งหมดเฉพาะผู้บริหาร
+### 9.2 เขียนข้อมูล (POST/PATCH/PUT/DELETE) — ทั้งหมดเฉพาะผู้บริหาร
 
 | Endpoint | หน้าที่ | จุดสำคัญ |
 |---|---|---|
@@ -604,7 +836,7 @@ role เพิ่มเติมสำหรับการอ่าน** (ด�
 (ฟังก์ชัน `audit()` รับ `client` ของทรานแซกชันโดยตรง — ถ้าทรานแซกชันถูก rollback แถว audit
 ก็จะหายไปด้วย ไม่เกิด audit log ที่โกหกว่ามีการเขียนสำเร็จ)
 
-### 8.3 รูปแบบข้อมูลบนสาย (wire format) ที่ต้องรู้
+### 9.3 รูปแบบข้อมูลบนสาย (wire format) ที่ต้องรู้
 
 - **วันที่**: ทุกวันที่ระหว่าง client-API เป็น `dd/mm/yyyy` (ฟังก์ชัน `dmy()`/`toDate()`
   ใน backend) — ไม่ใช่ ISO เหมือนปกติ เพราะตามรูปแบบเดิมของชีต Apps Script
@@ -618,7 +850,7 @@ role เพิ่มเติมสำหรับการอ่าน** (ด�
 
 ---
 
-## 9. การควบคุมสิทธิ์การเข้าถึง (Access Control) — สถานะปัจจุบัน
+## 10. การควบคุมสิทธิ์การเข้าถึง (Access Control) — สถานะปัจจุบัน
 
 **สำคัญมาก**: `credit.js` (บรรทัด 26-32) mount แค่ `requireAuth` เป็น middleware ระดับ
 โมดูล **ไม่มีการเช็ค role ใด ๆ เพิ่มเติมสำหรับสิทธิ์การอ่าน** — หมายความว่า:
@@ -661,9 +893,9 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
 
 ---
 
-## 10. ข้อจำกัดหรือสิ่งที่ยังไม่รองรับ (จาก PORT_NOTES.md)
+## 11. ข้อจำกัดหรือสิ่งที่ยังไม่รองรับ (จาก PORT_NOTES.md)
 
-### 10.1 Route ที่เคยขาดหายระหว่างพอร์ต — ปัจจุบันมีแล้ว
+### 11.1 Route ที่เคยขาดหายระหว่างพอร์ต — ปัจจุบันมีแล้ว
 
 `PORT_NOTES.md` ระบุไว้ (ตอนเขียนเอกสารพอร์ต) ว่า `GET /api/credit/projects` และ `GET
 /api/credit/facility-types` **ยังไม่มี** ในขณะนั้น และ `GET /data` ไม่รวมสองชุดนี้มาด้วย
@@ -677,7 +909,7 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
 เผื่อกรณี deploy environment ใดที่ backend เวอร์ชันเก่ากว่ายังไม่มี route เหล่านี้ — โค้ด
 ฝั่ง client จึงทำงานถูกต้องทั้งสองกรณี (มี route หรือไม่มีก็ตาม)
 
-### 10.2 ข้อจำกัดที่ยังคงอยู่จริงในปัจจุบัน
+### 11.2 ข้อจำกัดที่ยังคงอยู่จริงในปัจจุบัน
 
 1. **ไม่มี `PATCH /facilities`** — วงเงิน (limit) แก้ได้ผ่าน `PUT /limits` แต่ฟิลด์
    `type`, `interest`, `notes` ของ facility เป็น **read-only ในหน้าจอ** ไม่มี route
@@ -690,7 +922,7 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
 3. **`exportXlsx` ไม่มี server route** — export ทำงานฝั่ง client ทั้งหมดด้วย SheetJS จาก
    ข้อมูลที่กรองอยู่บนจอ (ดูหัวข้อ 7.5) `TECH_STACK.md` กำหนด ExcelJS ไว้สำหรับงาน
    generate ฝั่งเซิร์ฟเวอร์ — ถ้าต้องย้าย export ไปทำที่ API ในอนาคต ควรใช้ ExcelJS
-4. **สิทธิ์การเข้าถึงยังไม่ล็อกระดับการอ่าน** — ดูหัวข้อ 9 โดยละเอียด
+4. **สิทธิ์การเข้าถึงยังไม่ล็อกระดับการอ่าน** — ดูหัวข้อ 10 โดยละเอียด
 5. **อัตราดอกเบี้ยที่ไม่ใช่ตัวเลข** — `credit.facilities.interest` เป็นข้อความอิสระ
    ระบบไม่พยายามตีความอัตราที่ซับซ้อนกว่ารูปแบบ "ตัวเลข%" ธรรมดา (เช่น "MLR ต่อปี" หรือ
    "1.25% ต่อปีเรียกเก็บทุก 3 เดือน" จะถูกดึงได้แค่ตัวเลข 1.25 เท่านั้น ส่วนเงื่อนไข
@@ -699,7 +931,7 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
    ติดอยู่ที่ tooltip ของแท็บ `/plan`, `/actual`, `/variance` ใน `App.jsx` (`TABS` array)
    — เป็นสัญญาณบอกผู้ใช้ว่าฟีเจอร์กลุ่มนี้ยังไม่นิ่งเท่าแท็บอื่น
 
-### 10.3 สิ่งที่ระบบเดิม (Apps Script/mock) มีบั๊กและได้รับการแก้ไขแล้ว
+### 11.3 สิ่งที่ระบบเดิม (Apps Script/mock) มีบั๊กและได้รับการแก้ไขแล้ว
 
 - **คำขอไม่สามารถอนุมัติได้เลย** — mock เดิมเขียนคำขอลง array `transactions` แต่
   `decideRequest()` ค้นหาใน array `requests` ที่ไม่มีใครเขียนอะไรลงไปเลย ปัจจุบันมีตาราง
@@ -711,7 +943,7 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
   เพราะ `Number('') === 0` เป็นค่าที่ finite ทำให้ตรรกะเดิมเข้าใจผิดว่าเป็น "0 วัน" ปัจจุบัน
   ใช้ `parseDays()` ที่แยกกรณี "สตริงว่าง" ออกจาก "0" อย่างชัดเจน (ดูหัวข้อ 7.4)
 
-### 10.4 โค้ดที่ไม่ถูกเรียกใช้ (Dead code)
+### 11.4 โค้ดที่ไม่ถูกเรียกใช้ (Dead code)
 
 - **`src/components/SignIn.jsx` ไม่ถูก import จากที่ใดเลย** — ตรวจสอบเมื่อ 2026-09-05 โดย
   ค้นทั้ง `credit-facility/src/` ด้วยคำว่า `SignIn` พบการอ้างอิงเฉพาะภายในตัวไฟล์เองเท่านั้น
@@ -721,7 +953,7 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
 
 ---
 
-## 11. รายการไฟล์อ้างอิงทั้งหมด
+## 12. รายการไฟล์อ้างอิงทั้งหมด
 
 | ไฟล์ | หน้าที่ |
 |---|---|

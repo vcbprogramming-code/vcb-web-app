@@ -1580,4 +1580,5 @@ export const EN = {
   'ต้น': 'Junior',
   'ครบ': 'Complete',
   'ยังไม่ครบ': 'Incomplete',
+  'ปิดแถบประกาศ': 'Dismiss announcement',
 };

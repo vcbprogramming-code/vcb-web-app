@@ -777,32 +777,6 @@ if (!ctx) throw new Error('useMinutesData must be used inside <MinutesDataProvid
 
 ---
 
-### 2.13 ⚠️ โค้ดที่ไม่ถูกใช้งาน (Dead Code) — `CommentsPanel.jsx`
-
-**สถานะ: ไม่ใช่ฟีเจอร์ที่ผู้ใช้เข้าถึงได้ — เป็น component กำพร้าที่ไม่มีไฟล์ใดในโปรเจกต์ import**
-
-**ไฟล์:** `src/components/CommentsPanel.jsx` (149 บรรทัด)
-
-**สิ่งที่โค้ดนี้ *ดูเหมือนว่า* จะทำ:** เป็น drawer คอมเมนต์แยกเดี่ยว เลื่อนออกจากขอบขวา (`fixed inset-y-0 right-0`)
-พร้อม backdrop แสดงรายการคอมเมนต์ของบันทึกหนึ่ง (ผู้เขียน + timestamp ผ่าน `fmtTimestamp` + ข้อความแบบ
-`whitespace-pre-wrap`) มีปุ่มลบ `✕` เฉพาะเจ้าของคอมเมนต์หรือแอดมิน (`mine = isAdmin || c.author === user?.email`)
-มีกล่องพิมพ์คอมเมนต์ (`maxLength={4000}`) ที่แสดงเฉพาะผู้ที่ `signedIn` และเรียก `minutesApi.addComment` /
-`minutesApi.removeComment` — ตรรกะเหมือนกับส่วนคอมเมนต์ที่อยู่ใน `ActivityPanel.jsx` (หัวข้อ 3.4) เกือบทั้งหมด
-
-**ยืนยันแล้วว่าไม่มีอะไร import:** การ grep คำว่า `CommentsPanel` ทั้ง tree `meeting-minutes/src/` พบเพียงบรรทัดเดียว
-คือ `export default function CommentsPanel(...)` **ภายในตัวไฟล์เอง** ไม่มี `import CommentsPanel from ...` ที่ใดเลย
-(`App.jsx` import `ActivityPanel` ผ่าน `MeetingDetail.jsx` แทน) ดังนั้น **ไม่มีเส้นทางใดในแอปที่ทำงานอยู่จริงเปิด
-panel นี้ได้** — โค้ดถูก bundle ไปด้วยแต่ไม่เคย render
-
-**ที่มาที่เป็นไปได้:** ตรงกับสิ่งที่หัวข้อ 3.4 อธิบายไว้ — ระหว่างการพอร์ต "ประวัติการแก้ไข" กับ "คอมเมนต์" เคยถูกแยก
-เป็นสองปุ่ม/สอง panel ซึ่งเป็น**ความผิดเพี้ยนจากการพอร์ต ไม่ใช่การออกแบบใหม่** แล้วจึงถูกรวมกลับเป็น `ActivityPanel`
-panel เดียว ไฟล์นี้น่าจะเป็นซากที่เหลือจากขั้นตอนนั้นและถูกลืมลบ
-
-**สิ่งที่ทีมควรทำ:** ตัดสินใจอย่างใดอย่างหนึ่ง — **(ก) ลบไฟล์ทิ้ง** (แนะนำ เพราะ `ActivityPanel` ครอบคลุมงานนี้แล้ว
-และการมีโค้ดคอมเมนต์สองชุดที่ต้องดูแลคู่กันจะทำให้แก้บั๊กที่หนึ่งแล้วลืมอีกที่หนึ่ง) หรือ **(ข) wire ขึ้นมาใช้จริง**
-ถ้าต้องการ drawer คอมเมนต์แยกจากประวัติการแก้ไข — แต่ต้องทบทวนเหตุผลในหัวข้อ 3.4 ที่ตัดสินใจรวมทั้งสองเข้าด้วยกัน
-ก่อน **ห้ามถือว่าฟีเจอร์นี้ใช้งานได้อยู่ในเอกสารหรือในการทดสอบ**
-
 ---
 
 ## 3. รายการฟังก์ชันทั้งหมด และ Logic การทำงาน
@@ -1358,7 +1332,7 @@ docstring ระบุว่าเป็นการ**เว้นไว้โ�
 | ฟังก์ชัน | ไฟล์ | ทำอะไร | ผู้เรียกจริง |
 |---|---|---|---|
 | `byPinnedThenDate(a, b)` | `lib/minutes.js` | Comparator ของลำดับรายการ: **pinned ขึ้นก่อนเสมอ → จากนั้นเรียงตาม `date` ใหม่ก่อน** แถวที่ไม่มีวันที่ใช้ค่าพื้น `'0000-00-00'` จึงจมลงล่างสุด (ถ้าใช้ `''` มันจะลอยขึ้นบนแทน) — ต่างจาก `sortMeetingsWithOverview` ตรงที่**ไม่**ดัน Overview ลงล่างเป็นพิเศษ | ใช้ภายใน `lib/minutes.js` เอง (`projectMeetings`) เท่านั้น — **ไม่มีไฟล์อื่น import** แม้จะ export ไว้ |
-| `errorMessage(err, t, vars)` | `lib/errors.js` | แปลง `ApiError` เป็นข้อความที่ผู้ใช้อ่านรู้เรื่อง — ทุก `catch` ในโมดูลจบที่นี่ | ใช้กว้างที่สุดในโมดูล: `AccessPage`, `ActivityPanel`, `AttachmentsBar`, `EditHistoryModal`, `EditorModal`, `MeetingDetail`, `MeetingModal`, `ProjectModal`, `TagPickerModal`, `VersionPreviewModal` (และ `CommentsPanel.jsx` ที่เป็น dead code, ดู 2.13) |
+| `errorMessage(err, t, vars)` | `lib/errors.js` | แปลง `ApiError` เป็นข้อความที่ผู้ใช้อ่านรู้เรื่อง — ทุก `catch` ในโมดูลจบที่นี่ | ใช้กว้างที่สุดในโมดูล: `AccessPage`, `ActivityPanel`, `AttachmentsBar`, `EditHistoryModal`, `EditorModal`, `MeetingDetail`, `MeetingModal`, `ProjectModal`, `TagPickerModal`, `VersionPreviewModal` |
 | `fileIconKind(mime, name)` | `lib/minutes.js` | คืน `{ kind, label }` ของ chip ไฟล์แนบ — **ดมจาก mime type และชื่อไฟล์พร้อมกัน** เพราะ `.csv` ที่ถูกส่งมาเป็น `text/plain` และ `.xlsx` ที่เป็น `application/octet-stream` ต้องอ่านออกมาเป็น spreadsheet ทั้งคู่ ค่า `kind` ที่เป็นไปได้: `xls`/`ppt`/`pdf`/`doc`/`img`/`gen` ซึ่งจับคู่กับสีใน `FILE_ICON_CLASS` (สีอยู่กับชนิด ไม่กระจายไปอยู่ในคอมโพเนนต์) | `AttachmentsBar.jsx` บรรทัด 107 |
 | `fmtFileSize(bytes)` | `lib/minutes.js` | ขนาดไฟล์แบบอ่านง่าย: `< 1 KB` เป็น `B`, `< 1 MB` เป็น `KB` (ปัดเป็นจำนวนเต็ม), เกินกว่านั้นเป็น `MB` ทศนิยม 1 ตำแหน่ง — `Number(bytes) || 0` ทำให้ค่า `null`/`undefined` แสดงเป็น `0 B` ไม่ใช่ `NaN` | `AttachmentsBar.jsx` บรรทัด 129 |
 
@@ -1519,9 +1493,3 @@ line-height/break-inside/content-box sizing มาแล้ว 4 วิธีแ
 11. **หน้าจอ Site-wide audit log** (`GET /api/minutes/audit`) และ **Fathom raw log** (`GET
     /api/minutes/fathom-raw-log`) **มี wrapper client พร้อมแล้วแต่ยังไม่มี UI เรียกใช้** — เป็น debugging surface
     สำหรับแอดมินที่ต้องเรียกจาก console เท่านั้น
-12. **`src/components/CommentsPanel.jsx` เป็นโค้ดที่ไม่ถูกใช้งาน (dead code)** — ไม่มีไฟล์ใดใน
-    `meeting-minutes/src/` import component นี้เลย (ยืนยันด้วยการ grep ทั้ง tree: พบเพียงบรรทัด `export default`
-    ภายในตัวไฟล์เอง) จึง**ไม่มีเส้นทางใดในแอปที่ทำงานอยู่จริงเปิด panel นี้ได้** งานคอมเมนต์ทั้งหมดที่ผู้ใช้เข้าถึงได้
-    อยู่ใน `ActivityPanel.jsx` (หัวข้อ 3.4) ไฟล์นี้น่าจะเป็นซากจากช่วงที่ประวัติการแก้ไขกับคอมเมนต์ยังแยกเป็นสอง
-    panel — ทีมควรตัดสินใจว่าจะ**ลบทิ้ง** (แนะนำ) หรือ **wire ขึ้นมาใช้จริง** ห้ามถือว่าเป็นฟีเจอร์ที่ใช้งานได้
-    รายละเอียดอยู่ในหัวข้อ 2.13

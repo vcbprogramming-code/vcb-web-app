@@ -692,8 +692,8 @@ Express API เท่านั้น ทุก path ประกอบจาก�
 `getCostCategories()` และ `getAudit()` **มีอยู่ในชั้น API แต่ยังไม่มีหน้าจอใดเรียก** เพราะ
 ข้อมูลสามชุดแรกมาพร้อม `GET /data` อยู่แล้ว (การกรองทำฝั่ง client ดูหัวข้อ 7.2) ส่วน
 `getAudit()` ยังไม่มีหน้าจอ audit trail — ทั้งสี่ตัวเป็นฐานพร้อมใช้สำหรับหน้าจอในอนาคต **ไม่ใช่
-dead code** (ต่างจาก `SignIn.jsx` ที่เป็นหน้าจอซ้ำซ้อนและถูกลบไปแล้ว ดูหัวข้อ 11.4): ฟังก์ชัน
-เหล่านี้มี endpoint ฝั่ง API ที่ทำงานได้จริงรออยู่ ขาดแค่หน้าจอที่จะเรียกใช้เท่านั้น
+โค้ดตาย**: ฟังก์ชันเหล่านี้มี endpoint ฝั่ง API ที่ทำงานได้จริงรออยู่ ขาดแค่หน้าจอที่จะเรียกใช้
+เท่านั้น — อย่าลบทิ้งโดยเข้าใจผิดว่าไม่มีใครใช้
 
 ### 8.2 ฟังก์ชันเขียนข้อมูล (write wrappers)
 
@@ -944,55 +944,17 @@ Connect ได้ (ไม่ว่าจะมีสิทธิ์อะไร�
   เพราะ `Number('') === 0` เป็นค่าที่ finite ทำให้ตรรกะเดิมเข้าใจผิดว่าเป็น "0 วัน" ปัจจุบัน
   ใช้ `parseDays()` ที่แยกกรณี "สตริงว่าง" ออกจาก "0" อย่างชัดเจน (ดูหัวข้อ 7.4)
 
-### 11.4 โค้ดที่ไม่ถูกเรียกใช้ (Dead code) — แก้ไขแล้ว
+## 12. เอกสารและไฟล์ที่ควรอ่านต่อ
 
-- ~~**`src/components/SignIn.jsx` ไม่ถูก import จากที่ใดเลย**~~ — **ลบไฟล์ทิ้งแล้วเมื่อ
-  2026-09-05** (commit `d3989ef`)
+ตารางรายชื่อไฟล์ `src/` ทั้งหมดถูกตัดออกโดยเจตนา: ทุกไฟล์มีคำอธิบายอยู่ในหัวข้อที่ว่าด้วย
+ฟีเจอร์ของมันอยู่แล้ว การเก็บสำเนารายชื่อไฟล์ไว้อีกชุดหนึ่งมีแต่จะล้าสมัยเมื่อมีการเพิ่ม/ลบ/
+เปลี่ยนชื่อไฟล์ โดยไม่ได้เพิ่มข้อมูลอะไร (ดูโครงสร้างจริงได้จากตัวโฟลเดอร์เอง)
 
-  ไฟล์นี้ (75 บรรทัด) เป็นหน้าล็อกอิน email + password เฉพาะของโมดูลนี้ ที่มาของมันอธิบายไว้ใน
-  คอมเมนต์หัวไฟล์เอง: สมัยเป็น Apps Script ระบบได้ตัวตนผู้ใช้มาฟรีจาก
-  `Session.getActiveUser().getEmail()` ซึ่งปลอมไม่ได้ แอปจึงไม่เคยต้องมีหน้าล็อกอิน พอเขียนใหม่
-  เป็น SPA ตัวตนฟรีนั้นหายไป แต่ละโมดูลจึงเคยต้องมีหน้าล็อกอินของตัวเองชั่วคราว
+ส่วนที่ยังมีประโยชน์คือ**ตัวชี้ไปยังเอกสารอื่น** ซึ่งหาไม่ได้จากการดูโฟลเดอร์:
 
-  ต่อมาสถาปัตยกรรมเปลี่ยนเป็น **ล็อกอินรวมศูนย์ผ่าน `@vcb/shared`** (โมดูลนี้ยังใช้
-  `AuthProvider` จาก `main.jsx` อยู่ตามปกติ) หน้าล็อกอินเฉพาะโมดูลจึงไม่จำเป็นอีก แต่ไม่มีใครลบทิ้ง
-
-  **ยืนยันก่อนลบด้วยการ build จริง**: build โมดูลทั้งก่อนและหลังลบ ได้บันเดิลขนาด
-  **726,436 ไบต์เท่ากันทุกไบต์** พิสูจน์ว่า Vite ไม่เคยรวมไฟล์นี้เข้าบันเดิลตั้งแต่แรก
-
----
-
-## 12. รายการไฟล์อ้างอิงทั้งหมด
-
-| ไฟล์ | หน้าที่ |
+| ไฟล์ | เนื้อหา |
 |---|---|
-| `credit-facility/src/App.jsx` | Shell, routing, provider composition |
-| `credit-facility/src/components/Header.jsx` | แถบบนสุด (ใช้ shared `AppBar`) |
-| `credit-facility/src/components/Dashboard.jsx` | การ์ดสรุปและตรรกะการคำนวณ |
-| `credit-facility/src/components/FilterBar.jsx` | แถบตัวกรองร่วม |
-| `credit-facility/src/components/RequestDialog.jsx` | ฟอร์มคำขอสินเชื่อ |
-| `credit-facility/src/components/TxnDialog.jsx` | ฟอร์มบันทึกการใช้วงเงิน |
-| `credit-facility/src/components/TxnDetailDialog.jsx` | รายละเอียด + ชำระ/ลบ transaction |
-| `credit-facility/src/components/LimitDialog.jsx` | ปรับวงเงิน/ใช้ไป |
-| `credit-facility/src/components/CapDialog.jsx` | ตั้งงบหมวดค่าใช้จ่าย |
-| `credit-facility/src/components/CostCategoryPicker.jsx` | ตัวเลือกหมวดค่าใช้จ่าย |
-| `credit-facility/src/components/SettingsDialog.jsx` | ตั้งค่าขั้นสูง |
-| `credit-facility/src/components/ui.jsx` | Primitive UI ทั้งหมด (Button, Modal, Meter ฯลฯ) |
-| `credit-facility/src/views/FacilitiesView.jsx` | ตารางวงเงิน |
-| `credit-facility/src/views/LedgerView.jsx` | ตาราง transaction |
-| `credit-facility/src/views/RequestsView.jsx` | คิวคำขอ + อนุมัติ |
-| `credit-facility/src/views/CostView.jsx` | สรุปค่าใช้จ่าย |
-| `credit-facility/src/views/PlanView.jsx` | แผนการเงิน T-bar (plan/actual) |
-| `credit-facility/src/views/VarianceView.jsx` | เทียบแผน vs จริง |
-| `credit-facility/src/lib/DataContext.jsx` | Store กลาง, reload/mutate |
-| `credit-facility/src/lib/FilterContext.jsx` | State ตัวกรองร่วม |
-| `credit-facility/src/lib/DashPrefsContext.jsx` | Preference การแสดงผลแดชบอร์ด |
-| `credit-facility/src/lib/domain.js` | ค่าคงที่โดเมน (status, kind, fold rules) |
-| `credit-facility/src/lib/format.js` | เงิน/วันที่/due bucket |
-| `credit-facility/src/lib/lookups.js` | ฟังก์ชันค้นหา/กรองข้อมูลอ้างอิง |
-| `credit-facility/src/lib/i18n.js` | Dictionary ภาษาไทย/อังกฤษของโมดูล |
-| `credit-facility/src/lib/api.js` | เรียก endpoint ทั้งหมด |
-| `credit-facility/src/lib/exportExcel.js` | Export Excel ฝั่ง client |
-| `credit-facility/PORT_NOTES.md` | บันทึกการพอร์ตจาก Apps Script |
-| `api/src/routes/credit.js` | Express route ทั้งหมดของโมดูล |
+| `credit-facility/PORT_NOTES.md` | บันทึกการพอร์ตจาก Apps Script — จุดที่ทำ 1:1 ไม่ได้และทำอะไรแทน |
+| `api/src/routes/credit.js` | Express route ทั้งหมดของโมดูล (ดูตาราง endpoint หัวข้อ 9) |
 | `docs/ACCESS_MODEL.md` | โครงสร้างสิทธิ์การเข้าถึงทั้งระบบ VCB Connect |
+| `docs/functional-spec/platform-shared.md` | ชั้น API/shared/ฐานข้อมูลที่โมดูลนี้ใช้ร่วมกับโมดูลอื่น |

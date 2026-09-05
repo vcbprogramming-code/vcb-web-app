@@ -76,3 +76,16 @@ export function formatMoney(n) {
   if (n == null || Number.isNaN(Number(n))) return '—';
   return '฿' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
+
+/**
+ * วันที่รูปแบบ YYYY-MM-DD ตามเวลาของเครื่องผู้ใช้
+ *
+ * toISOString() แปลงเป็นเวลา UTC ก่อนเสมอ ประเทศไทยเร็วกว่า UTC เจ็ดชั่วโมง
+ * ค่าที่ได้จึงเป็น "เมื่อวาน" ตลอดช่วงเที่ยงคืนถึงเจ็ดโมงเช้า ซึ่งเป็นเวลาที่
+ * หัวหน้างานเปิดหน้าจอลงบันทึกพอดี และวันที่ 1 ของเดือนก็กลายเป็นวันสุดท้าย
+ * ของเดือนก่อน — ใช้ฟังก์ชันนี้ทุกครั้งที่ต้องการ "วันนี้" ของผู้ใช้
+ */
+export function isoDate(d = new Date()) {
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}

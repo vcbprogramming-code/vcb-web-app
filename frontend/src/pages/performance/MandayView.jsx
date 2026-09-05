@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { perfApi } from '../../lib/performance.js';
+import { isoDate } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -79,7 +80,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [data, setData] = useState(null);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => isoDate());
   const [busy, setBusy] = useState('');
   const [closes, setCloses] = useState([]);
   const [picked, setPicked] = useState(() => new Set());

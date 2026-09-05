@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { onboardingApi } from '../../lib/modules.js';
+import { onboardingApi, isoDate } from '../../lib/modules.js';
 import { formatThaiDate } from '../../lib/ememo.js';
 import { Modal, Avatar } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
@@ -15,7 +15,7 @@ const STATUS_LABEL = { active: 'กำลังติดตาม', completed: '
 
 function AddHireModal({ onClose, onSaved }) {
   const t = useT();
-  const [form, setForm] = useState({ fullName: '', position: '', startDate: new Date().toISOString().slice(0, 10), email: '', phone: '' });
+  const [form, setForm] = useState({ fullName: '', position: '', startDate: isoDate(), email: '', phone: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));

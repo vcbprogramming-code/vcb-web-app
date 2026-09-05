@@ -20,6 +20,19 @@ Onboarding คือโปรแกรมปฐมนิเทศพนักง
 
 ## 2. ผังเส้นทาง (Routing) — `src/App.jsx`
 
+จุดเริ่มต้นของแอปคือ `src/main.jsx` — mount React ด้วย `createRoot` (React 18) ภายใต้ `StrictMode` และครอบ provider ตามลำดับที่**กำหนดตายตัว**ดังนี้:
+
+```
+ThemeProvider → I18nProvider → AuthProvider → BrowserRouter → <App />
+```
+
+ลำดับนี้ไม่ใช่เรื่องบังเอิญ: `ThemeProvider` ต้องอยู่นอกสุดเพื่อแตะ `<html>` ก่อนหน้าจอวาดครั้งแรก, ตามด้วย `I18nProvider` เพื่อให้ข้อความที่ error ของ auth ต้องใช้พร้อมอยู่แล้ว, แล้วจึง `AuthProvider` ส่วน router อยู่ในสุดเพราะการจัดเส้นทางเป็นเรื่องของโมดูลนี้เอง ไม่ใช่ของ shared foundation
+
+**สำคัญ**: `AuthProvider` รับ api instance **ตัวเดียวกัน**กับที่ `lib/onboardingApi.js` ใช้ — ถ้าเผลอเรียก `createApi()` ซ้ำอีกตัวที่นี่ คำขอทั้งหมดจะไม่มี token แนบไป และหน้า admin จะได้ 403 ทั้งที่ผู้ใช้ sign-in ถูกต้องแล้ว
+
+การมี `AuthProvider` **ไม่ได้**แปลว่าโมดูลนี้บังคับ sign-in — เส้นทางเกือบทั้งหมดยังเป็น anonymous ตามเจตนา auth มีไว้สำหรับ 2 หน้าจอ admin เท่านั้น
+
+
 | Path | หน้า | หมายเหตุ |
 |---|---|---|
 | `/` | Home.jsx | หน้าแรก (pre-boarding) |
@@ -162,7 +175,7 @@ Logic ใน `useProgress.toggleTask()`:
 4. **Journey Stepper** (`components/JourneyStepper.jsx`) — ทดแทนเมนูลิงก์แบบเรียบด้วยขั้นบันได 7 ขั้น: Pre-boarding → Required Documents → Department Selection → Day 1-30 → Day 31-60 → Day 61-90 → Completion โดยขั้นที่ 4-6 จะแสดงชื่อแผนกที่เลือกจริง และมี sub-step ย่อย (Reading / Knowledge / Outputs) ต่อเฟส
 5. ปุ่ม Settings, ลิงก์ Admin, สถานะ sign-in
 
-### Logic การคำนวณ % ความคืบหน้า (`components/ProgressBar.jsx`)
+### Logic การคำนวณ % ความคืบหน้า (`components/ProgressBar.jsx` + `src/lib/departmentTasks.js`)
 
 ```
 allIds = getDepartmentTaskIds(department, level)   // กรองตามระดับ junior/senior
@@ -225,9 +238,133 @@ pct    = Math.round(done / allIds.length * 100)
 
 ประกอบด้วย `CompanyStructure.jsx` (ฝังในหน้า Home), `OrgChart.jsx`, `GroupStructure.jsx`, `TreeNode.jsx` — แสดงผังองค์กรแบบต้นไม้ (tree) จากข้อมูลคงที่ใน `data/orgChart.js` เส้นเชื่อมแบบ tree-connector วาดด้วย CSS `::before` pseudo-element (ไม่ใช้ library วาดกราฟ ตาม TECH_STACK.md ที่ห้ามใช้ chart library)
 
+หน้า `/company-structure` (`src/pages/OrgChartPage.jsx`) แสดงผังเดียวกันแบบเต็มหน้า — แต่ **ไม่มีเมนูนำทางไปหน้านี้** โดยเจตนา เพราะแอปต้นฉบับก็ไม่มีหน้าแยก ผังองค์กรของต้นฉบับอยู่ในหน้า Home เท่านั้น เส้นทางนี้จึงเข้าถึงได้ด้วยการพิมพ์ URL เอง
+
 ---
 
-## 13. ข้อจำกัดที่ทราบอยู่แล้ว (จาก PORT_NOTES.md)
+## 13. โครงสร้างข้อมูลเนื้อหา (Content Data Model)
+
+เนื้อหาทั้งหมดของโมดูลนี้เป็น **ข้อมูลคงที่ที่ hardcode ไว้ในโค้ด** (ไม่ได้อยู่ในฐานข้อมูล) — ฐานข้อมูลเก็บเฉพาะ "ใครทำอะไรเสร็จแล้ว" กับ "override ที่ admin แก้" เท่านั้น
+
+### 13.1 นิยามชนิดข้อมูล — `src/data/types.js`
+
+TECH_STACK.md ห้ามใช้ TypeScript จึงเขียนเป็น JSDoc typedef แทน (ช่วยเรื่อง autocomplete ในเอดิเตอร์ แต่ไม่มีการ compile และไม่มีทางทำให้ build ล้มเหลว) โครงสร้างหลัก:
+
+| Type | ฟิลด์ |
+|---|---|
+| `EmployeeLevel` | `'junior'` \| `'senior'` |
+| `ChecklistItem` | `id` (ถาวร), `text`, `level?` (ถ้าไม่ระบุ = ทุกคนเห็น) |
+| `ChecklistBlock` | `heading`, `items[]`, `sub?` |
+
+> **กฎที่ห้ามละเมิด**: `id` ของ checklist item เป็นค่าถาวร — **ห้ามเปลี่ยนหรือนำกลับมาใช้ซ้ำเด็ดขาด** เมื่อมีพนักงานเคยติ๊กไปแล้ว เพราะตาราง `onboarding.progress` อ้างอิงด้วย id นี้ การเปลี่ยน id จะทำให้ความคืบหน้าที่บันทึกไว้หลุดออกจากงานที่มันเป็นเจ้าของโดยไม่มีสัญญาณเตือน — ส่วนการ**แก้ข้อความ (`text`) ปลอดภัยเสมอ** ซึ่งเป็นเหตุผลที่แยก id ออกมาเป็นฟิลด์ต่างหากตั้งแต่แรก
+
+### 13.2 ทะเบียนแผนก — `src/data/allDepartments.js`
+
+`ALL_DEPARTMENTS` ผูก 3 อย่างเข้าด้วยกันต่อหนึ่งแผนก: `id`, `landingPageKey` (คีย์ URL หน้าแผนก), `phasePrefix` (คำนำหน้าคีย์หน้าเฟส) และ `content` (เนื้อหาจริง) — จำเป็นต้องเขียน `landingPageKey` ออกมาตรงๆ ทีละแผนก เพราะแผนก property ใช้คีย์ `property-asset-management` ซึ่งไม่ตรงรูปแบบ `<id>-team` ที่แผนกอื่นใช้
+
+มีฟังก์ชันช่วยค้นหา: `getDepartmentByLandingKey()` และ `getDepartmentByPhasePrefix()`
+
+### 13.3 เนื้อหาแต่ละแผนก — `accounting.js`, `finance.js`, `procurement.js`, `property.js`, `engineering.js`
+
+แต่ละไฟล์ export ออบเจ็กต์เดียวที่พอร์ตมาจาก `content.html` ของต้นฉบับแบบคำต่อคำ โครงสร้าง:
+
+```
+{
+  eyebrow, title,
+  supervisor,        // ข้อความแนะนำหัวหน้างาน
+  overview[],        // ย่อหน้าภาพรวม
+  bullets[],         // หัวข้อย่อยของงานหลัก
+  footerQuote,       // คำคมปิดท้ายหัวข้อ
+  workflow[],        // ย่อหน้าอธิบายกระบวนการ ERP
+  phases[] {         // 3 เฟส
+    dayRange,        // 'day-1-30' | 'day-31-60' | 'day-61-90'
+    page {
+      eyebrow, title,
+      blocks[] {     // 3 บล็อก: Required Reading / Knowledge Requirements / Required Outputs
+        heading,
+        items[] { id, text, level? }
+      },
+      closing?, nextPhasePage?
+    }
+  }
+}
+```
+
+### 13.4 เนื้อหาหน้าอื่น
+
+| ไฟล์ | export | ใช้ที่ |
+|---|---|---|
+| `data/requiredDocuments.js` | `REQUIRED_DOCUMENTS` (8 รายการ) | หน้า Required Documents |
+| `data/home.js` | `HOME_HERO`, `CEO_QUOTE`, `CULTURE_VALUES`, `TRACK_RECORD_SLIDES` | หน้า Home |
+| `data/gallery.js` | `MEET_OUR_TEAM`, `LIFE_ON_SITE` | หน้าเนื้อหาเสริมหลังจบโปรแกรม |
+| `data/orgChart.js` | ข้อมูลผังองค์กร | คอมโพเนนต์ orgchart |
+| `data/departments.js` | `DEPARTMENTS` (รายชื่อ + `deptCard`) | dropdown เลือกแผนก + การ์ดเลือกแผนก |
+
+---
+
+## 14. ระบบ i18n และการแปลเนื้อหา
+
+### 14.1 `src/i18n.js` — พจนานุกรม UI
+
+ใช้ `createDictionary()` เก็บคีย์แบบจุด (dot key) ที่มีค่า `{ th, en }` ภาษาไทยมาก่อน merge ทับ `commonDictionary` ของ `@vcb/shared` — ข้อความภาษาไทยทั้ง **481 รายการ** ถูกยกมาจากระบบเดิมแบบ byte-for-byte และตรวจสอบด้วยโปรแกรม ไม่มีการพิมพ์ใหม่หรือแปลใหม่
+
+**ภาษาเริ่มต้นคือภาษาไทย** และค่า theme/ภาษาใช้คีย์ร่วมกับทุกโมดูล (`vcb_lang` / `vcb_theme`) เพื่อให้การตั้งค่าติดตามผู้ใช้ข้ามแอป
+
+### 14.2 `src/lib/contentText.js` — สะพานแปลเนื้อหา (`tc()`)
+
+เนื้อหาแผนกทั้งหมดใน `src/data/` เป็นภาษาอังกฤษที่เก็บเป็น **ข้อมูล** ไม่ใช่คีย์แปล การเขียนใหม่เป็น dot key ทั้งหมดจะต้องแก้หลายพันบรรทัดโดยไม่ได้ประโยชน์เชิงพฤติกรรม จึงใช้ `tc()` เป็นตัวกลาง: รับข้อความอังกฤษ → ค้นคีย์จาก `CONTENT_KEY_BY_EN` → แปลด้วยคีย์นั้น ถ้าไม่พบคีย์จะคืนข้อความเดิม (ซึ่งเป็นพฤติกรรมเดียวกับ `t()` แบบเก่า และอ่านรู้เรื่องอยู่แล้วเพราะเป็นประโยคอังกฤษเต็ม)
+
+> **สำหรับ UI ใหม่ให้ใช้ dot key ผ่าน `t()` โดยตรง** — `tc()` มีไว้สำหรับเนื้อหาที่ย้ายมาเท่านั้น ไม่ใช่วิธีแปลทั่วไปของระบบ
+
+---
+
+## 15. ระบบ Override เนื้อหา checklist
+
+### 15.1 หลักการ
+
+Admin แก้ checklist ได้โดย**ไม่แก้ไฟล์โค้ด** — การแก้ทุกอย่างถูกเก็บเป็นแถว "override" ในฐานข้อมูล แล้วนำมา**ซ้อนทับ**เนื้อหา baseline ตอน render (`src/lib/applyOverrides.js`) ทุกครั้ง บล็อกที่ไม่มี override ใดๆ จะทำงานเหมือน baseline ทุกประการ
+
+### 15.2 `applyOverridesToBlock()` — Logic การซ้อนทับ
+
+ทำ 4 อย่างในลำดับนี้:
+
+1. **ลบรายการที่ถูก soft-delete** — กรอง item ที่ `overrides[id].deleted === true` ออก
+2. **แก้ไขรายการเดิมในตำแหน่งเดิม** — ถ้ามี override ตรง id จะแทนที่ `text` และ `level` (ใช้ `??` ดังนั้นค่าที่ไม่ได้ระบุจะคงของเดิมไว้)
+3. **เพิ่มรายการใหม่ล้วน** — override ที่มี `pageKey`/`blockIndex` ตรงกับบล็อกนี้ แต่ id ไม่ตรงกับ item ใดใน baseline เลย = รายการที่ admin สร้างขึ้นใหม่
+4. **จัดลำดับใหม่** — ถ้ามี item ใดมี `_order` กำหนดไว้ จะ sort ทั้งบล็อก (item ที่ไม่มี order ไปอยู่ท้ายสุดด้วย `MAX_SAFE_INTEGER`)
+
+### 15.3 `useChecklistOverrides()` — hook โหลด/บันทึก override (`src/lib/useChecklistOverrides.js`)
+
+- **การอ่านเป็น anonymous** — พนักงานทุกคนโหลด override มาใช้โดยไม่ต้อง sign-in
+- **การเขียนต้องมี role `portal.admin`** — `saveItem()` / `deleteItem()` จะได้ 403 จาก API ถ้าไม่มีสิทธิ์
+- ถ้าโหลด override ไม่สำเร็จ จะ**ไม่ทำให้หน้าว่าง** — ยังตั้ง `loaded = true` และแสดง baseline ที่อยู่ใน bundle อยู่แล้ว พร้อม error `admin.overridesLoadFailed` เพราะ override เป็นแค่ชั้นซ้อนทับ ไม่ใช่เนื้อหาหลัก
+- ทุกครั้งที่บันทึกสำเร็จจะ `reload()` ใหม่ทั้งชุด
+
+### 15.4 `src/lib/requiredDocsGate.js` — ประตูกั้นเอกสาร
+
+```js
+areRequiredDocsComplete(isTaskDone)  // ทุกเอกสารใน REQUIRED_DOCUMENTS ติ๊ก doc::<id> ครบหรือยัง
+missingRequiredDocs(isTaskDone)      // คืนรายการเอกสารที่ยังขาด (ใช้แสดงใน modal)
+```
+
+ถูกเรียกใช้ 2 จุดโดยตั้งใจให้ซ้ำซ้อนกัน: (1) ตอนกดเลือกแผนก และ (2) ตอนเช็คว่าเฟสแรกของแผนกปลดล็อกหรือยัง — เพื่อให้คนที่พิมพ์ URL เข้าหน้าเฟสตรงๆ ก็ยังติดประตูเดียวกัน
+
+---
+
+## 16. คอมโพเนนต์ประกอบอื่น
+
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `components/ui.jsx` | primitive ที่ใช้ร่วมกัน: `Page`, `PageTitle`, `Eyebrow`, `Section`, `CtaLink`, `CtaButton`, `ErrorBanner`, `Notice` (เขียนเองทั้งหมด ไม่ใช้ UI kit ตาม TECH_STACK.md) |
+| `components/AdminSignIn.jsx` | หน้าจอขอ sign-in สำหรับหน้า Admin — รับ prop `missingRole` เพื่อแยกข้อความระหว่าง "ยังไม่ได้เข้าสู่ระบบ" กับ "เข้าสู่ระบบแล้วแต่ไม่มีสิทธิ์" |
+| `components/DepartmentSwitchModal.jsx` | กล่องยืนยันก่อนสลับแผนก (เตือนว่าความคืบหน้าแผนกเดิมจะถูกลบ) |
+| `components/RequiredDocsGateModal.jsx` | กล่องแจ้งเตือนเมื่อพยายามเลือกแผนกก่อนส่งเอกสารครบ พร้อมแสดงรายการเอกสารที่ยังขาด |
+| `components/CompletionCertificate.jsx` | ใบรับรองสำหรับพิมพ์ — หนึ่งแถวต่อหนึ่งงาน (ทุกเอกสาร + ทุกงานในทุกเฟส) พร้อมช่องให้ผู้บังคับบัญชาวงคะแนน 1-5 ด้วยปากกา และช่องเซ็นชื่อ จัดสไตล์แบบ print-first (ดำบนขาวคงที่ ไม่มี dark mode เพราะพิมพ์ออกมาจะอ่านไม่ออก) |
+| `pages/MeetOurTeamPage.jsx` / `pages/LifeOnSitePage.jsx` | หน้าเนื้อหาเสริมที่ปลดล็อกหลังจบโปรแกรม (ข้อมูลจาก `data/gallery.js`) |
+
+---
+
+## 17. ข้อจำกัดที่ทราบอยู่แล้ว (จาก PORT_NOTES.md)
 
 1. **ไม่มีหน้าจอสำหรับเปลี่ยนชื่อพนักงาน (`renameEmployee`)** — ฟังก์ชันและ endpoint พร้อมใช้งานแล้ว แต่ยังไม่มีปุ่ม/หน้าจอเรียกใช้ (ระบบเดิมก็ไม่มีเช่นกัน จึงไม่ใช่การถดถอย)
 2. **`tasks_done` ในหน้า Admin Cohort ไม่มีตัวหาร** — API ไม่ทราบว่าแผนกหนึ่งมีงานทั้งหมดกี่ข้อ จึงแสดงเป็นแท่งเทียบสัดส่วนกับคนที่ทำเยอะที่สุด แทนที่จะเป็นเปอร์เซ็นต์จริง

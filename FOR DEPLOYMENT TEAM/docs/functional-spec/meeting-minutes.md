@@ -661,7 +661,123 @@ component หนึ่งตัวจบได้โดยไม่ต้อง�
 
 ---
 
-### 2.12 ⚠️ โค้ดที่ไม่ถูกใช้งาน (Dead Code) — `CommentsPanel.jsx`
+### 2.12 ชั้นข้อมูลกลางของโมดูล (Data Layer) — `MinutesData.jsx`
+
+**ทำอะไรได้:** เป็น **แหล่งข้อมูลกลางเพียงแหล่งเดียว** ของโมดูล — ถือรายการโครงการ รายการบันทึก และ cache ของบันทึก
+ฉบับเต็ม แล้วแจกให้ทุกหน้าจอผ่าน React Context ทุกหน้าจอในหัวข้อ 2 และทุก modal ในหัวข้อ 3 อ่านข้อมูลจากที่นี่
+ที่เดียว ไม่มีหน้าจอใดยิง `listProjects`/`listMeetings` เอง
+
+**ไฟล์:** `src/MinutesData.jsx` (export สองตัว: `MinutesDataProvider` และ `useMinutesData`)
+
+**ทำไมจึงต้องมี (docstring บรรทัด 1-10):** `App.tsx` เดิมถือทั้งหมดนี้ไว้ในคอมโพเนนต์เดียว 358 บรรทัด ปนอยู่กับ
+routing, state ของ mobile pane, flag ของ modal หกตัว และ search debounce การยกชั้นข้อมูลออกมาทำให้ (ก) คอมโพเนนต์
+ที่อ่านข้อมูลเป็น pure ได้ และ (ข) ที่สำคัญกว่า — **เส้นทาง "refresh หลัง mutation" มีอยู่ที่เดียว แทนที่จะต้องเขียนซ้ำ
+ใน `onSaved` ของทุก modal** ใช้ Context + `useState` เท่านั้น (`TECH_STACK.md` ตัด Redux ออก และไม่มีอะไรตรงนี้ที่
+reducer จะทำให้ชัดขึ้น)
+
+#### 2.12.1 `MinutesDataProvider` — ตัวถือ state
+
+**ตำแหน่งการ mount:** `src/main.jsx` ครอบ `<App>` ไว้ทั้งก้อน (บรรทัด 32-56) อยู่ **ภายใน** provider ของ
+`@vcb/shared` เพราะมันเรียก `useAuth()` เพื่อรู้ว่าใครลงชื่อเข้าใช้อยู่
+
+**State ที่ถืออยู่:**
+
+| State | ชนิด | หน้าที่ |
+|---|---|---|
+| `projects` | `useState([])` | รายการโครงการที่ผู้เรียกรายนี้เห็นได้ (จาก `listProjects`) |
+| `meetings` | `useState(() => readListCache())` | รายการบันทึก (metadata) — **เริ่มต้นจาก localStorage cache ไม่ใช่ `[]`** |
+| `loaded` | `useState(false)` | โหลดรอบแรกเสร็จหรือยัง — `MeetingList`/`Timeline` ใช้ตัดสินว่าจะแสดง `<Loading>` |
+| `error` | `useState(null)` | ความล้มเหลวของการโหลดรอบ boot |
+| `cacheRef` | `useRef(new Map())` | บันทึกฉบับเต็ม (พร้อม body HTML) keyed ด้วย id |
+| `cacheVersion` | `useState(0)` | ตัวนับที่เพิ่มขึ้นทุกครั้งที่ `cacheRef` เปลี่ยน |
+
+**ทำไม cache ฉบับเต็มจึงเป็น `useRef` ไม่ใช่ `useState` (คอมเมนต์บรรทัด 68-72):** ทั้ง detail pane และบทสรุปโครงการ
+อ่านจาก map นี้ ถ้าเป็น state การอุ่น cache หนึ่งรายการจะ re-render ผู้บริโภคทุกตัว และระหว่าง prefetch ตอน boot
+จะ **repaint ทั้งแอปทีละรอบตามจำนวนโครงการ** คอมโพเนนต์ที่จำเป็นต้องรู้ว่ามีข้อมูลมาถึงแล้วจึงรับ `cacheVersion`
+แทน (นี่คือเหตุผลที่ `ProjectDashboard` ใส่ `cacheVersion` ไว้ใน dependency array — หัวข้อ 2.5)
+
+**ค่าที่ context เปิดให้ใช้ (`value`, บรรทัด 197-215):**
+
+| ชื่อ | ชนิด | หน้าที่ | ใครใช้ |
+|---|---|---|---|
+| `projects` | array | รายการโครงการตามลำดับที่ API ส่งมา | `Sidebar`, `Dashboard`, `Timeline`, `AccessPage`, `MeetingModal`, `TagPickerModal` |
+| `projectsById` | object (`useMemo`) | แผนที่ `id → project` สร้างจาก `projects` | `App.jsx`, `MeetingList`, `Timeline` |
+| `meetings` | array | รายการบันทึก (metadata) | `App.jsx`, `MeetingList`, `Dashboard`, `ProjectDashboard`, `Timeline` |
+| `loaded` | boolean | โหลดรอบแรกเสร็จแล้วหรือยัง | `MeetingList`, `Timeline` |
+| `error` | Error \| null | ความล้มเหลวตอน boot | — |
+| `refresh()` | async | ดึง `listProjects` + `listMeetings` ใหม่พร้อมกัน แล้วเขียน list cache | ทุก flow หลัง mutation ใน `App.jsx`, `AccessPage`, `MeetingDetail` |
+| `getCached(id)` | sync | อ่านบันทึกฉบับเต็มจาก memory cache (ไม่ยิง network) | `App.jsx`, `MeetingDetail`, `ProjectDashboard` |
+| `setCached(id, full)` | sync | เขียนบันทึกฉบับเต็มลง cache แล้วเพิ่ม `cacheVersion` | `MeetingDetail` |
+| `fetchMeeting(id, opts)` | async | **cache-first** — คืน cache ถ้ามี มิฉะนั้นเรียก `getMeeting` แล้วเก็บลง cache | `MeetingDetail`, `ProjectDashboard` |
+| `refetchMeeting(id, opts)` | async | **ข้าม cache เสมอ** เรียก `getMeeting` ใหม่แล้วทับ cache | `MeetingDetail` (ก่อนเปิด editor) |
+| `invalidate(id?)` | sync | ลบรายการเดียว หรือล้างทั้ง cache เมื่อไม่ส่ง `id` | `MeetingDetail` |
+| `cacheVersion` | number | สัญญาณว่า cache เปลี่ยน | `ProjectDashboard` |
+
+**สองการอ่านบันทึกฉบับเต็มที่แยกกันโดยเจตนา:** `fetchMeeting` เป็น cache-first (เปิดบันทึกเร็ว ไม่กระพริบ) ส่วน
+`refetchMeeting` บังคับดึงสด — `MeetingDetail` เรียกตัวหลังก่อนเปิด editor เสมอ (`openEditFresh`) เพื่อไม่ให้แก้ไข
+จากข้อมูลเก่าแล้วเขียนทับเวอร์ชันที่ Fathom ingest หรือคนอื่นแก้ไปแล้ว (ดู 3.5)
+
+**`refresh()` — จุดสิ้นสุดของทุก mutation (บรรทัด 121-135):** เรียก `listProjects` และ `listMeetings` ด้วย
+`Promise.all` (ไม่ใช่ตามลำดับ) แล้ว `setProjects` / `setMeetings` / `writeListCache` / `setLoaded(true)` /
+`setError(null)` และ **คืนค่า `{ projects, meetings }` กลับไปด้วย** เพื่อให้ effect ตอน boot ส่งต่อให้
+`prefetchLatest` ได้ทันทีโดยไม่ต้องรอ state รอบถัดไป
+
+#### 2.12.2 การแคชสองชั้น และกฎเรื่องความเป็นส่วนตัว
+
+**ชั้นที่ 1 — รายการบันทึกใน `localStorage`** (key `vcb_mm_meetings_cache`, บรรทัด 27-61):
+- **metadata เท่านั้น ไม่มี body HTML เด็ดขาด** — `meetings` ถูก initialise จาก `readListCache()` ทำให้ reload แล้ว
+  paint คอลัมน์กลางได้ทันทีแทนที่จะเห็นคอลัมน์ว่างระหว่างรอ fetch แรก
+- `readListCache()` ห่อ `try/catch` และตรวจ `Array.isArray` — storage ที่ถูกบล็อก หรือ cache ที่เขียนด้วย shape เก่า
+  ทั้งสองกรณีไม่คุ้มที่จะ fail เพราะ fetch ที่ตามมาจะแทนที่มันอยู่แล้ว
+- `writeListCache()` / `clearListCache()` ก็ห่อ `try/catch` เช่นกัน — storage เต็มหรือถูกบล็อกทำให้แอปเสียแค่
+  "การ paint ทันทีครั้งแรก" ไม่ใช่พัง
+
+**ชั้นที่ 2 — บันทึกฉบับเต็มใน memory เท่านั้น** (`cacheRef`): **ไม่เก็บลง localStorage โดยเด็ดขาด** ตาม docstring
+บรรทัด 22-25 — บันทึกของโครงการ locked ต้องไม่ค้างอยู่ใน localStorage ที่อยู่ยืนยาวกว่า session และอ่านได้โดยใครก็ตาม
+ที่มาใช้เครื่องนั้นต่อ
+
+**Effect เมื่อ identity เปลี่ยน (บรรทัด 156-183) — เป็นเรื่องความปลอดภัย ไม่ใช่การ optimise:**
+`identity = signedIn ? user?.email || '' : ''` เป็น dependency ของ effect นี้ ทุกครั้งที่ค่านี้เปลี่ยน:
+1. `cacheRef.current.clear()` + เพิ่ม `cacheVersion` — **ล้าง cache ก่อน** แล้วจึงโหลดใหม่
+2. `refresh({ signal })` ผ่าน `AbortController` พร้อม flag `cancelled` กัน `setState` หลัง unmount
+3. `prefetchLatest(p, m)` ถ้าไม่ถูกยกเลิก
+
+เหตุผลที่ระบุไว้ในคอมเมนต์: **identity เปลี่ยนสิ่งที่ API คืนกลับมา** — โครงการ locked จะ **หายไปทั้งแถว** จาก
+response ของผู้เรียก anonymous และบันทึกที่ซ่อนอยู่จะหายไปจาก response ของผู้ที่ไม่ใช่ editor ดังนั้นการ sign-in/out
+ต้อง refetch **และต้องทิ้ง record ที่ cache ไว้ก่อน** มิฉะนั้นบันทึกที่อ่านตอนลงชื่อเข้าใช้อยู่จะยังนั่งอยู่ใน memory
+และในรายการ localStorage หลังออกจากระบบแล้ว
+
+มี effect แยกอีกตัว (บรรทัด 187-189): `if (!signedIn) clearListCache();` — การออกจากระบบต้องไม่ทิ้งหัวข้อบันทึกของ
+คนก่อนหน้าไว้ใน localStorage บนเครื่องที่ใช้ร่วมกัน
+
+**การจัดการ error ตอน boot (บรรทัด 175-181):** การอ่านเป็นแบบ anonymous-friendly อยู่แล้ว (หัวข้อ 3.9) ดังนั้น
+ความล้มเหลวตรงนี้คือ **เหตุขัดข้องจริง ไม่ใช่การขาด session** — จึง `setError(err)` และ `setLoaded(true)` โดย
+**คงสิ่งที่ list cache paint ไว้แล้ว** ไม่ล้างหน้าจอให้ว่าง (และข้าม `AbortError` ซึ่งเป็นการยกเลิกที่ตั้งใจ)
+
+**`prefetchLatest` (บรรทัด 145-154):** วนโครงการทุกตัว หา `latestInProject()` แล้วเรียก `getMeeting` แบบ
+fire-and-forget ข้ามรายการที่ `cacheRef` มีอยู่แล้ว — `.catch()` **เงียบสนิทโดยเจตนา** เพราะ prefetch ที่ล้มเหลว
+ไม่มีต้นทุน (การเปิดจริงจะ fetch ใหม่และรายงานอย่างถูกต้อง) และการเด้ง error สำหรับ request ที่ผู้ใช้ไม่ได้ขอเอง
+คือ noise — หลักการเดียวกับ `.catch()` ของการค้นหาใน 2.1
+
+#### 2.12.3 `useMinutesData` — hook สำหรับอ่านข้อมูล
+
+**ทำอะไรได้:** คืนค่า context object ในตาราง 2.12.1 ให้คอมโพเนนต์ที่เรียก — เป็น **ทางเดียว** ที่หน้าจอเข้าถึงชั้น
+ข้อมูลนี้ได้ (ไม่มีการ export `MinutesDataContext` ออกไปให้ใครใช้ `useContext` ตรง ๆ)
+
+```js
+if (!ctx) throw new Error('useMinutesData must be used inside <MinutesDataProvider>');
+```
+
+**โยน error ทันทีเมื่อไม่มี provider ไม่ใช่คืน `null`** — คอมโพเนนต์ที่ถูกวางผิดตำแหน่งจะพังตรงจุดที่ผิดพร้อมข้อความ
+ที่บอกวิธีแก้ แทนที่จะ crash ในภายหลังด้วย `Cannot read property 'meetings' of null` ซึ่งชี้ไปที่บรรทัดที่ไม่ใช่สาเหตุ
+
+**ผู้ใช้ทั้งหมด (ยืนยันด้วยการ grep):** `App.jsx`, `AccessPage.jsx`, `Dashboard.jsx`, `MeetingDetail.jsx`,
+`MeetingList.jsx`, `MeetingModal.jsx`, `ProjectDashboard.jsx`, `Sidebar.jsx`, `TagPickerModal.jsx`, `Timeline.jsx`
+— แต่ละตัวทำ destructuring เอาเฉพาะ field ที่ต้องใช้
+
+---
+
+### 2.13 ⚠️ โค้ดที่ไม่ถูกใช้งาน (Dead Code) — `CommentsPanel.jsx`
 
 **สถานะ: ไม่ใช่ฟีเจอร์ที่ผู้ใช้เข้าถึงได้ — เป็น component กำพร้าที่ไม่มีไฟล์ใดในโปรเจกต์ import**
 
@@ -840,6 +956,49 @@ UI เดิม (Apps Script) พยายามอ่าน field `details.vers
 - การลบ audit entry เดี่ยว/version เดี่ยว/ล้างทั้งหมด เป็น **admin only** ทั้งหมด — เมื่อลบ version ผ่าน
   `DELETE /versions/:seq` จะลบเฉพาะ snapshot นั้น ไม่ cascade อะไรอื่น (schema ใหม่ไม่ผูก version กับ audit log
   เหมือนต้นฉบับเดิม)
+
+---
+
+
+**Wrapper ฝั่ง client ที่ต่อกับ endpoint เหล่านี้ — `lib/minutesApi.js`:**
+
+ทั้ง `EditHistoryModal.jsx` และ `ActivityPanel.jsx` (หัวข้อ 3.4) เรียกชุดเดียวกันนี้ — เป็นเหตุผลที่ทั้งสองแสดง
+ประวัติชุดเดียวกัน และเป็นเหตุผลที่ทั้งคู่ต้องเป็น admin-only เท่า ๆ กัน
+
+| ฟังก์ชัน | Endpoint | ผู้เรียกจริงในโค้ด |
+|---|---|---|
+| `listVersions(id, { signal })` | `GET /meetings/:id/versions` | `EditHistoryModal.jsx` บรรทัด 48, `ActivityPanel.jsx` บรรทัด 48 |
+| `getVersion(id, seq, { signal })` | `GET /meetings/:id/versions/:seq` | `VersionPreviewModal.jsx` บรรทัด 44 |
+| `deleteVersion(id, seq)` | `DELETE /meetings/:id/versions/:seq` | `EditHistoryModal.jsx` บรรทัด 81, `ActivityPanel.jsx` บรรทัด 98 |
+| `getMeetingAudit(id, { signal })` | `GET /meetings/:id/audit` | `EditHistoryModal.jsx` บรรทัด 49, `ActivityPanel.jsx` บรรทัด 49 |
+| `deleteAuditEntry(id, entryId)` | `DELETE /meetings/:id/audit/:entryId` | `EditHistoryModal.jsx` บรรทัด 72, `ActivityPanel.jsx` บรรทัด 89 |
+| `clearMeetingAudit(id)` | `DELETE /meetings/:id/audit` | `EditHistoryModal.jsx` บรรทัด 103, `ActivityPanel.jsx` บรรทัด 120 |
+| `listAudit({ limit, signal })` | `GET /audit[?limit=]` | **ไม่มีผู้เรียก** (ดูด้านล่าง) |
+| `listFathomRawLog({ limit, recordingId, signal })` | `GET /fathom-raw-log[?limit&recordingId]` | **ไม่มีผู้เรียก** (ดูด้านล่าง) |
+
+- **`listVersions`** — คืน `[{ seq, takenAt, takenBy }]` เรียงใหม่ก่อน คือ "รายการเวอร์ชันที่ดูตัวอย่างได้จริง"
+  ตามที่อธิบายไว้ข้างต้น ทั้งสองหน้าจอโหลดคู่กับ `getMeetingAudit` ใน `Promise.all` เดียว พร้อม `AbortController`
+- **`getVersion`** — รับ `seq` ที่เป็นเลข sequence จริง หรือค่าพิเศษ `'current'` / `'original'` และคืน
+  `{ html, title, dateLabel, time }` **ตามที่เป็น ณ ขณะ snapshot** สตริงว่างในสามฟิลด์หลังคือสัญญาณ backward-compat
+  ของ snapshot ก่อน 2026-07-22 ที่ให้ fallback ไปใช้แถวสด **เฉพาะกรณีนั้นเท่านั้น** (ดู 3.8)
+- **`deleteAuditEntry` / `clearMeetingAudit` / `deleteVersion`** — ทั้งสามเป็น admin only พอร์ตมาจาก
+  `deleteAuditEntries` / `clearAuditHistory` ใน `Code.js` เดิม `ActivityPanel` เรียก `deleteAuditEntry` และ
+  `deleteVersion` **คู่กัน** เมื่อแถวการแก้ไขจับคู่กับ version ได้ เพราะในฟีดรวม แถวเดียวแทนทั้งสองสิ่ง ส่วน
+  `EditHistoryModal` ที่แยกสองรายการออกจากกันจะเรียกทีละตัวตามปุ่มที่กด — `clearMeetingAudit` ลบ audit log ทั้งหมด
+  ของบันทึกนั้น (ปุ่ม "ล้างทั้งหมด" เรียกมันคู่กับการล้าง versions)
+
+**⚠️ สอง wrapper ที่มีอยู่แต่ไม่มีผู้เรียก (ยืนยันด้วยการ grep ทั้ง tree `meeting-minutes/src/`):**
+- **`listAudit`** — audit log **ทั้งระบบ** ไม่ใช่ของบันทึกเดียว docstring ระบุเหตุผลไว้ตรง ๆ ว่า "NO UI CALLS THIS
+  YET": สิ่งที่ Edit History แสดงคือ log **ต่อบันทึก** (`getMeetingAudit`) ซึ่งเป็นสิ่งที่แอป Apps Script เดิมมี
+  ส่วนหน้าจอกิจกรรมทั้งเว็บไซต์เป็น **ฟีเจอร์ใหม่จริง ๆ ไม่ใช่ส่วนหนึ่งของการพอร์ต** wrapper จึงมีอยู่และไม่มีอะไร
+  render มัน
+- **`listFathomRawLog`** — payload ดิบจาก Fathom webhook เป็น admin only และอ่านอย่างเดียว การ ingest ของ
+  Fathom/Transkriptor เกิดฝั่ง server ทั้งหมด (webhook + polling) **ไม่มี UI ของ client และไม่มี POST ที่นี่ —
+  เบราว์เซอร์ต้องไม่มีทางปลอมการ ingest ได้** ตัว wrapper เป็น **debugging surface** สำหรับแอดมินที่กำลังวินิจฉัย
+  ว่าทำไม recording หนึ่งจึงไม่ปรากฏ และ payload เป็น JSON ดิบของบุคคลที่สาม — มีประโยชน์เมื่อเรียกจาก console
+  ไม่ใช่สิ่งที่ควรเอามา render
+
+ทั้งสองตัวถูกบันทึกไว้แล้วเป็นข้อจำกัดข้อ 11 ในหัวข้อ 6 — **ห้ามถือว่าเป็นหน้าจอที่ใช้งานได้ในเอกสารหรือในการทดสอบ**
 
 ---
 
@@ -1060,6 +1219,176 @@ Editor/Admin ไม่ผ่าน logic นี้ — จุดเรียก�
 
 ---
 
+### 3.10 การจัดการโครงการ (Project Management) — `lib/minutesApi.js`
+
+**ทำอะไรได้:** สร้าง เปลี่ยนชื่อ/สี/cadence ลบโครงการ และจัดการสิทธิ์การเข้าถึงของโครงการ (public/locked +
+guest list)
+
+**ไฟล์:** `src/lib/minutesApi.js` (wrapper ทั้งหมด), `src/components/ProjectModal.jsx` (สร้าง/แก้ไข),
+`src/components/AccessPage.jsx` (สิทธิ์), `src/MinutesData.jsx` (การอ่านรายการ)
+
+**หมายเหตุเรื่องสิทธิ์:** โมเดลสามระดับ (public / locked / guest) และเหตุผลเบื้องหลังทั้งหมดอยู่ในหัวข้อ 3.9 แล้ว
+ตารางด้านล่าง**ไม่ทำซ้ำ** — ระบุเพียง endpoint และ role ที่ API บังคับสำหรับแต่ละ wrapper และย้อนกลับไปอ้าง 3.9
+ตรงจุดที่กฎนั้นถูกนิยามไว้
+
+| ฟังก์ชัน | Endpoint | สิทธิ์ที่ API บังคับ | ผู้เรียกจริงในโค้ด |
+|---|---|---|---|
+| `listProjects({ signal })` | `GET /projects` | anon | `MinutesData.jsx` (`refresh`) |
+| `createProject({ name, nameEn, cadence })` | `POST /projects` | admin | `ProjectModal.jsx` บรรทัด 61 |
+| `updateProject(projectId, patch)` | `PATCH /projects/:id` | admin | `ProjectModal.jsx` บรรทัด 53 |
+| `deleteProject(projectId)` | `DELETE /projects/:id` | admin | **ไม่มีผู้เรียก** (ดูด้านล่าง) |
+| `getProjectAccess(projectId, { signal })` | `GET /projects/:id/access` | editor \| admin | `AccessPage.jsx` บรรทัด 66 |
+| `setProjectPublic(projectId, isPublic)` | `PUT /projects/:id/visibility` | admin | `AccessPage.jsx` บรรทัด 123 |
+| `addProjectGuests(projectId, emailsText)` | `POST /projects/:id/guests` | admin | `AccessPage.jsx` บรรทัด 143 |
+| `removeProjectGuest(projectId, email)` | `DELETE /projects/:id/guests/:email` | admin | `AccessPage.jsx` บรรทัด 157 |
+
+**`listProjects` — การกรองตาม tier เกิดขึ้นฝั่ง server ทั้งหมด:** wrapper นี้ถูกเรียกที่เดียวเท่านั้น คือใน
+`refresh()` ของ `MinutesData` (พร้อมกับ `listMeetings` ผ่าน `Promise.all`) คืน
+`[{ id, name, nameEn, cadence, color, count, canSee, builtin, isPublic, docId }]` โดย `count` คือ**จำนวนบันทึกที่
+ผู้เรียกรายนี้เห็นได้** ไม่ใช่จำนวนทั้งหมด และ `docId` ไม่ว่างเฉพาะแอดมินและเฉพาะแถวยุค Doc
+
+ตาม docstring ของ wrapper: โครงการ locked **หายไปจาก response ของผู้เรียก anonymous ทั้งแถว ไม่ใช่แค่กดไม่ได้** —
+นี่คือกฎเดียวกับที่ `Sidebar.jsx` (หัวข้อ 2.2) ยึดว่า "ห้ามกรองสิทธิ์เอง" และเป็นเหตุผลที่ client ตัวนี้ **ต้องไม่
+เติมแถวกลับ หรืออนุมานโครงการจากรายการบันทึก** ไม่ว่ากรณีใด
+
+**`createProject` — ไม่มี Google Doc เกิดขึ้น:** รับ `{ name, nameEn = '', cadence = 'Monthly' }` สร้าง
+"tag-only bucket" เท่านั้น docstring ระบุว่าเป็น **regression guard ลงวันที่ 2026-07-19**: ปุ่ม "+ โครงการใหม่" เดิม
+เคยสร้าง Doc ขึ้นมาโดยที่ไม่มีใครต้องการ ค่า `docId`/`docUrl` ใน response จึงเป็น `''` เสมอ — มีไว้ให้ shape ตรงกับ
+โครงการยุค Doc ไม่ใช่เพื่อให้เปิดอะไรได้ (สอดคล้องกับกฎข้อแรกของ `PORT_NOTES.md` ในหัวข้อ 1)
+
+**`updateProject` — patch แบบบางส่วน:** API ใช้ `coalesce` ดังนั้น **field ที่ไม่ส่งจะไม่ถูกแตะ** ผู้เรียกจึงส่งเฉพาะ
+สิ่งที่เปลี่ยน ใช้ได้กับโครงการดั้งเดิมทั้งห้าตัวด้วย (การเปลี่ยนชื่อ/สีไม่ใช่การลบ) `ProjectModal.jsx` ส่ง
+`{ name, nameEn, cadence }` แล้วเรียก `onDone(project)` ซึ่ง `App.jsx` จะ `refresh()` ต่อ (ดู `afterProjectDone`
+ในหัวข้อ 2.1)
+
+**⚠️ `deleteProject` — ไม่มีผู้เรียกในแอป (ยืนยันด้วยการ grep):** การค้นทั้ง tree `meeting-minutes/src/` พบชื่อนี้
+เพียงที่นิยามของมันเองใน `lib/minutesApi.js` เท่านั้น **ไม่มีคอมโพเนนต์ใด import หรือเรียก** จึง**ไม่มีเส้นทางใน UI ที่
+ลบโครงการได้** — ต้องเรียกจาก console เท่านั้น
+
+docstring ระบุว่าเป็นการ**เว้นไว้โดยเจตนา ไม่ใช่งานที่ค้าง**: แอป Apps Script เดิมก็ไม่มีปุ่มลบโครงการเช่นกัน และการ
+เพิ่มปุ่มนี้เป็น "การตัดสินใจเรื่องคลังเอกสาร ไม่ใช่งานพอร์ต" wrapper กับข้อความ error ของมันถูกเขียนรอไว้แล้วเพื่อให้
+หน้าจอนั้น (ถ้าจะทำ) เป็นการเพิ่มเล็ก ๆ ไม่ใช่การเปิด API surface ใหม่ ฝั่ง server ปฏิเสธสองกรณีเป็น business rule
+ไม่ใช่ fault (ทั้งคู่มี key ของตัวเองใน `MINUTES_ERROR_KEYS`, ดู 3.12):
+- `PROJECT_BUILTIN` — โครงการดั้งเดิมห้าตัว (ถือประวัติยุค Doc การลบจะ cascade เอา guest list ไปด้วยและทิ้งบันทึกกำพร้า)
+- `PROJECT_NOT_EMPTY` — ยังมีบันทึกชี้มาที่โครงการนี้อยู่
+
+**`getProjectAccess` — ต่อโครงการเท่านั้น:** คืน `{ id, name, nameEn, color, isPublic, emails }` `AccessPage`
+เรียกทีละโครงการแบบขนานด้วย `Promise.all` เพราะ **ยังไม่มี bulk endpoint** (`PORT_NOTES.md` ข้อ 6 / ข้อจำกัดข้อ 4 ใน
+หัวข้อ 6) — และ catch ต่อโครงการ เพื่อให้โครงการเดียวที่อ่านไม่สำเร็จไม่ทำให้ทั้งหน้าจอว่าง
+
+**สิ่งที่ response นี้ *ไม่มี* และห้ามจำลอง:** ไม่มี field `domain` — type `ProjectAccess` เดิมมี flag
+"พนักงาน @vcb-con.com ทั้งหมด" แต่ schema ที่พอร์ตแล้วไม่มีคอลัมน์รองรับ (ดูเหตุผลเต็มในหัวข้อ 3.9)
+
+**`setProjectPublic` — ความไม่สมมาตรที่ UI ต้องพูดออกมา:** ส่ง `{ isPublic }` ไปที่
+`PUT /projects/:id/visibility` **การปลดล็อกจะเผยแพร่บันทึกทุกฉบับที่มีอยู่แล้วในโครงการนั้นทันที ในขณะที่การล็อกกลับ
+หยุดเพียงค่า default ในอนาคต และไม่ซ่อนแถวที่เผยแพร่ไปแล้วกลับคืน** `AccessPage.togglePublic` จึงถามยืนยันก่อนเปลี่ยน
+เป็น public เสมอ (รายละเอียดของกฎนี้อยู่ในหัวข้อ 3.9)
+
+**`addProjectGuests` — รับทั้งอีเมลเดี่ยวและการวางเป็นชุด:** ส่งข้อความดิบไปเป็น `{ emails: emailsText }` **API เป็น
+ฝ่ายแยกเอง** ตาม comma / semicolon / whitespace และ **ปฏิเสธทั้งชุดถ้ามีรายการผิดแม้ตัวเดียว** (`INVALID_EMAIL` พร้อม
+รายชื่อที่ผิดใน `err.body.emails`) เพื่อไม่ให้บันทึกครึ่ง ๆ กลาง ๆ คืน `{ emails }` ที่อัปเดตแล้วทั้งชุด — การตั้งชื่อ
+รายการที่ผิดคือคุณค่าทั้งหมดของข้อความ error ตัวนี้ ซึ่ง `errorMessage()` จัดการเป็นกรณีพิเศษ (ดู 3.12)
+
+**`removeProjectGuest`:** ลบทีละอีเมล (`encodeURIComponent` ทั้ง projectId และ email เพราะอีเมลอยู่ใน path)
+คืน `{ emails }` ที่อัปเดตแล้วเช่นกัน — `AccessPage` เขียนทับ state จากค่าที่ server คืนมา ไม่ใช่จากการเดาฝั่ง client
+
+---
+
+### 3.11 การกระทำกับบันทึกการประชุม (Meeting Operations) — `lib/minutesApi.js`
+
+**ทำอะไรได้:** อ่านรายการบันทึก อ่านบันทึกฉบับเต็ม สลับการ pin เผยแพร่/ซ่อนบันทึก ถอดแท็กโครงการ และลบไฟล์แนบ
+
+**ไฟล์:** `src/lib/minutesApi.js`, ผู้เรียก: `src/MinutesData.jsx`, `src/components/MeetingDetail.jsx`,
+`src/components/AttachmentsBar.jsx`
+
+| ฟังก์ชัน | Endpoint | สิทธิ์ | ผลที่เกิด | ผู้เรียกจริง |
+|---|---|---|---|---|
+| `listMeetings({ projectId, signal })` | `GET /meetings[?projectId=]` | anon | รายการ metadata กรองตาม tier แล้ว | `MinutesData.jsx` (`refresh`) |
+| `getMeeting(id, { signal })` | `GET /meetings/:id` | anon | บันทึกฉบับเต็ม + HTML + ไฟล์แนบ + คอมเมนต์ | `MinutesData.jsx` (3 จุด) |
+| `togglePin(id)` | `PUT /meetings/:id/pin` | admin | สลับสถานะ pin คืน `{ pinned }` | `MeetingDetail.jsx` บรรทัด 143 |
+| `setMeetingVisible(id, visible)` | `PUT /meetings/:id/visibility` | admin | เผยแพร่/ซ่อนบันทึกฉบับเดียว | **ไม่มีผู้เรียก** |
+| `untagMeeting(id, projectId)` | `DELETE /meetings/:id/tags/:projectId` | editor \| admin | ถอดแท็กโครงการเดียว คืน `{ taggedProjectIds }` | `MeetingDetail.jsx` บรรทัด 179 |
+| `removeAttachment(id, fileId)` | `DELETE /meetings/:id/attachments/:fileId` | editor \| admin | ลบ metadata ไฟล์แนบ คืน `{ attachments }` | `AttachmentsBar.jsx` บรรทัด 88 |
+
+**`listMeetings` — หนึ่ง recording อาจปรากฏหลายแถว:** เป็นรูปร่างแบบเบา (metadata) ที่การ์ดและคอลัมน์กลาง render
+จากมัน เรียกที่เดียวคือ `refresh()` ของ `MinutesData` (parameter `projectId` มีอยู่ใน wrapper แต่**ไม่มีผู้เรียกใด
+ส่งค่านี้** — แอปดึงมาทั้งหมดครั้งเดียวแล้วกรองฝั่ง client ตาม tab ด้วย `passesProjectFilter`, ดู 2.6)
+
+ตาม docstring: recording ใน inbox หนึ่งรายการจะปรากฏได้หลายครั้ง — มันคง `project_id` เดิมไว้ตลอดกาล **และ** ปรากฏ
+ใต้ทุกโครงการที่ถูกแท็กเข้าไป โดยใช้ **id เดียวกันทุกครั้ง** พร้อม `taggedFromInbox: true` บนสำเนา นี่คือสาเหตุที่
+`Dashboard` และ `MeetingList` ต้อง key ด้วย `projectId + id` ไม่ใช่ `id` เดี่ยว (หัวข้อ 2.4 และ 2.6) และเป็นสาเหตุที่
+`Timeline` กรอง inbox ออกก่อนพล็อต (หัวข้อ 2.7)
+
+**`getMeeting` — เรียกจาก `MinutesData` เท่านั้น:** คอมโพเนนต์ **ไม่เรียก wrapper นี้โดยตรงเลย** ทุกจุดผ่าน
+`fetchMeeting` / `refetchMeeting` / `prefetchLatest` ของ context (ทั้งสามเรียก `getMeeting` ข้างใน) เพื่อให้ cache
+มีเจ้าของเดียว — ดูรายละเอียดใน 2.12.1 การตอบ 404 (ไม่ใช่ 403) สำหรับบันทึกที่มองไม่เห็น อธิบายไว้ใน 3.5 และ
+`isNotFound()` ใน 3.12
+
+**`togglePin` — toggle ฝั่ง server ไม่ใช่การส่งค่าใหม่:** wrapper ไม่รับ body เลย server เป็นฝ่ายพลิกค่าและคืน
+`{ pinned }` ที่เป็นผลลัพธ์ `MeetingDetail.togglePin()` (ชื่อฟังก์ชันภายในซ้ำกับ wrapper) นำค่าที่ได้ไปอัปเดต state
+แล้วเรียก `refresh()` **เพราะ pinned มีผลต่อลำดับของทั้งรายการ** (pinned ขึ้นก่อนเสมอ — `byPinnedThenDate` และ
+`sortMeetingsWithOverview`, ดู 2.6 และ 3.12) การอัปเดตเฉพาะแถวเดียวจะทำให้ลำดับในคอลัมน์กลางไม่ตรงกับความจริง
+
+**⚠️ `setMeetingVisible` — ไม่มีผู้เรียกในแอป (ยืนยันด้วยการ grep):** ทั้ง tree `meeting-minutes/src/` พบชื่อนี้เฉพาะ
+ที่นิยามของมันเองเท่านั้น **ไม่มีคอมโพเนนต์ใดเรียก** ดังนั้น **ปุ่มเผยแพร่/ซ่อนบันทึกรายฉบับยังไม่มีใน UI** —
+แถวที่ซ่อนอยู่ยังคง render ลาย hatch ใน `MeetingList` ให้ editor เห็นได้ (หัวข้อ 2.6) แต่ **ไม่มีตัวควบคุมใดที่
+สลับสถานะนั้นจากหน้าจอ** ทางเดียวที่บันทึกจะถูกเผยแพร่ในปัจจุบันคือผลข้างเคียงของการปลดล็อกโครงการ
+(`setProjectPublic`, ดู 3.10) หรือการเรียก endpoint นี้ตรง ๆ
+
+ตัว route เองมีอยู่จริงและถูกแยกออกจาก save ของ editor **โดยเจตนา** — ตาม docstring มันคือ trigger `minutes_guard`
+เดิม ซึ่งมีอยู่เพราะ RLS เปรียบเทียบค่าเก่ากับค่าใหม่รายคอลัมน์ไม่ได้ ตอนนี้มันเป็นเพียง route ที่มี guard เข้มกว่า
+ผลคือ **การ save ของ editor ไม่มีทางแตะ pin หรือ visibility ได้เลย** (สอดคล้องกับกฎใน `saveMeeting` ที่ `visible`
+ถูก honour เฉพาะแอดมิน และแถวใหม่ของ editor เริ่มต้นเป็นซ่อนเสมอ)
+
+**`untagMeeting` — ถอดทีละแท็ก:** ใช้ `array_remove` ฝั่ง server (ดู 3.7) แท็กอื่นไม่กระทบ `MeetingDetail`
+เรียกผ่าน `untagOne` จากปุ่ม ✕ บน chip แต่ละตัว **ไม่มีปุ่ม "ถอดทุกแท็ก" และไม่มีทางออกจาก inbox เดิม** เพราะ
+`project_id` ของแถว inbox เป็นค่าถาวร (หัวข้อ 3.5 และ 3.7)
+
+**`removeAttachment` — ลบเฉพาะ metadata:** `DELETE /attachments/:fileId` ทำ jsonb array filter บนแถวบันทึก
+คืน `{ attachments }` ที่อัปเดตแล้ว **ไบต์ใน Storage ไม่ถูกลบด้วย** (ดู 3.6) `AttachmentsBar` ยืนยันด้วย
+`useConfirm()` ก่อน แล้วเขียน state จากค่าที่ server คืนมา
+
+---
+
+### 3.12 ฟังก์ชันช่วยเหลือขนาดเล็ก (Helper Functions) — `lib/minutes.js`, `lib/errors.js`
+
+ฟังก์ชันเหล่านี้ไม่ใช่ฟีเจอร์ที่ผู้ใช้เห็นเป็นหน้าจอ แต่เป็นกฎเล็ก ๆ ที่ถูกดึงออกมาไว้ที่เดียวเพื่อไม่ให้แต่ละหน้าจอ
+ตัดสินใจต่างกัน (เหตุผลเดียวกับที่ `lib/minutes.js` มีอยู่ — docstring บรรทัด 1-7)
+
+| ฟังก์ชัน | ไฟล์ | ทำอะไร | ผู้เรียกจริง |
+|---|---|---|---|
+| `byPinnedThenDate(a, b)` | `lib/minutes.js` | Comparator ของลำดับรายการ: **pinned ขึ้นก่อนเสมอ → จากนั้นเรียงตาม `date` ใหม่ก่อน** แถวที่ไม่มีวันที่ใช้ค่าพื้น `'0000-00-00'` จึงจมลงล่างสุด (ถ้าใช้ `''` มันจะลอยขึ้นบนแทน) — ต่างจาก `sortMeetingsWithOverview` ตรงที่**ไม่**ดัน Overview ลงล่างเป็นพิเศษ | ใช้ภายใน `lib/minutes.js` เอง (`projectMeetings`) เท่านั้น — **ไม่มีไฟล์อื่น import** แม้จะ export ไว้ |
+| `errorMessage(err, t, vars)` | `lib/errors.js` | แปลง `ApiError` เป็นข้อความที่ผู้ใช้อ่านรู้เรื่อง — ทุก `catch` ในโมดูลจบที่นี่ | ใช้กว้างที่สุดในโมดูล: `AccessPage`, `ActivityPanel`, `AttachmentsBar`, `EditHistoryModal`, `EditorModal`, `MeetingDetail`, `MeetingModal`, `ProjectModal`, `TagPickerModal`, `VersionPreviewModal` (และ `CommentsPanel.jsx` ที่เป็น dead code, ดู 2.13) |
+| `fileIconKind(mime, name)` | `lib/minutes.js` | คืน `{ kind, label }` ของ chip ไฟล์แนบ — **ดมจาก mime type และชื่อไฟล์พร้อมกัน** เพราะ `.csv` ที่ถูกส่งมาเป็น `text/plain` และ `.xlsx` ที่เป็น `application/octet-stream` ต้องอ่านออกมาเป็น spreadsheet ทั้งคู่ ค่า `kind` ที่เป็นไปได้: `xls`/`ppt`/`pdf`/`doc`/`img`/`gen` ซึ่งจับคู่กับสีใน `FILE_ICON_CLASS` (สีอยู่กับชนิด ไม่กระจายไปอยู่ในคอมโพเนนต์) | `AttachmentsBar.jsx` บรรทัด 107 |
+| `fmtFileSize(bytes)` | `lib/minutes.js` | ขนาดไฟล์แบบอ่านง่าย: `< 1 KB` เป็น `B`, `< 1 MB` เป็น `KB` (ปัดเป็นจำนวนเต็ม), เกินกว่านั้นเป็น `MB` ทศนิยม 1 ตำแหน่ง — `Number(bytes) || 0` ทำให้ค่า `null`/`undefined` แสดงเป็น `0 B` ไม่ใช่ `NaN` | `AttachmentsBar.jsx` บรรทัด 129 |
+
+**หมายเหตุ `byPinnedThenDate`:** ยืนยันด้วยการ grep ทั้ง tree `meeting-minutes/src/` — พบเพียงสองบรรทัด คือที่นิยาม
+ของมันเอง (บรรทัด 87) และที่ `projectMeetings` เรียกใช้ (บรรทัด 116) ภายในไฟล์เดียวกัน **ไม่มีคอมโพเนนต์ใด import
+ไปใช้ตรง ๆ** — คอลัมน์กลางใช้ `sortMeetingsWithOverview` แทน ส่วนหน้าจอที่ต้องการลำดับของโครงการก็เรียกผ่าน
+`projectMeetings` / `latestInProject` การ export มันออกมาจึงเป็นการเปิดไว้ให้ใช้ ไม่ใช่สิ่งที่มีผู้ใช้อยู่จริง
+
+**`errorMessage` — ทำไมจึงต้องมี (docstring บรรทัด 1-9):** `shared/src/api.js` ระบุชัดว่า `err.message` เป็น
+**รหัสที่เครื่องอ่าน (machine-readable code) และห้ามพิมพ์ให้ผู้ใช้เห็น** โค้ดเดิมทำแบบนั้นในราว **สามสิบ catch block**
+(`onToast('Failed: ' + e.message)`) ซึ่งภายใต้ mock บังเอิญออกมาเป็นภาษาอังกฤษที่อ่านได้ แต่กับ API จริงจะแสดงคำว่า
+`VALIDATION_FAILED` ให้ผู้อ่านภาษาไทยเห็น ไฟล์นี้จึงเป็น **จุดเดียวที่ตัดสินว่าความล้มเหลวอ่านออกมาว่าอย่างไร**
+
+ลำดับการหาข้อความ:
+1. **`INVALID_EMAIL` เป็นกรณีพิเศษที่มาก่อน** — อ่าน `err.body.emails` แล้วใช้ `err.invalidEmailList` ที่ระบุอีเมล
+   ที่ผิดจริง ๆ เหตุผล: API ปฏิเสธ**ทั้งชุด**เพราะรายการเดียวที่ผิด การบอกแค่ "ตรวจสอบรายการของคุณ" โดยไม่บอกว่า
+   ตัวไหนจึงไร้ประโยชน์ (ใช้กับ `addProjectGuests`, ดู 3.10)
+2. `MINUTES_ERROR_KEYS[code]` — รหัสเฉพาะของโมดูลนี้ที่ dictionary กลางไม่มี: `PROJECT_BUILTIN`,
+   `PROJECT_NOT_EMPTY`, `CANNOT_TAG_INBOX`, `NOT_AN_INBOX_ROW`, `PROJECT_NOT_FOUND`, `COMMENT_NOT_FOUND`,
+   `BAD_VERSION`, `UPLOAD_FAILED`
+3. `error.<CODE>` ของ dictionary กลาง (`NETWORK_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_FAILED`, `INTERNAL`
+   และรหัส auth)
+4. ถ้า `translate()` คืนค่าเท่ากับ key ที่ส่งเข้าไป แปลว่า**ยังไม่มีใครเขียนข้อความสำหรับรหัสนั้น** → ใช้
+   `common.error` — **ไม่เคย fallback ไปที่ `err.message` ในทุกกรณี**
+
+ไฟล์เดียวกันยัง export `isNotFound(err)` (`err?.status === 404`) ซึ่ง `MeetingDetail` ใช้แยกกรณี "ไม่พบ" ออกจาก
+error อื่น — เหตุผลที่ API ตอบ 404 ไม่ใช่ 403 อยู่ในหัวข้อ 3.5
+
+---
+
 ## 4. Data Flow — API Endpoints ทั้งหมด
 
 อ้างอิงจาก `src/lib/minutesApi.js` (comment บรรทัด 9-39) และยืนยันตรงกับ route จริงใน
@@ -1195,4 +1524,4 @@ line-height/break-inside/content-box sizing มาแล้ว 4 วิธีแ
     ภายในตัวไฟล์เอง) จึง**ไม่มีเส้นทางใดในแอปที่ทำงานอยู่จริงเปิด panel นี้ได้** งานคอมเมนต์ทั้งหมดที่ผู้ใช้เข้าถึงได้
     อยู่ใน `ActivityPanel.jsx` (หัวข้อ 3.4) ไฟล์นี้น่าจะเป็นซากจากช่วงที่ประวัติการแก้ไขกับคอมเมนต์ยังแยกเป็นสอง
     panel — ทีมควรตัดสินใจว่าจะ**ลบทิ้ง** (แนะนำ) หรือ **wire ขึ้นมาใช้จริง** ห้ามถือว่าเป็นฟีเจอร์ที่ใช้งานได้
-    รายละเอียดอยู่ในหัวข้อ 2.12
+    รายละเอียดอยู่ในหัวข้อ 2.13

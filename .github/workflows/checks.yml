@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: check docs against code
         working-directory: 'FOR DEPLOYMENT TEAM'
         run: node scripts/check-docs.mjs
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: install
         working-directory: 'FOR DEPLOYMENT TEAM/${{ matrix.module }}'
         # No lockfile is committed for every module, so `npm ci` cannot be

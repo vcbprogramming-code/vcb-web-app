@@ -1523,4 +1523,22 @@ export const EN = {
   'หน้าภาพรวมจะรวมยอดไว้ในกล่องเดียวกัน': 'the overview totals them in one card.',
   'เลขที่สัญญา / อ้างอิงธนาคาร': 'Contract / bank reference',
   'เช่น เลขที่วงเงินตามหนังสือธนาคาร': "e.g. the facility number on the bank's letter",
+
+  // ── รายงานการประชุม: สิทธิ์การเข้าถึงสามระดับ ─────────────────────────────
+  'สิทธิ์การเข้าถึงรายงานการประชุม': 'Who can read which minutes',
+  'สิทธิ์การเข้าถึง': 'Access',
+  'กำหนดว่ากลุ่มไหนใครอ่านได้': 'Set who can read each group',
+  'กลุ่มที่ล็อกจะไม่ปรากฏในรายการของผู้ที่ไม่มีสิทธิ์เลย — ไม่ใช่ขึ้นชื่อแล้วกดไม่ได้':
+    'A locked group is absent from the list for anyone without access — not shown and unopenable.',
+  'เปิดกลุ่มนี้ให้อ่านได้': 'Open this group for reading',
+  'รายงานทุกฉบับที่มีอยู่แล้วในกลุ่มนี้จะอ่านได้ทันที และการล็อกกลับภายหลังจะไม่เรียกคืน':
+    'Every existing set of minutes in this group becomes readable at once, and locking it again does not take that back.',
+  'เปิดให้อ่าน': 'Open',
+  'ล็อก': 'Locked',
+  'ยังไม่มีผู้อ่านที่ระบุชื่อ': 'No named readers',
+  'ล็อกไว้แต่ยังไม่มีใครถูกระบุชื่อ — ตอนนี้มีแต่ผู้ดูแลและผู้แก้ไขที่เข้าถึงได้':
+    'Locked with nobody named — only admins and editors can reach it right now.',
+  'ยังไม่มีใครถูกระบุชื่อ': 'Nobody named yet',
+  'อีเมล — วางหลายรายการพร้อมกันได้': 'Email — paste several at once',
+  'เพิ่มผู้อ่านแล้ว': 'Readers added',
 };

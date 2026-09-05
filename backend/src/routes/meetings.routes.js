@@ -53,13 +53,34 @@ const slug = (name) => (String(name).replace(/[^\w.\-]+/g, '-').replace(/^-+|-+$
 /** Groups this user may see. Admin sees all; otherwise a group tied to a project
  *  follows the project visibility the client already configures per user. */
 async function visibleGroupIds(profile) {
-  if (profile.role === 'admin') return null;
+  // ผู้แก้ไขและผู้ดูแลเห็นทุกกลุ่ม — ตอบเป็น null (ไม่จำกัด) ถูกกว่าไล่รายชื่อ
+  if (profile.role === 'admin' || hasPermission(profile, 'meetings', 'edit')) return null;
+
+  // ── สิทธิ์สามระดับ (ข้อกำหนดฟังก์ชัน §3.9) ──────────────────────────────
+  // กลุ่ม public ผู้ใช้ที่ลงชื่อเข้าใช้แล้วอ่านได้ · กลุ่ม locked อ่านได้เฉพาะ
+  // ผู้ที่ถูกระบุอีเมลไว้ กลุ่มที่อ่านไม่ได้ต้อง "หายไปจากรายการ" ไม่ใช่ขึ้นชื่อ
+  // แล้วกดไม่ได้ เพราะการโชว์ชื่อกลุ่มที่เปิดไม่ได้ก็คือการรั่วอยู่แล้ว
+  const readable = (await query(
+    `select g.id from mtg_groups g
+      where g.visibility = 'public'
+         or exists (select 1 from mtg_group_guests gu
+                     where gu.group_id = g.id and lower(gu.email) = lower($1))`,
+    [profile.email || ''])).rows.map((r) => r.id);
+
+  // ขอบเขตโครงการรายบุคคลที่ผู้ดูแลตั้งไว้ ยังคงตัดทอนต่อจากนั้นอีกชั้น
   const scope = profile.visibility?.projectIds || profile.visible_project_ids || null;
-  if (!scope || !scope.length) return null; // no restriction configured = sees all
-  const { rows } = await query(
-    'select id from mtg_groups where project_id is null or project_id = any($1)', [scope]);
-  return rows.map((r) => r.id);
+  if (!scope || !scope.length) return readable;
+  const inScope = new Set((await query(
+    'select id from mtg_groups where project_id is null or project_id = any($1)', [scope])).rows.map((r) => r.id));
+  return readable.filter((id) => inScope.has(id));
 }
+
+/** อ่านกลุ่มนี้ได้ไหม — ใช้กับเส้นทางที่รับ groupId มาตรง ๆ */
+async function canReadGroup(profile, groupId) {
+  const ids = await visibleGroupIds(profile);
+  return ids === null || ids.includes(groupId);
+}
+
 const inGroups = (ids, col = 'm.group_id') => (ids === null ? '' : ` and ${col} = any($GRP)`);
 
 const LIST_SELECT = `
@@ -141,6 +162,22 @@ router.get('/', canView, asyncHandler(async (req, res) => {
      limit 300`;
   const { rows } = await query(sql, params);
   res.json({ data: rows });
+}));
+
+/**
+ * GET /api/meetings/access — ภาพรวมสิทธิ์ทุกกลุ่มในหน้าเดียว
+ *
+ * เตือนกลุ่มที่ล็อกไว้แต่ไม่มีใครถูกระบุชื่อเลย — ถูกต้องตามกฎ (แปลว่าเฉพาะผู้ดูแล
+ * และผู้แก้ไขเข้าถึงได้) แต่มักเกิดโดยไม่ตั้งใจ และมองจากข้างนอกวินิจฉัยยาก
+ */
+router.get('/access', canManage, asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select g.id, g.name, g.code, g.color, g.visibility, g.is_inbox,
+            coalesce(array_agg(gu.email order by gu.email) filter (where gu.email is not null), '{}') as emails
+       from mtg_groups g left join mtg_group_guests gu on gu.group_id = g.id
+      where g.is_active = true
+      group by g.id order by g.sort_order, g.name`);
+  res.json({ data: rows.map((r) => ({ ...r, bare: r.visibility === 'locked' && r.emails.length === 0 })) });
 }));
 
 /** GET /api/meetings/:id — the full record: body, attachments, comments. */
@@ -419,6 +456,7 @@ const groupSchema = z.object({
   cadence: z.string().trim().max(60).optional().default(''),
   color: z.string().trim().max(24).optional().default('#64748b'),
   is_active: z.boolean().optional(),
+  visibility: z.enum(['public', 'locked']).optional(),
 });
 
 router.post('/groups/new', canManage, asyncHandler(async (req, res) => {
@@ -438,10 +476,10 @@ router.patch('/groups/:id', canManage, asyncHandler(async (req, res) => {
   const row = await queryOne(
     `update mtg_groups set name = coalesce($2, name), name_en = coalesce($3, name_en),
        cadence = coalesce($4, cadence), color = coalesce($5, color),
-       is_active = coalesce($6, is_active)
+       is_active = coalesce($6, is_active), visibility = coalesce($7, visibility)
      where id = $1 returning *`,
     [req.params.id, p.data.name ?? null, p.data.name_en ?? null, p.data.cadence ?? null,
-     p.data.color ?? null, p.data.is_active ?? null]);
+     p.data.color ?? null, p.data.is_active ?? null, p.data.visibility ?? null]);
   if (!row) throw new ApiError(404, 'ไม่พบกลุ่มนี้');
   res.json({ data: row });
 }));
@@ -451,6 +489,50 @@ router.delete('/groups/:id', canManage, asyncHandler(async (req, res) => {
   if (n.n > 0) throw new ApiError(409, `กลุ่มนี้ยังมีรายงาน ${n.n} ฉบับ — ย้ายหรือลบรายงานออกก่อน`);
   const row = await queryOne('delete from mtg_groups where id = $1 returning id', [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบกลุ่มนี้');
+  res.json({ data: { ok: true } });
+}));
+
+// ── ผู้ที่ถูกระบุชื่อให้อ่านกลุ่มที่ล็อกไว้ (ข้อกำหนดฟังก์ชัน §3.9) ──────────
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** GET /api/meetings/groups/:id/guests — รายชื่อผู้ที่อ่านกลุ่มนี้ได้ */
+router.get('/groups/:id/guests', canManage, asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select gu.email, gu.added_at, p.full_name as added_by_name
+       from mtg_group_guests gu left join profiles p on p.id = gu.added_by
+      where gu.group_id = $1 order by gu.email`, [req.params.id]);
+  res.json({ data: rows });
+}));
+
+/**
+ * POST /api/meetings/groups/:id/guests — เพิ่มทีละคนหรือวางมาทีเดียวหลายอีเมล
+ *
+ * ถ้ามีอีเมลผิดรูปแบบแม้แค่ตัวเดียว ปฏิเสธทั้งชุดพร้อมบอกว่าตัวไหนผิด — บันทึก
+ * ครึ่ง ๆ กลาง ๆ แล้วปล่อยให้ผู้ดูแลไปไล่หาเองว่าใครเข้าไม่ได้ แย่กว่าไม่บันทึกเลย
+ */
+router.post('/groups/:id/guests', canManage, asyncHandler(async (req, res) => {
+  const raw = String(req.body?.emails ?? req.body?.email ?? '');
+  const list = [...new Set(raw.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean))];
+  if (!list.length) throw new ApiError(400, 'ยังไม่ได้ระบุอีเมล');
+  const bad = list.filter((e) => !EMAIL.test(e));
+  if (bad.length) throw new ApiError(400, `อีเมลไม่ถูกต้อง: ${bad.join(', ')}`, { emails: bad });
+
+  const g = await queryOne('select id from mtg_groups where id = $1', [req.params.id]);
+  if (!g) throw new ApiError(404, 'ไม่พบกลุ่มนี้');
+  for (const email of list) {
+    await query(
+      `insert into mtg_group_guests (group_id, email, added_by) values ($1,$2,$3)
+       on conflict (group_id, email) do nothing`,
+      [req.params.id, email, req.profile.id]);
+  }
+  res.status(201).json({ data: { added: list.length } });
+}));
+
+/** DELETE /api/meetings/groups/:id/guests/:email */
+router.delete('/groups/:id/guests/:email', canManage, asyncHandler(async (req, res) => {
+  await query('delete from mtg_group_guests where group_id = $1 and lower(email) = lower($2)',
+    [req.params.id, req.params.email]);
   res.json({ data: { ok: true } });
 }));
 

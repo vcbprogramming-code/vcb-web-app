@@ -181,9 +181,18 @@ Properties (`FATHOM_API_KEY`, `TRANSKRIPTOR_API_KEY`).
 
 Each module's `FOR DEPLOYMENT TEAM/supabase/` now holds the Postgres schema that
 would replace its Google Sheet, derived from the live app's own table
-definitions. **Nothing is connected**: no Supabase project exists, no data has
-been imported, and every React app still runs on its mock layer. The Apps Script
-apps remain the live system.
+definitions. **Nothing is connected to real data**: no Supabase project exists
+and no data has been imported — `api/.env` does not exist, only `.env.example`.
+The Apps Script apps remain the live system.
+
+This is not the same as "every React app runs on a client-side mock" anymore.
+Most modules' client-side mocks are already gone — `api/src/routes/*.js` holds
+real route handlers with real SQL against the schemas below, and the React
+apps call them over REST (see each module's `PORT_NOTES.md` for which). What is
+missing is a live database on the other end of `DATABASE_URL`, not the API code
+that would query one. Local dev stands up a throwaway Postgres (or a
+hand-rolled stub server) to exercise that code — that is a dev-environment
+convenience, not the same thing this section is warning about.
 
 | Module | Schema | Note |
 |---|---|---|
@@ -208,12 +217,15 @@ on Google auth restricted to the workspace domain, seed the role tables, import
 the data, then replace `src/mock/` with real queries. Do one end-to-end before
 starting the next.
 
-## Known gap
+## Known gap (resolved)
 
-**Theme fragmentation across the React mirrors.** All modules ship light *and*
-dark, but each implements it differently — four CSS selectors
-(`html[data-theme]`, `body.dark`, `html.theme-dark`, `html.dark`), five
-`localStorage` keys, and only HR Work Log supports follow-OS. Under one domain
-they share an origin, so a user's choice will not follow them between modules.
-Token names and palettes differ too. `hr-worklog` has the most complete
-implementation — use it as the model when converging.
+**Theme fragmentation across the React mirrors** — this section used to warn
+that each module implemented light/dark differently (four CSS selectors, five
+`localStorage` keys). That has since been converged: every module now reads
+`darkMode: 'class'` from `shared/tailwind.preset.js`, toggled as `html.dark`,
+with theme state in one shared key (`THEME_KEY = 'vcb_theme'` in
+`shared/src/theme.jsx`) rather than a per-module key. Checked 2026-09-05 by
+grepping every module's `src/index.css` for the old selector variants — none
+remain outside historical comments explaining what the port replaced.
+Leaving this note rather than deleting it, since it is exactly the kind of
+fact worth re-verifying rather than trusting forever.

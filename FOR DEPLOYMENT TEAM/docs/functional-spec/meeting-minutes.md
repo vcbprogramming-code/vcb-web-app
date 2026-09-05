@@ -1006,6 +1006,11 @@ UI เดิม (Apps Script) พยายามอ่าน field `details.vers
 ข้อความ, จำกัดความยาว 4000 ตัวอักษร (`maxLength` ที่ TextArea และ zod schema `commentSchema` ฝั่ง server ก็จำกัด
 4000 เช่นกัน)
 
+**การลบคอมเมนต์ (`removeComment()`):** ปุ่ม `✕` บนคอมเมนต์ของตัวเอง (หรือของใครก็ได้ถ้าเป็นแอดมิน) เรียก
+`removeComment()` ใน `ActivityPanel.jsx` ซึ่งเรียกต่อไปยัง `minutesApi.removeComment(id, commentId)` →
+`DELETE /comments/:commentId` แล้วนำรายการคอมเมนต์ชุดใหม่ที่ server ส่งกลับมาแทนที่ของเดิมทั้งชุด (ไม่ลบเฉพาะ
+รายการเดียวฝั่ง client) เพื่อให้สิ่งที่เห็นตรงกับฐานข้อมูลเสมอแม้มีคนอื่นแก้ไขพร้อมกัน
+
 **Logic ฝั่ง server สำหรับคอมเมนต์:**
 - `POST /meetings/:id/comments` ต้อง `requireAuth` และตรวจซ้ำว่าอ่านบันทึกนี้ได้จริงหรือไม่ (`canReadProject`) —
   แค่ signed-in ไม่พอถ้าเป็นโครงการ locked ที่ผู้ใช้ไม่มีสิทธิ์ (คอมเมนต์บรรทัด 1153-1157)

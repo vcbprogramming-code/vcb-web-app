@@ -1,0 +1,57 @@
+name: checks
+
+# Runs on GitHub, not on anyone's machine — no laptop needs to be open.
+#
+# This exists because documentation drifted for months without anyone noticing:
+# portal/STATUS.md named the wrong app and claimed a backend that did not
+# exist, and whole features (Excel export, the leave workflow) were missing
+# from their specs. Both were eventually caught by a person reading, which is
+# not a system.
+
+on:
+  push:
+    branches: [VCB-dev, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docs:
+    name: documentation drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: check docs against code
+        working-directory: 'FOR DEPLOYMENT TEAM'
+        run: node scripts/check-docs.mjs
+
+  build:
+    name: build ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one broken module should not hide the others
+      matrix:
+        module:
+          - portal
+          - hr-worklog
+          - credit-facility
+          - meeting-minutes
+          - sop
+          - system-map
+          - onboarding
+          - ememo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: install
+        working-directory: 'FOR DEPLOYMENT TEAM/${{ matrix.module }}'
+        # No lockfile is committed for every module, so `npm ci` cannot be
+        # relied on here; install is the portable choice.
+        run: npm install --no-audit --no-fund
+      - name: build
+        working-directory: 'FOR DEPLOYMENT TEAM/${{ matrix.module }}'
+        run: npm run build

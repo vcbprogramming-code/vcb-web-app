@@ -113,7 +113,7 @@ create index if not exists access_audit_at_idx    on portal.access_audit(at desc
 -- the one-off scripts and a psql session must be audited too — the value of
 -- this log is that it has no gaps.
 create or replace function portal.log_access_change() returns trigger
-language plpgsql as $
+language plpgsql as $$
 declare
   -- Branch on TG_OP rather than coalesce(new.x, old.x): in PL/pgSQL, touching
   -- NEW during a DELETE raises "record new is not assigned yet" - it does not
@@ -156,7 +156,7 @@ begin
   -- AFTER trigger: the return value is ignored, but DELETE must not return NEW.
   if TG_OP = 'DELETE' then return old; end if;
   return new;
-end $;
+end $$;
 
 drop trigger if exists access_grants_audit on portal.access_grants;
 create trigger access_grants_audit

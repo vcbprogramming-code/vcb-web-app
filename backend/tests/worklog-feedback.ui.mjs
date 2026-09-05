@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import ExcelJS from 'exceljs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import { suite, happy, bad, report, U, warm, APP, API, tok, query } from './harness.mjs';
+import { suite, happy, bad, report, U, warm, APP, API, tok, query, call } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 const SHOTS = `${ROOT}/worklog-feedback`;
@@ -20,6 +20,20 @@ const DL = `${SHOTS}/downloads`;
 fs.rmSync(DL, { recursive: true, force: true });
 fs.mkdirSync(DL, { recursive: true });
 await warm();
+
+// ชุดนี้ตรวจความสามารถที่มาจาก "เอกสารเกณฑ์ตรวจรับ" ซึ่งตอนนี้ปิดไว้เป็นค่า
+// เริ่มต้น เพราะระบบที่ลูกค้าใช้จริงไม่มี — โค้ดยังอยู่ครบและเปิดกลับได้
+// ต้องรัน API ด้วย WORKLOG_FEATURES=all จึงจะทดสอบส่วนนี้ได้
+{
+  const boot = await call('/performance/bootstrap', { user: U.admin });
+  const need = ['verify','periodClose','mandayEntry','attachments','employeeImport','leaveAttachment'];
+  const off = need.filter((f) => !boot.features?.[f]);
+  if (off.length) {
+    console.log(`\nข้าม ${off.length} ความสามารถที่ปิดอยู่: ${off.join(', ')}`);
+    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้\n');
+    process.exit(0);
+  }
+}
 
 const { admin: A } = U;
 const MARK = 'ZZFB';

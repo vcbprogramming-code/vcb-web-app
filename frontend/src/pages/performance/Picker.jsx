@@ -39,7 +39,12 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [step, onClose]);
 
-  const items = step === 1 ? activities : categories;
+  // ขั้นที่สองต้องเหลือเฉพาะหมวดต้นทุนที่รหัสงานนั้นใช้ได้จริง (allowed_cost)
+  // ระบบเดิมของลูกค้ากรองตรงนี้ การปล่อยให้เลือกได้ทุกหมวดทำให้ค่าแรงลงผิดหมวด
+  // โดยไม่มีอะไรฟ้อง — รหัสที่ไม่ระบุไว้ (กลุ่ม Z) ยังเลือกได้ทั้งหมดตามเดิม
+  const allowed = String(pending?.allowed_cost || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const allowedCats = allowed.length ? categories.filter((c) => allowed.includes(String(c.code))) : categories;
+  const items = step === 1 ? activities : allowedCats;
   const query = q.trim().toLowerCase();
   const filtered = query
     ? items.filter((it) => [it.name, it.desc, it.category, it.code].some((x) => String(x || '').toLowerCase().includes(query)))
@@ -69,7 +74,16 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
         {step === 1
           ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> {t('เลือกกิจกรรม')}</>
-          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b></>}
+          : <>
+              <span className="text-lg leading-none">‹</span>
+              <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span>
+              {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b>
+              {allowed.length > 0 && (
+                <span className="ml-auto text-[11px] font-normal text-slate-400">
+                  {t('ใช้ได้ {n} หมวด', { n: allowed.length })}
+                </span>
+              )}
+            </>}
       </div>
       <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1.5">
         <input ref={searchRef} type="text" placeholder={t('ค้นหา…')} autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}

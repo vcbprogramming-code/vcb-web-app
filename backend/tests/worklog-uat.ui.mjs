@@ -18,6 +18,20 @@ const SHOTS = `${ROOT}/worklog-uat`;
 fs.mkdirSync(SHOTS, { recursive: true });
 await warm();
 
+// ชุดนี้ตรวจความสามารถที่มาจาก "เอกสารเกณฑ์ตรวจรับ" ซึ่งตอนนี้ปิดไว้เป็นค่า
+// เริ่มต้น เพราะระบบที่ลูกค้าใช้จริงไม่มี — โค้ดยังอยู่ครบและเปิดกลับได้
+// ต้องรัน API ด้วย WORKLOG_FEATURES=all จึงจะทดสอบส่วนนี้ได้
+{
+  const boot = await call('/performance/bootstrap', { user: U.admin });
+  const need = ['verify','periodClose','mandayEntry','attachments','orgRegistry','employeeImport','leaveHalfDay','leaveAttachment'];
+  const off = need.filter((f) => !boot.features?.[f]);
+  if (off.length) {
+    console.log(`\nข้าม ${off.length} ความสามารถที่ปิดอยู่: ${off.join(', ')}`);
+    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้\n');
+    process.exit(0);
+  }
+}
+
 const { admin: A, exec: C } = U;
 const MARK = 'ZZUI2';
 const d = new Date();

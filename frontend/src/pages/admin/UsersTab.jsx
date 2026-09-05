@@ -18,18 +18,21 @@ const ROLE_CHIP = {
 };
 
 /**
- * The five levels the work-log acceptance criteria name, in the order an
- * administrator thinks about them: who keys the day, who signs it off, then the
- * office roles. This list is the one place the choice is defined — the labels
- * come from nav.js so the menu, the chips and this picker can never drift apart.
+ * สามระดับ เท่ากับที่ระบบงานจริงของลูกค้าใช้ (Users: admin / manager / staff)
+ *
+ * เคยมีห้าระดับ โดยเพิ่ม recorder และ verifier เข้ามาตามเอกสารเกณฑ์ตรวจรับ
+ * ซึ่งเป็นคนละต้นทางกับระบบที่พนักงานใช้จริง — ไม่มีบัญชีไหนใช้สองระดับนั้นเลย
+ * จึงเอาออกจากตัวเลือก ค่าเดิมยังอ่านได้ถ้ามีข้อมูลเก่าค้างอยู่
+ *
+ * ไม่เปลี่ยน "ชื่อ" ของสามระดับที่เหลือให้ตรงคำของเขา เพราะ E-Memo ผูกสิทธิ์
+ * ไว้กับชื่อเหล่านี้ทั้งโมดูล การเปลี่ยนชื่อจะทำให้ระบบที่ส่งมอบแล้วพัง —
+ * ความหมายตรงกันอยู่แล้ว: hr = manager, executive = staff (ดูอย่างเดียว)
  */
-const ROLE_OPTIONS = ['recorder', 'verifier', 'hr', 'executive', 'admin'];
+const ROLE_OPTIONS = ['hr', 'executive', 'admin'];
 
 /** One line on what each level may do, so the choice is not a guess. */
 const ROLE_HINT = {
-  recorder: 'บันทึกงานรายวันของไซต์ที่รับผิดชอบ — ยืนยันข้อมูลของตัวเองไม่ได้',
-  verifier: 'ตรวจสอบและยืนยันข้อมูลของโครงการ — ไม่บันทึกงานรายวัน',
-  hr: 'ดูและบันทึกข้อมูลตามโครงการที่รับผิดชอบ',
+  hr: 'ดูและบันทึกข้อมูลตามโครงการที่รับผิดชอบ (เทียบเท่า manager ของระบบเดิม)',
   executive: 'ดูได้ทุกโครงการรวมข้อมูลการเงิน และอนุมัติรายการได้',
   admin: 'เข้าถึงและตั้งค่าได้ทั้งหมด',
 };

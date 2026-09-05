@@ -184,7 +184,7 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
       if (aw.has(day.date)) return;
       perDay[day.date].t++;
       const v = (d.entries[e.eid] || {})[day.date] || {};
-      if (v.team || v.detail || v.pm) perDay[day.date].f++;
+      if (v.detail || v.pm) perDay[day.date].f++;
     });
   });
 
@@ -241,7 +241,7 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
                   {d.days.map((day) => {
                     if (awaySet.has(day.date)) return <td key={day.date}><div className="flex h-7 w-7 items-center justify-center rounded text-[10px] text-slate-400" style={{ background: '#e7ebf1' }}>—</div></td>;
                     const v = by[day.date] || {};
-                    const amv = v.team || v.detail || '', pmv = v.pm || '', has = !!(amv || pmv);
+                    const amv = v.detail || '', pmv = v.pm || '', has = !!(amv || pmv);
                     const future = day.date > ahead, locked = day.date < cutoff, editable = !future && !locked;
                     let bg, inner = null;
                     if (future) bg = '#eef2f8';
@@ -319,7 +319,10 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
           <tbody>
             {d.employees.map((e) => {
               const op = e.kind === 'operation';
-              const primaryField = op ? 'team' : 'detail';
+              // ระบบจริงของลูกค้าแยก "ทีม/ชุดงาน" ออกจาก "งานที่ทำ" คนละเรื่องกัน
+              // งานหลักลงช่องเดียวกันทุกคน ไม่ว่าสายปฏิบัติการหรือสนับสนุน — เดิม
+              // สายปฏิบัติการเขียนรหัสงานลงช่องทีม ทำให้คอลัมน์เดียวถือสองความหมาย
+              const primaryField = 'detail';
               const awaySet = new Set(e.away);
               return (
                 <tr key={e.eid} className={focus && focus.eid === e.eid ? 'bg-brand-tint/40' : ''}>
@@ -330,7 +333,7 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                   {visible.map((day) => {
                     if (awaySet.has(day.date)) return <td key={day.date} className="rounded bg-slate-50" />;
                     const v = (d.entries[e.eid] || {})[day.date] || {};
-                    const amVal = op ? (v.team || '') : (v.detail || '');
+                    const amVal = v.detail || '';
                     const locked = day.date < cutoff || day.date > ahead;
                     const isFocus = focus && focus.eid === e.eid && focus.date === day.date;
                     // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window

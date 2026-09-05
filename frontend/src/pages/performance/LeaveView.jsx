@@ -79,7 +79,7 @@ function Row({ r, children, onOpenFile, onDownloadFile }) {
   );
 }
 
-export default function LeaveView({ employees, canEntry, onChanged }) {
+export default function LeaveView({ employees, canEntry, onChanged, features = {} }) {
   const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
@@ -223,8 +223,10 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
               <input type="date" value={form.to} onChange={(e) => setForm((f) => ({ ...f, to: e.target.value }))} className="field" />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
+          {/* ระบบจริงของลูกค้ารับเฉพาะลาเต็มวันและไม่มีไฟล์แนบ ทั้งสองช่องจึงขึ้น
+              กับสวิตช์ — ฝั่งเซิร์ฟเวอร์ก็ปฏิเสธค่าเหล่านี้เมื่อยังไม่เปิด */}
+          <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${features.leaveHalfDay || features.leaveAttachment ? '' : 'hidden'}`}>
+            <div className={features.leaveHalfDay ? '' : 'hidden'}>
               {/* §6 ครึ่งวันนับเป็น 0.5 — ถ้านับเป็น 1 ยอดแรงงาน-วันจะเพี้ยน */}
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('ช่วงเวลาที่ลา')}</label>
               <select value={form.dayPart} onChange={(e) => setForm((f) => ({ ...f, dayPart: e.target.value }))} className="field">
@@ -236,7 +238,7 @@ export default function LeaveView({ employees, canEntry, onChanged }) {
                 <p className="mt-1 text-xs text-slate-400">{t('ลาครึ่งวันเลือกได้เฉพาะวันเดียว นับเป็น 0.5 วัน')}</p>
               )}
             </div>
-            <div>
+            <div className={features.leaveAttachment ? '' : 'hidden'}>
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('ไฟล์แนบ เช่น ใบรับรองแพทย์')}</label>
               <input type="file" onChange={(e) => setForm((f) => ({ ...f, file: e.target.files?.[0] || null }))}
                 className="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-1.5 file:text-sm" />

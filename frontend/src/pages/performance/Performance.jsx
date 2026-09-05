@@ -41,7 +41,7 @@ export default function Performance() {
   // The tab lives in the URL so a link can point at one — "ดูหน้าการลา" was
   // impossible to send to anyone, unlike the deep links SOP already supports.
   const [sp, setSp] = useSearchParams();
-  const view = sp.get('tab') || 'entry'; // entry | dashboard | leave | index | settings
+  const rawView = sp.get('tab') || 'entry'; // entry | dashboard | leave | index | settings
   const setView = (v) => setSp((prev) => { const n = new URLSearchParams(prev); n.set('tab', v); return n; }, { replace: true });
   const [cur, setCur] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const [siteKey, setSiteKey] = useState('');
@@ -77,12 +77,18 @@ export default function Performance() {
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
   if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
+  // ลิงก์เก่าที่ชี้ไปแท็บที่ปิดแล้วต้องไม่พาไปหน้าว่าง
+  const view = (rawView === 'manday' && !boot.features?.mandayEntry) ? 'dashboard' : rawView;
+
+  // หน้าจอชุดเดียวกับระบบที่ลูกค้าใช้จริง — ภาพรวม · ลงบันทึกรายวัน · ทะเบียนงาน
+  // · การลา · ตั้งค่า ส่วนหน้าแรงงาน-วัน (กรอกตัวเลข) เป็นส่วนเสริมที่มาจาก
+  // เอกสารตรวจรับ ไม่ใช่ระบบเดิม จึงขึ้นกับสวิตช์ features.mandayEntry
+  const f = boot.features || {};
   const tabs = [
     { key: 'dashboard', label: t('ภาพรวม'), show: true },
     { key: 'entry', label: t('ลงบันทึกรายวัน'), show: boot.canEntry },
-    // the two screens the acceptance criteria are written around
-    { key: 'manday', label: t('แรงงาน-วัน'), show: true },
-    { key: 'reports', label: t('รายงานและตรวจสอบ'), show: true },
+    { key: 'manday', label: t('แรงงาน-วัน'), show: Boolean(f.mandayEntry) },
+    { key: 'reports', label: t('รายงาน'), show: true },
     { key: 'leave', label: t('การลา'), show: true },
     { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
@@ -145,22 +151,23 @@ export default function Performance() {
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
 
-      {view === 'manday' && (
+      {view === 'manday' && f.mandayEntry && (
         boot.sites.length === 0
           ? <NoSites />
           : <MandayView site={siteKey} month={`${cur.y}-${String(cur.m).padStart(2, '0')}`} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
       )}
 
-      {view === 'reports' && <ReportsView site={siteKey} />}
+      {view === 'reports' && <ReportsView site={siteKey} features={f} />}
 
       {view === 'leave' && (
-        <LeaveView employees={roster} canEntry={boot.canEntry} onChanged={() => setRosterKey((k) => k + 1)} />
+        <LeaveView employees={roster} canEntry={boot.canEntry} features={f} onChanged={() => setRosterKey((k) => k + 1)} />
       )}
 
       {view === 'index' && <WorkIndex />}
 
       {view === 'settings' && (
         <SettingsView
+          features={f}
           sites={boot.sites}
           onOpenSite={(key) => { setSiteKey(key); setRosterKey((k) => k + 1); setView('entry'); }}
           onSitesChange={(key, lockDays) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, lockDays } : s)) }))}

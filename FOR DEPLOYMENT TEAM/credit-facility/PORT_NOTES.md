@@ -183,7 +183,8 @@ The old `html.dark` + private `:root` custom properties are gone, as is
 
 Apps Script gave identity free via `Session.getActiveUser().getEmail()`, so the
 app had no login. As a SPA there is none — identity is the JWT the API issues,
-and `src/components/SignIn.jsx` is where it is obtained. `me.isManager` from
+obtained through the shared `AuthProvider` (`@vcb/shared`, wired in
+`src/main.jsx`) rather than any screen of this module's own. `me.isManager` from
 `GET /data` only hides controls; `requireRole('credit','manager')` in the API is
 the actual gate.
 

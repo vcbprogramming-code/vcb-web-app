@@ -27,6 +27,22 @@ description from the function's name alone.
 | `dangling-reference` | The file is gone. Either drop the mention, or reword it as history ("เดิม…", "ถูกแทนที่ด้วย…") if it explains what the port replaced. |
 | `duplicate-section` / `broken-crossref` | Renumber sequentially and repair every in-text `หัวข้อ N` reference you shift. |
 | `stale-stack-claim` / `stale-backend-claim` | Rewrite the file to match reality. Keep it short — link to the functional spec rather than restating it. |
+| `change-history-in-spec` | **Delete the passage.** Do not reword it. A spec says what the app does now; git says what changed. If the struck-through claim turned out to be wrong, remove the whole row/section rather than leaving a correction. |
+| `file-listing-table` | **Delete the table.** It duplicates the folder listing. Keep only rows pointing at *other documents* (PORT_NOTES.md, an API route file, ACCESS_MODEL.md) — those cannot be got from `ls`. |
+
+## Removing is as valuable as adding
+
+Half of what goes wrong in these documents is not missing text but surplus text.
+When you touch a spec, also delete anything that is:
+
+- **A second copy of git** — dates, commit hashes, "this used to be…", struck-through retractions
+- **A second copy of the filesystem** — tables listing files that add no description
+- **A second copy of another section** — restating what a cross-reference could point at
+- **A description of a file that no longer exists**
+
+Deleting these is not "losing information": every one of them is either recoverable
+from git, visible in the folder, or already written somewhere better. Prefer a
+shorter document that is true over a longer one that is padded.
 
 ## Rules
 

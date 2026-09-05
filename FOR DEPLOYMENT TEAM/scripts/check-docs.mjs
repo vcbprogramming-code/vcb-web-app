@@ -174,6 +174,40 @@ for (const { id } of MODULES) {
   }
 }
 
+// --- CHECK 7: no change-history inside the specs ---------------------------
+// Git records what changed, when and why. A spec that also carries "deleted on
+// 2026-09-05, commit abc1234" is keeping a second, worse copy of git — and it
+// makes the document describe its own past instead of the app's present.
+// Every one of these got written by hand and then had to be hand-removed.
+const HISTORY_PATTERNS = [
+  { re: /commit\s+`?[0-9a-f]{7,40}`?/g, what: 'a commit hash' },
+  { re: /(?:ลบไฟล์ทิ้งแล้วเมื่อ|แก้ไขแล้วเมื่อ|ลบทิ้งแล้วเมื่อ)/g, what: 'a "fixed/deleted on <date>" note' },
+  { re: /~~[^~]{4,}~~/g, what: 'struck-through text (a retracted claim)' },
+];
+for (const f of readdirSync(SPEC_DIR).filter((n) => n.endsWith('.md'))) {
+  const doc = readFileSync(join(SPEC_DIR, f), 'utf8');
+  for (const { re, what } of HISTORY_PATTERNS) {
+    const hits = [...doc.matchAll(re)];
+    if (hits.length) {
+      add('error', f.replace(/\.md$/, ''), 'change-history-in-spec',
+        `contains ${what} (${hits.length}x) — that belongs in git log, not the spec`, true);
+    }
+  }
+}
+
+// --- CHECK 8: no duplicated file-listing tables ------------------------------
+// credit-facility.md carried a 28-row table listing every src/ file. It was a
+// second copy of the folder itself: it went stale on every rename and added
+// nothing, because each file is already explained where its feature is.
+for (const f of readdirSync(SPEC_DIR).filter((n) => n.endsWith('.md'))) {
+  const doc = readFileSync(join(SPEC_DIR, f), 'utf8');
+  const rows = (doc.match(/^\|\s*`?[a-z-]+\/src\/[^|]+\|/gm) || []).length;
+  if (rows >= 10) {
+    add('error', f.replace(/\.md$/, ''), 'file-listing-table',
+      `has a ${rows}-row table listing src/ files — duplicates the folder and goes stale; describe files where their feature is explained instead`, true);
+  }
+}
+
 const asJson = process.argv.includes('--json');
 const errors = findings.filter((f) => f.severity === 'error');
 

@@ -1502,12 +1502,10 @@ migration เล็กและ idempotent (match ที่ `key`, รันซ�
 |---|---|---|---|
 | 1 | `api/assets/fonts/` | มีแต่ `README.md` **ไม่มีไฟล์ `.ttf`** ทั้งที่ `index.js` `process.exit(1)` เมื่อไม่มี | **API บูตไม่ขึ้นจาก repo สด** — ต้องดาวน์โหลด Sarabun ก่อน deploy ครั้งแรก |
 | 2 | `api/package.json` vs. โครงสร้างไฟล์ | ประกาศ `"migrate": "node scripts/migrate.js"` แต่ **ไม่มีไดเรกทอรี `api/scripts/`** | `npm run migrate` พังทันที ต้องรัน SQL 9 ไฟล์ด้วยมือตามลำดับ |
-| 3 | `api/src/auth.js` JSDoc ของ `resolveRoles()` | ระบุ `hr: 'admin' \| 'manager' \| 'user' \| null` | **คอมเมนต์ผิด** — CHECK constraint จริงใน `004_hr.sql` คือ `('admin','manager','staff')` และ `008_access.sql` ก็ seed `staff` |
-| 4 | `api/src/middleware/auth.js` | `allowAnonymous` สร้าง `req.user` **โดยไม่มี `hrSites`** ต่างจาก `requireAuth` | ยังไม่มี route ไหนต่อ `allowAnonymous` เข้ากับ `requireHrSite()` แต่ถ้าทำ ผู้ที่ไม่ใช่ admin จะได้ 403 `SITE_SCOPE_UNKNOWN` เสมอ |
-| 5 | `008_access.sql` vs. `api/src/routes/credit.js` | seed บทบาท `credit.viewer` ไว้ แต่ route ใช้แค่ `router.use(requireAuth)` | **ทุกคนที่ล็อกอินได้อ่านข้อมูล Credit Facility ทั้งหมด** ไม่ว่าจะอยู่ใน `credit.managers` หรือไม่ (คอมเมนต์ในไฟล์รับทราบเรื่องนี้เป็น "การเปลี่ยนบรรทัดเดียว" ที่ยังไม่ทำ) |
-| 6 | ~~`008` vs `009` `name_th`~~ | **ไม่ใช่ปัญหา — ตรวจสอบซ้ำแล้วเมื่อ 2026-09-05** `009_app_names.sql` เป็น migration แก้ค่าโดยเจตนา (มีคอมเมนต์อธิบายเหตุผลครบ และเขียนแบบ idempotent) การที่ค่าต่างจาก `008` คือพฤติกรรมที่ถูกต้องของ migration ตามลำดับ ไม่ใช่ความขัดแย้ง | ไม่ต้องทำอะไร |
-| 7 | `shared/src/access.js` (ทั้งไฟล์) | หน้าจอบริหารสิทธิ์เขียนลง `portal.access_grants` แต่ **`resolveRoles()` ยังอ่านตารางรายโมดูล** | **สิทธิ์ที่ให้ผ่านหน้าจอนี้ไม่มีผลต่อสิ่งที่ใครเปิดได้จริง** — เป็นสถานะที่ตั้งใจ ไม่ใช่บั๊ก แต่ต้องรู้ |
-| 8 | `shared/src/auth.jsx`, `i18n.jsx`, `theme.jsx` | คอมเมนต์พูดว่า "seven SPAs" | `008_access.sql` ลงทะเบียน **แปด** แอป (`ememo`, `minutes`, `sop`, `sysmap`, `hr`, `credit`, `onboarding`, `portal`) — E-Memo เป็นแอป TypeScript แยกที่อยู่นอก `@vcb/shared` จำนวนที่ใช้ `@vcb/shared` จริงจึงเป็น 7 **คอมเมนต์ถูกในบริบทของมัน แต่อ่านสับสนได้** |
+| 3 | `api/src/middleware/auth.js` | `allowAnonymous` สร้าง `req.user` **โดยไม่มี `hrSites`** ต่างจาก `requireAuth` | ยังไม่มี route ไหนต่อ `allowAnonymous` เข้ากับ `requireHrSite()` แต่ถ้าทำ ผู้ที่ไม่ใช่ admin จะได้ 403 `SITE_SCOPE_UNKNOWN` เสมอ |
+| 4 | `008_access.sql` vs. `api/src/routes/credit.js` | seed บทบาท `credit.viewer` ไว้ แต่ route ใช้แค่ `router.use(requireAuth)` | **ทุกคนที่ล็อกอินได้อ่านข้อมูล Credit Facility ทั้งหมด** ไม่ว่าจะอยู่ใน `credit.managers` หรือไม่ (คอมเมนต์ในไฟล์รับทราบเรื่องนี้เป็น "การเปลี่ยนบรรทัดเดียว" ที่ยังไม่ทำ) |
+| 5 | `shared/src/access.js` (ทั้งไฟล์) | หน้าจอบริหารสิทธิ์เขียนลง `portal.access_grants` แต่ **`resolveRoles()` ยังอ่านตารางรายโมดูล** | **สิทธิ์ที่ให้ผ่านหน้าจอนี้ไม่มีผลต่อสิ่งที่ใครเปิดได้จริง** — เป็นสถานะที่ตั้งใจ ไม่ใช่บั๊ก แต่ต้องรู้ |
+| 6 | `shared/src/auth.jsx`, `i18n.jsx`, `theme.jsx` | คอมเมนต์พูดว่า "seven SPAs" | `008_access.sql` ลงทะเบียน **แปด** แอป (`ememo`, `minutes`, `sop`, `sysmap`, `hr`, `credit`, `onboarding`, `portal`) — E-Memo เป็นแอป TypeScript แยกที่อยู่นอก `@vcb/shared` จำนวนที่ใช้ `@vcb/shared` จริงจึงเป็น 7 **คอมเมนต์ถูกในบริบทของมัน แต่อ่านสับสนได้** |
 
 ---
 

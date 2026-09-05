@@ -62,12 +62,18 @@ suite('1. ผู้ดูแลตั้งลายเซ็นให้ผู�
 
 // ── 2. หน้าตั้งค่ารวมที่เดียว ──────────────────────────────────────────────
 suite('2. หน้าตั้งค่ารวมอยู่ที่เดียว');
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 {
   const browser = await puppeteer.launch({
-    executablePath: CHROME, headless: false, userDataDir: `${ROOT}/chrome-profile`,
+    executablePath: CHROME, headless: false, userDataDir: `${ROOT}/chrome-settings`,
     defaultViewport: { width: 1600, height: 1000 }, args: ['--no-first-run', '--no-default-browser-check'],
   });
   const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
   const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
   const shot = async (n) => { await page.screenshot({ path: `${ROOT}/set/${n}.png` }); };
   const body = () => page.evaluate(() => document.body.innerText);

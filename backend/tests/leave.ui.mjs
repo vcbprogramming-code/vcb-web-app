@@ -21,14 +21,20 @@ const unit = (await query('select id, code, name from units where code is not nu
 const emp = (await query(
   `insert into employees (full_name, employee_code, unit_id, is_active, kind)
    values ($1,'ZZUI1',$2,true,'operation') returning id`, [`${MARK} พนักงานทดสอบลา`, unit.id])).rows[0];
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  headless: false, userDataDir: `${ROOT}/chrome-profile`,
+  headless: false, userDataDir: `${ROOT}/chrome-leave`,
   defaultViewport: { width: 1440, height: 1000 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 const body = () => page.evaluate(() => document.body.innerText);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png` });

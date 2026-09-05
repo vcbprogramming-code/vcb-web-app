@@ -31,15 +31,21 @@ const led = await call('/credit/ledger', { method: 'POST', user: A, body: {
   facilityId: fac.data.id, amount: 2000000, startDate: '2026-08-01',
   dueDate: '2026-12-31', ref: `${MARK}-L1` } });
 made.led.push(led.data.id);
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: false,
-  userDataDir: `${ROOT}/chrome-profile`,
+  userDataDir: `${ROOT}/chrome-credit`,
   defaultViewport: { width: 1440, height: 950 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 const body = () => page.evaluate(() => document.body.innerText);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png` });

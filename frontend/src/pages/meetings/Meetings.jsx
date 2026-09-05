@@ -6,6 +6,7 @@ import { useConfirm } from '../../components/Confirm.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import AccessPanel from './AccessPanel.jsx';
 import MeetingDetail from './MeetingDetail.jsx';
 import MeetingForm from './MeetingForm.jsx';
 import { useT } from '../../lib/i18n.jsx';
@@ -58,6 +59,8 @@ export default function Meetings() {
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
     on ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`;
 
+  const [access, setAccess] = useState(false);
+
   const removeRow = async (r) => {
     const ok = await confirm({
       title: t('ลบรายงานการประชุม'),
@@ -78,11 +81,21 @@ export default function Meetings() {
       <PageHeader
         title={t('รายงานการประชุม')}
         subtitle={t('บันทึกการประชุมแยกตามโครงการและฝ่าย · {n} ฉบับ', { n: boot.total })}
-        right={canEdit ? (
-          <button onClick={() => setEditing('new')} className="btn-primary !py-2 !text-sm">
-            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายงาน')}
-          </button>
-        ) : undefined}
+        right={(
+          <div className="flex items-center gap-2">
+            {boot.canManage && (
+              <button onClick={() => setAccess(true)} className="btn-outline !py-2 !text-sm"
+                title={t('กำหนดว่ากลุ่มไหนใครอ่านได้')}>
+                <Icon name="people" className="h-4 w-4" /> {t('สิทธิ์การเข้าถึง')}
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => setEditing('new')} className="btn-primary !py-2 !text-sm">
+                <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายงาน')}
+              </button>
+            )}
+          </div>
+        )}
       />
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -177,6 +190,7 @@ export default function Meetings() {
           onSaved={(id) => { setEditing(null); setOpenId(id); load(); }}
         />
       )}
+      {access && <AccessPanel onClose={() => { setAccess(false); load(); }} />}
     </div>
   );
 }

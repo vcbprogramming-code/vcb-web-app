@@ -1474,4 +1474,111 @@ export const EN = {
   'ไฟล์': 'File',
   'สถานะใช้งาน': 'Active status',
   'ชุดที่บันทึก': 'Batch',
+
+  // ── ปรับให้ตรงระบบที่ลูกค้าใช้จริง ────────────────────────────────────────
+  'รายงาน': 'Reports',
+  'ใช้ได้ {n} หมวด': '{n} allowed',
+  'หนึ่งวันที่มีงานลง = 1 แรงงาน-วัน · ลงสองงานในวันเดียวแบ่งเป็น 0.5/0.5':
+    'A day with any task logged is 1 man-day; two tasks on one day split 0.5/0.5.',
+  'จำนวนรายการในรายงาน': 'Rows in report',
+  'รายหมวดต้นทุน': 'By cost category',
+  'จากคำขอลาเลขที่': 'From leave request',
+
+  // ── แผนผังระบบ: คำอธิบายสัญลักษณ์และการแสดงเส้นเชื่อม ────────────────────
+  'อยู่ในระบบ ERP': 'In ERP',
+  'ทำด้วยมือ': 'Manual',
+  'แสดงทุกเส้นเชื่อม': 'Show all links',
+  'กำลังแสดงเส้นเชื่อมทั้งหมด': 'Showing all',
+  'เส้น — กดที่กล่องงานเพื่อเน้นเฉพาะเส้นของกล่องนั้น':
+    'links — click a step to bring its own links forward.',
+  'กดที่กล่องงานเพื่อดูรายละเอียดและเส้นทางที่เชื่อมกับกล่องนั้น หรือกด “แสดงทุกเส้นเชื่อม” เพื่อดูภาพรวมทั้ง':
+    'Click a step for its detail and the links around it, or use “Show all links” to see all',
+  'เส้นพร้อมกัน': 'at once.',
+
+  // ── SOP: ประวัติเวอร์ชัน ──────────────────────────────────────────────────
+  'ประวัติเวอร์ชัน': 'Version history',
+  'ประวัติเวอร์ชันเปิดให้เฉพาะผู้มีสิทธิ์แก้ไขคู่มือ': 'Version history is for manual editors only.',
+  'กู้คืนคู่มือกลับไปเป็นเวอร์ชันนี้': 'Restore the manual to this version',
+  'ระบบจะเก็บภาพของฉบับปัจจุบันไว้ก่อน จึงย้อนกลับได้อีกถ้ากู้ผิดเวอร์ชัน':
+    'The current version is saved first, so this can be undone if you restore the wrong one.',
+  'กู้คืน': 'Restore',
+  'กู้คืนคู่มือแล้ว': 'Manual restored',
+  'ทุกครั้งที่มีการแก้ไขคู่มือ ระบบจะเก็บภาพของฉบับก่อนหน้าไว้ที่นี่ กู้คืนได้ทุกเวอร์ชัน และการกู้คืนก็ย้อนกลับได้':
+    'Every edit saves the manual as it was, here. Any version can be restored, and a restore can itself be undone.',
+  'ยังไม่มีการแก้ไขคู่มือ จึงยังไม่มีเวอร์ชันย้อนหลัง': 'The manual has not been edited yet, so there is nothing to restore.',
+  'เมื่อ': 'When',
+  'การแก้ไข': 'Change',
+  'เนื้อหาในเวอร์ชันนั้น': 'Contents at the time',
+  'กรณี': 'cases',
+  'เพิ่มกรณีศึกษาใหม่': 'Case added',
+  'แก้ไขเนื้อหากรณีศึกษา': 'Case edited',
+  'ลบกรณีศึกษาออก': 'Case deleted',
+  'สลับลำดับกรณีศึกษา': 'Cases reordered',
+  'เพิ่มรายการรายงาน': 'Report added',
+  'แก้ไขรายการรายงาน': 'Report edited',
+  'ลบรายการรายงานออก': 'Report deleted',
+
+  // ── วงเงินสินเชื่อ: ทะเบียนประเภทและการพับรวมกล่อง ────────────────────────
+  'ใช้วงเงินร่วมกับ': 'Shares its limit with',
+  'หน้าภาพรวมจะรวมยอดไว้ในกล่องเดียวกัน': 'the overview totals them in one card.',
+  'เลขที่สัญญา / อ้างอิงธนาคาร': 'Contract / bank reference',
+  'เช่น เลขที่วงเงินตามหนังสือธนาคาร': "e.g. the facility number on the bank's letter",
+
+  // ── รายงานการประชุม: สิทธิ์การเข้าถึงสามระดับ ─────────────────────────────
+  'สิทธิ์การเข้าถึงรายงานการประชุม': 'Who can read which minutes',
+  'สิทธิ์การเข้าถึง': 'Access',
+  'กำหนดว่ากลุ่มไหนใครอ่านได้': 'Set who can read each group',
+  'กลุ่มที่ล็อกจะไม่ปรากฏในรายการของผู้ที่ไม่มีสิทธิ์เลย — ไม่ใช่ขึ้นชื่อแล้วกดไม่ได้':
+    'A locked group is absent from the list for anyone without access — not shown and unopenable.',
+  'เปิดกลุ่มนี้ให้อ่านได้': 'Open this group for reading',
+  'รายงานทุกฉบับที่มีอยู่แล้วในกลุ่มนี้จะอ่านได้ทันที และการล็อกกลับภายหลังจะไม่เรียกคืน':
+    'Every existing set of minutes in this group becomes readable at once, and locking it again does not take that back.',
+  'เปิดให้อ่าน': 'Open',
+  'ล็อก': 'Locked',
+  'ยังไม่มีผู้อ่านที่ระบุชื่อ': 'No named readers',
+  'ล็อกไว้แต่ยังไม่มีใครถูกระบุชื่อ — ตอนนี้มีแต่ผู้ดูแลและผู้แก้ไขที่เข้าถึงได้':
+    'Locked with nobody named — only admins and editors can reach it right now.',
+  'ยังไม่มีใครถูกระบุชื่อ': 'Nobody named yet',
+  'อีเมล — วางหลายรายการพร้อมกันได้': 'Email — paste several at once',
+  'เพิ่มผู้อ่านแล้ว': 'Readers added',
+
+  // ── ปฐมนิเทศพนักงานใหม่ 90 วัน ────────────────────────────────────────────
+  'ปฐมนิเทศพนักงานใหม่': 'New employee onboarding',
+  'โปรแกรม 90 วัน — เอกสาร แผนกที่สังกัด และรายการที่ต้องทำในแต่ละช่วง': 'A 90-day programme — documents, your department, and what to do in each phase',
+  'ความคืบหน้ารวม': 'Overall',
+  'แผนกที่สังกัด': 'Department',
+  'ระดับพนักงาน': 'Level',
+  'ระดับต้น': 'Junior',
+  'ระดับอาวุโส': 'Senior',
+  'เลือกแผนกที่จะไปประจำก่อน': 'Choose your department first',
+  'รายการที่ต้องทำใน 90 วันแรกต่างกันไปตามแผนก': 'The first 90 days differ by department.',
+  'เอกสารที่ต้องส่ง': 'Documents',
+  'วันที่ {r}': 'Day {r}',
+  'จบโปรแกรม': 'Completion',
+  'ภาพรวมพนักงาน': 'Cohort',
+  'ส่งเอกสารครบแล้ว — เริ่มเฟสแรกได้เลย': 'All documents in — the first phase is open.',
+  'ยังเหลืออีก {n} รายการ จึงจะเริ่มเฟสแรกได้': '{n} still to go before the first phase opens.',
+  'ยกเลิกการส่ง': 'Mark as not sent',
+  'ทำเครื่องหมายว่าส่งแล้ว': 'Mark as sent',
+  'ส่งเอกสารให้ครบก่อน จึงจะเริ่มติ๊กรายการในเฟสนี้ได้ — เนื้อหาด้านล่างอ่านล่วงหน้าได้เลย': 'Send every document before ticking anything here — everything below can be read ahead of time.',
+  'ทำเฟสก่อนหน้าให้ครบก่อน จึงจะเริ่มติ๊กรายการในเฟสนี้ได้ — เนื้อหาด้านล่างอ่านล่วงหน้าได้เลย': 'Finish the previous phase before ticking anything here — everything below can be read ahead of time.',
+  'ครบ 90 วันแล้ว': '90 days complete',
+  'จบเฟสนี้แล้ว': 'Phase complete',
+  'อยู่หน้านี้ต่อ': 'Stay on this page',
+  'ไปหน้าจบโปรแกรม': 'Go to completion',
+  'ไปเฟสถัดไป': 'Next phase',
+  'ยินดีต้อนรับเข้าสู่ทีมอย่างเป็นทางการ': 'Welcome, officially, to the team.',
+  'ทำครบทุกรายการของเฟสนี้แล้ว': 'Every task in this phase is done.',
+  'ยังไม่ครบทุกเฟส': 'Not finished yet',
+  'กลับไปทำรายการที่เหลือให้ครบก่อน': 'Go back and finish what is left.',
+  'จบโปรแกรมปฐมนิเทศ 90 วัน': '90-day onboarding complete',
+  'ทำรายการครบทั้ง {n} รายการของ{dept}': 'All {n} tasks for {dept} are done.',
+  'เริ่ม': 'Started',
+  'พิมพ์ใบรับรอง': 'Print certificate',
+  'ยังไม่มีพนักงานเข้าโปรแกรม': 'Nobody has joined the programme yet.',
+  'อาวุโส': 'Senior',
+  'ต้น': 'Junior',
+  'ครบ': 'Complete',
+  'ยังไม่ครบ': 'Incomplete',
+  'ปิดแถบประกาศ': 'Dismiss announcement',
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { perfApi, perfPrefs } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -27,6 +27,19 @@ const dnum = (iso) => Number(iso.slice(8, 10));
  *  • รายสัปดาห์ (Weekly): 7-day grid, each cell = primary task (op→team / sup→detail)
  *    + optional 2nd task (pm). Click a slot → Picker. Autosaves per field.
  */
+/**
+ * โน้ตของวันที่มาจากการอนุมัติคำขอลา เก็บเป็น "[LV] <ประเภท> · <เลขที่คำขอ>"
+ *
+ * การอนุมัติเขียนรหัส Z-2 ลงช่องงานหลักเหมือนที่ HR พิมพ์มือทุกประการ ทั้งสอง
+ * กรณีจึงแยกจากกันไม่ออกถ้าไม่มี marker นี้ — จับที่ตัวอักษร [LV] เท่านั้น
+ * ไม่จับข้อความไทยข้างหลัง เพราะข้อความเป็นสิ่งที่แก้คำหรือแปลได้
+ */
+const leaveNote = (note) => {
+  const m = /^\[LV\]\s*([^·]+)(?:·\s*(.*))?$/.exec(String(note || '').trim());
+  return m ? { type: m[1].trim(), ref: (m[2] || '').trim() } : null;
+};
+
+
 export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) {
   const t = useT();
   const toast = useToast();
@@ -38,6 +51,10 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
   const [weekStart, setWeekStart] = useState(0);
   const [focus, setFocus] = useState(null);
   const [picker, setPicker] = useState(null); // { eid, date, field, anchor }
+  // หน้านี้ re-render แทบทุกครั้งที่บันทึกหรือพิมพ์ ถ้าส่ง arrow function ใหม่ทุกครั้ง
+  // effect ที่ผูก listener ในตัวเลือกจะถอดแล้วติดใหม่ไม่หยุด และมีจังหวะที่กลืนคลิก
+  // ที่ควรพาไปขั้นที่สอง — ข้อกำหนดฟังก์ชัน §3.2.3 ระบุจุดนี้ไว้ตรง ๆ
+  const closePicker = useCallback(() => setPicker(null), []);
   const [flash, setFlash] = useState('');
   const [showEmp, setShowEmp] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -166,7 +183,7 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
       {picker && (
         <Picker anchor={picker.anchor} activities={base.teams} categories={base.costs}
           onApply={(value) => { setCell(picker.eid, picker.date, picker.field, value, picker.unlock); setPicker(null); }}
-          onClose={() => setPicker(null)} />
+          onClose={closePicker} />
       )}
       {empPanel}
     </div>
@@ -319,6 +336,9 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
           <tbody>
             {d.employees.map((e) => {
               const op = e.kind === 'operation';
+              // ช่องงานหลักใช้คนละคอลัมน์ตามสายงาน: สายปฏิบัติการเก็บที่ team
+              // สายสนับสนุนเก็บที่ detail — ตามข้อกำหนดฟังก์ชัน §3.2.2 (primaryField(kind))
+              // ไม่ใช่การใช้ผิดคอลัมน์อย่างที่เคยเข้าใจ ชื่อคอลัมน์มาจากสเปรดชีตเดิม
               const primaryField = op ? 'team' : 'detail';
               const awaySet = new Set(e.away);
               return (
@@ -330,7 +350,8 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                   {visible.map((day) => {
                     if (awaySet.has(day.date)) return <td key={day.date} className="rounded bg-slate-50" />;
                     const v = (d.entries[e.eid] || {})[day.date] || {};
-                    const amVal = op ? (v.team || '') : (v.detail || '');
+                    const amVal = (op ? v.team : v.detail) || '';
+                    const lv = leaveNote(v.note);
                     const locked = day.date < cutoff || day.date > ahead;
                     const isFocus = focus && focus.eid === e.eid && focus.date === day.date;
                     // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window
@@ -339,6 +360,12 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                       <td key={day.date} className={`rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
                         <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked} onOpen={onOpen} />
                         <Slot val={v.pm || ''} field="pm" isSecond weekend={day.weekend} locked={locked} onOpen={onOpen} />
+                        {lv && (
+                          <div title={lv.ref ? `${t('จากคำขอลาเลขที่')} ${lv.ref}` : undefined}
+                            className="mt-0.5 truncate rounded bg-indigo-50 px-1 text-[9px] font-medium leading-4 text-indigo-700">
+                            ✓ {t(lv.type, null, 'leave')}
+                          </div>
+                        )}
                       </td>
                     );
                   })}

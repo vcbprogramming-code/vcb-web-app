@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import ExcelJS from 'exceljs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import { suite, happy, bad, report, U, warm, APP, API, tok, query } from './harness.mjs';
+import { suite, happy, bad, report, U, warm, APP, API, tok, query, call } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 const SHOTS = `${ROOT}/worklog-feedback`;
@@ -20,6 +20,21 @@ const DL = `${SHOTS}/downloads`;
 fs.rmSync(DL, { recursive: true, force: true });
 fs.mkdirSync(DL, { recursive: true });
 await warm();
+
+// ชุดนี้ตรวจความสามารถที่มาจาก "เอกสารเกณฑ์ตรวจรับ" ซึ่งตอนนี้ปิดไว้เป็นค่า
+// เริ่มต้น เพราะระบบที่ลูกค้าใช้จริงไม่มี — โค้ดยังอยู่ครบและเปิดกลับได้
+// ต้องรัน API ด้วย WORKLOG_FEATURES=all จึงจะทดสอบส่วนนี้ได้
+{
+  const boot = await call('/performance/bootstrap', { user: U.admin });
+  const need = ['verify','periodClose','mandayEntry','attachments','employeeImport','leaveAttachment'];
+  const off = need.filter((f) => !boot.features?.[f]);
+  if (off.length) {
+    console.log(`\nข้าม ${off.length} ความสามารถที่ปิดอยู่: ${off.join(', ')}`);
+    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้');
+    // พิมพ์บรรทัดสรุปด้วย ไม่งั้นตัวรันรวมอ่านผลไม่เจอแล้วนับว่าชุดนี้ล้ม
+    process.exit(report());
+  }
+}
 
 const { admin: A } = U;
 const MARK = 'ZZFB';
@@ -52,14 +67,24 @@ for (const [i, n] of NAMES.entries()) {
     [site.id, `${MARK} ${n}`, `${MARK}-${String(i + 1).padStart(3, '0')}`])).rows[0]);
 }
 await query('insert into profile_units (profile_id, unit_id) values ($1,$2) on conflict do nothing', [A.id, site.id]);
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-worklog-feedback`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  headless: false, userDataDir: `${ROOT}/chrome-profile`,
+  headless: false, userDataDir: `${ROOT}/chrome-worklog-feedback`,
   defaultViewport: { width: 1440, height: 950 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const cdp = await page.createCDPSession();
 await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL, eventsEnabled: true });
 const settle = (ms = 2200) => new Promise((r) => setTimeout(r, ms));
@@ -344,8 +369,8 @@ suite('ข้อ 7 ค่าเดิม → ค่าใหม่ ในปร�
   });
   await settle(3000);
 
-  await clickText('รายงานและตรวจสอบ'); await settle(3000);
-  happy('เปิดแท็บรายงานและตรวจสอบได้', (await body()).includes('ประวัติการแก้ไข') || (await body()).includes('ผู้ทำรายการ'), '');
+  await clickText('รายงาน'); await settle(3000);
+  happy('เปิดแท็บรายงานได้', (await body()).includes('ประวัติการแก้ไข') || (await body()).includes('ผู้ทำรายการ'), '');
 
   const cells = await page.evaluate(() => {
     const table = [...document.querySelectorAll('table')]

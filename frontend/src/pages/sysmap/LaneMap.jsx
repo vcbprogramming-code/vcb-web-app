@@ -1,17 +1,18 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { pick, connMeta } from '../../lib/sysmap.js';
+import { pick, connMeta, CONN_META } from '../../lib/sysmap.js';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
  * The process map: one row per lane, boxes left to right in sequence.
  *
- * All 129 connections drawn at once is a hairball nobody can read — which is why
- * the source app hides them behind a "click a box to trace it" mode too. So the
- * lines appear for the SELECTED box only: what feeds it, and what it feeds. That
- * is the question people actually bring to this diagram.
+ * Two ways to read it. Click a box and only its own lines are drawn — what feeds
+ * it and what it feeds — which is the question most people bring here. Or turn
+ * on "ทุกเส้น" and the whole web of 129 appears at once, the way the reference
+ * app draws it, for someone reading the shape of the whole process rather than
+ * following one thread.
  */
-export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, onSelect, filterDept, layer }) {
+export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, onSelect, filterDept, layer, showAll }) {
   const t = useT();
   const wrapRef = useRef(null);
   const boxRefs = useRef(new Map());
@@ -44,7 +45,7 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
   // Measure after paint: the boxes are laid out by flexbox, so their positions
   // are only known once the browser has done it.
   useLayoutEffect(() => {
-    if (!selected || !related) { setEdges([]); return undefined; }
+    if (!showAll && (!selected || !related)) { setEdges([]); return undefined; }
     const draw = () => {
       const wrap = wrapRef.current;
       if (!wrap) return;
@@ -60,21 +61,20 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
           mid: r.top - w.top + wrap.scrollTop + r.height / 2,
         };
       };
-      const me = at(selected);
-      if (!me) return;
       const made = [];
-      for (const c of [...related.inn, ...related.out]) {
-        const incoming = c.to_node === selected;
-        const other = at(incoming ? c.from_node : c.to_node);
-        if (!other) continue;
-        const from = incoming ? other : me;
-        const to = incoming ? me : other;
+      // เส้นที่จะวาด: ทั้งหมด หรือเฉพาะของกล่องที่เลือก
+      const list = showAll ? conns : [...related.inn, ...related.out];
+      for (const c of list) {
+        const from = at(c.from_node);
+        const to = at(c.to_node);
+        if (!from || !to) continue;
         // leave from whichever side faces the target so lines don't cross the box
         const x1 = from.right <= to.left ? from.right : from.left;
         const x2 = from.right <= to.left ? to.left : to.right;
         const midX = (x1 + x2) / 2;
         made.push({
           id: c.id,
+          faded: showAll && selected && c.from_node !== selected && c.to_node !== selected,
           d: `M ${x1} ${from.mid} C ${midX} ${from.mid}, ${midX} ${to.mid}, ${x2} ${to.mid}`,
           ...connMeta(c.conn_type),
           label: c.label,
@@ -87,15 +87,33 @@ export default function LaneMap({ lanes, nodes, conns, depts, lang, selected, on
     if (wrapRef.current) ro.observe(wrapRef.current);
     window.addEventListener('resize', draw);
     return () => { ro.disconnect(); window.removeEventListener('resize', draw); };
-  }, [selected, related, lanes, nodes, filterDept, layer, lang]);
+  }, [selected, related, showAll, conns, lanes, nodes, filterDept, layer, lang]);
 
   return (
     <div ref={wrapRef} className="relative overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3">
+      {/* คำอธิบายสัญลักษณ์ — สีเส้นบอกความสัมพันธ์ จุดหน้ากล่องบอกว่าอยู่ใน ERP
+          หรือทำด้วยมือ ถ้าไม่บอกไว้ ผู้อ่านต้องเดาจากสีเอง */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-slate-500">
+        {Object.entries(CONN_META).map(([k, m]) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-5 rounded" style={{ background: m.color }} />
+            {t(m.label)}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" /> {t('อยู่ในระบบ ERP')}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-400" /> {t('ทำด้วยมือ')}
+        </span>
+      </div>
       {edges.length > 0 && (
         <svg className="pointer-events-none absolute left-0 top-0" width={box.w} height={box.h} aria-hidden="true">
           {edges.map((e) => (
-            <path key={e.id} d={e.d} fill="none" stroke={e.color} strokeWidth="2"
-              strokeDasharray={e.label === 'ทำภายหลัง' ? '5 4' : undefined} opacity="0.85" />
+            <path key={e.id} d={e.d} fill="none" stroke={e.color}
+              strokeWidth={e.faded ? 1 : 2}
+              strokeDasharray={e.label === 'ทำภายหลัง' ? '5 4' : undefined}
+              opacity={e.faded ? 0.16 : 0.85} />
           ))}
         </svg>
       )}

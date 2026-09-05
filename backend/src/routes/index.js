@@ -9,6 +9,7 @@ import adminRoutes from './admin.routes.js';
 import performanceRoutes from './performance.routes.js';
 import creditRoutes from './credit.routes.js';
 import onboardingRoutes from './onboarding.routes.js';
+import onboardingProgramRoutes from './onboardingProgram.routes.js';
 import announcementRoutes from './announcements.routes.js';
 import supportRoutes from './support.routes.js';
 import sopRoutes from './sop.routes.js';
@@ -54,6 +55,9 @@ router.use('/performance', moduleGate('performance'), performanceRoutes);
 router.use('/credit', moduleGate('credit'), creditRoutes);
 // Module 4: Onboarding 90 days
 router.use('/onboarding', moduleGate('onboarding'), onboardingRoutes);
+// โปรแกรมปฐมนิเทศ 90 วันตามที่ลูกค้าใช้จริง — คนละสิ่งกับเครื่องมือฝั่ง HR ข้างบน
+// ซึ่งเก็บไว้เพราะยังมีแม่แบบแผนที่ใช้อยู่ ทั้งคู่อยู่ใต้ประตูโมดูลเดียวกัน
+router.use('/onboarding-program', moduleGate('onboarding'), onboardingProgramRoutes);
 // Module 5: SOP (คู่มือปฏิบัติงาน) — reference content, gated like the rest
 router.use('/sop', moduleGate('sop'), sopRoutes);
 // แผนผังระบบ: how the group works, as data. Read by everyone, edited by admins.

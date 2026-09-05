@@ -12,9 +12,11 @@ import { useT } from '../../lib/i18n.jsx';
  * came from, and who last touched it are the three questions that get asked
  * together when a number looks wrong.
  */
+// รายงานหลักของระบบจริงคือ "สรุปวันทำงานรายหมวดงาน/กิจกรรม" — หมวดต้นทุนจึง
+// มาก่อน เพราะเป็นมุมที่เอาไปกระจายค่าแรงลงงานตามสัญญาได้จริง
 const GROUPS = [
-  ['project', 'รายโครงการ'], ['team', 'รายทีม'],
-  ['worktype', 'รายประเภทงาน'], ['employee', 'รายพนักงาน'],
+  ['cost', 'รายหมวดต้นทุน'], ['worktype', 'รายประเภทงาน'],
+  ['project', 'รายโครงการ'], ['employee', 'รายพนักงาน'],
 ];
 const iso = (d) => d.toISOString().slice(0, 10);
 
@@ -86,30 +88,33 @@ const ACTION_TH = {
  * a comparison, and the monthly report is explicitly required to cover them all.
  * The site picker still scopes the audit trail, which is about one site's rows.
  */
-export default function ReportsView({ site }) {
+export default function ReportsView({ site, features = {} }) {
   const t = useT();
   const toast = useToast();
   const today = new Date();
   const [from, setFrom] = useState(() => iso(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [to, setTo] = useState(() => iso(today));
-  const [groupBy, setGroupBy] = useState('project');
+  const [groupBy, setGroupBy] = useState('cost');
   const [manpower, setManpower] = useState(null);
   const [report, setReport] = useState(null);
   const [audit, setAudit] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [busy, setBusy] = useState(false);
 
+  // กำลังคนกับรายการแจ้งเตือนเป็นส่วนเสริมที่ระบบจริงไม่มี — ไม่เรียกเลยเมื่อปิดอยู่
+  // (เส้นทางฝั่งเซิร์ฟเวอร์ตอบ 404 ด้วย การเรียกไปก็ได้แค่ error ให้ผู้ใช้เห็น)
   const load = useCallback(() => {
     setBusy(true);
+    const none = Promise.resolve({ data: null });
     Promise.all([
-      perfApi.manpower({ from, to }),
+      features.manpower ? perfApi.manpower({ from, to }) : none,
       perfApi.mandayReport({ from, to, groupBy }),
       perfApi.workAudit({ site, from, to }),
-      perfApi.alerts(),
+      features.alerts ? perfApi.alerts() : none,
     ]).then(([m, r, a, al]) => {
       setManpower(m.data); setReport(r.data); setAudit(a.data || []); setAlerts(al.data || []);
     }).catch((e) => toast.error(e.message)).finally(() => setBusy(false));
-  }, [from, to, groupBy, site, toast]);
+  }, [from, to, groupBy, site, toast, features.manpower, features.alerts]);
   useEffect(load, [load]);
 
   const downloadPdf = async () => {
@@ -156,7 +161,7 @@ export default function ReportsView({ site }) {
 
   return (
     <div className="space-y-4">
-      {alerts.length > 0 && (
+      {features.alerts && alerts.length > 0 && (
         <div className="card-sm border-l-4 border-amber-400">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
             <Icon name="bell" className="h-4 w-4 text-amber-500" /> {t('รายการที่ต้องดำเนินการ')} ({alerts.length})
@@ -197,43 +202,45 @@ export default function ReportsView({ site }) {
         </div>
       </div>
 
-      {busy && !manpower ? <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div> : (
+      {busy && !report ? <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div> : (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="card-sm">
               <div className="text-xs font-semibold text-slate-500">{t('รวมแรงงาน-วัน')}</div>
               <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
-                {(manpower?.total?.manday || 0).toFixed(2)}
+                {(report?.total || 0).toFixed(2)}
+              </div>
+              {/* บอกที่มาของตัวเลขไว้ตรงนี้ เพราะเป็นจุดที่คนเข้าใจผิดบ่อยที่สุด */}
+              <div className="mt-1 text-[11px] text-slate-400">
+                {t('หนึ่งวันที่มีงานลง = 1 แรงงาน-วัน · ลงสองงานในวันเดียวแบ่งเป็น 0.5/0.5')}
               </div>
             </div>
             <div className="card-sm">
-              <div className="text-xs font-semibold text-slate-500">{t('จำนวนคนที่มีบันทึก')}</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{manpower?.total?.people || 0}</div>
-            </div>
-            <div className="card-sm">
-              <div className="text-xs font-semibold text-slate-500">{t('จำนวนรายการ')}</div>
-              <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{manpower?.total?.rows || 0}</div>
+              <div className="text-xs font-semibold text-slate-500">{t('จำนวนรายการในรายงาน')}</div>
+              <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{(report?.rows || []).length}</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">{t('กำลังคนรายโครงการ')}</h3>
-              <Bar rows={manpower?.byProject || []} unit={t('วัน')} />
+          {features.manpower && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="card">
+                <h3 className="mb-3 font-bold text-slate-800">{t('กำลังคนรายโครงการ')}</h3>
+                <Bar rows={manpower?.byProject || []} unit={t('วัน')} />
+              </div>
+              <div className="card">
+                <h3 className="mb-3 font-bold text-slate-800">{t('สัดส่วนตามประเภทงาน')}</h3>
+                <Bar rows={manpower?.byWorkType || []} unit={t('วัน')} />
+              </div>
+              <div className="card">
+                <h3 className="mb-3 font-bold text-slate-800">{t('กำลังคนรายทีม')}</h3>
+                <Bar rows={manpower?.byTeam || []} unit={t('วัน')} />
+              </div>
+              <div className="card">
+                <h3 className="mb-3 font-bold text-slate-800">{t('แยกตามสถานะการทำงาน')}</h3>
+                <Bar rows={manpower?.byStatus || []} unit={t('วัน')} />
+              </div>
             </div>
-            <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">{t('สัดส่วนตามประเภทงาน')}</h3>
-              <Bar rows={manpower?.byWorkType || []} unit={t('วัน')} />
-            </div>
-            <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">{t('กำลังคนรายทีม')}</h3>
-              <Bar rows={manpower?.byTeam || []} unit={t('วัน')} />
-            </div>
-            <div className="card">
-              <h3 className="mb-3 font-bold text-slate-800">{t('แยกตามสถานะการทำงาน')}</h3>
-              <Bar rows={manpower?.byStatus || []} unit={t('วัน')} />
-            </div>
-          </div>
+          )}
 
           <div className="card overflow-hidden !p-0">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">

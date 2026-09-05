@@ -128,6 +128,30 @@ export default function Portal() {
 
   const [awaiting, setAwaiting] = useState(0);
   const [announcements, setAnnouncements] = useState([]);
+  // ประกาศที่ปักหมุดขึ้นเป็นแถบเด่นด้านบนก่อน กดปิดแล้วจึงย้ายไปอยู่ในการ์ด
+  // ประกาศด้านล่าง — ไม่แสดงข้อความเดียวกันสองที่บนจอเดียวกัน
+  const [dismissed, setDismissed] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('vcb_ann_dismissed') || '[]')); }
+    catch { return new Set(); }
+  });
+  const dismiss = (id) => {
+    setDismissed((prev) => {
+      const next = new Set(prev); next.add(String(id));
+      // เก็บเป็นข้อความทึบ ไม่ตีความ — ค่าที่ค้างจากรุ่นก่อนจึงแปลว่า "ไม่ใช่อันนี้"
+      // อย่างมากก็แค่เห็นแถบอีกครั้ง ซึ่งเป็นผลลัพธ์ที่ถูกต้อง
+      try { localStorage.setItem('vcb_ann_dismissed', JSON.stringify([...next])); } catch { /* โหมดส่วนตัว */ }
+      return next;
+    });
+  };
+
+  // แถบเด่นแสดงประกาศที่ปักหมุดอันแรกที่ยังไม่ถูกปิด — ที่เหลือ (และอันที่ถูกปิดแล้ว)
+  // ไปอยู่ในการ์ดประกาศ เพื่อไม่ให้ข้อความเดียวกันซ้ำสองที่บนจอเดียว
+  const banner = useMemo(
+    () => announcements.find((a) => a.pinned && !dismissed.has(String(a.id))) || null,
+    [announcements, dismissed]);
+  const panelAnnouncements = useMemo(
+    () => announcements.filter((a) => !banner || a.id !== banner.id),
+    [announcements, banner]);
   const [annErr, setAnnErr] = useState(false);
   const [q, setQ] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -249,8 +273,21 @@ export default function Portal() {
               <div className="space-y-6 lg:col-span-2">
                 <WelcomeCard name={shortName} />
 
+                {/* แถบประกาศเด่น — ตัดข้อความไว้สองบรรทัดเสมอ ไม่ให้ยืดตามความยาว */}
+                {banner && (
+                  <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${ANNOUNCE_STYLE[banner.level] || ANNOUNCE_STYLE.info}`}>
+                    <Icon name="bell" className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold">{t(banner.title)}</div>
+                      {banner.body && <div className="mt-0.5 line-clamp-2 text-sm opacity-90">{banner.body}</div>}
+                    </div>
+                    <button onClick={() => dismiss(banner.id)} aria-label={t('ปิดแถบประกาศ')}
+                      className="shrink-0 rounded p-1 opacity-60 hover:opacity-100">×</button>
+                  </div>
+                )}
+
                 {/* announcements — a failed fetch is shown, not silently hidden */}
-                {(announcements.length > 0 || annErr) && (
+                {(panelAnnouncements.length > 0 || annErr) && (
                   <div className="space-y-2">
                     <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700"><Icon name="bell" className="h-4 w-4 text-brand" /> ประกาศ</h2>
                     {annErr ? (
@@ -259,7 +296,7 @@ export default function Portal() {
                         <button onClick={() => { setAnnErr(false); portalApi.announcements().then((r) => setAnnouncements(r.data || [])).catch(() => setAnnErr(true)); }}
                           className="ml-2 font-semibold text-brand hover:underline">{t('ลองใหม่')}</button>
                       </div>
-                    ) : announcements.map((a) => (
+                    ) : panelAnnouncements.map((a) => (
                       <div key={a.id} className={`rounded-xl border px-4 py-3 ${ANNOUNCE_STYLE[a.level] || ANNOUNCE_STYLE.info}`}>
                         <div className="flex items-center gap-1.5 text-sm font-semibold">
                           {a.pinned && <Icon name="pin" className="h-3.5 w-3.5 shrink-0" />}{t(a.title)}

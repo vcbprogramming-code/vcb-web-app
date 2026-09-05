@@ -27,7 +27,7 @@ let facId = null;
 {
   const r = await call('/credit/facilities', { method: 'POST', user: A, body: {
     projectId: project.id, company: `${MARK} บริษัททดสอบ`, bank: 'ธนาคารทดสอบ',
-    facilityNo: 'ZZ-1', type: 'B/E (AVAL)', limit: 1000000, usedBaseline: 0,
+    facilityNo: 6, limit: 1000000, usedBaseline: 0,   // 6 = B/E รับรอง/อาวัลตั๋ว
     interestRate: 1.0, notes: `${MARK}` } });
   happy('เพิ่มวงเงินได้', r.status === 201 || r.status === 200, `${r.status}`);
   facId = r.data?.id; if (facId) made.fac.push(facId);
@@ -39,13 +39,13 @@ let facId = null;
 
   bad('ประเภทวงเงินที่ระบบไม่รู้จัก → 400',
     (await call('/credit/facilities', { method: 'POST', user: A, body: {
-      projectId: project.id, facilityNo: 'ZZ-7', type: 'ไม่มีประเภทนี้', limit: 1 } })).status === 400, '');
+      projectId: project.id, facilityNo: 99, limit: 1 } })).status === 400, '');
   bad('วงเงินติดลบไม่ได้',
     (await call('/credit/facilities', { method: 'POST', user: A, body: {
-      projectId: project.id, facilityNo: 'ZZ-9', type: 'B/E (AVAL)', limit: -5 } })).status === 400, '');
+      projectId: project.id, facilityNo: 6, limit: -5 } })).status === 400, '');
   bad('โครงการที่ไม่มีอยู่จริง → ไม่ผ่าน',
     [400, 404].includes((await call('/credit/facilities', { method: 'POST', user: A, body: {
-      projectId: '00000000-0000-0000-0000-000000000000', facilityNo: 'ZZ-8', type: 'B/E (AVAL)', limit: 1 } })).status), '');
+      projectId: '00000000-0000-0000-0000-000000000000', facilityNo: 6, limit: 1 } })).status), '');
 }
 
 // ── 2. การเบิกใช้ ──────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ let ledId = null;
   bad('แก้ยอดเบิกเป็นติดลบภายหลังไม่ได้',
     (await call(`/credit/ledger/${ledId}`, { method: 'PATCH', user: A, body: { amount: -999 } })).status === 400, '');
   const clean = ((await call('/credit/facilities', { user: A })).data || []).find((x) => x.id === facId);
-  happy('คงเหลือไม่มีทางเกินวงเงินที่ตั้งไว้', Number(clean.available) <= 1000000, String(clean.available));
+  happy('คงเหลือไม่มีทางเกินวงเงินที่ตั้งไว้', Number(clean?.available) <= 1000000, String(clean?.available));
   bad('เลขที่รายการที่ไม่ใช่รูปแบบ id → 404 ไม่ใช่ 500',
     (await call('/credit/ledger/not-a-uuid/settle', { method: 'POST', user: A, body: {} })).status === 404, '');
 }
@@ -171,14 +171,14 @@ suite('6. สิทธิ์ — ข้อมูลการเงินต้�
 
   bad('คนที่ไม่มีสิทธิ์เปิดดูไม่ได้', (await call('/credit/facilities', { user: H })).status === 403, '');
   bad('คนที่ไม่มีสิทธิ์เพิ่มวงเงินไม่ได้',
-    (await call('/credit/facilities', { method: 'POST', user: H, body: { projectId: project.id, facilityNo: 'x', type: 'B/E (AVAL)', limit: 1 } })).status === 403, '');
+    (await call('/credit/facilities', { method: 'POST', user: H, body: { projectId: project.id, facilityNo: 6, limit: 1 } })).status === 403, '');
 
   // ดูได้อย่างเดียวต้องไม่กลายเป็นแก้ได้
   await query(`update profiles set permissions = $2 where id = $1`,
     [H.id, JSON.stringify({ ...withoutCredit, credit: { view: true, edit: false } })]);
   happy('เปิดสิทธิ์ "ดูข้อมูล" ให้รายบุคคลแล้วเปิดดูได้จริง', (await call('/credit/facilities', { user: H })).status === 200, '');
   bad('แต่ยังเพิ่มวงเงินไม่ได้',
-    (await call('/credit/facilities', { method: 'POST', user: H, body: { projectId: project.id, facilityNo: 'x', type: 'P/N', limit: 1 } })).status === 403, '');
+    (await call('/credit/facilities', { method: 'POST', user: H, body: { projectId: project.id, facilityNo: 7, limit: 1 } })).status === 403, '');
   await query('update profiles set permissions = $2 where id = $1', [H.id, hrPerms]);
 
   happy('ผู้บริหารเปิดดูได้', (await call('/credit/facilities', { user: C })).status === 200, '');
@@ -212,13 +212,13 @@ await query('delete from credit_requests where facility_id = any($1)', [made.fac
 await query('delete from facilities where company like $1 or notes like $1', [`%${MARK}%`]);
 // the permission checks post a facility they expect to be refused; when one of
 // them is wrong the row lands anyway, so it is swept by its marker too
-await query("delete from credit_ledger where facility_id in (select id from facilities where facility_no = 'x')");
-await query("delete from facilities where facility_no = 'x'");
+await query(`delete from credit_ledger where facility_id in (select id from facilities where notes like '${MARK}%')`);
+await query(`delete from facilities where notes like '${MARK}%'`);
 await query('delete from cash_plans where note like $1', [`%${MARK}%`]);
 await query('delete from cash_plans where id = any($1)', [made.plan]);
 // count the cash plans too — they were the one table the sweep used to miss
 const left = await query(
-  `select (select count(*) from facilities where notes like $1 or facility_no = 'x')::int f,
+  `select (select count(*) from facilities where notes like $1)::int f,
           (select count(*) from credit_ledger where ref like $1)::int l,
           (select count(*) from cash_plans where note like $1)::int c`, [`%${MARK}%`]);
 suite('9. ไม่ทิ้งข้อมูลทดสอบไว้');

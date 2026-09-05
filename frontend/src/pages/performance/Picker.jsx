@@ -32,14 +32,33 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
   }, [anchor, step]);
 
   useEffect(() => { searchRef.current?.focus(); }, [step]);
+  // ตัวปิดเมื่อคลิกนอกกล่องต้องทำงานที่ capture phase
+  //
+  // กดรายการที่เป็น one-to-many แล้ว pick() เรียก setStep(2) ทันทีใน discrete
+  // event — React 18 flush แบบ synchronous ไม่ batch แถวขั้นที่หนึ่งจึงถูกถอด
+  // ออกจาก DOM ไปแล้วก่อนที่ listener แบบ bubble บน document จะได้ทำงาน พอถึง
+  // คิว .contains() ก็ตอบ false อย่างถูกต้องตามสิ่งที่มันเห็น เพราะ node นั้น
+  // ไม่อยู่ใน DOM แล้ว ผลคือกล่องปิดแทนที่จะไปขั้นที่สอง
+  //
+  // capture phase ทำงานขาลง ก่อน React จะ dispatch และก่อน node ถูกถอด จึงเห็น
+  // DOM ตามสภาพจริงตอนที่เมาส์กดลงเสมอ — ข้อกำหนดฟังก์ชัน §3.2.3 บันทึกบั๊กนี้ไว้
   useEffect(() => {
     const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') { if (step === 2) { setStep(1); setQ(''); } else onClose(); } };
-    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [step, onClose]);
 
-  const items = step === 1 ? activities : categories;
+  // ขั้นที่สองต้องเหลือเฉพาะหมวดต้นทุนที่รหัสงานนั้นใช้ได้จริง (allowed_cost)
+  // ระบบเดิมของลูกค้ากรองตรงนี้ การปล่อยให้เลือกได้ทุกหมวดทำให้ค่าแรงลงผิดหมวด
+  // โดยไม่มีอะไรฟ้อง — รหัสที่ไม่ระบุไว้ (กลุ่ม Z) ยังเลือกได้ทั้งหมดตามเดิม
+  const allowed = String(pending?.allowed_cost || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const allowedCats = allowed.length ? categories.filter((c) => allowed.includes(String(c.code))) : categories;
+  const items = step === 1 ? activities : allowedCats;
   const query = q.trim().toLowerCase();
   const filtered = query
     ? items.filter((it) => [it.name, it.desc, it.category, it.code].some((x) => String(x || '').toLowerCase().includes(query)))
@@ -69,7 +88,16 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
         {step === 1
           ? <><span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">1/2</span> {t('เลือกกิจกรรม')}</>
-          : <><span className="text-lg leading-none">‹</span> <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span> {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b></>}
+          : <>
+              <span className="text-lg leading-none">‹</span>
+              <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span>
+              {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b>
+              {allowed.length > 0 && (
+                <span className="ml-auto text-[11px] font-normal text-slate-400">
+                  {t('ใช้ได้ {n} หมวด', { n: allowed.length })}
+                </span>
+              )}
+            </>}
       </div>
       <div className="flex items-center gap-2 border-b border-slate-100 px-2 py-1.5">
         <input ref={searchRef} type="text" placeholder={t('ค้นหา…')} autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}

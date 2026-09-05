@@ -11,6 +11,21 @@ import { call, suite, happy, bad, report, U, warm, query, API } from './harness.
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 await warm();
+
+// ชุดนี้ตรวจความสามารถที่มาจาก "เอกสารเกณฑ์ตรวจรับ" ซึ่งตอนนี้ปิดไว้เป็นค่า
+// เริ่มต้น เพราะระบบที่ลูกค้าใช้จริงไม่มี — โค้ดยังอยู่ครบและเปิดกลับได้
+// ต้องรัน API ด้วย WORKLOG_FEATURES=all จึงจะทดสอบส่วนนี้ได้
+{
+  const boot = await call('/performance/bootstrap', { user: U.admin });
+  const need = ['verify','periodClose','mandayEntry','attachments','alerts','orgRegistry','employeeImport','leaveHalfDay','leaveAttachment'];
+  const off = need.filter((f) => !boot.features?.[f]);
+  if (off.length) {
+    console.log(`\nข้าม ${off.length} ความสามารถที่ปิดอยู่: ${off.join(', ')}`);
+    console.log('ตั้ง WORKLOG_FEATURES=all ที่ฝั่ง API แล้วรันใหม่เพื่อทดสอบส่วนนี้');
+    // พิมพ์บรรทัดสรุปด้วย ไม่งั้นตัวรันรวมอ่านผลไม่เจอแล้วนับว่าชุดนี้ล้ม
+    process.exit(report());
+  }
+}
 const { admin: A, exec: C, hr: H } = U;
 const MARK = 'ZZUAT';
 const today = new Date();
@@ -44,13 +59,26 @@ suite('§2 ข้อมูลหลัก (Master Data)');
   const list = await call(`/performance/teams?site=${site.code}`, { user: A });
   happy('อ่านทะเบียนทีมกลับมาได้', (list.data || []).some((x) => x.name.includes(`${MARK} ทีม ก`)), '');
 
+  // ทะเบียนงานยึดตามระบบที่ลูกค้าใช้จริง (VCB_WORK_TYPES 44 รหัส) ไม่ใช่ตัวอย่าง
+  // ที่เราตั้งขึ้นเอง — กลุ่ม Z "ไม่ปฏิบัติงาน" ของจริงมีสามรหัสเท่านั้น
+  //
+  // เอกสารเกณฑ์ตรวจรับระบุ "ฝึกอบรม" กับ "หยุดเนื่องจากสภาพอากาศ" ไว้ด้วย แต่
+  // ทะเบียนจริงไม่มี ต้องตกลงกับลูกค้าว่าจะเพิ่มเข้าทะเบียนหรือตัดออกจากเกณฑ์
   const acts = await call('/performance/activities', { user: A });
-  const names = JSON.stringify(acts.data || acts);
-  for (const w of ['Standby', 'ฝึกอบรม', 'สภาพอากาศ']) {
+  const rows = acts.data || [];
+  const names = JSON.stringify(rows);
+  happy(`ทะเบียนประเภทงานครบตามระบบจริง (${rows.length} รหัส)`, rows.length === 44, `${rows.length}`);
+  for (const w of ['Standby', 'ลา', 'ลาออก']) {
     happy(`ทะเบียนประเภทงานครอบคลุม "${w}"`, names.includes(w), '');
   }
-  happy('ประเภทงานแยก 2 ระดับ (กิจกรรม + หมวดต้นทุน)',
-    (await call('/performance/cost-categories', { user: A })).status === 200, '');
+  const cats = await call('/performance/cost-categories', { user: A });
+  happy('ประเภทงานแยก 2 ระดับ (กิจกรรม + หมวดต้นทุน)', cats.status === 200, '');
+  happy(`หมวดต้นทุนครบตามระบบจริง (${(cats.data || []).length} หมวด)`,
+    (cats.data || []).length === 20, `${(cats.data || []).length}`);
+  // รหัสงานแต่ละตัวต้องบอกได้ว่าใช้กับหมวดต้นทุนไหน มิฉะนั้นขั้นที่สองกรองไม่ได้
+  happy('รหัสงานระบุหมวดต้นทุนที่ใช้ได้',
+    rows.filter((r) => (r.allowed_cost || '').trim()).length >= 41,
+    `${rows.filter((r) => (r.allowed_cost || '').trim()).length}/44`);
 }
 
 // ── §2 ทะเบียนแผนกและตำแหน่ง ──────────────────────────────────────────────

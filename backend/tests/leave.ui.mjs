@@ -21,14 +21,24 @@ const unit = (await query('select id, code, name from units where code is not nu
 const emp = (await query(
   `insert into employees (full_name, employee_code, unit_id, is_active, kind)
    values ($1,'ZZUI1',$2,true,'operation') returning id`, [`${MARK} พนักงานทดสอบลา`, unit.id])).rows[0];
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-leave`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  headless: false, userDataDir: `${ROOT}/chrome-profile`,
+  headless: false, userDataDir: `${ROOT}/chrome-leave`,
   defaultViewport: { width: 1440, height: 1000 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 const body = () => page.evaluate(() => document.body.innerText);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png` });
@@ -123,8 +133,16 @@ suite('3. อนุมัติแล้ววันลาเข้าตาร�
   await call(`/performance/leave/${reqId}/decide`, { method: 'POST', user: U.exec, body: { approve: true } });
   // ปลดการผูกทันที ไม่ให้กระทบข้อถัดไปที่ตรวจว่ายังมีพนักงานที่ไม่มีหัวหน้า
   await query('delete from leave_approvers where approver_id = $1 and employee_id = $2', [U.exec.id, emp.id]);
-  const away = await query('select ymd from employee_away where leave_request_id = $1', [reqId]);
-  happy('เขียนวันลาลงตารางงาน 3 วัน', away.rows.length === 3, `${away.rows.length}`);
+  // การอนุมัติเขียนรหัส Z-2 ลงตารางงานพร้อมโน้ต [LV] ไม่ใช่ทำเครื่องหมาย away
+  // (ข้อกำหนดฟังก์ชัน §3.2.2) — สายปฏิบัติการลงช่อง team สายสนับสนุนลงช่อง detail
+  const logs = await query(
+    `select w.ymd::text ymd, case when e.kind = 'operation' then w.team else w.detail end slot1, w.note
+       from work_logs w join employees e on e.id = w.employee_id
+      where w.employee_id = $1 and w.deleted_at is null order by w.ymd`, [emp.id]);
+  happy('เขียนวันลาลงตารางงาน 3 วัน', logs.rows.length === 3, `${logs.rows.length}`);
+  happy('ลงเป็นรหัส Z-2 พร้อมโน้ต [LV]',
+    logs.rows.every((x) => x.slot1 === 'Z-2' && String(x.note || '').startsWith('[LV]')),
+    logs.rows.map((x) => `${x.slot1}|${x.note}`).join(' · '));
 
   await as(A);
   await clickText('การลา');

@@ -13,6 +13,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import Performance from './pages/performance/Performance.jsx';
 import CreditFacility from './pages/credit/CreditFacility.jsx';
 import Onboarding from './pages/onboarding/Onboarding.jsx';
+import OnboardingProgram from './pages/onboarding/Program.jsx';
 import Sop from './pages/sop/Sop.jsx';
 import SystemMap from './pages/sysmap/SystemMap.jsx';
 import Meetings from './pages/meetings/Meetings.jsx';
@@ -85,6 +86,8 @@ export default function App() {
           />
 
           <Route path="onboarding" element={<Feature path="/onboarding"><Onboarding /></Feature>} />
+          {/* โปรแกรม 90 วันที่พนักงานใหม่เดินเอง — คนละหน้ากับเครื่องมือฝั่ง HR */}
+          <Route path="onboarding/program" element={<Feature path="/onboarding"><OnboardingProgram /></Feature>} />
 
           <Route path="sop" element={<Feature path="/sop"><Sop /></Feature>} />
 

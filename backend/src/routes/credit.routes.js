@@ -7,7 +7,26 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff } from '../services/credit.js';
 
-const FACILITY_TYPES = ['L/G (BG)', 'LGM (L/G)', 'T/L', 'B/E (AVAL)', 'P/N'];
+/**
+ * การพับรวมวงเงินบนหน้าจอ — ธนาคารไม่ได้แยกวงเงินเหล่านี้ออกจากกัน
+ *
+ * เอกสารข้อกำหนดฟังก์ชัน §3.2: หนังสือค้ำประกันสามใบ (ค้ำสัญญา 5% · ค้ำ Advance
+ * 15% · ค้ำประกันผลงาน) ใช้วงเงินก้อนเดียวกัน จึงรวมเป็นกล่อง BG กล่องเดียว
+ * ส่วน L/G วัสดุ · DLC · P/N Post ใช้วงเงินร่วมกับ B/E (อาวัล) จึงพับเข้ากล่อง B/E
+ *
+ * ตัวเลขที่พับรวมคือสิ่งที่คนอ่านใช้ตัดสินใจ ถ้าแยกกล่องตามเลขประเภทจะได้กล่อง
+ * ที่วงเงินคงเหลือดูมากกว่าความจริง เพราะเงินก้อนเดียวถูกนับเป็นหลายก้อน
+ */
+const BG_PARTS = [1, 2, 3];
+const BE_FOLD_INTO = 6;
+const BE_FOLDED = [5, 9, 10];
+/** เลขประเภท → กล่องที่ควรไปรวมอยู่ */
+const foldNo = (no) => {
+  const n = Number(no);
+  if (BG_PARTS.includes(n)) return 1;          // สามใบรวมเป็นกล่อง BG
+  if (BE_FOLDED.includes(n)) return BE_FOLD_INTO;
+  return n;
+};
 
 // Financial data — admin + executive only.
 const router = Router();
@@ -69,7 +88,8 @@ router.param('id', (req, res, next, v) => (UUID.test(v) ? next() : next(new ApiE
 
 const facilitySchema = z.object({
   projectId: z.string().uuid(), company: z.string().optional().nullable(), bank: z.string().optional().nullable(),
-  facilityNo: z.string().optional().nullable(), type: z.enum(FACILITY_TYPES), limit: z.number().nonnegative(),
+  // ประเภทวงเงินอ้างทะเบียนจริง 10 ประเภท ไม่ใช่ข้อความอิสระอีกต่อไป
+  facilityNo: z.number().int().min(1).max(10), limit: z.number().nonnegative(),
   usedBaseline: z.number().optional(), interestRate: z.number().optional().nullable(), feeRate: z.number().optional().nullable(),
   approvedDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(), notes: z.string().optional().nullable(),
 });
@@ -78,13 +98,16 @@ router.post('/facilities', asyncHandler(async (req, res) => {
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
   if (!(await queryOne('select id from projects where id = $1', [d.projectId]))) throw new ApiError(404, 'Project not found');
+  const ft = await queryOne('select * from facility_types where no = $1 and is_active', [d.facilityNo]);
+  if (!ft) throw new ApiError(400, 'ไม่พบประเภทวงเงินนี้ในทะเบียน');
+  // type เก็บป้ายสั้นไว้ให้รายงานเดิมอ่านได้ แต่ความจริงอยู่ที่ facility_no
   const row = await queryOne(
     `insert into facilities (project_id, company, bank, facility_no, type, "limit", used_baseline, interest_rate, fee_rate, approved_date, due_date, notes)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
-    [d.projectId, d.company || null, d.bank || null, d.facilityNo || null, d.type, d.limit, d.usedBaseline || 0,
+    [d.projectId, d.company || null, d.bank || null, d.facilityNo, ft.doc_kind, d.limit, d.usedBaseline || 0,
      d.interestRate ?? null, d.feeRate ?? null, d.approvedDate || null, d.dueDate || null, d.notes || null]
   );
-  await writeAudit({ actor: req.profile, action: 'create', target: 'facility', targetId: row.id, note: d.type });
+  await writeAudit({ actor: req.profile, action: 'create', target: 'facility', targetId: row.id, note: ft.name_th });
   res.status(201).json({ data: facilityView(row, 0) });
 }));
 router.patch('/facilities/:id', asyncHandler(async (req, res) => {
@@ -93,7 +116,7 @@ router.patch('/facilities/:id', asyncHandler(async (req, res) => {
   const before = await queryOne('select * from facilities where id = $1', [req.params.id]);
   if (!before) throw new ApiError(404, 'Facility not found');
   const d = parsed.data;
-  const map = { company: 'company', bank: 'bank', facilityNo: 'facility_no', type: 'type', limit: '"limit"',
+  const map = { company: 'company', bank: 'bank', facilityNo: 'facility_no', limit: '"limit"',
     interestRate: 'interest_rate', feeRate: 'fee_rate', approvedDate: 'approved_date', dueDate: 'due_date', notes: 'notes' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] || null); sets.push(`${col} = $${vals.length}`); }
@@ -239,6 +262,14 @@ router.post('/requests/:id/decide', asyncHandler(async (req, res) => {
 }));
 
 // ── overview / overdue ──────────────────────────────────────────────────
+/** GET /api/credit/facility-types — ทะเบียนประเภทวงเงิน สำหรับช่องเลือกและป้ายกำกับ */
+router.get('/facility-types', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    'select no, code, name_th, name_en, kind, doc_kind from facility_types where is_active order by sort_order, no');
+  // บอกด้วยว่าแต่ละประเภทไปรวมอยู่กล่องไหน หน้าจอจะได้ไม่ต้องรู้กฎการพับเอง
+  res.json({ data: rows.map((r) => ({ ...r, foldsInto: foldNo(r.no) })) });
+}));
+
 router.get('/overview', asyncHandler(async (req, res) => {
   const [facilities, authorized, pending, approved] = await Promise.all([
     query('select * from facilities where is_active = true'),
@@ -249,11 +280,22 @@ router.get('/overview', asyncHandler(async (req, res) => {
   const rateBy = Object.fromEntries(facilities.rows.map((f) => [f.id, f.interest_rate]));
   const usedBy = new Map();
   for (const i of authorized.rows) usedBy.set(i.facility_id, (usedBy.get(i.facility_id) || 0) + Number(i.amount));
+  // จัดกลุ่มตามกล่องที่พับรวมแล้ว พร้อมเก็บรายละเอียดของแต่ละประเภทย่อยไว้ให้กาง
+  // ดูได้ — ผู้ใช้ต้องเห็นว่ากล่อง BG ก้อนเดียวมาจากค้ำประกันสามใบอะไรบ้าง
+  const types = Object.fromEntries((await query('select * from facility_types')).rows.map((t) => [t.no, t]));
   const byType = {};
   for (const f of facilities.rows) {
     const v = facilityView(f, usedBy.get(f.id) || 0);
-    const t = byType[f.type] || { type: f.type, limit: 0, used: 0 };
-    t.limit += v.limit; t.used += v.used; byType[f.type] = t;
+    const boxNo = foldNo(f.facility_no);
+    const box = types[boxNo];
+    const key = box?.doc_kind || f.type || '(ไม่ระบุ)';
+    const t = byType[key] || { type: key, no: boxNo, name: box?.name_th || key, limit: 0, used: 0, parts: [] };
+    t.limit += v.limit; t.used += v.used;
+    if (v.limit > 0 || v.used > 0) {
+      const part = types[Number(f.facility_no)];
+      t.parts.push({ no: Number(f.facility_no) || null, name: part?.name_th || f.type, limit: v.limit, used: v.used });
+    }
+    byType[key] = t;
   }
   const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 }, later: { count: 0, amount: 0 } };
   let overdueInt = 0;
@@ -341,7 +383,14 @@ router.get('/export', asyncHandler(async (req, res) => {
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (req.query.projectId) add('f.project_id = $$', req.query.projectId);
-  if (req.query.type) add('f.type = $$', req.query.type);
+  // กรองด้วยกล่องที่พับรวมแล้ว: เลือก "B/E" ต้องได้ทั้งอาวัล L/G วัสดุ DLC และ PN Post
+  if (req.query.type) {
+    const nos = (await query('select no from facility_types where doc_kind = $1', [req.query.type])).rows
+      .map((r) => r.no)
+      .flatMap((n) => (n === BE_FOLD_INTO ? [n, ...BE_FOLDED] : n === 1 ? BG_PARTS : [n]));
+    if (nos.length) add('f.facility_no = any($$)', nos);
+    else add('f.type = $$', req.query.type);
+  }
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const facilities = (await query(`select f.*, p.name as project_name, p.code as project_code from facilities f join projects p on p.id=f.project_id ${whereSql} order by f.created_at`, params)).rows;
   const usedMap = await authorizedUsedMap(facilities.map((f) => f.id));

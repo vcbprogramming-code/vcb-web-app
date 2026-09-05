@@ -12,7 +12,7 @@ import OrgRegistry from './OrgRegistry.jsx';
  * Client-side (localStorage): grid cell display (code vs name) + which sites are
  * hidden on the dashboard.
  */
-export default function SettingsView({ sites, onSitesChange, onOpenSite }) {
+export default function SettingsView({ sites, onSitesChange, onOpenSite, features = {} }) {
   const t = useT();
   const toast = useToast();
   const [prefs, setPrefs] = useState(perfPrefs.get());
@@ -38,8 +38,10 @@ export default function SettingsView({ sites, onSitesChange, onOpenSite }) {
     <div className="space-y-5">
       {/* the two registries need room for two columns; the settings below stay
           narrow because they are single fields */}
-      <OrgRegistry sites={sites} />
-      <ImportEmployees onOpenSite={onOpenSite} />
+      {/* ทะเบียนแผนก/ตำแหน่ง และการนำเข้าจาก Excel ไม่มีในระบบที่ลูกค้าใช้จริง
+          — ระบบเดิมแก้รายชื่อในชีตโดยตรง และเอกสารของเขาระบุว่าไม่ทำตัวนำเข้า */}
+      {features.orgRegistry && <OrgRegistry sites={sites} />}
+      {features.employeeImport && <ImportEmployees onOpenSite={onOpenSite} />}
       <div className="max-w-2xl space-y-5">
 
       {/* display */}

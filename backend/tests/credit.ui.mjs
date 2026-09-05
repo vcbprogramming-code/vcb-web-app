@@ -25,21 +25,31 @@ const made = { fac: [], led: [] };
 // real figures to read off the screen: a 5,000,000 facility with 2,000,000 drawn
 const fac = await call('/credit/facilities', { method: 'POST', user: A, body: {
   projectId: project.id, company: `${MARK} ทดสอบหน้าจอ`, bank: 'ธนาคารกรุงเทพ',
-  facilityNo: `${MARK}-100`, type: 'L/G (BG)', limit: 5000000, notes: MARK } });
+  facilityNo: 1, limit: 5000000, notes: MARK } });   // 1 = หนังสือค้ำประกันสัญญา 5% (กล่อง BG)
 made.fac.push(fac.data.id);
 const led = await call('/credit/ledger', { method: 'POST', user: A, body: {
   facilityId: fac.data.id, amount: 2000000, startDate: '2026-08-01',
   dueDate: '2026-12-31', ref: `${MARK}-L1` } });
 made.led.push(led.data.id);
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-credit`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: false,
-  userDataDir: `${ROOT}/chrome-profile`,
+  userDataDir: `${ROOT}/chrome-credit`,
   defaultViewport: { width: 1440, height: 950 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 const body = () => page.evaluate(() => document.body.innerText);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png` });
@@ -74,7 +84,7 @@ suite('1. โมดูลเปิดใช้งานแล้ว');
   await as(A, '/credit');
   const c = await body();
   happy('เปิดหน้าวงเงินสินเชื่อได้', !c.includes('ไม่พบหน้า') && !c.includes('ยังไม่เปิดใช้งาน'), c.slice(0, 60));
-  happy('เห็นเลขที่วงเงินที่เพิ่งสร้าง', c.includes(`${MARK}-100`), '');
+  happy('เห็นวงเงินที่เพิ่งสร้าง', c.includes(`${MARK} ทดสอบหน้าจอ`), '');
   happy('เห็นชื่อธนาคารเจ้าของวงเงิน', c.includes('ธนาคารกรุงเทพ'), '');
   await shot('02-หน้าวงเงิน');
 }
@@ -122,14 +132,14 @@ suite('4. ฝ่ายบุคคลที่ไม่มีสิทธิ์�
   bad('การ์ดวงเงินสินเชื่อไม่ขึ้นให้คนที่ไม่มีสิทธิ์', !(await body()).includes('วงเงินสินเชื่อ'), '');
   await as(H, '/credit');
   const t = await body();
-  bad('เปิดตรง ๆ ก็ไม่เห็นตัวเลขวงเงิน', !t.includes('5,000,000') && !t.includes(`${MARK}-100`), t.slice(0, 70));
+  bad('เปิดตรง ๆ ก็ไม่เห็นตัวเลขวงเงิน', !t.includes('5,000,000') && !t.includes(`${MARK} ทดสอบหน้าจอ`), t.slice(0, 70));
   bad('ไม่ถูกทิ้งไว้กับหน้าที่พังหรือข้อความภาษาอังกฤษ',
     !/Insufficient permissions|Forbidden|403/.test(t), t.slice(0, 70));
   happy('ถูกพากลับหน้าแรก ไม่ใช่จอว่าง', t.includes('แอปพลิเคชัน'), t.slice(0, 60));
   await shot('04-ไม่มีสิทธิ์');
 
   await as(C, '/credit');
-  happy('ผู้บริหารเปิดดูได้ตามสิทธิ์', (await body()).includes(`${MARK}-100`), '');
+  happy('ผู้บริหารเปิดดูได้ตามสิทธิ์', (await body()).includes(`${MARK} ทดสอบหน้าจอ`), '');
   await shot('05-ผู้บริหาร');
 }
 
@@ -141,7 +151,7 @@ suite('4ข. เปิดสิทธิ์ให้รายบุคคลไ�
   await setHrCredit(true);
   await as(H, '/credit');
   const t = await body();
-  happy('ผู้ที่ได้รับสิทธิ์เพิ่มเปิดดูได้ แม้ไม่ได้เป็นผู้บริหาร', t.includes(`${MARK}-100`), '');
+  happy('ผู้ที่ได้รับสิทธิ์เพิ่มเปิดดูได้ แม้ไม่ได้เป็นผู้บริหาร', t.includes(`${MARK} ทดสอบหน้าจอ`), '');
   bad('ไม่มีข้อความสิทธิ์ไม่พอค้างอยู่บนหน้า', !/Insufficient permissions|ไม่มีสิทธิ์/.test(t), '');
   await as(H, '/');
   happy('การ์ดขึ้นในหน้าแรกให้คนที่ได้รับสิทธิ์', (await body()).includes('วงเงินสินเชื่อ'), '');
@@ -149,7 +159,7 @@ suite('4ข. เปิดสิทธิ์ให้รายบุคคลไ�
 
   // ดูได้ แต่ยังแก้ไม่ได้
   const w = await call('/credit/facilities', { method: 'POST', user: H, body: {
-    projectId: project.id, facilityNo: `${MARK}-X`, type: 'P/N', limit: 1 } });
+    projectId: project.id, facilityNo: 7, limit: 1, notes: MARK } });
   bad('ได้สิทธิ์ดูอย่างเดียว ยังเพิ่มวงเงินไม่ได้', w.status === 403, `${w.status}`);
 
   await query('update profiles set permissions = $2 where id = $1', [H.id, hrPerms]);
@@ -179,9 +189,9 @@ suite('7. ไม่ทิ้งข้อมูลทดสอบไว้');
 {
   // sweep by marker, not only by the ids this run created — an aborted run
   // would otherwise leave a facility behind and fail the next one
-  await query("delete from credit_ledger where facility_id in (select id from facilities where facility_no like $1 or notes = $2)", [`${MARK}%`, MARK]);
-  await query('delete from facilities where facility_no like $1 or notes = $2', [`${MARK}%`, MARK]);
-  const left = await query("select count(*)::int n from facilities where notes = $1 or facility_no like $2", [MARK, `${MARK}%`]);
+  await query('delete from credit_ledger where facility_id in (select id from facilities where notes = $1)', [MARK]);
+  await query('delete from facilities where notes = $1', [MARK]);
+  const left = await query('select count(*)::int n from facilities where notes = $1', [MARK]);
   happy('ลบข้อมูลทดสอบหมดแล้ว', left.rows[0].n === 0, `${left.rows[0].n} รายการ`);
 }
 

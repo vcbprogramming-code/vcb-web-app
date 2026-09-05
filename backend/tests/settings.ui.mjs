@@ -2,6 +2,7 @@
  * PH — ชุดที่ 3: รวมหน้าตั้งค่าไว้ที่เดียว + ตั้งลายเซ็นให้ผู้ใช้รายอื่น
  */
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import zlib from 'node:zlib';
 import { execSync } from 'node:child_process';
@@ -62,12 +63,22 @@ suite('1. ผู้ดูแลตั้งลายเซ็นให้ผู�
 
 // ── 2. หน้าตั้งค่ารวมที่เดียว ──────────────────────────────────────────────
 suite('2. หน้าตั้งค่ารวมอยู่ที่เดียว');
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 {
-  const browser = await puppeteer.launch({
-    executablePath: CHROME, headless: false, userDataDir: `${ROOT}/chrome-profile`,
+  // โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-settings`, { recursive: true, force: true });
+const browser = await puppeteer.launch({
+    executablePath: CHROME, headless: false, userDataDir: `${ROOT}/chrome-settings`,
     defaultViewport: { width: 1600, height: 1000 }, args: ['--no-first-run', '--no-default-browser-check'],
   });
   const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
   const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
   const shot = async (n) => { await page.screenshot({ path: `${ROOT}/set/${n}.png` }); };
   const body = () => page.evaluate(() => document.body.innerText);

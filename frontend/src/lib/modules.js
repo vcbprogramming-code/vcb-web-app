@@ -29,6 +29,8 @@ export const performanceApi = {
 // ── Module 3: Credit Facility ───────────────────────────────────────────────
 export const creditApi = {
   overview: () => api('/credit/overview'),
+  // ทะเบียนประเภทวงเงิน 10 ประเภท พร้อมบอกว่าแต่ละประเภทไปรวมอยู่กล่องไหน
+  facilityTypes: () => api('/credit/facility-types'),
   facilities: (filters) => api(`/credit/facilities${qs(filters)}`),
   addFacility: (body) => api('/credit/facilities', { method: 'POST', body }),
   updateFacility: (id, body) => api(`/credit/facilities/${id}`, { method: 'PATCH', body }),

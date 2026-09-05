@@ -6,6 +6,7 @@ import { requireAuth, requireRole, requirePermission } from '../middleware/auth.
 import { hasPermission } from '../config/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { featureOn, featureMap } from '../config/worklogFeatures.js';
 import multer from 'multer';
 import { buildLeaveSlip } from '../services/leaveSlip.js';
 import { buildMandayReportPdf } from '../services/mandayReportPdf.js';
@@ -110,7 +111,13 @@ const workFields = (r) => ({
 const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
 const siteOut = (u) => ({ key: u.code, name: u.name, company: u.company, color: u.color, lockDays: u.lock_days ?? 3 });
-const activityOut = (a) => ({ code: a.code, name: a.name, desc: a.description || '', category: a.category, mapping: a.mapping || 'one-to-many', fixed_cost: a.fixed_cost || undefined, sites: '' });
+// allowed_cost คือรายการรหัสหมวดต้นทุนที่รหัสงานนี้ใช้ได้ ระบบจริงใช้มันกรอง
+// ตัวเลือกขั้นที่สอง — ส่งออกไปด้วย ไม่งั้นหน้าจอต้องเดาเอง
+const activityOut = (a) => ({
+  code: a.code, name: a.name, name_en: a.name_en || '', desc: a.description || '',
+  category: a.category, mapping: a.mapping || 'one-to-many',
+  fixed_cost: a.fixed_cost || undefined, allowed_cost: a.allowed_cost || '', sites: a.sites || '',
+});
 const categoryOut = (c) => ({ code: c.code, name: c.name, name_en: c.name_en || '' });
 
 async function loadUnitByKey(key) {
@@ -119,11 +126,24 @@ async function loadUnitByKey(key) {
 async function loadActivities() {
   // hr-worklog activities MUST have a code (used in the "A-1 / 5" composite); skip
   // legacy code-less work_types left over from the old OT module.
-  return (await query("select id, code, name, description, category, mapping, fixed_cost, sort_order from work_types where is_active = true and code is not null order by sort_order, code, name")).rows;
+  return (await query(`select id, code, name, name_en, description, category, mapping,
+                              fixed_cost, allowed_cost, sites, sort_order
+                         from work_types
+                        where is_active = true and code is not null
+                        order by sort_order, code, name`)).rows;
 }
 async function loadCategories() {
   return (await query('select code, name, name_en, sort_order from cost_categories where is_active = true order by sort_order, code')).rows;
 }
+
+/**
+ * ปิดเส้นทางของส่วนเสริมที่ยังไม่ได้เปิด — 404 ไม่ใช่ 403 เพราะสำหรับผู้ใช้
+ * ตอนนี้ฟีเจอร์นี้ยังไม่มีอยู่จริง ไม่ใช่มีแต่ไม่มีสิทธิ์
+ */
+const requireFeature = (name) => (req, res, next) => {
+  if (featureOn(name)) return next();
+  next(new ApiError(404, 'ยังไม่ได้เปิดใช้ความสามารถนี้'));
+};
 
 // canEntry = may record work (admin/hr, or explicit performance.edit); executives view only.
 function canEntry(profile) {
@@ -142,6 +162,9 @@ router.get('/bootstrap', asyncHandler(async (req, res) => {
     role: req.profile.role,
     isAdmin: req.profile.role === 'admin',
     canEntry: canEntry(req.profile),
+    // หน้าจอใช้ค่านี้ตัดสินใจว่าจะวาดแท็บ/ปุ่มไหน — ไม่ใช่รายการที่เชื่อถือเพื่อ
+    // ความปลอดภัย เพราะแต่ละเส้นทางกันตัวเองด้วย requireFeature อยู่แล้ว
+    features: featureMap(),
     sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, lockDays: u.lock_days ?? 3 })),
   });
 }));
@@ -345,7 +368,7 @@ router.get('/site-month', asyncHandler(async (req, res) => {
   const month = `${Y}-${pad(M)}`;
   const employees = await employeesForUnit(unit.id, month);
   const logs = (await query(
-    `select employee_id, ymd, team, detail, pm, man_day, hours, work_status, entry_at, updated_at, verified_at
+    `select employee_id, ymd, team, detail, pm, note, man_day, hours, work_status, entry_at, updated_at, verified_at
        from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null`,
     [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
   const entries = {};
@@ -355,6 +378,9 @@ router.get('/site-month', asyncHandler(async (req, res) => {
     if (l.team) cell.team = l.team;
     if (l.detail) cell.detail = l.detail;
     if (l.pm) cell.pm = l.pm;
+    // โน้ตขึ้นต้นด้วย [LV] คือวันที่มาจากการอนุมัติคำขอลา ไม่ใช่คนพิมพ์เอง
+    // กริดใช้ marker นี้ขึ้นป้ายกำกับ — ข้อกำหนดฟังก์ชัน §3.2.2
+    if (l.note) cell.note = l.note;
     if (l.man_day != null) cell.manDay = Number(l.man_day);
     if (l.hours != null) cell.hours = Number(l.hours);
     if (l.work_status) cell.workStatus = l.work_status;
@@ -686,6 +712,14 @@ const leaveSchema = z.object({
 
 /** POST /api/performance/leave — ask for leave (HR files it for the employee). */
 router.post('/leave', requirePermission('performance', 'edit'), fileUpload.single('file'), asyncHandler(async (req, res) => {
+  // ระบบจริงของลูกค้ารับเฉพาะลาเต็มวันและไม่มีไฟล์แนบ — ปฏิเสธตั้งแต่ต้นทาง
+  // ไม่ใช่แค่ซ่อนช่องบนหน้าจอ ไม่งั้นข้อมูลเข้ามาได้ทางอื่นแล้วยอดวันเพี้ยน
+  if (!featureOn('leaveHalfDay') && req.body?.dayPart && req.body.dayPart !== 'full') {
+    throw new ApiError(400, 'ระบบรับเฉพาะการลาเต็มวัน');
+  }
+  if (!featureOn('leaveAttachment') && req.file) {
+    throw new ApiError(400, 'ยังไม่เปิดให้แนบไฟล์กับใบลา');
+  }
   // §6 ใบรับรองแพทย์มากับคำขอในครั้งเดียว — multer ปล่อยคำขอ JSON ผ่านไปตามเดิม
   if (req.file) {
     const name = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
@@ -786,16 +820,43 @@ router.post('/leave/:id/decide', asyncHandler(async (req, res) => {
     [row.id, status, req.profile.id, p.data.note]
   );
 
-  // Approval is what puts the days into the work log. Tagged with the request id
-  // so reversing the decision takes back exactly these days and leaves any an
-  // admin marked by hand alone.
+  // การอนุมัติคือสิ่งที่เขียนวันลาลงตารางงาน
+  //
+  // เขียนเป็นรหัส Z-2 (ลา) ลงช่องงานหลักเหมือนที่ HR พิมพ์มือทุกประการ พร้อม
+  // โน้ตโครงสร้าง "[LV] <ประเภท> · <เลขที่คำขอ>" ให้กริดขึ้นป้ายกำกับได้ว่าวันนี้
+  // มาจากคำขอที่อนุมัติแล้ว ไม่ใช่คนพิมพ์เอง — ข้อกำหนดฟังก์ชัน §3.2.2
+  //
+  // ทำไมไม่ใช้ employee_away อย่างเดิม: วันที่ทำเครื่องหมาย away จะถูกกริดแสดง
+  // เป็นช่องเทาและซ่อนช่องงาน วันลาจึงหายไปจากรายงานทั้งหมดแทนที่จะไปโผล่ในกลุ่ม
+  // "ไม่ปฏิบัติงาน" ตามที่ทะเบียนงานออกแบบไว้
   if (p.data.approve) {
-    await query(
-      `insert into employee_away (employee_id, ymd, leave_request_id)
-       select $1, d::date, $2 from generate_series($3::date, $4::date, interval '1 day') d
-       on conflict do nothing`,
-      [row.employee_id, row.id, row.from_date, row.to_date]
-    );
+    const emp = await queryOne('select id, unit_id, kind from employees where id = $1', [row.employee_id]);
+    const slot1 = emp?.kind === 'operation' ? 'team' : 'detail';
+    const note = `[LV] ${LEAVE_TH[row.leave_type] || row.leave_type || 'ลา'} · ${row.id}`;
+    const days = (await query(
+      `select d::date::text ymd from generate_series($1::date, $2::date, interval '1 day') d`,
+      [row.from_date, row.to_date])).rows;
+    for (const { ymd: day } of days) {
+      const before = await queryOne(
+        'select id, team, detail, pm from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+        [row.employee_id, day]);
+      // วันลาไม่มีงานเสริม — ล้าง pm ทิ้ง ไม่งั้นแรงงาน-วันจะถูกแบ่งครึ่งให้งานที่
+      // ไม่ได้เกิดขึ้น ค่าเดิมยังตามอ่านได้จากประวัติการแก้ไข
+      await query(
+        `insert into work_logs (employee_id, unit_id, ymd, kind, ${slot1}, pm, note, status, updated_by)
+         values ($1,$2,$3,$4,'Z-2',null,$5,'',$6)
+         on conflict (employee_id, ymd) do update set
+           unit_id = excluded.unit_id, kind = excluded.kind,
+           ${slot1} = 'Z-2', pm = null, note = excluded.note,
+           deleted_at = null, deleted_by = null, updated_by = excluded.updated_by, updated_at = now()`,
+        [row.employee_id, emp.unit_id, day, emp.kind, note, req.profile.id]);
+      const after = await queryOne(
+        'select id, team, detail, pm from work_logs where employee_id = $1 and ymd = $2', [row.employee_id, day]);
+      await logWork({ actor: req.profile, workLogId: after?.id, employeeId: row.employee_id,
+        unitId: emp.unit_id, ymd: day, action: before ? 'edit' : 'create',
+        before: before ? workFields(before) : null, after: workFields(after),
+        reason: `อนุมัติคำขอลา ${row.id}` });
+    }
   }
 
   const full = await queryOne(`${leaveSelect} where r.id = $1`, [row.id]);
@@ -908,7 +969,7 @@ const daySchema = z.object({
 });
 const HOURS_PER_DAY = 8;
 
-router.post('/day', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+router.post('/day', requireFeature('mandayEntry'), requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = daySchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
@@ -981,7 +1042,7 @@ const verifySchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   undo: z.boolean().optional(),
 });
-router.post('/verify', asyncHandler(async (req, res) => {
+router.post('/verify', requireFeature('verify'), asyncHandler(async (req, res) => {
   const p = verifySchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const { site, from, to, undo } = p.data;
@@ -1020,7 +1081,7 @@ function hasVerifyRight(profile) {
 }
 
 // ── §4 closing a month ────────────────────────────────────────────────────
-router.get('/period-closes', asyncHandler(async (req, res) => {
+router.get('/period-closes', requireFeature('periodClose'), asyncHandler(async (req, res) => {
   const unit = req.query.site ? await loadUnitByKey(req.query.site) : null;
   const { rows } = unit
     ? await query('select p.*, u.code site from period_closes p join units u on u.id = p.unit_id where unit_id = $1 order by ym desc', [unit.id])
@@ -1028,7 +1089,7 @@ router.get('/period-closes', asyncHandler(async (req, res) => {
   res.json({ data: rows });
 }));
 const closeSchema = z.object({ site: z.string().min(1), ym: z.string().regex(/^\d{4}-\d{2}$/), note: z.string().optional() });
-router.post('/period-close', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/period-close', requireFeature('periodClose'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = closeSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const unit = await loadUnitByKey(p.data.site);
@@ -1041,7 +1102,7 @@ router.post('/period-close', requireRole('admin'), asyncHandler(async (req, res)
   await logWork({ actor: req.profile, unitId: unit.id, action: 'period-close', after: { ym: p.data.ym }, reason: p.data.note });
   res.json({ data: row });
 }));
-router.post('/period-open', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/period-open', requireFeature('periodClose'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = z.object({ site: z.string(), ym: z.string().regex(/^\d{4}-\d{2}$/), reason: z.string().min(1) }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'การเปิดงวดที่ปิดแล้วต้องระบุเหตุผล', p.error?.flatten());
   const unit = await loadUnitByKey(p.data.site);
@@ -1106,7 +1167,7 @@ router.patch('/teams/:id', requirePermission('performance', 'edit'), asyncHandle
 }));
 
 // ── §7 manpower, as of a day or over a range ──────────────────────────────
-router.get('/manpower', asyncHandler(async (req, res) => {
+router.get('/manpower', requireFeature('manpower'), asyncHandler(async (req, res) => {
   const from = req.query.from || todayStr();
   const to = req.query.to || from;
   if (to < from) throw new ApiError(400, 'ช่วงวันที่ไม่ถูกต้อง');
@@ -1125,7 +1186,11 @@ router.get('/manpower', asyncHandler(async (req, res) => {
 
   // A day with no man-day recorded still used a person, so it counts as one
   // head; the man-day column stays honest about what was actually measured.
-  const md = 'coalesce(w.man_day, 1)';
+  // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
+  // ช่องงานหลักคนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) จึงต้องดู e.kind
+  // ทุกคำสั่งที่ใช้ค่านี้ join employees e ไว้แล้ว
+  const md = `(case when coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') <> ''
+                      or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const [byProject, byTeam, byType, byStatus, totals] = await Promise.all([
     query(`select u.code site, u.name site_name, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
              from work_logs w join units u on u.id = w.unit_id join employees e on e.id = w.employee_id ${W}
@@ -1157,28 +1222,56 @@ const reportMeta = (req, from, to) => ({
   generatedBy: req.profile.full_name || req.profile.email,
 });
 
+/**
+ * รายงานแรงงาน-วัน — ตรรกะเดียวใช้ทั้งฉบับ JSON และ PDF
+ *
+ * อ่านจาก view worklog_slots เสมอ ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ หนึ่งวันที่มีงานลง
+ * คือหนึ่งแรงงาน-วัน และวันที่ลงสองงานแบ่ง 0.5/0.5 ให้แต่ละรหัส — ทำให้รายงาน
+ * นี้เป็นเครื่องมือกระจายค่าแรง ไม่ใช่แค่สมุดนับวัน และทำให้ทุกมุมมองได้ยอดรวม
+ * เท่ากันเพราะหารก้อนเดียวกัน
+ */
+// ไม่มีมุมมอง "รายทีม" อีกต่อไป — คอลัมน์ team คือช่องงานหลักของสายปฏิบัติการ
+// ตามข้อกำหนดฟังก์ชัน §3.2.2 ไม่ใช่ชื่อชุดงาน การจัดกลุ่มด้วยคอลัมน์นี้จึงได้
+// รหัสงานปนกับชื่อทีมเก่าที่ค้างอยู่ ซึ่งเป็นตัวเลขที่ไม่มีความหมายให้ใครอ่าน
+const MANDAY_GROUPS = ['cost', 'worktype', 'project', 'employee'];
+async function mandayReport(profile, from, to, groupBy) {
+  const scoped = scopedUnitIds(profile);
+  const params = [from, to]; const where = ['s.ymd >= $1', 's.ymd <= $2'];
+  if (scoped) { params.push(scoped); where.push(`s.unit_id = any($${params.length}::uuid[])`); }
+  const W = `where ${where.join(' and ')}`;
+  const SQL = {
+    cost:     `select coalesce(s.cost_code,'-') key, coalesce(c.name,'(ไม่ระบุหมวดต้นทุน)') label,
+                      sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
+                 from worklog_slots s left join cost_categories c on c.code = s.cost_code ${W}
+                group by 1,2 order by 3 desc`,
+    worktype: `select coalesce(s.work_code,'-') key, coalesce(w.name,'(ไม่ระบุงาน)') label,
+                      sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
+                 from worklog_slots s left join work_types w on w.code = s.work_code ${W}
+                group by 1,2 order by 3 desc`,
+    project:  `select u.code key, u.name label, sum(s.manday)::numeric manday,
+                      count(distinct s.employee_id)::int people
+                 from worklog_slots s join units u on u.id = s.unit_id ${W}
+                group by 1,2 order by 3 desc`,
+    employee: `select e.employee_code key, e.full_name label, sum(s.manday)::numeric manday,
+                      count(distinct s.ymd)::int people
+                 from worklog_slots s join employees e on e.id = s.employee_id ${W}
+                group by 1,2 order by 3 desc`,
+  }[groupBy];
+  const { rows } = await query(SQL, params);
+  const total = await queryOne(
+    `select coalesce(sum(s.manday),0)::numeric manday from worklog_slots s ${W}`, params);
+  return {
+    rows: rows.map((r) => ({ ...r, manday: Number(r.manday || 0) })),
+    total: Number(total?.manday || 0),
+  };
+}
+
 router.get('/report/manday', asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
-  const groupBy = ['project', 'team', 'worktype', 'employee'].includes(req.query.groupBy) ? req.query.groupBy : 'project';
-  const scoped = scopedUnitIds(req.profile);
-  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
-  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
-  const W = `where ${where.join(' and ')}`;
-  const md = 'coalesce(w.man_day, 1)';
-  const SQL = {
-    project:  `select u.code key, u.name label, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w join units u on u.id = w.unit_id ${W} group by 1,2 order by 3 desc`,
-    team:     `select coalesce(w.team,'(ไม่ระบุ)') key, coalesce(w.team,'(ไม่ระบุทีม)') label, sum(${md})::numeric manday,
-                      count(distinct w.employee_id)::int people from work_logs w ${W} group by 1,2 order by 3 desc`,
-    worktype: `select coalesce(l.work_type_code, '-') key, coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') label,
-                      sum(coalesce(l.man_day, ${md}))::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w left join work_log_lines l on l.work_log_id = w.id ${W} group by 1,2 order by 3 desc`,
-    employee: `select e.employee_code key, e.full_name label, sum(${md})::numeric manday, count(*)::int people
-                 from work_logs w join employees e on e.id = w.employee_id ${W} group by 1,2 order by 3 desc`,
-  }[groupBy];
-  const { rows } = await query(SQL, params);
-  res.json({ data: { groupBy, meta: reportMeta(req, from, to), rows: rows.map((r) => ({ ...r, manday: Number(r.manday || 0) })) } });
+  const groupBy = MANDAY_GROUPS.includes(req.query.groupBy) ? req.query.groupBy : 'cost';
+  const { rows, total } = await mandayReport(req.profile, from, to, groupBy);
+  res.json({ data: { groupBy, meta: reportMeta(req, from, to), total, rows } });
 }));
 
 /** §8 the monthly report has to be one file covering every project. */
@@ -1190,16 +1283,24 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
   const params = [from, to]; let scopeSql = '';
   if (scoped) { params.push(scoped); scopeSql = ` and w.unit_id = any($${params.length}::uuid[])`; }
-  const md = 'coalesce(w.man_day, 1)';
+  // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
+  // ช่องงานหลักคนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) จึงต้องดู e.kind
+  // ทุกคำสั่งที่ใช้ค่านี้ join employees e ไว้แล้ว
+  const md = `(case when coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') <> ''
+                      or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const { rows } = await query(
     `select u.code site, u.name site_name, e.employee_code, e.full_name, coalesce(w.team,'') team,
-            w.ymd, ${md}::numeric manday, coalesce(w.hours, 0)::numeric hours,
-            coalesce(w.work_status,'') work_status, coalesce(l.work_type_code,'') work_type_code,
-            coalesce(l.work_type_name, w.detail, '') work_type_name
+            w.ymd, ${md}::numeric manday,
+            coalesce(w.detail,'') as slot1, coalesce(w.pm,'') as slot2,
+            coalesce(a1.name,'') as slot1_name, coalesce(c1.name,'') as slot1_cost,
+            coalesce(a2.name,'') as slot2_name, coalesce(c2.name,'') as slot2_cost
        from work_logs w
        join units u on u.id = w.unit_id
        join employees e on e.id = w.employee_id
-       left join work_log_lines l on l.work_log_id = w.id
+       left join work_types a1 on a1.code = nullif(btrim(split_part(w.detail, '/', 1)), '')
+       left join cost_categories c1 on c1.code = nullif(btrim(split_part(w.detail, '/', 2)), '')
+       left join work_types a2 on a2.code = nullif(btrim(split_part(w.pm, '/', 1)), '')
+       left join cost_categories c2 on c2.code = nullif(btrim(split_part(w.pm, '/', 2)), '')
       where w.ymd >= $1 and w.ymd <= $2 and w.deleted_at is null${scopeSql}
       order by u.name, e.full_name, w.ymd`, params);
 
@@ -1222,22 +1323,25 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
     { header: 'ชื่อ-สกุล', key: 'full_name', width: 26 },
     { header: 'ทีม', key: 'team', width: 16 },
     { header: 'วันที่ปฏิบัติงาน', key: 'ymd', width: 16 },
-    { header: 'รหัสประเภทงาน', key: 'work_type_code', width: 16 },
-    { header: 'ประเภทงาน', key: 'work_type_name', width: 30 },
-    { header: 'สถานะการทำงาน', key: 'work_status', width: 16 },
+    // งานหลัก/งานเสริมเก็บเป็น "รหัสงาน / รหัสหมวดต้นทุน" — แยกชื่อออกมาให้ด้วย
+    // เพื่อให้คนอ่านไฟล์ไม่ต้องเปิดทะเบียนควบคู่ไปด้วย
+    { header: 'งานหลัก (รหัส)', key: 'slot1', width: 14 },
+    { header: 'งานหลัก', key: 'slot1_name', width: 30 },
+    { header: 'หมวดต้นทุน (งานหลัก)', key: 'slot1_cost', width: 30 },
+    { header: 'งานเสริม (รหัส)', key: 'slot2', width: 14 },
+    { header: 'งานเสริม', key: 'slot2_name', width: 30 },
+    { header: 'หมวดต้นทุน (งานเสริม)', key: 'slot2_cost', width: 30 },
     { header: 'แรงงาน-วัน', key: 'manday', width: 12 },
-    { header: 'ชั่วโมง', key: 'hours', width: 10 },
   ];
   for (const r of rows) {
     ws.addRow({
       ...r, ymd: dateStr(r.ymd),
       // §8 numbers have to arrive as numbers, or the client cannot total them
-      manday: Number(r.manday), hours: Number(r.hours),
+      manday: Number(r.manday),
     });
   }
   ws.getRow(1).font = { bold: true };
   ws.getColumn('manday').numFmt = '0.00';
-  ws.getColumn('hours').numFmt = '0.00';
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="manday-${ym}.xlsx"`);
   await wb.xlsx.write(res);
@@ -1248,7 +1352,7 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
 /** Sites that have not recorded today, and days about to lock. A notification
  *  that disappears before it is acted on is worse than none, so this is derived
  *  from the data every time rather than stored and marked read. */
-router.get('/alerts', asyncHandler(async (req, res) => {
+router.get('/alerts', requireFeature('alerts'), asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
   const units = (scoped
     ? await query('select id, code, name, lock_days from units where id = any($1) and code is not null', [scoped])
@@ -1313,7 +1417,7 @@ const pick = (o, ...names) => { for (const n of names) if (o[n] !== undefined &&
  * than typing them by hand, so nothing is written unless the whole file parses,
  * and every rejection carries its row number.
  */
-router.post('/import/employees', requirePermission('performance', 'edit'), importUpload.single('file'),
+router.post('/import/employees', requireFeature('employeeImport'), requirePermission('performance', 'edit'), importUpload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
     const dryRun = String(req.query.dryRun || req.body?.dryRun || '') === 'true';
@@ -1411,7 +1515,7 @@ router.post('/import/employees', requirePermission('performance', 'edit'), impor
   }));
 
 /** §2 the template, so nobody has to guess the column names. */
-router.get('/import/employees/template.xlsx', asyncHandler(async (req, res) => {
+router.get('/import/employees/template.xlsx', requireFeature('employeeImport'), asyncHandler(async (req, res) => {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('พนักงาน');
   ws.columns = [
@@ -1454,7 +1558,7 @@ const bulkSchema = z.object({
  * unrecorded. Each person is still a row of their own, so everything downstream
  * — verification, audit, reports — is unchanged.
  */
-router.post('/bulk', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+router.post('/bulk', requireFeature('mandayEntry'), requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = bulkSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
@@ -1503,29 +1607,15 @@ router.post('/bulk', requirePermission('performance', 'edit'), asyncHandler(asyn
 }));
 
 // ── §8 รายงานเป็น PDF ─────────────────────────────────────────────────────
-const GROUP_TH = { project: 'รายโครงการ', team: 'รายทีม', worktype: 'รายประเภทงาน', employee: 'รายพนักงาน' };
+const GROUP_TH = { cost: 'รายหมวดต้นทุน', worktype: 'รายประเภทงาน', project: 'รายโครงการ', employee: 'รายพนักงาน' };
 router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
-  const groupBy = Object.keys(GROUP_TH).includes(req.query.groupBy) ? req.query.groupBy : 'project';
-  const scoped = scopedUnitIds(req.profile);
-  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
-  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
-  const W = `where ${where.join(' and ')}`;
-  const md = 'coalesce(w.man_day, 1)';
-  const SQL = {
-    project:  `select u.code key, u.name label, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w join units u on u.id = w.unit_id ${W} group by 1,2 order by 3 desc`,
-    team:     `select coalesce(w.team,'-') key, coalesce(w.team,'(ไม่ระบุทีม)') label, sum(${md})::numeric manday,
-                      count(distinct w.employee_id)::int people from work_logs w ${W} group by 1,2 order by 3 desc`,
-    worktype: `select coalesce(l.work_type_code,'-') key, coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') label,
-                      sum(coalesce(l.man_day, ${md}))::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w left join work_log_lines l on l.work_log_id = w.id ${W} group by 1,2 order by 3 desc`,
-    employee: `select e.employee_code key, e.full_name label, sum(${md})::numeric manday, count(*)::int people
-                 from work_logs w join employees e on e.id = w.employee_id ${W} group by 1,2 order by 3 desc`,
-  }[groupBy];
-  const { rows } = await query(SQL, params);
-  const totals = rows.reduce((a, r) => ({ manday: a.manday + Number(r.manday || 0), people: a.people + Number(r.people || 0) }), { manday: 0, people: 0 });
+  const groupBy = MANDAY_GROUPS.includes(req.query.groupBy) ? req.query.groupBy : 'cost';
+  // ฉบับ PDF ต้องเป็นตัวเลขชุดเดียวกับที่หน้าจอแสดง — ใช้ฟังก์ชันเดียวกัน
+  // ไม่ใช่คำสั่ง SQL คู่ขนานที่คลาดจากกันได้เงียบ ๆ
+  const { rows, total } = await mandayReport(req.profile, from, to, groupBy);
+  const totals = { manday: total, people: rows.reduce((a, r) => a + Number(r.people || 0), 0) };
   const pdf = await buildMandayReportPdf({
     title: 'รายงานแรงงาน-วัน (Man-day Report)',
     groupLabel: GROUP_TH[groupBy],
@@ -1539,7 +1629,7 @@ router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
 }));
 
 // ── §11 ไฟล์ประกอบการบันทึก ───────────────────────────────────────────────
-router.post('/attachments', requirePermission('performance', 'edit'), fileUpload.single('file'),
+router.post('/attachments', requireFeature('attachments'), requirePermission('performance', 'edit'), fileUpload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
     const site = req.body.site, eid = req.body.employeeId, date = req.body.date;
@@ -1561,7 +1651,7 @@ router.post('/attachments', requirePermission('performance', 'edit'), fileUpload
     res.status(201).json({ data: row });
   }));
 
-router.get('/attachments', asyncHandler(async (req, res) => {
+router.get('/attachments', requireFeature('attachments'), asyncHandler(async (req, res) => {
   const { site, employeeId, date } = req.query;
   if (!site) throw new ApiError(400, 'ต้องระบุไซต์งาน');
   const unit = await loadUnitByKey(site);
@@ -1574,7 +1664,7 @@ router.get('/attachments', asyncHandler(async (req, res) => {
   res.json({ data: rows });
 }));
 
-router.get('/attachments/:id/file', asyncHandler(async (req, res) => {
+router.get('/attachments/:id/file', requireFeature('attachments'), asyncHandler(async (req, res) => {
   const row = await queryOne('select * from work_log_attachments where id = $1', [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบไฟล์นี้');
   assertUnitInScope(scopedUnitIds(req.profile), row.unit_id);
@@ -1588,7 +1678,7 @@ router.get('/attachments/:id/file', asyncHandler(async (req, res) => {
   obj.stream.pipe(res);
 }));
 
-router.delete('/attachments/:id', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+router.delete('/attachments/:id', requireFeature('attachments'), requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const row = await queryOne('select * from work_log_attachments where id = $1', [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบไฟล์นี้');
   assertUnitInScope(scopedUnitIds(req.profile), row.unit_id);
@@ -1604,7 +1694,7 @@ router.delete('/attachments/:id', requirePermission('performance', 'edit'), asyn
 // is ever deleted once used — §2 wants a change to apply going forward without
 // rewriting what is already filed, so retiring is a switch, not a removal.
 
-router.get('/departments', asyncHandler(async (req, res) => {
+router.get('/departments', requireFeature('orgRegistry'), asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
   const params = []; const where = [];
   if (req.query.site) {
@@ -1627,7 +1717,7 @@ router.get('/departments', asyncHandler(async (req, res) => {
 }));
 
 const deptSchema = z.object({ site: z.string().min(1), name: z.string().trim().min(1).max(120) });
-router.post('/departments', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/departments', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = deptSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const unit = await loadUnitByKey(p.data.site);
@@ -1641,7 +1731,7 @@ router.post('/departments', requireRole('admin'), asyncHandler(async (req, res) 
   res.status(201).json({ data: row });
 }));
 
-router.patch('/departments/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+router.patch('/departments/:id', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = z.object({ name: z.string().trim().min(1).max(120).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const before = await queryOne('select * from departments where id = $1', [req.params.id]);
@@ -1665,7 +1755,7 @@ router.patch('/departments/:id', requireRole('admin'), asyncHandler(async (req, 
   res.json({ data: after });
 }));
 
-router.delete('/departments/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+router.delete('/departments/:id', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const row = await queryOne('select * from departments where id = $1', [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบแผนกนี้');
   const used = await queryOne('select count(*)::int n from employees where department_id = $1', [row.id]);
@@ -1678,7 +1768,7 @@ router.delete('/departments/:id', requireRole('admin'), asyncHandler(async (req,
   res.json({ data: { deleted: true } });
 }));
 
-router.get('/positions', asyncHandler(async (req, res) => {
+router.get('/positions', requireFeature('orgRegistry'), asyncHandler(async (req, res) => {
   const params = []; const where = [];
   if (req.query.departmentId) { params.push(req.query.departmentId); where.push(`p.department_id = $${params.length}`); }
   const scoped = scopedUnitIds(req.profile);
@@ -1694,7 +1784,7 @@ router.get('/positions', asyncHandler(async (req, res) => {
 }));
 
 const posSchema = z.object({ departmentId: z.string().uuid(), name: z.string().trim().min(1).max(120) });
-router.post('/positions', requireRole('admin'), asyncHandler(async (req, res) => {
+router.post('/positions', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = posSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const dept = await queryOne('select * from departments where id = $1', [p.data.departmentId]);
@@ -1708,7 +1798,7 @@ router.post('/positions', requireRole('admin'), asyncHandler(async (req, res) =>
   res.status(201).json({ data: row });
 }));
 
-router.patch('/positions/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+router.patch('/positions/:id', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const p = z.object({ name: z.string().trim().min(1).max(120).optional(), isActive: z.boolean().optional() }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const before = await queryOne('select * from positions where id = $1', [req.params.id]);
@@ -1729,7 +1819,7 @@ router.patch('/positions/:id', requireRole('admin'), asyncHandler(async (req, re
   res.json({ data: after });
 }));
 
-router.delete('/positions/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+router.delete('/positions/:id', requireFeature('orgRegistry'), requireRole('admin'), asyncHandler(async (req, res) => {
   const row = await queryOne('select * from positions where id = $1', [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบตำแหน่งนี้');
   const used = await queryOne('select count(*)::int n from employees where position_id = $1', [row.id]);

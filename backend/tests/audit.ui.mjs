@@ -49,15 +49,25 @@ const WHO = [
   { u: C, role: 'ผู้บริหาร', key: 'exec' },
   { u: H, role: 'ฝ่ายบุคคล', key: 'hr' },
 ];
+// แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
+// Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
+// ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
 
+// โปรไฟล์ Chrome ใช้ครั้งเดียวแล้วทิ้ง — ชุดที่ล้มกลางคันทิ้งโปรไฟล์ที่เขียนค้าง
+// ไว้ และ Chrome จะค้างตอนเปิดโปรไฟล์นั้นทุกครั้งหลังจากนั้น ชุดเดิมจึงล้มซ้ำ
+// ไปเรื่อย ๆ ทั้งที่โค้ดไม่ได้ผิดอะไร (ไล่จนเจอเมื่อ 2026-09-05)
+fs.rmSync(`${ROOT}/chrome-audit`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: false,
-  userDataDir: `${ROOT}/chrome-profile`,
+  userDataDir: `${ROOT}/chrome-audit`,
   defaultViewport: { width: 1440, height: 950 },
   args: ['--no-first-run', '--no-default-browser-check'],
 });
 const page = (await browser.pages())[0] || (await browser.newPage());
+// 30 วินาทีของค่าเริ่มต้นตึงเกินไปเมื่อเครื่องรันงานอื่นอยู่ด้วย
+page.setDefaultNavigationTimeout(90000);
+page.setDefaultTimeout(90000);
 const settle = (ms = 2500) => new Promise((r) => setTimeout(r, ms));
 
 // collect what the browser complains about, per navigation
@@ -65,9 +75,16 @@ let errors = [];
 let failed = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 160)); });
 page.on('pageerror', (e) => errors.push(`อุบัติเหตุสคริปต์: ${String(e).slice(0, 160)}`));
-page.on('requestfailed', (r) => failed.push(`${r.method()} ${r.url().slice(0, 90)}`));
+// นับเฉพาะคำขอที่หน้าเว็บของเราเป็นคนยิง — chrome-extension:// เป็นของตัว
+// เบราว์เซอร์เอง (เช่นตัวเปิด PDF ในตัว) เราควบคุมไม่ได้และไม่ใช่ข้อบกพร่องของระบบ
+const ourRequest = (u) => !u.startsWith('chrome-extension://') && !u.startsWith('devtools://');
+page.on('requestfailed', (r) => {
+  if (ourRequest(r.url())) failed.push(`${r.method()} ${r.url().slice(0, 90)}`);
+});
 page.on('response', (r) => {
-  if (r.status() >= 400 && !r.url().includes('favicon')) failed.push(`${r.status()} ${r.url().slice(0, 90)}`);
+  if (r.status() >= 400 && !r.url().includes('favicon') && ourRequest(r.url())) {
+    failed.push(`${r.status()} ${r.url().slice(0, 90)}`);
+  }
 });
 
 async function open(user, path) {

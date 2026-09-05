@@ -7,6 +7,12 @@ const qs = (o) => {
 
 /** รายงานการประชุม — minutes per group, every version kept. */
 export const meetingsApi = {
+  // สิทธิ์การเข้าถึงสามระดับ (ข้อกำหนดฟังก์ชัน §3.9)
+  access: () => api('/meetings/access'),
+  addGuests: (groupId, emails) => api(`/meetings/groups/${groupId}/guests`, { method: 'POST', body: { emails } }),
+  removeGuest: (groupId, email) =>
+    api(`/meetings/groups/${groupId}/guests/${encodeURIComponent(email)}`, { method: 'DELETE' }),
+
   bootstrap: () => api('/meetings/bootstrap'),
   list: ({ groupId, q } = {}) => api(`/meetings${qs({ groupId, q })}`),
   get: (id) => api(`/meetings/${id}`),

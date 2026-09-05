@@ -68,11 +68,14 @@ suite('แรงงาน-วันคำนวณจากงานที่ล
     `select slot, work_code, cost_code, manday::float8 from worklog_slots where unit_id = $1 order by slot`,
     [site.id])).rows;
 
+  // พนักงานทดสอบเป็นสายปฏิบัติการ ช่องงานหลักจึงเป็นคอลัมน์ team
+  // (สายสนับสนุนใช้ detail) — ข้อกำหนดฟังก์ชัน §3.2.2 primaryField(kind)
+  const SLOT1 = 'team';
   const save = (field, value) => call('/performance/cell', { method: 'POST', user: A,
     body: { site: site.code, eid: emp.id, date: TODAY, field, value } });
 
   happy('ยังไม่ลงงาน = 0 แรงงาน-วัน', (await md()) === 0, String(await md()));
-  const r1 = await save('detail', 'A-1 / 5');
+  const r1 = await save(SLOT1, 'A-1 / 5');
   happy('ลงงานหลักได้', r1.status === 200, `${r1.status}`);
   happy('ลงงานหนึ่งช่อง = 1 แรงงาน-วัน', (await md()) === 1, String(await md()));
 
@@ -84,13 +87,15 @@ suite('แรงงาน-วันคำนวณจากงานที่ล
   happy('แยกรหัสงานและรหัสหมวดต้นทุนออกจากกันได้',
     s2[0].work_code === 'A-1' && s2[0].cost_code === '5', JSON.stringify(s2[0]));
 
-  const rep = (await call(`/performance/report/manday?from=${TODAY}&to=${TODAY}&groupBy=cost`, { user: A })).data;
-  const rep2 = (await call(`/performance/report/manday?from=${TODAY}&to=${TODAY}&groupBy=worktype`, { user: A })).data;
-  happy('รายงานรายหมวดต้นทุนกับรายประเภทงานได้ยอดเท่ากัน', rep.total === rep2.total, `${rep.total} / ${rep2.total}`);
+  const totals = {};
+  for (const g of ['cost', 'worktype', 'project', 'employee']) {
+    totals[g] = (await call(`/performance/report/manday?from=${TODAY}&to=${TODAY}&groupBy=${g}`, { user: A })).data.total;
+  }
+  happy('รายงานทุกมุมมองได้ยอดรวมเท่ากัน', new Set(Object.values(totals)).size === 1, JSON.stringify(totals));
 
   await save('pm', '');
   happy('ลบงานเสริมแล้วกลับเป็น 1 แรงงาน-วัน', (await md()) === 1, String(await md()));
-  await save('detail', '');
+  await save(SLOT1, '');
   bad('ลบงานทั้งหมดแล้วไม่นับเป็นวันทำงาน', (await md()) === 0, String(await md()));
 }
 

@@ -1157,8 +1157,10 @@ router.get('/manpower', requireFeature('manpower'), asyncHandler(async (req, res
   // A day with no man-day recorded still used a person, so it counts as one
   // head; the man-day column stays honest about what was actually measured.
   // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
-  // (กติกาเดียวกับ view worklog_mandays — ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ในช่อง man_day)
-  const md = `(case when coalesce(w.detail,'') <> '' or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
+  // ช่องงานหลักคนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) จึงต้องดู e.kind
+  // ทุกคำสั่งที่ใช้ค่านี้ join employees e ไว้แล้ว
+  const md = `(case when coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') <> ''
+                      or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const [byProject, byTeam, byType, byStatus, totals] = await Promise.all([
     query(`select u.code site, u.name site_name, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
              from work_logs w join units u on u.id = w.unit_id join employees e on e.id = w.employee_id ${W}
@@ -1190,19 +1192,23 @@ const reportMeta = (req, from, to) => ({
   generatedBy: req.profile.full_name || req.profile.email,
 });
 
-router.get('/report/manday', asyncHandler(async (req, res) => {
-  const from = req.query.from, to = req.query.to;
-  if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
-  const groupBy = ['project', 'cost', 'worktype', 'team', 'employee'].includes(req.query.groupBy)
-    ? req.query.groupBy : 'cost';
-  const scoped = scopedUnitIds(req.profile);
+/**
+ * รายงานแรงงาน-วัน — ตรรกะเดียวใช้ทั้งฉบับ JSON และ PDF
+ *
+ * อ่านจาก view worklog_slots เสมอ ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ หนึ่งวันที่มีงานลง
+ * คือหนึ่งแรงงาน-วัน และวันที่ลงสองงานแบ่ง 0.5/0.5 ให้แต่ละรหัส — ทำให้รายงาน
+ * นี้เป็นเครื่องมือกระจายค่าแรง ไม่ใช่แค่สมุดนับวัน และทำให้ทุกมุมมองได้ยอดรวม
+ * เท่ากันเพราะหารก้อนเดียวกัน
+ */
+// ไม่มีมุมมอง "รายทีม" อีกต่อไป — คอลัมน์ team คือช่องงานหลักของสายปฏิบัติการ
+// ตามข้อกำหนดฟังก์ชัน §3.2.2 ไม่ใช่ชื่อชุดงาน การจัดกลุ่มด้วยคอลัมน์นี้จึงได้
+// รหัสงานปนกับชื่อทีมเก่าที่ค้างอยู่ ซึ่งเป็นตัวเลขที่ไม่มีความหมายให้ใครอ่าน
+const MANDAY_GROUPS = ['cost', 'worktype', 'project', 'employee'];
+async function mandayReport(profile, from, to, groupBy) {
+  const scoped = scopedUnitIds(profile);
   const params = [from, to]; const where = ['s.ymd >= $1', 's.ymd <= $2'];
   if (scoped) { params.push(scoped); where.push(`s.unit_id = any($${params.length}::uuid[])`); }
   const W = `where ${where.join(' and ')}`;
-
-  // แรงงาน-วันมาจาก worklog_slots เสมอ ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ — หนึ่งวัน
-  // ที่มีงานลงคือหนึ่งแรงงาน-วัน และวันที่ลงสองงานจะแบ่ง 0.5/0.5 ให้แต่ละรหัส
-  // นี่คือสิ่งที่ทำให้รายงานนี้เป็นเครื่องมือกระจายค่าแรง ไม่ใช่แค่สมุดนับวัน
   const SQL = {
     cost:     `select coalesce(s.cost_code,'-') key, coalesce(c.name,'(ไม่ระบุหมวดต้นทุน)') label,
                       sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
@@ -1216,25 +1222,26 @@ router.get('/report/manday', asyncHandler(async (req, res) => {
                       count(distinct s.employee_id)::int people
                  from worklog_slots s join units u on u.id = s.unit_id ${W}
                 group by 1,2 order by 3 desc`,
-    team:     `select coalesce(l.team,'(ไม่ระบุ)') key, coalesce(l.team,'(ไม่ระบุทีม)') label,
-                      sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
-                 from worklog_slots s
-                 join work_logs l on l.employee_id = s.employee_id and l.ymd = s.ymd and l.deleted_at is null
-                 ${W} group by 1,2 order by 3 desc`,
     employee: `select e.employee_code key, e.full_name label, sum(s.manday)::numeric manday,
                       count(distinct s.ymd)::int people
                  from worklog_slots s join employees e on e.id = s.employee_id ${W}
                 group by 1,2 order by 3 desc`,
   }[groupBy];
   const { rows } = await query(SQL, params);
-  // ยอดรวมของทุกมุมมองต้องเท่ากันเสมอ เพราะทุกมุมมองหารก้อนเดียวกัน
   const total = await queryOne(
     `select coalesce(sum(s.manday),0)::numeric manday from worklog_slots s ${W}`, params);
-  res.json({ data: {
-    groupBy, meta: reportMeta(req, from, to),
-    total: Number(total?.manday || 0),
+  return {
     rows: rows.map((r) => ({ ...r, manday: Number(r.manday || 0) })),
-  } });
+    total: Number(total?.manday || 0),
+  };
+}
+
+router.get('/report/manday', asyncHandler(async (req, res) => {
+  const from = req.query.from, to = req.query.to;
+  if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
+  const groupBy = MANDAY_GROUPS.includes(req.query.groupBy) ? req.query.groupBy : 'cost';
+  const { rows, total } = await mandayReport(req.profile, from, to, groupBy);
+  res.json({ data: { groupBy, meta: reportMeta(req, from, to), total, rows } });
 }));
 
 /** §8 the monthly report has to be one file covering every project. */
@@ -1247,8 +1254,10 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
   const params = [from, to]; let scopeSql = '';
   if (scoped) { params.push(scoped); scopeSql = ` and w.unit_id = any($${params.length}::uuid[])`; }
   // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
-  // (กติกาเดียวกับ view worklog_mandays — ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ในช่อง man_day)
-  const md = `(case when coalesce(w.detail,'') <> '' or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
+  // ช่องงานหลักคนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) จึงต้องดู e.kind
+  // ทุกคำสั่งที่ใช้ค่านี้ join employees e ไว้แล้ว
+  const md = `(case when coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') <> ''
+                      or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const { rows } = await query(
     `select u.code site, u.name site_name, e.employee_code, e.full_name, coalesce(w.team,'') team,
             w.ymd, ${md}::numeric manday,
@@ -1568,31 +1577,15 @@ router.post('/bulk', requireFeature('mandayEntry'), requirePermission('performan
 }));
 
 // ── §8 รายงานเป็น PDF ─────────────────────────────────────────────────────
-const GROUP_TH = { project: 'รายโครงการ', team: 'รายทีม', worktype: 'รายประเภทงาน', employee: 'รายพนักงาน' };
+const GROUP_TH = { cost: 'รายหมวดต้นทุน', worktype: 'รายประเภทงาน', project: 'รายโครงการ', employee: 'รายพนักงาน' };
 router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
-  const groupBy = Object.keys(GROUP_TH).includes(req.query.groupBy) ? req.query.groupBy : 'project';
-  const scoped = scopedUnitIds(req.profile);
-  const params = [from, to]; const where = ['w.ymd >= $1', 'w.ymd <= $2', 'w.deleted_at is null'];
-  if (scoped) { params.push(scoped); where.push(`w.unit_id = any($${params.length}::uuid[])`); }
-  const W = `where ${where.join(' and ')}`;
-  // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
-  // (กติกาเดียวกับ view worklog_mandays — ไม่ใช่ตัวเลขที่ใครพิมพ์ไว้ในช่อง man_day)
-  const md = `(case when coalesce(w.detail,'') <> '' or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
-  const SQL = {
-    project:  `select u.code key, u.name label, sum(${md})::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w join units u on u.id = w.unit_id ${W} group by 1,2 order by 3 desc`,
-    team:     `select coalesce(w.team,'-') key, coalesce(w.team,'(ไม่ระบุทีม)') label, sum(${md})::numeric manday,
-                      count(distinct w.employee_id)::int people from work_logs w ${W} group by 1,2 order by 3 desc`,
-    worktype: `select coalesce(l.work_type_code,'-') key, coalesce(l.work_type_name, w.detail, w.team, '(ไม่ระบุงาน)') label,
-                      sum(coalesce(l.man_day, ${md}))::numeric manday, count(distinct w.employee_id)::int people
-                 from work_logs w left join work_log_lines l on l.work_log_id = w.id ${W} group by 1,2 order by 3 desc`,
-    employee: `select e.employee_code key, e.full_name label, sum(${md})::numeric manday, count(*)::int people
-                 from work_logs w join employees e on e.id = w.employee_id ${W} group by 1,2 order by 3 desc`,
-  }[groupBy];
-  const { rows } = await query(SQL, params);
-  const totals = rows.reduce((a, r) => ({ manday: a.manday + Number(r.manday || 0), people: a.people + Number(r.people || 0) }), { manday: 0, people: 0 });
+  const groupBy = MANDAY_GROUPS.includes(req.query.groupBy) ? req.query.groupBy : 'cost';
+  // ฉบับ PDF ต้องเป็นตัวเลขชุดเดียวกับที่หน้าจอแสดง — ใช้ฟังก์ชันเดียวกัน
+  // ไม่ใช่คำสั่ง SQL คู่ขนานที่คลาดจากกันได้เงียบ ๆ
+  const { rows, total } = await mandayReport(req.profile, from, to, groupBy);
+  const totals = { manday: total, people: rows.reduce((a, r) => a + Number(r.people || 0), 0) };
   const pdf = await buildMandayReportPdf({
     title: 'รายงานแรงงาน-วัน (Man-day Report)',
     groupLabel: GROUP_TH[groupBy],

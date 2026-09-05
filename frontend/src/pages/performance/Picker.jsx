@@ -32,11 +32,25 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
   }, [anchor, step]);
 
   useEffect(() => { searchRef.current?.focus(); }, [step]);
+  // ตัวปิดเมื่อคลิกนอกกล่องต้องทำงานที่ capture phase
+  //
+  // กดรายการที่เป็น one-to-many แล้ว pick() เรียก setStep(2) ทันทีใน discrete
+  // event — React 18 flush แบบ synchronous ไม่ batch แถวขั้นที่หนึ่งจึงถูกถอด
+  // ออกจาก DOM ไปแล้วก่อนที่ listener แบบ bubble บน document จะได้ทำงาน พอถึง
+  // คิว .contains() ก็ตอบ false อย่างถูกต้องตามสิ่งที่มันเห็น เพราะ node นั้น
+  // ไม่อยู่ใน DOM แล้ว ผลคือกล่องปิดแทนที่จะไปขั้นที่สอง
+  //
+  // capture phase ทำงานขาลง ก่อน React จะ dispatch และก่อน node ถูกถอด จึงเห็น
+  // DOM ตามสภาพจริงตอนที่เมาส์กดลงเสมอ — ข้อกำหนดฟังก์ชัน §3.2.3 บันทึกบั๊กนี้ไว้
   useEffect(() => {
     const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) onClose(); };
     const onKey = (e) => { if (e.key === 'Escape') { if (step === 2) { setStep(1); setQ(''); } else onClose(); } };
-    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [step, onClose]);
 
   // ขั้นที่สองต้องเหลือเฉพาะหมวดต้นทุนที่รหัสงานนั้นใช้ได้จริง (allowed_cost)

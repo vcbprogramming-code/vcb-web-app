@@ -16,7 +16,7 @@ import { useT } from '../../lib/i18n.jsx';
 // มาก่อน เพราะเป็นมุมที่เอาไปกระจายค่าแรงลงงานตามสัญญาได้จริง
 const GROUPS = [
   ['cost', 'รายหมวดต้นทุน'], ['worktype', 'รายประเภทงาน'],
-  ['project', 'รายโครงการ'], ['team', 'รายทีม'], ['employee', 'รายพนักงาน'],
+  ['project', 'รายโครงการ'], ['employee', 'รายพนักงาน'],
 ];
 const iso = (d) => d.toISOString().slice(0, 10);
 

@@ -54,9 +54,13 @@ const run = async () => {
     return {
       code, name, nameEn, category, desc, sort: i + 1,
       allowed: list.join(','),
-      // ระบบจริงอนุมานจาก allowed_cost: 1 รหัส = ข้ามขั้นที่สอง, หลายรหัส = ให้เลือก
-      mapping: list.length === 1 ? 'one-to-one' : 'one-to-many',
-      fixedCost: list.length === 1 ? list[0] : (fixedCost || null),
+      // เอกสารข้อกำหนดฟังก์ชันระบุกติกาไว้สามกรณี ไม่ใช่สอง:
+      //   1 รหัส  → one-to-one ข้ามขั้นที่สอง เติมรหัสต้นทุนให้
+      //   หลายรหัส → one-to-many ให้เลือกต่อในขั้นที่สอง
+      //   ไม่มีเลย → one-to-one แต่ "ไม่มีต้นทุน" (กลุ่ม Z) บันทึกเป็นรหัสเปล่า "Z-2"
+      //             ห้ามต่อ " / " เพราะ split_part ฝั่งสรุปจะพังทันที
+      mapping: list.length === 1 || list.length === 0 ? 'one-to-one' : 'one-to-many',
+      fixedCost: list.length === 1 ? list[0] : (list.length === 0 ? null : (fixedCost || null)),
     };
   });
   const haveWork = (await query('select code, name from work_types')).rows;
@@ -129,11 +133,18 @@ const run = async () => {
     await query('update work_logs set pm = $2, updated_at = now() where pm = $1', [from, to]);
     await query('update work_logs set team = $2, updated_at = now() where team = $1', [from, to]);
   }
-  for (const r of strays) {
-    await query(
-      `update work_logs set detail = coalesce(detail, team), team = null, updated_at = now() where id = $1`,
-      [r.id]);
-  }
+  // ช่องงานหลักอยู่คนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2):
+  //   สายปฏิบัติการ → team · สายสนับสนุน → detail
+  // ข้อมูลสาธิตเดิมเขียนชื่อทีม ("ทีม ก") ลงคอลัมน์ team ของทุกคน ซึ่งสำหรับสาย
+  // ปฏิบัติการคือช่องงานหลัก ทำให้หน้าจอแสดงชื่อทีมแทนรหัสงาน — ย้ายรหัสไปให้ถูกช่อง
+  const moved = await query(
+    `update work_logs w set team = w.detail, detail = null, updated_at = now()
+       from employees e
+      where e.id = w.employee_id and e.kind = 'operation'
+        and w.deleted_at is null
+        and w.detail ~ '^[A-Z]-[0-9]+'
+      returning w.id`);
+  if (moved.rowCount) console.log(`ย้ายรหัสงานของสายปฏิบัติการไปช่อง team ${moved.rowCount} แถว`);
 
   const n = await queryOne("select count(*)::int c from work_types where is_active");
   const m = await queryOne("select count(*)::int c from cost_categories where is_active");

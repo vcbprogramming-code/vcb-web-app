@@ -245,7 +245,7 @@ export default function ReportsView({ site, features = {} }) {
             </div>
           )}
 
-          <div className="card overflow-hidden !p-0">
+          <div className="card overflow-x-auto !p-0">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
               <h3 className="font-bold text-slate-800">{t('รายงานแรงงาน-วัน')} · {t(GROUPS.find(([k]) => k === groupBy)?.[1] || '')}</h3>
               {report?.meta && (
@@ -281,7 +281,7 @@ export default function ReportsView({ site, features = {} }) {
             </table>
           </div>
 
-          <div className="card overflow-hidden !p-0">
+          <div className="card overflow-x-auto !p-0">
             <h3 className="px-5 py-3 font-bold text-slate-800">{t('ประวัติการแก้ไข (Audit Trail)')}</h3>
             <div className="max-h-[420px] overflow-y-auto">
               <table className="tbl">

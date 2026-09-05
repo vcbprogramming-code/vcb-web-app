@@ -93,5 +93,30 @@ for (const [path, name] of PAGES) {
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: false });
 }
 
+// ── แท็บที่มีตารางกว้าง — ที่ที่ตัวเลขอยู่ ─────────────────────────────────
+// หน้าแรกของแต่ละโมดูลมักเป็นการ์ด ตารางจริงอยู่ในแท็บถัดไป จึงต้องกดเข้าไปดู
+for (const [path, name, tab] of [
+  ['/performance', 'บันทึกการทำงาน', 'รายงาน'],
+  ['/credit', 'วงเงินสินเชื่อ', 'วงเงินสินเชื่อ (Facilities)'],
+  ['/sop', 'คู่มือ SOP', 'เมนูรายงาน'],
+  ['/onboarding', 'ปฐมนิเทศฝั่ง HR', 'พนักงานใหม่'],
+]) {
+  suite(`${name} · แท็บ ${tab} บนจอโทรศัพท์`);
+  errors.length = 0;
+  await page.goto(`${APP}${path}`, { waitUntil: 'networkidle2' }).catch(() => {});
+  await settle();
+  const opened = await page.evaluate((l) => {
+    const b = [...document.querySelectorAll('button, a')].find((x) => x.innerText.trim().startsWith(l));
+    if (b) { b.click(); return true; } return false;
+  }, tab);
+  happy('เปิดแท็บได้', opened, tab);
+  await settle(2600);
+  const o = await overflow();
+  bad('หน้าไม่เลื่อนซ้าย-ขวาทั้งหน้า', o.pageScroll <= 2, `เกินมา ${o.pageScroll}px`);
+  bad('ตารางกว้างเลื่อนอยู่ในกล่องของตัวเอง ไม่ถูกตัดหาย', o.items.length === 0, o.items.join(' · '));
+  bad('ไม่มี error', errors.length === 0, errors.slice(0, 2).join(' / '));
+  await page.screenshot({ path: `${SHOTS}/${name}-${tab}.png` });
+}
+
 await browser.close();
 process.exit(report(`${SHOTS}/result.json`) ? 1 : 0);

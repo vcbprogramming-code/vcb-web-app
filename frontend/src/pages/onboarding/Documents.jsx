@@ -37,7 +37,7 @@ export default function Documents({ documents, status, onChanged }) {
         </div>
       </div>
 
-      <div className="card overflow-hidden !p-0">
+      <div className="card overflow-x-auto !p-0">
         {documents.map((d) => {
           const on = submitted.has(d.id);
           return (

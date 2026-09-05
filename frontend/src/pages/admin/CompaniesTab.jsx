@@ -148,29 +148,29 @@ export default function CompaniesTab() {
             <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="text-sm sm:col-span-2">
                 <span className="mb-1 block font-medium text-slate-600">{t('ชื่อบริษัท (ไทย) *')}</span>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${field} w-full`} placeholder={t('บริษัท ... จำกัด')} />
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={`${field} w-full`} placeholder={t('บริษัท ... จำกัด')} />
               </label>
               <label className="text-sm sm:col-span-2">
                 <span className="mb-1 block font-medium text-slate-600">{t('ชื่อบริษัท (อังกฤษ)')}</span>
-                <input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} className={`${field} w-full`} placeholder="... Co., Ltd." />
+                <input value={form.nameEn} onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))} className={`${field} w-full`} placeholder="... Co., Ltd." />
               </label>
               <label className="text-sm sm:col-span-2">
                 <span className="mb-1 block font-medium text-slate-600">{t('ที่อยู่')}</span>
-                <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className={`${field} w-full`} />
+                <input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className={`${field} w-full`} />
               </label>
               <label className="text-sm">
                 <span className="mb-1 block font-medium text-slate-600">{t('โทรศัพท์')}</span>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`${field} w-full`} />
+                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={`${field} w-full`} />
               </label>
               <label className="text-sm">
                 <span className="mb-1 block font-medium text-slate-600">{t('โทรสาร')}</span>
-                <input value={form.fax} onChange={(e) => setForm({ ...form, fax: e.target.value })} className={`${field} w-full`} />
+                <input value={form.fax} onChange={(e) => setForm((f) => ({ ...f, fax: e.target.value }))} className={`${field} w-full`} />
               </label>
             </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+            <input type="checkbox" checked={form.isDefault} onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))} className="h-4 w-4 rounded border-slate-300" />
             {t('ตั้งเป็นบริษัทหลัก (ค่าเริ่มต้นเมื่อสร้างเอกสาร)')}
           </label>
 

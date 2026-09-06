@@ -75,6 +75,24 @@ async function snapshot(profile, note) {
     [JSON.stringify(data), note, profile?.id || null]);
 }
 
+/**
+ * เขียนหลายแถวด้วยคำสั่งเดียว
+ *
+ * การกู้คืนเขียนคืนทั้งเอกสาร — กรณีศึกษา ขั้นตอน ป้ายหมวด รายงาน และผังงาน
+ * รวมกันหลายร้อยแถว ถ้ายิงทีละคำสั่งก็คือวิ่งไป-กลับฐานข้อมูลหลายร้อยรอบ
+ * วัดบนฐานข้อมูลจริงได้สิบวินาทีต่อการกดหนึ่งครั้ง ผู้ใช้เห็นแต่วงกลมหมุน
+ * รวบเป็นคำสั่งเดียวต่อตารางแล้วเหลือไม่ถึงวินาที
+ */
+async function insertMany(client, table, cols, rows, tail = '') {
+  const CHUNK = 500;                       // กันพารามิเตอร์ทะลุเพดานของ pg
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const part = rows.slice(i, i + CHUNK);
+    const params = [];
+    const tuples = part.map((r) => `(${r.map((v) => { params.push(v); return `$${params.length}`; }).join(',')})`);
+    await client.query(`insert into ${table} (${cols.join(',')}) values ${tuples.join(',')} ${tail}`, params);
+  }
+}
+
 // ── read ────────────────────────────────────────────────────────────────────
 
 /** GET /api/sop/bootstrap — modules, doc meta and per-module counts. */
@@ -212,6 +230,10 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
+    // เลขที่กรณีศึกษาเป็นกุญแจหลัก อ่าน max แล้วเขียนพร้อมกันสองคนจะได้เลข
+    // เดียวกันและคนหลังชนกุญแจซ้ำ → 500 (ทดสอบพร้อมกัน 8 คน สำเร็จแค่คนเดียว)
+    // ล็อกเฉพาะช่วงจองเลข ปล่อยเองเมื่อจบทรานแซกชัน คนอ่านไม่ถูกกระทบ
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', ['sop_scenarios.no']);
     const { rows: nx } = await client.query('select coalesce(max(no),0)+1 as no from sop_scenarios');
     const no = nx[0].no;
     const { rows: so } = await client.query(
@@ -389,33 +411,22 @@ router.post('/versions/:id/restore', canEdit, asyncHandler(async (req, res) => {
     for (const t of ['sop_scenario_steps', 'sop_scenario_modules', 'sop_reports', 'sop_flows', 'sop_scenarios']) {
       await client.query(`delete from ${t}`);
     }
-    for (const r of d.scenarios || []) {
-      await client.query(
-        `insert into sop_scenarios (no, module, sort_order, title_th, title_en, problem, ref, note, date_added)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [r.no, r.module, r.sort_order, r.title_th, r.title_en, r.problem, r.ref, r.note, r.date_added]);
-    }
-    for (const r of d.steps || []) {
-      await client.query(
-        'insert into sop_scenario_steps (scenario_no, step_order, is_substep, text) values ($1,$2,$3,$4)',
-        [r.scenario_no, r.step_order, r.is_substep, r.text]);
-    }
-    for (const r of d.tags || []) {
-      await client.query('insert into sop_scenario_modules (scenario_no, module) values ($1,$2) on conflict do nothing',
-        [r.scenario_no, r.module]);
-    }
-    for (const r of d.reports || []) {
-      await client.query(
-        'insert into sop_reports (id, case_no, scenario_text, report_path, sort_order) values ($1,$2,$3,$4,$5)',
-        [r.id, r.case_no, r.scenario_text, r.report_path, r.sort_order]);
-    }
-    for (const r of d.flows || []) {
-      await client.query(
-        `insert into sop_flows (id, module, title_th, title_en, sort_order, lanes, nodes, edges)
-         values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [r.id, r.module, r.title_th, r.title_en, r.sort_order,
-         JSON.stringify(r.lanes ?? []), JSON.stringify(r.nodes ?? []), JSON.stringify(r.edges ?? [])]);
-    }
+    await insertMany(client, 'sop_scenarios',
+      ['no', 'module', 'sort_order', 'title_th', 'title_en', 'problem', 'ref', 'note', 'date_added'],
+      (d.scenarios || []).map((r) => [r.no, r.module, r.sort_order, r.title_th, r.title_en,
+        r.problem, r.ref, r.note, r.date_added]));
+    await insertMany(client, 'sop_scenario_steps',
+      ['scenario_no', 'step_order', 'is_substep', 'text'],
+      (d.steps || []).map((r) => [r.scenario_no, r.step_order, r.is_substep, r.text]));
+    await insertMany(client, 'sop_scenario_modules', ['scenario_no', 'module'],
+      (d.tags || []).map((r) => [r.scenario_no, r.module]), 'on conflict do nothing');
+    await insertMany(client, 'sop_reports',
+      ['id', 'case_no', 'scenario_text', 'report_path', 'sort_order'],
+      (d.reports || []).map((r) => [r.id, r.case_no, r.scenario_text, r.report_path, r.sort_order]));
+    await insertMany(client, 'sop_flows',
+      ['id', 'module', 'title_th', 'title_en', 'sort_order', 'lanes', 'nodes', 'edges'],
+      (d.flows || []).map((r) => [r.id, r.module, r.title_th, r.title_en, r.sort_order,
+        JSON.stringify(r.lanes ?? []), JSON.stringify(r.nodes ?? []), JSON.stringify(r.edges ?? [])]));
     // ลำดับ id ของ sop_reports เป็น serial — ดันให้พ้นค่าที่เพิ่งเขียนกลับไป
     // ไม่งั้นการเพิ่มรายงานถัดไปจะชนกับ id ที่กู้คืนมา
     await client.query(

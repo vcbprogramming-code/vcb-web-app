@@ -141,7 +141,7 @@ export default function CashPlanTab({ projects, onChanged }) {
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      <div className="card !p-0 overflow-hidden">
+      <div className="card !p-0 overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr className="tbl-head">
@@ -166,8 +166,8 @@ export default function CashPlanTab({ projects, onChanged }) {
                 <td className="tbl-td text-right tabular-nums text-red-600">{formatMoney(c.deductions)}</td>
                 <td className="tbl-td text-right tabular-nums font-medium text-emerald-600">{formatMoney(c.available)}</td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setEdit(c)} className="mr-2 text-slate-400 hover:text-slate-700"><Icon name="edit" className="inline h-4 w-4" /></button>
-                  <button onClick={() => remove(c.id)} className="text-slate-400 hover:text-red-600"><Icon name="trash" className="inline h-4 w-4" /></button>
+                  <button onClick={() => setEdit(c)} className="mr-2 text-slate-400 hover:text-slate-700" title={t('แก้ไข')} aria-label={t('แก้ไข')}><Icon name="edit" className="inline h-4 w-4" /></button>
+                  <button onClick={() => remove(c.id)} className="text-slate-400 hover:text-red-600" title={t('ลบ')} aria-label={t('ลบ')}><Icon name="trash" className="inline h-4 w-4" /></button>
                 </td>
               </tr>
             ))}

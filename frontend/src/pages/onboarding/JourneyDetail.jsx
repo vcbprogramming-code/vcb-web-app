@@ -103,11 +103,11 @@ export default function JourneyDetail({ journeyId, onBack }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้ประเมิน')}</label>
-            <input value={review.reviewer} onChange={(e) => setReview({ ...review, reviewer: e.target.value })} className="field" />
+            <input value={review.reviewer} onChange={(e) => setReview((r) => ({ ...r, reviewer: e.target.value }))} className="field" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผลการประเมิน')}</label>
-            <select value={review.result} onChange={(e) => setReview({ ...review, result: e.target.value })} className="field">
+            <select value={review.result} onChange={(e) => setReview((r) => ({ ...r, result: e.target.value }))} className="field">
               <option value="">{t('— ยังไม่สรุป —')}</option>
               <option value="pass">{t('ผ่านทดลองงาน')}</option>
               <option value="extend">{t('ขยายเวลาทดลองงาน')}</option>
@@ -126,7 +126,7 @@ export default function JourneyDetail({ journeyId, onBack }) {
                     <button
                       key={n}
                       type="button"
-                      onClick={() => setReview({ ...review, scores: { ...review.scores, [c]: n } })}
+                      onClick={() => setReview((r) => ({ ...r, scores: { ...r.scores, [c]: n } }))}
                       className={`h-6 w-6 rounded text-xs font-semibold ${
                         (review.scores[c] || 0) >= n ? 'bg-brand text-white' : 'bg-slate-100 text-slate-400'
                       }`}
@@ -140,11 +140,11 @@ export default function JourneyDetail({ journeyId, onBack }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('จุดเด่น')}</label>
-            <textarea rows={2} value={review.strengths} onChange={(e) => setReview({ ...review, strengths: e.target.value })} className="field" />
+            <textarea rows={2} value={review.strengths} onChange={(e) => setReview((r) => ({ ...r, strengths: e.target.value }))} className="field" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('สิ่งที่ควรพัฒนา')}</label>
-            <textarea rows={2} value={review.improvements} onChange={(e) => setReview({ ...review, improvements: e.target.value })} className="field" />
+            <textarea rows={2} value={review.improvements} onChange={(e) => setReview((r) => ({ ...r, improvements: e.target.value }))} className="field" />
           </div>
         </div>
         <div className="flex items-center justify-between">

@@ -61,7 +61,7 @@ function layout(flow) {
     let ly;
     let tf = ABOVE;
     if (s.li === target.li) {
-      if (forward) { d = `M${s.r},${s.cy} L${target.l},${target.cy}`; lx = (s.r + target.l) / 2; ly = s.target - 4; }
+      if (forward) { d = `M${s.r},${s.cy} L${target.l},${target.cy}`; lx = (s.r + target.l) / 2; ly = s.t - 4; }
       else {
         const y = s.laneBottom - 10;
         d = `M${s.cx},${s.b} V${y} H${target.cx} V${target.b}`; lx = (s.cx + target.cx) / 2; ly = y - 3;
@@ -69,20 +69,20 @@ function layout(flow) {
     } else if (Math.abs(target.cx - s.cx) < 2) {
       // A pair of nodes often has both a down and an up connector (submit /
       // reject). Offset each by direction so the two lines — and their labels —
-      // don'target land on top of each other.
+      // don't land on top of each other.
       const off = down ? 9 : -9;
-      d = down ? `M${s.cx + off},${s.b} L${target.cx + off},${target.target}` : `M${s.cx + off},${s.target} L${target.cx + off},${target.b}`;
+      d = down ? `M${s.cx + off},${s.b} L${target.cx + off},${target.t}` : `M${s.cx + off},${s.t} L${target.cx + off},${target.b}`;
       lx = s.cx + off + (down ? 7 : -7);
-      ly = (down ? s.b + target.target : target.b + s.target) / 2;
+      ly = (down ? s.b + target.t : target.b + s.t) / 2;
       tf = down ? 'translate(0,-50%)' : 'translate(-100%,-50%)';
     } else if (forward) {
-      d = `M${s.r},${s.cy} H${target.cx} V${down ? target.target : target.b}`;
+      d = `M${s.r},${s.cy} H${target.cx} V${down ? target.t : target.b}`;
       // label the vertical drop, not the horizontal run: a decision that fans
       // out to two lanes at the same rank shares the run but not the drop.
-      lx = target.cx + 7; ly = (s.cy + (down ? target.target : target.b)) / 2; tf = 'translate(0,-50%)';
+      lx = target.cx + 7; ly = (s.cy + (down ? target.t : target.b)) / 2; tf = 'translate(0,-50%)';
     } else {
-      d = `M${s.cx},${down ? s.b : s.target} V${target.cy} H${target.r}`;
-      lx = (s.cx + target.r) / 2; ly = target.target - 4;
+      d = `M${s.cx},${down ? s.b : s.t} V${target.cy} H${target.r}`;
+      lx = (s.cx + target.r) / 2; ly = target.t - 4;
     }
     const st = styleOf(e.kind);
     return { key: `${e.from}->${e.to}-${i}`, d, lx, ly, tf, color: st.color, label: e.label || st.label };

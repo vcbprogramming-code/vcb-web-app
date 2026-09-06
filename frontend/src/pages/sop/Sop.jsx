@@ -92,24 +92,24 @@ export default function Sop() {
 
       {/* view switch */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.filter((x) => !x.editorOnly || canEdit).map((tab) => (
-          <button key={tab.key} onClick={() => {
-            pickTab(tab.key);
-            // don'tab carry a filter into a tab where that module has nothing
-            if (tab.key === 'versions') { setModule(''); return; }
-            const next = tab.key === 'flows' ? counts.flows : counts.scenarios;
+        {TABS.filter((x) => !x.editorOnly || canEdit).map((it) => (
+          <button key={it.key} onClick={() => {
+            pickTab(it.key);
+            // don't carry a filter into a it where that module has nothing
+            if (it.key === 'versions') { setModule(''); return; }
+            const next = it.key === 'flows' ? counts.flows : counts.scenarios;
             if (module && !next[module]) setModule('');
           }}
             className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
-            <Icon name={tab.icon} className="h-4 w-4" /> {tab.label}
+            <Icon name={it.icon} className="h-4 w-4" /> {it.label}
             {/* แท็บประวัติเวอร์ชันไม่มีจำนวนกำกับ — เลขจะเปลี่ยนทุกครั้งที่แก้คู่มือ
                 และไม่ได้บอกอะไรที่คนอ่านต้องรู้ก่อนกดเข้าไป */}
-            {tab.key !== 'versions' && (
+            {it.key !== 'versions' && (
               <span className="ml-1 text-xs text-slate-400">
-                {tab.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
-                  : tab.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
+                {it.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
+                  : it.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
                   : counts.reports}
               </span>
             )}

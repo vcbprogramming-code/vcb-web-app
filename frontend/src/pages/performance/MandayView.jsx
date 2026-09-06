@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { perfApi } from '../../lib/performance.js';
+import { isoDate } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -35,7 +36,7 @@ function FileCell({ files, canEdit, open, onToggle, onAttach, onOpen, onDownload
     <div className="relative">
       <div className={`flex items-center gap-1 ${tall ? 'h-11' : ''}`}>
         {files.length > 0 && (
-          <button type="button" onClick={onToggle}
+          <button type="button" onClick={onToggle} title={t('ไฟล์แนบของวันนี้')} aria-label={t('ไฟล์แนบของวันนี้')}
             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-sm text-brand hover:bg-slate-50">
             <Icon name="paperclip" className="h-4 w-4" /> {files.length}
           </button>
@@ -79,7 +80,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [data, setData] = useState(null);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => isoDate());
   const [busy, setBusy] = useState('');
   const [closes, setCloses] = useState([]);
   const [picked, setPicked] = useState(() => new Set());

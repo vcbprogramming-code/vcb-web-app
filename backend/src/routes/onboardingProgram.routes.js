@@ -77,7 +77,9 @@ async function statusFor(profileId, content) {
   const phases = (dept?.phases || []).map((p) => {
     const items = p.blocks.flatMap((b) => visible(b.items, track));
     const doneCount = items.filter((i) => done.has(i.id)).length;
-    return { id: p.id, total: items.length, done: doneCount, complete: items.length > 0 && doneCount === items.length };
+    // เฟสที่ระดับนี้ไม่มีรายการต้องทำเลย ถือว่าผ่าน — ไม่งั้นคนคนนั้นจะติดค้าง
+    // อยู่ตรงนั้นตลอดไป เพราะเฟสถัดไปรอเฟสก่อนหน้าให้ครบก่อน
+    return { id: p.id, total: items.length, done: doneCount, complete: doneCount === items.length };
   });
 
   let previousComplete = true;
@@ -90,7 +92,9 @@ async function statusFor(profileId, content) {
     if (!open) lockReason[p.id] = !docsComplete ? 'documents' : 'previous-phase';
     previousComplete = previousComplete && p.complete;
   }
-  const allComplete = phases.length > 0 && phases.every((p) => p.complete);
+  // เฟสว่างไม่ขวางทางเดินต่อ แต่โปรแกรมที่ไม่มีรายการให้ทำเลยก็ไม่ควรนับว่า
+  // "จบหลักสูตรแล้ว" — ต้องมีอย่างน้อยหนึ่งรายการที่คนคนนี้ต้องทำจริง
+  const allComplete = phases.some((p) => p.total > 0) && phases.every((p) => p.complete);
 
   return {
     enrolled: Boolean(enr),

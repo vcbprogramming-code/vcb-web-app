@@ -52,7 +52,7 @@ export default function LedgerTab({ projects, onChanged }) {
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
-      <div className="card !p-0 overflow-hidden">
+      <div className="card !p-0 overflow-x-auto">
         <table className="tbl">
           <thead>
             <tr className="tbl-head">
@@ -80,7 +80,7 @@ export default function LedgerTab({ projects, onChanged }) {
                   {l.status === 'อนุมัติแล้ว' && (
                     <button onClick={() => settle(l.id)} className="mr-2 text-sm text-emerald-600 hover:underline">{t('ชำระแล้ว')}</button>
                   )}
-                  <button onClick={() => remove(l.id)} className="text-slate-400 hover:text-red-600"><Icon name="trash" className="inline h-4 w-4" /></button>
+                  <button onClick={() => remove(l.id)} className="text-slate-400 hover:text-red-600" title={t('ลบรายการนี้')} aria-label={t('ลบรายการนี้')}><Icon name="trash" className="inline h-4 w-4" /></button>
                 </td>
               </tr>
             ))}

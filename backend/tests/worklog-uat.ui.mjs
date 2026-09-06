@@ -314,23 +314,46 @@ suite('§4 ปิดงวดและเปิดงวดจากหน้า
 // ── §8 รายงาน PDF และ Excel จากหน้าจอ ─────────────────────────────────────
 suite('§8 ดาวน์โหลดรายงานจากหน้าจอได้ทั้ง PDF และ Excel');
 {
+  // รายงานนับแรงงาน-วันจาก "งานที่ลงไว้" ตามระบบจริง ไม่ใช่ตัวเลขที่กรอกในช่อง
+  // แรงงาน-วัน (ซึ่งเป็นส่วนเสริมของเรา) จึงต้องมีงานที่ลงรหัสไว้จริงในช่วงที่ดู
+  await query(
+    `update work_logs set team = 'A-1 / 5' where employee_id = $1 and ymd = $2 and deleted_at is null`,
+    [emps[0].id, TODAY]);
   await as(A);
   await pickSite(); await settle(1200);
   happy('เปิดแท็บ "รายงาน" ได้', await clickText('รายงาน'), '');
   await settle(3200);
   const t = await body();
   happy('เห็นยอดรวมแรงงาน-วัน', /รวมแรงงาน-วัน/.test(t), '');
-  // §7 เปลี่ยนช่วงวันที่แล้วตัวเลขต้องเปลี่ยนตาม
+  // §7 เปลี่ยนช่วงวันที่แล้วตัวเลขต้องเปลี่ยนตาม — เลื่อนไปช่วงที่ไม่มีข้อมูล
+  // เลย ยอดต้องกลายเป็นศูนย์ (ช่วงเริ่มต้นคือต้นเดือนถึงวันนี้ ซึ่งครอบข้อมูล
+  // ทดสอบทั้งหมดอยู่แล้ว การหดช่วงให้สั้นลงจึงไม่ทำให้ยอดเปลี่ยน)
   const before = await page.evaluate(() => document.body.innerText.match(/รวมแรงงาน-วัน\s*([\d.,]+)/)?.[1] || '');
-  await page.evaluate((d) => {
-    const inp = document.querySelector('input[type=date]');
-    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, d);
-    inp.dispatchEvent(new Event('input', { bubbles: true }));
-    inp.dispatchEvent(new Event('change', { bubbles: true }));
-  }, TODAY);
+  await page.evaluate(() => {
+    const set = (el, v) => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const [from, to] = [...document.querySelectorAll('input[type=date]')];
+    if (from) set(from, '2020-01-01');
+    if (to) set(to, '2020-01-31');
+  });
   await settle(3200);
   const afterRange = await page.evaluate(() => document.body.innerText.match(/รวมแรงงาน-วัน\s*([\d.,]+)/)?.[1] || '');
   happy('เปลี่ยนช่วงวันที่แล้วยอดรวมคำนวณใหม่', afterRange !== '' && afterRange !== before, `${before} → ${afterRange}`);
+  // ดึงช่วงกลับมาที่เดือนนี้ก่อนตรวจประวัติ — ประวัติใช้ช่วงเดียวกันกับรายงาน
+  await page.evaluate((today) => {
+    const set = (el, v) => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(el, v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const [from, to] = [...document.querySelectorAll('input[type=date]')];
+    if (from) set(from, `${today.slice(0, 8)}01`);
+    if (to) set(to, today);
+  }, TODAY);
+  await settle(3000);
   happy('มีกล่องรายการที่ต้องดำเนินการพร้อมข้อความจริง',
     /ยังไม่บันทึก|บันทึกแล้ว \d+ จาก|จะถูกล็อก/.test(t), '');
   const auditRows = await page.evaluate(() => {

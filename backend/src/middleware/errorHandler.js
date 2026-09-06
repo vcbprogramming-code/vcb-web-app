@@ -29,12 +29,22 @@ export function errorHandler(err, req, res, next) {
     const msg = MULTER_MESSAGE[err.code] || 'อัปโหลดไฟล์ไม่สำเร็จ';
     return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: msg, code: err.code });
   }
+  // ฐานข้อมูลตอบรหัส 22P02 เมื่อค่าที่ส่งมาไม่ใช่รูปแบบของคอลัมน์นั้น — เกิดตอน
+  // เปิดลิงก์เก่าที่รหัสเพี้ยน หรือแก้ URL เอง นั่นคือคำขอที่ผิด ไม่ใช่ระบบพัง
+  // และข้อความดิบจากฐานข้อมูล ('invalid input syntax for type uuid') ไม่ควร
+  // หลุดไปถึงหน้าจอผู้ใช้
+  const PG_BAD_INPUT = new Set(['22P02', '22003', '22007', '22008', '22001']);
+  if (!err?.status && PG_BAD_INPUT.has(err?.code)) {
+    return res.status(400).json({ error: 'รูปแบบข้อมูลที่ส่งมาไม่ถูกต้อง' });
+  }
   const status = err.status || 500;
   if (status >= 500) {
     console.error(err);
   }
   res.status(status).json({
-    error: err.message || 'Internal server error',
+    // ความผิดพลาดฝั่งเซิร์ฟเวอร์เก็บรายละเอียดไว้ใน log เท่านั้น ผู้ใช้เห็นข้อความ
+    // ที่อ่านรู้เรื่องแทนข้อความภายในระบบ
+    error: (status >= 500 && isProd) ? 'ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง' : (err.message || 'Internal server error'),
     ...(err.details ? { details: err.details } : {}),
     ...(isProd ? {} : { stack: err.stack }),
   });

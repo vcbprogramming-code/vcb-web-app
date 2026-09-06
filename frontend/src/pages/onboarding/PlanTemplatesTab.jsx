@@ -44,14 +44,14 @@ export default function PlanTemplatesTab() {
                 {items.map((tpl) => (
                   <div key={tpl.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-sm">
                     <span className="text-slate-700">{tpl.title}</span>
-                    <button onClick={() => remove(tpl.id)} className="text-slate-300 hover:text-red-600"><Icon name="trash" className="h-4 w-4" /></button>
+                    <button onClick={() => remove(tpl.id)} className="text-slate-300 hover:text-red-600" title={t('ลบงานนี้')} aria-label={t('ลบงานนี้')}><Icon name="trash" className="h-4 w-4" /></button>
                   </div>
                 ))}
                 {items.length === 0 && <p className="text-xs text-slate-400">{t('ยังไม่มีรายการ')}</p>}
               </div>
               <form onSubmit={(e) => { e.preventDefault(); add(phase); }} className="mt-3 flex gap-2">
                 <input value={draft[phase]} onChange={(e) => setDraft((d) => ({ ...d, [phase]: e.target.value }))} placeholder={t('เพิ่มงาน…')} className="field text-sm" />
-                <button type="submit" className="btn-primary shrink-0 !px-3"><Icon name="plus" className="h-4 w-4" /></button>
+                <button type="submit" className="btn-primary shrink-0 !px-3" title={t('เพิ่มงาน')} aria-label={t('เพิ่มงาน')}><Icon name="plus" className="h-4 w-4" /></button>
               </form>
             </div>
           );

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { perfApi } from '../../lib/performance.js';
+import { isoDate } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
@@ -18,7 +19,9 @@ const GROUPS = [
   ['cost', 'รายหมวดต้นทุน'], ['worktype', 'รายประเภทงาน'],
   ['project', 'รายโครงการ'], ['employee', 'รายพนักงาน'],
 ];
-const iso = (d) => d.toISOString().slice(0, 10);
+// ช่วงวันที่ต้องอิงเวลาของผู้ใช้ ไม่ใช่ UTC — ไม่งั้นวันที่ 1 ของเดือน
+// กลายเป็นวันสุดท้ายของเดือนก่อน และ "ถึงวันนี้" กลายเป็นเมื่อวาน
+const iso = (d) => isoDate(d);
 
 /**
  * The trail stored what changed as JSON, and the table printed the JSON. A row
@@ -242,7 +245,7 @@ export default function ReportsView({ site, features = {} }) {
             </div>
           )}
 
-          <div className="card overflow-hidden !p-0">
+          <div className="card overflow-x-auto !p-0">
             <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3">
               <h3 className="font-bold text-slate-800">{t('รายงานแรงงาน-วัน')} · {t(GROUPS.find(([k]) => k === groupBy)?.[1] || '')}</h3>
               {report?.meta && (
@@ -278,7 +281,7 @@ export default function ReportsView({ site, features = {} }) {
             </table>
           </div>
 
-          <div className="card overflow-hidden !p-0">
+          <div className="card overflow-x-auto !p-0">
             <h3 className="px-5 py-3 font-bold text-slate-800">{t('ประวัติการแก้ไข (Audit Trail)')}</h3>
             <div className="max-h-[420px] overflow-y-auto">
               <table className="tbl">

@@ -21,15 +21,15 @@ export default function Onboarding() {
       <PageHeader title={t('แนะแนวและติดตามพนักงานใหม่ 90 วัน')} subtitle="คลังข้อมูล · แผนแนะแนว 30-60-90 วัน · แบบประเมินทดลองงาน" />
 
       <div className="flex gap-1 border-b border-slate-200">
-        {TABS.map((tab) => (
+        {TABS.map((it) => (
           <button
-            key={tab.key}
-            onClick={() => setTab(tab.key)}
+            key={it.key}
+            onClick={() => setTab(it.key)}
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab === tab.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
+              tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {tab.label}
+            {it.label}
           </button>
         ))}
       </div>

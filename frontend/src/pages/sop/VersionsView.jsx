@@ -66,7 +66,7 @@ export default function VersionsView({ canEdit, onRestored }) {
       {rows.length === 0 ? (
         <div className="card py-12 text-center text-sm text-slate-500">{t('ยังไม่มีการแก้ไขคู่มือ จึงยังไม่มีเวอร์ชันย้อนหลัง')}</div>
       ) : (
-        <div className="card overflow-hidden !p-0">
+        <div className="card overflow-x-auto !p-0">
           <table className="tbl">
             <thead>
               <tr>

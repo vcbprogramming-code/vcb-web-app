@@ -24,7 +24,7 @@ export default function Cohort() {
   if (!rows.length) return <div className="card py-12 text-center text-sm text-slate-500">{t('ยังไม่มีพนักงานเข้าโปรแกรม')}</div>;
 
   return (
-    <div className="card overflow-hidden !p-0">
+    <div className="card overflow-x-auto !p-0">
       <table className="tbl">
         <thead>
           <tr>

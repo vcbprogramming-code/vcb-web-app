@@ -169,8 +169,7 @@ export default function ModuleShell() {
                 </button>
                 <button
                   onClick={toggle}
-                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                >
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50">
                   <Icon name={isDark ? 'sun' : 'moon'} className="h-4 w-4 text-slate-400" /> {isDark ? 'สลับเป็นโหมดสว่าง' : 'สลับเป็นโหมดมืด'}
                 </button>
                 <div className="my-1 border-t border-slate-100" />

@@ -138,7 +138,7 @@ export default function ResourcesTab() {
                   {r.link && <a href={r.link} target="_blank" rel="noreferrer" className="text-brand hover:underline">{t('ลิงก์')}</a>}
                 </div>
               </div>
-              <button onClick={() => remove(r.id)} className="shrink-0 text-slate-300 hover:text-red-600"><Icon name="trash" className="h-4 w-4" /></button>
+              <button onClick={() => remove(r.id)} className="shrink-0 text-slate-300 hover:text-red-600" title={t('ลบเอกสารนี้')} aria-label={t('ลบเอกสารนี้')}><Icon name="trash" className="h-4 w-4" /></button>
             </div>
           ))}
         </div>

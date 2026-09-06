@@ -29,6 +29,10 @@ export default function Meetings() {
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState(sp.get('id') || null);
   const [editing, setEditing] = useState(null); // null | 'new' | row
+  // ต้องประกาศรวมกับ hook อื่นตรงนี้ ไม่ใช่ใต้ทางออกก่อนกำหนดด้านล่าง — พอ
+  // ข้อมูลมาถึงแล้วเรนเดอร์รอบสองผ่านทางออกนั้นไป จำนวน hook จะเพิ่มขึ้นหนึ่ง
+  // ตัว React จึงล้มทั้งหน้า ("Rendered more hooks than during the previous render")
+  const [access, setAccess] = useState(false);
 
   const load = useCallback(() => meetingsApi.list({ groupId: group, q })
     .then((r) => setRows(r.data))
@@ -58,8 +62,6 @@ export default function Meetings() {
   const { groups, canEdit } = boot;
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
     on ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`;
-
-  const [access, setAccess] = useState(false);
 
   const removeRow = async (r) => {
     const ok = await confirm({

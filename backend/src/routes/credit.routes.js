@@ -5,7 +5,7 @@ import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff } from '../services/credit.js';
+import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff, AUTHORIZED_STATUSES } from '../services/credit.js';
 
 /**
  * การพับรวมวงเงินบนหน้าจอ — ธนาคารไม่ได้แยกวงเงินเหล่านี้ออกจากกัน
@@ -51,25 +51,32 @@ const ledgerOut = (l) => ({
   id: l.id, facility_id: l.facility_id, project_id: l.project_id, amount: Number(l.amount), status: l.status,
   start_date: l.start_date, due_date: l.due_date, settled_date: l.settled_date, ref: l.ref, source: l.source,
   doc_from: l.doc_from, doc_to: l.doc_to, interest_rate: num(l.interest_rate), note: l.note, request_id: l.request_id,
+  beneficiary: l.beneficiary, counterparty: l.counterparty, purpose: l.purpose,
+  cost_category: l.cost_category, ref_doc_from: l.ref_doc_from, ref_doc_to: l.ref_doc_to, term_days: l.term_days,
 });
 const requestOut = (r) => ({
   id: r.id, facility_id: r.facility_id, project_id: r.project_id, amount: Number(r.amount),
   start_date: r.start_date, due_date: r.due_date, ref: r.ref, note: r.note, status: r.status,
   decided_at: r.decided_at, decision_note: r.decision_note, ledger_id: r.ledger_id,
+  beneficiary: r.beneficiary, purpose: r.purpose, cost_category: r.cost_category, term_days: r.term_days,
+  ref_doc_no: r.ref_doc_no, ref_doc_from: r.ref_doc_from, ref_doc_to: r.ref_doc_to,
+  attach_source: r.attach_source, attach_from: r.attach_from, attach_to: r.attach_to,
 });
 const cashPlanOut = (c) => ({
   id: c.id, project_id: c.project_id, month: c.month, period: c.period, income: Number(c.income),
   new_pn: Number(c.new_pn), deductions: Number(c.deductions), income_breakdown: c.income_breakdown,
-  available: Number(c.available), note: c.note, paid_ids: c.paid_ids || [],
+  available: Number(c.available), note: c.note, kind: c.kind || 'plan', paid_ids: c.paid_ids || [],
 });
 
 // ── facilities ──────────────────────────────────────────────────────────
 router.get('/facilities', asyncHandler(async (req, res) => {
-  const { projectId, type, search } = req.query;
+  const { projectId, type, search, company, facilityNo } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (projectId) add('project_id = $$', projectId);
   if (type) add('type = $$', type);
+  if (company) add('company = $$', company);
+  if (facilityNo) add('facility_no = $$', Number(facilityNo));
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const { rows } = await query(`select * from facilities ${whereSql} order by created_at`, params);
   const usedMap = await authorizedUsedMap(rows.map((r) => r.id));
@@ -142,34 +149,77 @@ router.put('/facilities/:id/limit', asyncHandler(async (req, res) => {
 
 // ── ledger ────────────────────────────────────────────────────────────────
 router.get('/ledger', asyncHandler(async (req, res) => {
-  const { facilityId, projectId, status } = req.query;
+  const { facilityId, projectId, status, costCategory, company, due } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (facilityId) add('facility_id = $$', facilityId);
   if (projectId) add('project_id = $$', projectId);
   if (status) add('status = $$', status);
+  if (costCategory) add('cost_category = $$', costCategory);
+  // บริษัทอยู่ที่ตัววงเงิน ไม่ได้อยู่ที่รายการ — กรองผ่านวงเงินที่สังกัด
+  if (company) add('facility_id in (select id from facilities where company = $$)', company);
+  // "ครบใน 7 วัน" นับแยกอิสระจากกลุ่มเดือนนี้/เดือนหน้าตามข้อกำหนด §5
+  // รายการหนึ่งจึงอยู่ได้ทั้งสองกลุ่มพร้อมกัน
+  if (due === 'due7') where.push('due_date between current_date and current_date + 7');
+  else if (due === 'overdue') where.push('due_date < current_date');
+  else if (due === 'thisMonth') where.push("date_trunc('month', due_date) = date_trunc('month', current_date)");
+  else if (due === 'nextMonth') where.push("date_trunc('month', due_date) = date_trunc('month', current_date + interval '1 month')");
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const { rows } = await query(`select * from credit_ledger ${whereSql} order by start_date desc nulls last, created_at desc`, params);
   res.json({ data: rows.map(ledgerOut) });
 }));
+/** วันครบกำหนดจากวันเริ่ม + จำนวนวัน — ฟอร์มของระบบจริงกรอกจำนวนวันแล้วได้วันที่ */
+const dueFromTerm = (startDate, days) => {
+  if (!startDate || !days) return null;
+  const [Y, M, D] = String(startDate).slice(0, 10).split('-').map(Number);
+  const d = new Date(Y, M - 1, D + Number(days));
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+};
+
+// ยอดติดลบ = ปลด/คืนวงเงิน ตามที่ฟอร์มของระบบจริงเขียนกำกับไว้ — ตอนธนาคาร
+// ปลดหนังสือค้ำประกัน ยอดใช้ไปต้องลดลง การห้ามค่าลบไปเลยทำให้ทำแบบนั้นไม่ได้
+// สิ่งที่ต้องกันคือ "ปลดเกินกว่าที่เคยใช้" ซึ่งดูจากยอดรวมของวงเงินก้อนนั้น
 const ledgerSchema = z.object({
-  facilityId: z.string().uuid(), amount: z.number().positive(), status: z.string().optional(),
+  facilityId: z.string().uuid(),
+  amount: z.number().refine((n) => n !== 0, 'จำนวนเงินต้องไม่เป็นศูนย์'),
+  status: z.string().optional(),
   startDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(),
   ref: z.string().optional().nullable(), source: z.string().optional().nullable(),
   docFrom: z.string().optional().nullable(), docTo: z.string().optional().nullable(),
   interestRate: z.number().optional().nullable(), note: z.string().optional().nullable(),
+  beneficiary: z.string().optional().nullable(), counterparty: z.string().optional().nullable(),
+  purpose: z.string().optional().nullable(), costCategory: z.string().optional().nullable(),
+  refDocFrom: z.string().optional().nullable(), refDocTo: z.string().optional().nullable(),
+  termDays: z.number().int().optional().nullable(),
 });
+
+/** ปลดวงเงินได้ไม่เกินที่เคยใช้ไป — ไม่งั้นยอดคงเหลือจะโตเกินที่ธนาคารให้ */
+async function assertNotOverReleased(facilityId, delta, excludeId) {
+  const cur = await queryOne(
+    `select coalesce(sum(amount), 0)::float8 used from credit_ledger
+      where facility_id = $1 and status = any($2) and ($3::uuid is null or id <> $3)`,
+    [facilityId, AUTHORIZED_STATUSES, excludeId || null]);
+  if (Number(cur.used) + delta < -0.005) {
+    throw new ApiError(400, `ปลดวงเงินเกินกว่าที่ใช้ไปจริง (ตอนนี้ใช้อยู่ ${Number(cur.used).toLocaleString('th-TH')} บาท)`);
+  }
+}
 router.post('/ledger', asyncHandler(async (req, res) => {
   const parsed = ledgerSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
   const fac = await queryOne('select project_id from facilities where id = $1', [d.facilityId]);
   if (!fac) throw new ApiError(404, 'Facility not found');
+  if (d.amount < 0) await assertNotOverReleased(d.facilityId, d.amount, null);
+  const due = d.dueDate || dueFromTerm(d.startDate, d.termDays);
   const row = await queryOne(
-    `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, source, doc_from, doc_to, interest_rate, note, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
-    [d.facilityId, fac.project_id, d.amount, d.status || 'อนุมัติแล้ว', d.startDate || null, d.dueDate || null,
-     d.ref || null, d.source || null, d.docFrom || null, d.docTo || null, d.interestRate ?? null, d.note || null, req.profile.id]
+    `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, source, doc_from, doc_to, interest_rate, note, created_by,
+                                beneficiary, counterparty, purpose, cost_category, ref_doc_from, ref_doc_to, term_days)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) returning *`,
+    [d.facilityId, fac.project_id, d.amount, d.status || 'อนุมัติแล้ว', d.startDate || null, due,
+     d.ref || null, d.source || null, d.docFrom || null, d.docTo || null, d.interestRate ?? null, d.note || null, req.profile.id,
+     d.beneficiary || null, d.counterparty || null, d.purpose || null, d.costCategory || null,
+     d.refDocFrom || null, d.refDocTo || null, d.termDays ?? null]
   );
   await writeAudit({ actor: req.profile, action: 'create', target: 'ledger', targetId: row.id, note: `${d.amount}` });
   res.status(201).json({ data: ledgerOut(row) });
@@ -216,15 +266,28 @@ router.get('/requests', asyncHandler(async (req, res) => {
 router.post('/requests', asyncHandler(async (req, res) => {
   const parsed = z.object({ facilityId: z.string().uuid(), amount: z.number().positive(),
     startDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(),
-    ref: z.string().optional().nullable(), note: z.string().optional().nullable() }).safeParse(req.body);
+    ref: z.string().optional().nullable(), note: z.string().optional().nullable(),
+    beneficiary: z.string().optional().nullable(), purpose: z.string().optional().nullable(),
+    costCategory: z.string().optional().nullable(), termDays: z.number().int().optional().nullable(),
+    refDocNo: z.string().optional().nullable(),
+    refDocFrom: z.string().optional().nullable(), refDocTo: z.string().optional().nullable(),
+    attachSource: z.string().optional().nullable(),
+    attachFrom: z.string().optional().nullable(), attachTo: z.string().optional().nullable(),
+  }).safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
   const fac = await queryOne('select project_id from facilities where id = $1', [d.facilityId]);
   if (!fac) throw new ApiError(404, 'Facility not found');
   const row = await queryOne(
-    `insert into credit_requests (facility_id, project_id, amount, start_date, due_date, ref, note, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
-    [d.facilityId, fac.project_id, d.amount, d.startDate || null, d.dueDate || null, d.ref || null, d.note || null, req.profile.id]
+    `insert into credit_requests (facility_id, project_id, amount, start_date, due_date, ref, note, created_by,
+                                  beneficiary, purpose, cost_category, term_days, ref_doc_no, ref_doc_from, ref_doc_to,
+                                  attach_source, attach_from, attach_to)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`,
+    [d.facilityId, fac.project_id, d.amount, d.startDate || null,
+     d.dueDate || dueFromTerm(d.startDate, d.termDays), d.ref || null, d.note || null, req.profile.id,
+     d.beneficiary || null, d.purpose || null, d.costCategory || null, d.termDays ?? null,
+     d.refDocNo || null, d.refDocFrom || null, d.refDocTo || null,
+     d.attachSource || null, d.attachFrom || null, d.attachTo || null]
   );
   await writeAudit({ actor: req.profile, action: 'create', target: 'request', targetId: row.id, note: `${d.amount}` });
   res.status(201).json({ data: requestOut(row) });
@@ -241,9 +304,11 @@ router.post('/requests/:id/decide', asyncHandler(async (req, res) => {
     let ledger = null;
     if (parsed.data.decision === 'อนุมัติ') {
       ledger = (await client.query(
-        `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, note, request_id, created_by)
-         values ($1,$2,$3,'อนุมัติแล้ว',$4,$5,$6,$7,$8,$9) returning *`,
-        [r.facility_id, r.project_id, r.amount, r.start_date, r.due_date, r.ref, r.note, r.id, req.profile.id]
+        `insert into credit_ledger (facility_id, project_id, amount, status, start_date, due_date, ref, note, request_id, created_by,
+                                    beneficiary, purpose, cost_category, term_days)
+         values ($1,$2,$3,'อนุมัติแล้ว',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
+        [r.facility_id, r.project_id, r.amount, r.start_date, r.due_date, r.ref, r.note, r.id, req.profile.id,
+         r.beneficiary, r.purpose, r.cost_category, r.term_days]
       )).rows[0];
     }
     const updated = (await client.query(
@@ -322,6 +387,8 @@ router.get('/cash-plan', asyncHandler(async (req, res) => {
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (req.query.projectId) add('project_id = $$', req.query.projectId);
   if (req.query.month) add('month = $$', req.query.month);
+  // ฉบับแผนกับฉบับจริงอยู่ตารางเดียวกัน ไม่ระบุมาก็ให้ฉบับแผนเป็นค่าเริ่มต้น
+  add('kind = $$', req.query.kind === 'actual' ? 'actual' : 'plan');
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const { rows } = await query(`select * from cash_plans ${whereSql} order by month, period`, params);
   // attach paid_ids
@@ -336,15 +403,22 @@ const cashPlanSchema = z.object({
   income: z.number().nonnegative().optional(), newPN: z.number().nonnegative().optional(),
   deductions: z.number().nonnegative().optional(),
   incomeBreakdown: z.string().optional().nullable(), available: z.number().optional(), note: z.string().optional().nullable(),
+  kind: z.enum(['plan', 'actual']).optional(),
 });
 router.post('/cash-plan', asyncHandler(async (req, res) => {
   const parsed = cashPlanSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
   const row = await queryOne(
-    `insert into cash_plans (project_id, month, period, income, new_pn, deductions, income_breakdown, available, note, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
-    [d.projectId, d.month, d.period || '1', d.income || 0, d.newPN || 0, d.deductions || 0, d.incomeBreakdown || null, d.available || 0, d.note || null, req.profile.id]
+    `insert into cash_plans (project_id, month, period, income, new_pn, deductions, income_breakdown, available, note, created_by, kind)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     on conflict (project_id, month, period, kind) do update set
+       income = excluded.income, new_pn = excluded.new_pn, deductions = excluded.deductions,
+       income_breakdown = excluded.income_breakdown, available = excluded.available, note = excluded.note,
+       updated_at = now()
+     returning *`,
+    [d.projectId, d.month, d.period || '1', d.income || 0, d.newPN || 0, d.deductions || 0,
+     d.incomeBreakdown || null, d.available || 0, d.note || null, req.profile.id, d.kind || 'plan']
   );
   await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan', targetId: row.id });
   res.status(201).json({ data: cashPlanOut({ ...row, paid_ids: [] }) });
@@ -353,7 +427,7 @@ router.patch('/cash-plan/:id', asyncHandler(async (req, res) => {
   const parsed = cashPlanSchema.partial().safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
   const d = parsed.data;
-  const map = { month: 'month', period: 'period', income: 'income', newPN: 'new_pn', deductions: 'deductions', incomeBreakdown: 'income_breakdown', available: 'available', note: 'note' };
+  const map = { month: 'month', period: 'period', income: 'income', newPN: 'new_pn', deductions: 'deductions', incomeBreakdown: 'income_breakdown', available: 'available', note: 'note', kind: 'kind' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] ?? null); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
@@ -367,6 +441,135 @@ router.delete('/cash-plan/:id', asyncHandler(async (req, res) => {
   await query('delete from cash_plans where id = $1', [req.params.id]);
   await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan', targetId: req.params.id });
   res.json({ data: { deleted: true } });
+}));
+
+// ── หมวดค่าใช้จ่าย · งบประมาณ · สรุปค่าใช้จ่าย ──────────────────────────────
+// ระบบจริงของลูกค้าตั้งงบเป็นคู่ (โครงการ × หมวดค่าใช้จ่าย) แล้วหน้าสรุปเทียบ
+// ยอดที่เบิกไปจริงกับงบนั้น พร้อมเตือนว่าหมวดไหนเกินงบและหมวดไหนยังไม่ได้ตั้งงบ
+
+router.get('/cost-categories', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    'select name, sort_order, is_active from credit_cost_categories where is_active order by sort_order, name');
+  res.json({ data: rows.map((r) => r.name) });
+}));
+
+router.post('/cost-categories', requirePermission('credit', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ต้องระบุชื่อหมวดค่าใช้จ่าย');
+  const next = await queryOne('select coalesce(max(sort_order), 0) + 1 n from credit_cost_categories');
+  await query(
+    `insert into credit_cost_categories (name, sort_order) values ($1, $2)
+     on conflict (name) do update set is_active = true`, [p.data.name, next.n]);
+  await writeAudit({ actor: req.profile, action: 'create', target: 'costCategory', targetId: p.data.name });
+  res.status(201).json({ data: { name: p.data.name } });
+}));
+
+router.get('/category-caps', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select c.project_id, p.code project_code, p.name project_name, c.cost_category,
+            c.cap::float8 cap, c.note, c.updated_at
+       from credit_category_caps c join projects p on p.id = c.project_id
+      order by p.code, c.cost_category`);
+  res.json({ data: rows });
+}));
+
+router.put('/category-caps', requirePermission('credit', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({
+    projectId: z.string().uuid(), costCategory: z.string().trim().min(1),
+    cap: z.number().nonnegative(), note: z.string().optional().nullable(),
+  }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  const d = p.data;
+  const row = await queryOne(
+    `insert into credit_category_caps (project_id, cost_category, cap, note, updated_by, updated_at)
+     values ($1,$2,$3,$4,$5, now())
+     on conflict (project_id, cost_category) do update
+       set cap = excluded.cap, note = excluded.note, updated_by = excluded.updated_by, updated_at = now()
+     returning *`,
+    [d.projectId, d.costCategory, d.cap, d.note || null, req.profile.id]);
+  await writeAudit({ actor: req.profile, action: 'update', target: 'categoryCap',
+    targetId: `${d.projectId}|${d.costCategory}`, note: String(d.cap) });
+  res.json({ data: { ...row, cap: Number(row.cap) } });
+}));
+
+/**
+ * GET /api/credit/cost-summary — ใช้ไปเทียบงบ แยกตามโครงการและหมวดค่าใช้จ่าย
+ *
+ * นับเฉพาะรายการที่อนุมัติแล้ว และรวมรายการที่ไม่ได้ระบุหมวดไว้เป็นกลุ่มของ
+ * ตัวเองด้วย — ไม่ซ่อน เพราะเงินก้อนนั้นออกไปจริงและต้องกระทบยอดได้
+ */
+router.get('/cost-summary', asyncHandler(async (req, res) => {
+  const params = []; let where = "where l.status = any($1)";
+  params.push(AUTHORIZED_STATUSES);
+  if (req.query.projectId) { params.push(req.query.projectId); where += ` and l.project_id = $${params.length}`; }
+  const { rows } = await query(
+    `select p.id project_id, p.code project_code, p.name project_name,
+            coalesce(nullif(btrim(l.cost_category), ''), '(ไม่ระบุหมวด)') cost_category,
+            count(*)::int items, sum(l.amount)::float8 spent
+       from credit_ledger l join projects p on p.id = l.project_id
+       ${where}
+      group by 1,2,3,4 order by p.code, 4`, params);
+  const caps = (await query('select project_id, cost_category, cap::float8 cap, note from credit_category_caps')).rows;
+  const capOf = new Map(caps.map((c) => [`${c.project_id}|${c.cost_category}`, c]));
+
+  const byProject = new Map();
+  for (const r of rows) {
+    const cap = capOf.get(`${r.project_id}|${r.cost_category}`);
+    const line = {
+      cost_category: r.cost_category, items: r.items, spent: r.spent,
+      cap: cap ? cap.cap : null, note: cap?.note || null,
+      pct: cap && cap.cap > 0 ? Math.round((r.spent / cap.cap) * 1000) / 10 : null,
+      remaining: cap ? cap.cap - r.spent : null,
+      over: Boolean(cap && cap.cap > 0 && r.spent > cap.cap),
+    };
+    const key = r.project_id;
+    if (!byProject.has(key)) {
+      byProject.set(key, { project_id: key, project_code: r.project_code, project_name: r.project_name,
+        lines: [], spent: 0, cap: 0, overCount: 0, noBudgetCount: 0 });
+    }
+    const g = byProject.get(key);
+    g.lines.push(line);
+    g.spent += r.spent;
+    if (line.cap != null) g.cap += line.cap;
+    if (line.over) g.overCount += 1;
+    if (line.cap == null) g.noBudgetCount += 1;
+  }
+  const projects = [...byProject.values()].map((g) => ({
+    ...g, pct: g.cap > 0 ? Math.round((g.spent / g.cap) * 1000) / 10 : null,
+  }));
+  res.json({ data: {
+    projects,
+    overCount: projects.reduce((a, g) => a + g.overCount, 0),
+    noBudgetCount: projects.reduce((a, g) => a + g.noBudgetCount, 0),
+  } });
+}));
+
+/**
+ * GET /api/credit/cash-plan/variance — ผลต่างระหว่างฉบับแผนกับฉบับจริง
+ *
+ * ทั้งสองฉบับอยู่ในตารางเดียวกันแยกด้วยคอลัมน์ kind การเทียบจึงเป็นการจับคู่
+ * ตาม (โครงการ · เดือน · ช่วง) แล้วลบกันทีละช่อง
+ */
+router.get('/cash-plan/variance', asyncHandler(async (req, res) => {
+  const params = []; const where = [];
+  if (req.query.projectId) { params.push(req.query.projectId); where.push(`project_id = $${params.length}`); }
+  if (req.query.month) { params.push(req.query.month); where.push(`month = $${params.length}`); }
+  const whereSql = where.length ? `where ${where.join(' and ')}` : '';
+  const { rows } = await query(`select * from cash_plans ${whereSql} order by month, period`, params);
+  const key = (r) => `${r.project_id}|${r.month}|${r.period}`;
+  const plan = new Map(); const actual = new Map();
+  for (const r of rows) (r.kind === 'actual' ? actual : plan).set(key(r), r);
+  const keys = [...new Set([...plan.keys(), ...actual.keys()])].sort();
+  const n = (v) => Number(v || 0);
+  const data = keys.map((k) => {
+    const [projectId, month, period] = k.split('|');
+    const p = plan.get(k); const a = actual.get(k);
+    const f = (col) => ({ plan: n(p?.[col]), actual: n(a?.[col]), diff: n(a?.[col]) - n(p?.[col]) });
+    return { project_id: projectId, month, period,
+      income: f('income'), new_pn: f('new_pn'), deductions: f('deductions'), available: f('available'),
+      has_plan: Boolean(p), has_actual: Boolean(a) };
+  });
+  res.json({ data });
 }));
 
 // ── audit + export ──────────────────────────────────────────────────────

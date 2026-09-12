@@ -19,10 +19,12 @@ export default function LedgerTab({ projects, onChanged }) {
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
   const [status, setStatus] = useState('');
+  // ช่วงเวลาครบกำหนด — "ครบใน 7 วัน" เป็นกลุ่มอิสระ ไม่ได้อยู่ใต้เดือนนี้
+  const [due, setDue] = useState('');
 
   const load = useCallback(() => {
-    creditApi.ledger({ projectId, status }).then((r) => setRows(r.data)).catch((e) => setError(e.message));
-  }, [projectId, status]);
+    creditApi.ledger({ projectId, status, due }).then((r) => setRows(r.data)).catch((e) => setError(e.message));
+  }, [projectId, status, due]);
   useEffect(() => { load(); }, [load]);
 
   const projName = Object.fromEntries(projects.map((p) => [p.id, p.name || p.code]));
@@ -47,6 +49,13 @@ export default function LedgerTab({ projects, onChanged }) {
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="field !w-auto">
           <option value="">{t('ทุกสถานะ')}</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={due} onChange={(e) => setDue(e.target.value)} className="field !w-auto">
+          <option value="">{t('ทุกระยะเวลา')}</option>
+          <option value="due7">{t('ครบใน 7 วัน')}</option>
+          <option value="thisMonth">{t('เดือนนี้')}</option>
+          <option value="nextMonth">{t('เดือนหน้า')}</option>
+          <option value="overdue">{t('เกินกำหนด')}</option>
         </select>
       </div>
 

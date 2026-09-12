@@ -101,15 +101,25 @@ export default function Dashboard({ cur, onOpenSite }) {
   const hidden = new Set(perfPrefs.get().hiddenSites);
   const rows = (data.rows || []).filter((r) => !hidden.has(r.site_key));
 
+  const ym = `${cur.y}-${String(cur.m).padStart(2, '0')}`;
+
   return (
     <div className="space-y-3">
-      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-        {MODES.map(([k, label]) => (
-          <button key={k} onClick={() => setMode(k)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-            {t(label)}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {MODES.map(([k, label]) => (
+            <button key={k} onClick={() => setMode(k)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+              {t(label)}
+            </button>
+          ))}
+        </div>
+        {/* รายงานของทั้งเดือนทุกโครงการในไฟล์เดียว — อยู่ตรงนี้เพราะคนมาดู
+            ภาพรวมแล้วมักอยากได้ไฟล์ไปต่อทันที ไม่ต้องข้ามไปแท็บรายงาน */}
+        <a href={perfApi.monthlyReportUrl(ym)} className="btn-outline ml-auto !py-1.5 !text-sm"
+          title={t('ดาวน์โหลดรายงานวันทำงานของเดือนนี้ทุกโครงการ')}>
+          <Icon name="download" className="h-4 w-4" /> {t('รายงานวันทำงาน')}
+        </a>
       </div>
 
       {rows.length === 0 ? (

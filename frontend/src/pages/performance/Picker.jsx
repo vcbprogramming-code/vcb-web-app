@@ -7,9 +7,10 @@ import { useT } from '../../lib/i18n.jsx';
  * activity skips step 2 and auto-applies its fixed cost. Stored value = "A-1 / 5".
  * Floats next to `anchor`; onApply('') clears the cell.
  */
-export default function Picker({ anchor, activities, categories, onApply, onClose }) {
+export default function Picker({ anchor, activities, categories, siblingCode = '', onApply, onClose }) {
   const t = useT();
   const [step, setStep] = useState(1);
+  const [warn, setWarn] = useState('');
   const [q, setQ] = useState('');
   const [pending, setPending] = useState(null);
   const boxRef = useRef(null);
@@ -73,8 +74,17 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
 
   const pick = (it) => {
     if (step === 1) {
+      // ห้ามลงงานเดียวกันทั้งสองช่องของวันเดียว — จะกลายเป็นครึ่งวันสองครั้ง
+      // ของงานเดิม ซึ่งไม่ได้บอกอะไรและทำให้การกระจายแรงงาน-วันเพี้ยน
+      if (siblingCode && it.code === siblingCode) {
+        setWarn(t('งานทั้งสองช่องเหมือนกัน — เลือกงานคนละประเภทเพื่อบันทึก 2 งาน'));
+        return;
+      }
+      // งานที่ใช้หมวดต้นทุนได้หมวดเดียว ไม่ต้องถามขั้นที่สอง
+      const only = String(it.allowed_cost || '').split(',').map((x) => x.trim()).filter(Boolean);
       const oneToOne = (it.mapping || 'one-to-many') === 'one-to-one';
       if (oneToOne) { onApply(it.fixed_cost ? `${it.code} / ${it.fixed_cost}` : it.code); return; }
+      if (only.length === 1) { onApply(`${it.code} / ${only[0]}`); return; }
       setPending(it); setStep(2); setQ('');
     } else {
       onApply(`${pending ? pending.code : ''} / ${it.code}`);
@@ -84,6 +94,9 @@ export default function Picker({ anchor, activities, categories, onApply, onClos
   return (
     <div ref={boxRef} className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
       style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxHeight }}>
+      {warn && (
+        <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{warn}</div>
+      )}
       <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${step === 2 ? 'cursor-pointer text-brand' : 'text-slate-700'} bg-slate-50 border-b border-slate-200`}
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
         {step === 1

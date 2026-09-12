@@ -107,6 +107,22 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
   // via a functional update — a whole-map snapshot revert would wipe any other
   // cell edited while this save was still in flight. Flash the "saved" toast only
   // after the server confirms, so a failed save can't show success + error at once.
+  /**
+   * รหัสงานที่อยู่ในอีกช่องของเซลล์เดียวกัน
+   *
+   * ใช้กันไม่ให้เลือกงานเดียวกันทั้งสองช่อง — วันเดียวที่ลงงานเดิมสองครั้งจะถูก
+   * นับเป็นครึ่งวันสองท่อนของงานเดียวกัน ซึ่งไม่ได้บอกอะไรและทำให้การกระจาย
+   * แรงงาน-วันลงหมวดต้นทุนเพี้ยน (กฎเดียวกับระบบที่ลูกค้าใช้อยู่)
+   */
+  const siblingCodeOf = (p) => {
+    if (!p || !entries) return '';
+    const cell = (entries[p.eid] || {})[p.date] || {};
+    const other = p.field === 'pm'
+      ? (cell.team || cell.detail || '')
+      : (cell.pm || '');
+    return String(other).split('/')[0].trim();
+  };
+
   const setCell = (eid, date, field, value, unlock = false) => {
     const applyField = (map, v) => {
       const next = { ...map };
@@ -164,6 +180,12 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
             <Icon name="people" className="h-4 w-4" /> {t('จัดการพนักงาน')}
           </button>
         )}
+        {/* ส่งออกตารางของไซต์และเดือนที่กำลังดูอยู่ — คนเอาไปทำสรุปต่อใน Excel */}
+        <a href={perfApi.entriesXlsxUrl({ site: siteKey, month: `${cur.y}-${String(cur.m).padStart(2, '0')}` })}
+          className="btn-outline !py-1.5 !text-sm"
+          title={t('ดาวน์โหลดตารางเดือนนี้เป็นไฟล์ Excel')}>
+          <Icon name="download" className="h-4 w-4" /> Excel
+        </a>
         {flash && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">{flash}</span>}
         {!canEdit && <span className="text-xs text-slate-400">{t('· โหมดดูอย่างเดียว')}</span>}
       </div>
@@ -182,6 +204,7 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
 
       {picker && (
         <Picker anchor={picker.anchor} activities={base.teams} categories={base.costs}
+          siblingCode={siblingCodeOf(picker)}
           onApply={(value) => { setCell(picker.eid, picker.date, picker.field, value, picker.unlock); setPicker(null); }}
           onClose={closePicker} />
       )}

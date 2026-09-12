@@ -1411,6 +1411,170 @@ function sheetRows(ws) {
 }
 const pick = (o, ...names) => { for (const n of names) if (o[n] !== undefined && o[n] !== '') return o[n]; return ''; };
 
+// ── ทะเบียนงาน: ส่งออก/นำเข้าเป็น Excel ─────────────────────────────────────
+// ระบบจริงของลูกค้ามีปุ่ม ⬇ Excel และ ⬆ นำเข้า อยู่บนหน้าดัชนีงาน เพราะทะเบียน
+// 44 รหัสนี้แก้กันทีละหลายแถว การพิมพ์ทีละช่องบนหน้าจอไม่ไหว
+
+/** แปลงชีตเป็น workbook ไฟล์เดียว พร้อมหัวตารางหนา */
+function sheetToWorkbook(name, columns, rows) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(name);
+  ws.columns = columns;
+  ws.getRow(1).font = { bold: true };
+  rows.forEach((r) => ws.addRow(r));
+  return wb;
+}
+const sendXlsx = async (res, wb, filename) => {
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+  await wb.xlsx.write(res);
+  res.end();
+};
+
+router.get('/export/activities.xlsx', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select code, name, coalesce(name_en, '') name_en, coalesce(description, '') description,
+            coalesce(category, '') category, coalesce(mapping, '') mapping,
+            coalesce(fixed_cost, '') fixed_cost, coalesce(allowed_cost, '') allowed_cost, is_active
+       from work_types order by category, code`);
+  const wb = sheetToWorkbook('ทะเบียนงาน', [
+    { header: 'รหัสงาน', key: 'code', width: 12 },
+    { header: 'ชื่องาน', key: 'name', width: 40 },
+    { header: 'ชื่อภาษาอังกฤษ', key: 'name_en', width: 34 },
+    { header: 'คำอธิบาย', key: 'description', width: 52 },
+    { header: 'หมวดหมู่', key: 'category', width: 26 },
+    { header: 'การจับคู่หมวดต้นทุน', key: 'mapping', width: 18 },
+    { header: 'หมวดต้นทุนตายตัว', key: 'fixed_cost', width: 16 },
+    { header: 'หมวดต้นทุนที่อนุญาต', key: 'allowed_cost', width: 24 },
+    { header: 'เปิดใช้งาน', key: 'is_active', width: 10 },
+  ], rows);
+  await sendXlsx(res, wb, 'ทะเบียนงาน.xlsx');
+}));
+
+router.get('/export/cost-categories.xlsx', asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select code, name, coalesce(name_en, '') name_en, is_active from cost_categories order by length(code), code`);
+  const wb = sheetToWorkbook('หมวดต้นทุน', [
+    { header: 'รหัส', key: 'code', width: 10 },
+    { header: 'ชื่อหมวดต้นทุน', key: 'name', width: 44 },
+    { header: 'ชื่อภาษาอังกฤษ', key: 'name_en', width: 34 },
+    { header: 'เปิดใช้งาน', key: 'is_active', width: 10 },
+  ], rows);
+  await sendXlsx(res, wb, 'หมวดต้นทุน.xlsx');
+}));
+
+/**
+ * นำเข้าทะเบียนงานจาก Excel — ตรวจก่อนเขียนเสมอ
+ *
+ * เหมือนการนำเข้าพนักงาน: ถ้ามีแถวผิดแม้แถวเดียวจะไม่เขียนอะไรเลยตอนตรวจ และ
+ * ทุกแถวที่ตกบอกเลขแถวกับเหตุผลกลับไป รหัสที่มีอยู่แล้วถือเป็นการแก้ไข
+ */
+router.post('/import/activities', requirePermission('performance', 'edit'), importUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
+    const dryRun = String(req.query.dryRun || req.body?.dryRun || '') === 'true';
+    const wb = new ExcelJS.Workbook();
+    try { await wb.xlsx.load(req.file.buffer); }
+    catch { throw new ApiError(400, 'อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ Excel (.xlsx)'); }
+    const ws = wb.worksheets[0];
+    if (!ws) throw new ApiError(400, 'ไฟล์นี้ไม่มีชีตข้อมูล');
+    const rows = sheetRows(ws);
+    if (!rows.length) throw new ApiError(400, 'ไฟล์นี้ไม่มีข้อมูลใต้หัวตาราง');
+
+    const costCodes = new Set((await query('select code from cost_categories')).rows.map((r) => String(r.code)));
+    const ok = []; const bad = [];
+    for (const r of rows) {
+      const code = pick(r, 'รหัสงาน', 'code', 'รหัส');
+      const name = pick(r, 'ชื่องาน', 'name', 'ชื่อ');
+      if (!code) { bad.push({ row: r._row, reason: 'ไม่มีรหัสงาน' }); continue; }
+      if (!name) { bad.push({ row: r._row, reason: 'ไม่มีชื่องาน' }); continue; }
+      if (!/^[A-Z]-\d+$/i.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ผิดรูปแบบ (ต้องเป็นแบบ A-1)` }); continue; }
+      const allowed = String(pick(r, 'หมวดต้นทุนที่อนุญาต', 'allowed_cost') || '')
+        .split(/[,\s]+/).filter(Boolean);
+      const unknown = allowed.filter((c) => !costCodes.has(c));
+      if (unknown.length) { bad.push({ row: r._row, reason: `หมวดต้นทุนไม่มีในทะเบียน: ${unknown.join(', ')}` }); continue; }
+      ok.push({
+        code: code.toUpperCase(), name,
+        name_en: pick(r, 'ชื่อภาษาอังกฤษ', 'name_en') || null,
+        description: pick(r, 'คำอธิบาย', 'description') || null,
+        category: pick(r, 'หมวดหมู่', 'category') || null,
+        mapping: pick(r, 'การจับคู่หมวดต้นทุน', 'mapping') || 'one-to-many',
+        fixed_cost: pick(r, 'หมวดต้นทุนตายตัว', 'fixed_cost') || null,
+        allowed_cost: allowed.length ? allowed.join(',') : null,
+      });
+    }
+    if (dryRun || bad.length) {
+      return res.json({ data: { dryRun: true, willImport: ok.length, rejected: bad, imported: 0 } });
+    }
+    for (const a of ok) {
+      await query(
+        `insert into work_types (code, name, name_en, description, category, mapping, fixed_cost, allowed_cost, is_active)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,true)
+         on conflict (code) do update set
+           name = excluded.name, name_en = excluded.name_en, description = excluded.description,
+           category = excluded.category, mapping = excluded.mapping, fixed_cost = excluded.fixed_cost,
+           allowed_cost = excluded.allowed_cost, is_active = true, updated_at = now()`,
+        [a.code, a.name, a.name_en, a.description, a.category, a.mapping, a.fixed_cost, a.allowed_cost]);
+    }
+    res.json({ data: { dryRun: false, imported: ok.length, rejected: bad } });
+  }));
+
+/** ส่งออกตารางลงบันทึกของไซต์+เดือนที่กำลังดูอยู่ */
+router.get('/export/entries.xlsx', asyncHandler(async (req, res) => {
+  const site = String(req.query.site || '');
+  const ym = String(req.query.month || '');
+  if (!site || !/^\d{4}-\d{2}$/.test(ym)) throw new ApiError(400, 'ต้องระบุ site และ month (YYYY-MM)');
+  const unit = await loadUnitByKey(site);
+  if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
+  assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  const [Y, M] = ym.split('-').map(Number);
+  const from = ymd(Y, M, 1), to = ymd(Y, M, daysInMonthN(Y, M));
+  const { rows } = await query(
+    `select e.employee_code, e.full_name, e.kind, w.ymd,
+            coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') slot1,
+            coalesce(w.pm, '') slot2, coalesce(w.note, '') note
+       from work_logs w join employees e on e.id = w.employee_id
+      where w.unit_id = $1 and w.ymd between $2 and $3 and w.deleted_at is null
+      order by e.full_name, w.ymd`, [unit.id, from, to]);
+  const wb = sheetToWorkbook(`${unit.code} ${ym}`, [
+    { header: 'รหัสพนักงาน', key: 'employee_code', width: 14 },
+    { header: 'ชื่อ-นามสกุล', key: 'full_name', width: 30 },
+    { header: 'สายงาน', key: 'kind', width: 12 },
+    { header: 'วันที่', key: 'ymd', width: 12 },
+    { header: 'งานหลัก', key: 'slot1', width: 18 },
+    { header: 'งานที่สอง', key: 'slot2', width: 18 },
+    { header: 'หมายเหตุ', key: 'note', width: 30 },
+  ], rows.map((r) => ({ ...r, ymd: dateStr(r.ymd) })));
+  await sendXlsx(res, wb, `บันทึกงาน ${unit.code} ${ym}.xlsx`);
+}));
+
+/**
+ * ย้ายพนักงานไปหน่วยงานอื่น
+ *
+ * บันทึกงานเก่าเก็บ unit_id ไว้ในแถวของตัวเองอยู่แล้ว การย้ายจึงไม่ทำให้
+ * ประวัติเพี้ยน — เดือนที่ผ่านมายังอยู่กับไซต์เดิม ส่วนวันข้างหน้าไปไซต์ใหม่
+ */
+router.post('/employees/:id/move', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ site: z.string().min(1), note: z.string().optional().nullable() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ต้องระบุไซต์ปลายทาง');
+  const emp = await queryOne('select * from employees where id = $1', [req.params.id]);
+  if (!emp) throw new ApiError(404, 'ไม่พบพนักงาน');
+  const to = await loadUnitByKey(p.data.site);
+  if (!to) throw new ApiError(404, 'ไม่พบไซต์ปลายทาง');
+  const scoped = scopedUnitIds(req.profile);
+  assertUnitInScope(scoped, emp.unit_id);
+  assertUnitInScope(scoped, to.id);
+  if (emp.unit_id === to.id) throw new ApiError(400, 'พนักงานอยู่ไซต์นี้อยู่แล้ว');
+  const fromUnit = await queryOne('select code, name from units where id = $1', [emp.unit_id]);
+  await query('update employees set unit_id = $1, updated_at = now() where id = $2', [to.id, emp.id]);
+  await logWork({
+    actor: req.profile, employeeId: emp.id, unitId: to.id, action: 'employee.move',
+    before: { unit: fromUnit?.name || null }, after: { unit: to.name }, reason: p.data.note || null,
+  });
+  res.json({ data: { moved: true, from: fromUnit?.name || null, to: to.name } });
+}));
+
+
 /**
  * §2 bring the employee register in from a spreadsheet, and say plainly which
  * rows did not make it and why. An import that silently drops rows is worse

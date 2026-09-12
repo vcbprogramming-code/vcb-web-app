@@ -103,9 +103,16 @@ suite('2. ตัวเลขบนหน้าจอต้องตรงกั�
 
 // ── 3. ครบทั้งสี่แท็บ ──────────────────────────────────────────────────────
 suite('3. ทุกแท็บเปิดได้ ไม่มีจอขาว');
-for (const tab of ['วงเงินสินเชื่อ (Facilities)', 'รายการสินเชื่อ (Credit Ledger)',
-  'วางแผนสินเชื่อ (Cash Plan)', 'คำขอใช้วงเงิน']) {
-  const found = await clickText(tab);
+// ชื่อแท็บเปลี่ยนให้ตรงกับระบบจริงของลูกค้าแล้ว และเพิ่มมาอีกสามแท็บ
+for (const tab of ['วงเงินสินเชื่อ', 'รายการสินเชื่อ', 'สรุปค่าใช้จ่าย',
+  'แผนการเงิน', 'หักค่างานตามจริง', 'ผลต่าง', 'คำขอใช้วงเงิน']) {
+  // กดที่แถบแท็บโดยตรง — ชื่อแท็บบางชื่อไปตรงกับหัวข้อในหน้าด้วย
+  const found = await page.evaluate((label) => {
+    const tabs = [...document.querySelectorAll('button')].filter((b) => b.className.includes('border-b-2'));
+    const el = tabs.find((b) => b.innerText.trim() === label)
+      || [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === label);
+    if (el) { el.click(); return true; } return false;
+  }, tab);
   await settle(2200);
   const t = await body();
   happy(`แท็บ "${tab}" เปิดได้`, found && t.trim().length > 120, found ? `${t.trim().length} ตัวอักษร` : 'ไม่พบแท็บ');

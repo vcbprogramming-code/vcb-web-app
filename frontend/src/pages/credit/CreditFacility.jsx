@@ -217,12 +217,13 @@ export default function CreditFacility() {
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 border-b border-slate-200">
+      {/* หกแท็บไม่พอดีจอโทรศัพท์ — ให้แถบแท็บเลื่อนในตัวเอง ไม่ใช่ดันทั้งหน้า */}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {TABS.map((it) => (
           <button
             key={it.key}
             onClick={() => setTab(it.key)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >

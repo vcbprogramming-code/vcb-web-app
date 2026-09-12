@@ -230,7 +230,13 @@ router.patch('/ledger/:id', asyncHandler(async (req, res) => {
   const before = await queryOne('select * from credit_ledger where id = $1', [req.params.id]);
   if (!before) throw new ApiError(404, 'Ledger item not found');
   const d = parsed.data;
-  const map = { amount: 'amount', status: 'status', startDate: 'start_date', dueDate: 'due_date', ref: 'ref', note: 'note', interestRate: 'interest_rate' };
+  // แก้ยอดเป็นค่าลบได้ (ปลดวงเงิน) แต่ต้องไม่ทำให้ยอดใช้ไปของวงเงินนั้นติดลบ
+  if (d.amount !== undefined && d.amount < 0) {
+    await assertNotOverReleased(before.facility_id, d.amount, before.id);
+  }
+  const map = { amount: 'amount', status: 'status', startDate: 'start_date', dueDate: 'due_date', ref: 'ref', note: 'note', interestRate: 'interest_rate',
+    beneficiary: 'beneficiary', counterparty: 'counterparty', purpose: 'purpose', costCategory: 'cost_category',
+    refDocFrom: 'ref_doc_from', refDocTo: 'ref_doc_to', termDays: 'term_days' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] ?? null); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');

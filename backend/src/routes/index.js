@@ -11,6 +11,7 @@ import creditRoutes from './credit.routes.js';
 import onboardingRoutes from './onboarding.routes.js';
 import onboardingProgramRoutes from './onboardingProgram.routes.js';
 import announcementRoutes from './announcements.routes.js';
+import portalRoutes from './portal.routes.js';
 import supportRoutes from './support.routes.js';
 import sopRoutes from './sop.routes.js';
 import sysmapRoutes from './sysmap.routes.js';
@@ -45,6 +46,7 @@ router.use('/verify', verifyRoutes); // public (token-based) document authentici
 router.use('/share', shareRoutes);
 router.use('/admin', adminRoutes); // admin-only: users + config
 router.use('/announcements', announcementRoutes); // portal notices (read: all, write: admin)
+router.use('/portal', portalRoutes);          // ใครลาวันนี้ · วันเกิดที่ใกล้ถึง
 router.use('/support', supportRoutes); // portal "report an issue" → emails admins
 
 // Modules 2–4 are soft-disabled at launch (E-Memo + Admin only). The gate

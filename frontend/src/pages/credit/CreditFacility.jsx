@@ -6,13 +6,19 @@ import Icon from '../../components/Icon.jsx';
 import FacilitiesTab from './FacilitiesTab.jsx';
 import LedgerTab from './LedgerTab.jsx';
 import CashPlanTab from './CashPlanTab.jsx';
+import CostSummaryTab from './CostSummaryTab.jsx';
+import VarianceTab from './VarianceTab.jsx';
 import RequestsPanel from './RequestsPanel.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
+// ลำดับแท็บเดียวกับระบบที่ลูกค้าใช้อยู่ — คนที่ย้ายมาจะหาของเจอที่เดิม
 const TABS = [
-  { key: 'facilities', label: 'วงเงินสินเชื่อ (Facilities)' },
-  { key: 'ledger', label: 'รายการสินเชื่อ (Credit Ledger)' },
-  { key: 'cashplan', label: 'วางแผนสินเชื่อ (Cash Plan)' },
+  { key: 'facilities', label: 'วงเงินสินเชื่อ' },
+  { key: 'ledger', label: 'รายการสินเชื่อ' },
+  { key: 'costs', label: 'สรุปค่าใช้จ่าย' },
+  { key: 'cashplan', label: 'แผนการเงิน' },
+  { key: 'actual', label: 'หักค่างานตามจริง' },
+  { key: 'variance', label: 'ผลต่าง' },
 ];
 
 function FacilityStat({ label, item }) {
@@ -55,13 +61,27 @@ function FacilityStat({ label, item }) {
   );
 }
 
-function BucketStat({ label, bucket, accent }) {
+/**
+ * การ์ดสรุปที่กดแล้วพาไปดูของจริง
+ *
+ * ตัวเลขบนการ์ดไม่มีประโยชน์ถ้าคนอ่านตามต่อไม่ได้ว่ามาจากรายการไหน — กดแล้ว
+ * เปิดแท็บรายการสินเชื่อพร้อมกรองช่วงเวลานั้นให้เลย เหมือนปุ่ม "ดูรายการ →"
+ * ของระบบที่เขาใช้อยู่
+ */
+function BucketStat({ label, bucket, accent, onOpen, extra }) {
   const t = useT();
   return (
     <div className="card-sm">
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className={`mt-1 text-xl font-bold ${accent || 'text-slate-900'}`}>{formatMoney(bucket?.amount || 0)}</div>
-      <div className="mt-1 text-[11px] text-slate-400">{bucket?.count || 0} {t('รายการ')}</div>
+      <div className="mt-1 text-[11px] text-slate-400">
+        {bucket?.count || 0} {t('รายการ')}{extra ? ` · ${extra}` : ''}
+      </div>
+      {onOpen && (
+        <button onClick={onOpen} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
+          {t('ดูรายการ')} <Icon name="arrowRight" className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
@@ -99,7 +119,11 @@ export default function CreditFacility() {
     }
   };
 
-  const TabComp = { facilities: FacilitiesTab, ledger: LedgerTab, cashplan: CashPlanTab }[tab];
+  // แผนการเงินกับหักค่างานตามจริงใช้จอเดียวกัน ต่างกันที่ฉบับไหนเท่านั้น
+  const TabComp = {
+    facilities: FacilitiesTab, ledger: LedgerTab, costs: CostSummaryTab,
+    cashplan: CashPlanTab, actual: CashPlanTab, variance: VarianceTab,
+  }[tab] || FacilitiesTab;
 
   return (
     <div className="space-y-5">
@@ -161,8 +185,13 @@ export default function CreditFacility() {
         <div className="card">
           <h3 className="mb-3 font-bold text-slate-800">{t('ครบกำหนด')}</h3>
           <div className="grid grid-cols-2 gap-3">
-            <BucketStat label={t('ครบกำหนด — เดือนนี้')} bucket={overview?.buckets?.thisMonth} accent="text-amber-600" />
-            <BucketStat label={t('ครบกำหนด — เดือนหน้า')} bucket={overview?.buckets?.nextMonth} />
+            <BucketStat
+              label={t('ครบกำหนด — เดือนนี้')} bucket={overview?.buckets?.thisMonth} accent="text-amber-600"
+              extra={overview?.buckets?.overdue?.amount
+                ? `${t('เกินกำหนดค้าง')} ${formatMoney(overview.buckets.overdue.amount)}` : ''}
+              onOpen={() => setTab('ledger')} />
+            <BucketStat label={t('ครบกำหนด — เดือนหน้า')} bucket={overview?.buckets?.nextMonth}
+              onOpen={() => setTab('ledger')} />
           </div>
           {overview?.buckets?.overdue?.count ? (
             <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -188,12 +217,13 @@ export default function CreditFacility() {
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 border-b border-slate-200">
+      {/* หกแท็บไม่พอดีจอโทรศัพท์ — ให้แถบแท็บเลื่อนในตัวเอง ไม่ใช่ดันทั้งหน้า */}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {TABS.map((it) => (
           <button
             key={it.key}
             onClick={() => setTab(it.key)}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -202,7 +232,13 @@ export default function CreditFacility() {
         ))}
       </div>
 
-      <TabComp projects={projects} onChanged={loadOverview} openNew={openNew} />
+      <TabComp
+        projects={projects}
+        onChanged={loadOverview}
+        openNew={openNew}
+        canEdit={overview?.canEdit ?? true}
+        kind={tab === 'actual' ? 'actual' : 'plan'}
+      />
 
       {showRequests && (
         <RequestsPanel

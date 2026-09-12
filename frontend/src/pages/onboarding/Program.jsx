@@ -7,6 +7,7 @@ import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
 import Documents from './Documents.jsx';
+import Preboarding from './Preboarding.jsx';
 import Phase from './Phase.jsx';
 import Completion from './Completion.jsx';
 import Cohort from './Cohort.jsx';
@@ -49,6 +50,8 @@ export default function Program() {
   const dept = departments.find((d) => d.slug === status.department) || null;
 
   const tabs = [
+    // ขั้นแรกสุดของพอร์ทัลที่บริษัทใช้อยู่คือหน้าต้อนรับ ไม่ใช่หน้าส่งเอกสาร
+    { key: 'welcome', label: t('ก่อนเริ่มงาน') },
     { key: 'docs', label: t('เอกสารที่ต้องส่ง'), done: status.docsComplete },
     ...(dept ? dept.phases.map((p, i) => ({
       key: p.id,
@@ -124,6 +127,7 @@ export default function Program() {
             ))}
           </div>
 
+          {view === 'welcome' && <Preboarding onStart={() => setView('docs')} />}
           {view === 'docs' && <Documents documents={documents} status={status} onChanged={load} />}
           {view === 'cohort' && isAdmin && <Cohort />}
           {view === 'done' && <Completion dept={dept} status={status} />}

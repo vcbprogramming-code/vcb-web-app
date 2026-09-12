@@ -73,9 +73,10 @@ let ledId = null;
   bad('วงเงินที่ไม่มีอยู่จริง → 404',
     (await call('/credit/ledger', { method: 'POST', user: A, body: {
       facilityId: '00000000-0000-0000-0000-000000000000', amount: 100 } })).status === 404, '');
-  // a negative drawdown used to be accepted, and it pushed available credit past the limit
-  bad('แก้ยอดเบิกเป็นติดลบภายหลังไม่ได้',
-    (await call(`/credit/ledger/${ledId}`, { method: 'PATCH', user: A, body: { amount: -999 } })).status === 400, '');
+  // ยอดติดลบคือการปลดวงเงินคืน (ฟอร์มของระบบจริงเขียนกำกับไว้แบบนั้น) — รับได้
+  // แต่ต้องไม่ปลดเกินกว่าที่ใช้ไปจริง ไม่งั้นคงเหลือจะโตเกินที่ธนาคารให้
+  bad('แก้ยอดเป็นติดลบจนยอดใช้ไปติดลบไม่ได้',
+    (await call(`/credit/ledger/${ledId}`, { method: 'PATCH', user: A, body: { amount: -9999999 } })).status === 400, '');
   const clean = ((await call('/credit/facilities', { user: A })).data || []).find((x) => x.id === facId);
   happy('คงเหลือไม่มีทางเกินวงเงินที่ตั้งไว้', Number(clean?.available) <= 1000000, String(clean?.available));
   bad('เลขที่รายการที่ไม่ใช่รูปแบบ id → 404 ไม่ใช่ 500',

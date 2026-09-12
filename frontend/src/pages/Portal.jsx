@@ -88,6 +88,74 @@ function AppCard({ app, soon, awaiting, onOpen }) {
 /** Sidebar nav row (module scope — same remount reason as AppCard).
  *  `opens` marks a row that launches an application, which gets the ↗ affordance;
  *  plain rows (help, sign out) don't. */
+/** ทางลัดออกไปเว็บอื่น — หน้าตาเหมือนเมนูในระบบ แต่เปิดแท็บใหม่ */
+function NavLink({ icon, label, href, title }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" title={title}
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
+      <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-slate-400 transition group-hover:text-white" />
+      <span className="flex-1 truncate text-left">{label}</span>
+      <Icon name="arrowUpRight" className="h-3.5 w-3.5 shrink-0 text-slate-500 opacity-0 transition group-hover:opacity-100" />
+    </a>
+  );
+}
+
+/**
+ * ใครลาวันนี้ · วันเกิดที่ใกล้ถึง
+ *
+ * กล่องเดียวกับที่พอร์ทัลเดิมมี — กล่องวันเกิดจะไม่ขึ้นเลยถ้ายังไม่มีใครกรอก
+ * วันเกิดไว้ ดีกว่าโชว์กรอบว่าง ๆ ให้คนสงสัยว่าระบบเสียหรือเปล่า
+ */
+function TodayPanel() {
+  const t = useT();
+  const [data, setData] = useState(null);
+  useEffect(() => { portalApi.today().then((r) => setData(r.data)).catch(() => setData({ onLeave: [], birthdays: [] })); }, []);
+  if (!data) return null;
+  const { onLeave = [], birthdays = [] } = data;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
+          <Icon name="userClock" className="h-4 w-4 text-brand" /> {t('ใครลาวันนี้')}
+        </h3>
+        {onLeave.length === 0 ? (
+          <p className="text-xs text-slate-400">{t('วันนี้ไม่มีใครลา')}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {onLeave.map((p) => (
+              <li key={`${p.employee_code}-${p.from_date}`} className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate text-slate-700">{p.full_name}</span>
+                <span className="shrink-0 text-[11px] text-slate-400">
+                  {t(p.leave_type, null, 'leave')}{p.day_part && p.day_part !== 'full' ? ` · ${t('ครึ่งวัน')}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {birthdays.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
+            <Icon name="cap" className="h-4 w-4 text-brand" /> {t('วันเกิดที่ใกล้ถึง')}
+          </h3>
+          <ul className="space-y-1.5">
+            {birthdays.map((p) => (
+              <li key={p.employee_code} className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate text-slate-700">{p.full_name}</span>
+                <span className="shrink-0 text-[11px] text-slate-400">
+                  {p.days === 0 ? t('วันนี้') : t('อีก {n} วัน', { n: p.days })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavRow({ icon, label, onClick, badge = 0, opens = false }) {
   return (
     <button onClick={onClick}
@@ -223,6 +291,13 @@ export default function Portal() {
           <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label={t('แอปพลิเคชัน')}>
             <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('แอปพลิเคชัน')}</div>
             {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
+            {/* ทางลัดออกไประบบอื่นที่พนักงานใช้คู่กันทุกวัน — เปิดแท็บใหม่
+                เพราะไม่ใช่ส่วนหนึ่งของ VCB Connect */}
+            <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ทางลัด')}</div>
+            <NavLink icon="building" label="ERP"
+              title={t('ไปที่ Mango ERP — ใบขอซื้อ ขอเบิกเงิน และรายการตัวเลขอื่น ๆ')}
+              href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/" />
+            <NavLink icon="people" label="Zoom" title={t('เข้าห้องประชุม Zoom')} href="https://zoom.us/join" />
             <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ช่วยเหลือ')}</div>
             <NavRow icon="help" label={t('ช่วยเหลือ / แจ้งปัญหา')} onClick={() => { setNavOpen(false); setHelp(true); }} />
           </nav>
@@ -329,6 +404,7 @@ export default function Portal() {
               {/* side column */}
               <div className="space-y-6">
                 <HolidayCalendar />
+                <TodayPanel />
               </div>
             </div>
 

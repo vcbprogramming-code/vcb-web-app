@@ -52,6 +52,11 @@ export default function ReportsView({ canEdit, onChanged }) {
             placeholder={t('ค้นหาจากสิ่งที่อยากรู้ หรือชื่อรายงาน…')}
             className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         </div>
+        {/* คลังความรู้ที่บริษัทผูกไว้กับคู่มือฉบับนี้ — ลิงก์เดียวกับที่ระบบเดิมมี */}
+        <a href="https://notebooklm.google.com/notebook/17c8699a-9e2d-4d3b-8a74-51a3cf8ba64c"
+          target="_blank" rel="noreferrer" className="btn-outline !py-2 !text-sm">
+          <Icon name="book" className="h-4 w-4" /> {t('เปิด NotebookLM')}
+        </a>
         {canEdit && (
           <button onClick={() => setEdit(null)} className="btn-primary !py-2 !text-sm">
             <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายการ')}

@@ -46,6 +46,13 @@ export const creditApi = {
     api(`/credit/requests/${id}/decide`, { method: 'POST', body: { decision, note } }),
   overdue: () => api('/credit/overdue'),
   cashPlan: (filters) => api(`/credit/cash-plan${qs(filters)}`),
+  // แผนกับจริงอยู่เส้นทางเดียวกัน แยกด้วย kind — ผลต่างคำนวณให้ฝั่งเซิร์ฟเวอร์
+  cashPlanVariance: (filters) => api(`/credit/cash-plan/variance${qs(filters)}`),
+  costCategories: () => api('/credit/cost-categories'),
+  addCostCategory: (name) => api('/credit/cost-categories', { method: 'POST', body: { name } }),
+  categoryCaps: () => api('/credit/category-caps'),
+  setCategoryCap: (body) => api('/credit/category-caps', { method: 'PUT', body }),
+  costSummary: (filters) => api(`/credit/cost-summary${qs(filters)}`),
   addCashPlan: (body) => api('/credit/cash-plan', { method: 'POST', body }),
   updateCashPlan: (id, body) => api(`/credit/cash-plan/${id}`, { method: 'PATCH', body }),
   deleteCashPlan: (id) => api(`/credit/cash-plan/${id}`, { method: 'DELETE' }),

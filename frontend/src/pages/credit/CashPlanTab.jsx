@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { creditApi, formatMoney } from '../../lib/modules.js';
+import { creditApi, formatMoney, isoDate } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
-function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved }) {
+function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved, kind = 'plan' }) {
   const t = useT();
   const editing = Boolean(row);
   const [form, setForm] = useState({
@@ -38,6 +38,7 @@ function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved }) {
         available: Number(form.available) || 0,
         incomeBreakdown: form.incomeBreakdown || null,
         note: form.note || null,
+        kind,
       };
       if (editing) await creditApi.updateCashPlan(row.id, body);
       else await creditApi.addCashPlan(body);
@@ -106,18 +107,24 @@ function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved }) {
   );
 }
 
-export default function CashPlanTab({ projects, onChanged }) {
+/**
+ * แผนการเงิน — ใช้จอเดียวกันทั้งฉบับ "แผน" และฉบับ "หักค่างานตามจริง"
+ *
+ * สองฉบับนี้เก็บในตารางเดียวกันแยกด้วย kind หน้าผลต่างจึงเอามาลบกันได้ตรง ๆ
+ * และคนกรอกก็เห็นฟอร์มหน้าตาเดียวกันทั้งสองฝั่ง ไม่ต้องเรียนรู้สองแบบ
+ */
+export default function CashPlanTab({ projects, onChanged, kind = 'plan' }) {
   const t = useT();
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
   const [month, setMonth] = useState('');
   const [edit, setEdit] = useState(undefined);
-  const defaultMonth = new Date().toISOString().slice(0, 7);
+  const defaultMonth = isoDate().slice(0, 7);
 
   const load = useCallback(() => {
-    creditApi.cashPlan({ projectId, month }).then((r) => setRows(r.data)).catch((e) => setError(e.message));
-  }, [projectId, month]);
+    creditApi.cashPlan({ projectId, month, kind }).then((r) => setRows(r.data)).catch((e) => setError(e.message));
+  }, [projectId, month, kind]);
   useEffect(() => { load(); }, [load]);
 
   const confirm = useConfirm();
@@ -176,7 +183,7 @@ export default function CashPlanTab({ projects, onChanged }) {
       </div>
 
       {edit !== undefined && (
-        <CashPlanModal row={edit} projects={projects} defaultMonth={defaultMonth} onClose={() => setEdit(undefined)} onSaved={refresh} />
+        <CashPlanModal row={edit} projects={projects} defaultMonth={defaultMonth} kind={kind} onClose={() => setEdit(undefined)} onSaved={refresh} />
       )}
     </div>
   );

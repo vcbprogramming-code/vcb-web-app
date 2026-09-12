@@ -142,9 +142,12 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
   );
 }
 
-function DrawdownModal({ facility, onClose, onSaved }) {
+function DrawdownModal({ facility, costCategories = [], onClose, onSaved }) {
   const t = useT();
-  const [form, setForm] = useState({ amount: '', startDate: '', dueDate: '', ref: '', note: '' });
+  const [form, setForm] = useState({
+    amount: '', startDate: '', dueDate: '', termDays: '', ref: '', note: '',
+    counterparty: '', beneficiary: '', costCategory: '',
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -160,8 +163,12 @@ function DrawdownModal({ facility, onClose, onSaved }) {
         status: 'อนุมัติแล้ว',
         startDate: form.startDate || null,
         dueDate: form.dueDate || null,
+        termDays: form.termDays === '' ? null : Number(form.termDays),
         ref: form.ref || null,
         note: form.note || null,
+        counterparty: form.counterparty || null,
+        beneficiary: form.beneficiary || null,
+        costCategory: form.costCategory || null,
       });
       onSaved();
     } catch (err) {
@@ -184,22 +191,55 @@ function DrawdownModal({ facility, onClose, onSaved }) {
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('จำนวนเงิน')} <span className="text-red-500">*</span></label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">
+            {t('จำนวนเงิน (บาท) — ใส่ค่าลบเมื่อปลด/คืนวงเงิน')} <span className="text-red-500">*</span>
+          </label>
           <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" />
+          {Number(form.amount) < 0 && (
+            <p className="mt-1 text-xs text-amber-700">
+              {t('ยอดติดลบคือการปลดวงเงินคืน — ยอดใช้ไปของวงเงินก้อนนี้จะลดลงเท่าที่ใส่')}
+            </p>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันเริ่ม')}</label>
             <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" />
+          </div>
+          <div>
+            {/* กรอกจำนวนวันแล้วได้วันครบกำหนดเลย แบบเดียวกับที่เขาทำกันอยู่ */}
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('จำนวนวัน')}</label>
+            <input type="number" value={form.termDays} onChange={(e) => set('termDays', e.target.value)} className="field" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ครบกำหนด')}</label>
             <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
           </div>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('อ้างอิง / หมายเหตุ')}</label>
-          <input value={form.ref} onChange={(e) => set('ref', e.target.value)} className="field" placeholder={t('เลขที่เอกสาร / อ้างอิง')} />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('รายละเอียด / คู่ค้า')}</label>
+            <input value={form.counterparty} onChange={(e) => set('counterparty', e.target.value)} className="field" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้รับผลประโยชน์')}</label>
+            <input value={form.beneficiary} onChange={(e) => set('beneficiary', e.target.value)} className="field" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            {/* หมวดนี้เป็นตัวป้อนหน้าสรุปค่าใช้จ่าย ไม่ใส่ก็ยังบันทึกได้
+                แต่รายการจะไปรวมอยู่กลุ่ม "ไม่ระบุหมวด" */}
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมวดค่าใช้จ่าย')}</label>
+            <select value={form.costCategory} onChange={(e) => set('costCategory', e.target.value)} className="field">
+              <option value="">{t('— ไม่ระบุ —')}</option>
+              {costCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อ้างอิง / หมายเหตุ')}</label>
+            <input value={form.ref} onChange={(e) => set('ref', e.target.value)} className="field" placeholder={t('เลขที่เอกสาร / อ้างอิง')} />
+          </div>
         </div>
         {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
       </form>
@@ -210,7 +250,17 @@ function DrawdownModal({ facility, onClose, onSaved }) {
 export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
   // ทะเบียนประเภทวงเงินโหลดครั้งเดียว — ใช้ทั้งช่องเลือก ตัวกรอง และป้ายกำกับ
   const [types, setTypes] = useState([]);
+  const [company, setCompany] = useState('');
+  const [costCategories, setCostCategories] = useState([]);
+  // รายชื่อบริษัทอ่านจากวงเงินที่มีอยู่จริง — ไม่ต้องมีทะเบียนแยกให้ดูแลอีกชุด
+  const [companies, setCompanies] = useState([]);
   useEffect(() => { creditApi.facilityTypes().then((r) => setTypes(r.data || [])).catch(() => setTypes([])); }, []);
+  useEffect(() => { creditApi.costCategories().then((r) => setCostCategories(r.data || [])).catch(() => setCostCategories([])); }, []);
+  useEffect(() => {
+    creditApi.facilities({}).then((r) => setCompanies(
+      [...new Set((r.data || []).map((f) => f.company).filter(Boolean))].sort(),
+    )).catch(() => setCompanies([]));
+  }, []);
   const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
@@ -222,8 +272,9 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
   const [drawdown, setDrawdown] = useState(null);
 
   const load = useCallback(() => {
-    creditApi.facilities({ projectId, type, search }).then((r) => setFacilities(r.data)).catch((e) => setError(e.message));
-  }, [projectId, type, search]);
+    creditApi.facilities({ projectId, type, search, company })
+      .then((r) => setFacilities(r.data)).catch((e) => setError(e.message));
+  }, [projectId, type, search, company]);
   useEffect(() => {
     const timer = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(timer);
@@ -244,6 +295,11 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
           <option value="">{t('ทุกประเภท')}</option>
           {/* กรองด้วยกล่องที่พับรวมแล้ว — เลือก B/E ต้องได้ทุกวงเงินที่ใช้ก้อนนั้นร่วมกัน */}
           {[...new Set(types.map((x) => x.doc_kind))].map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+        {/* บริษัทผู้ถือวงเงิน — กลุ่มนี้มีหลายนิติบุคคลและกิจการร่วมค้า */}
+        <select value={company} onChange={(e) => setCompany(e.target.value)} className="field !w-auto">
+          <option value="">{t('ทุกบริษัท')}</option>
+          {companies.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <div className="relative min-w-[200px] flex-1">
           <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -310,7 +366,7 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
         <FacilityModal facility={edit} projects={projects} types={types} onClose={() => setEdit(undefined)} onSaved={refresh} />
       )}
       {drawdown && (
-        <DrawdownModal facility={drawdown} onClose={() => setDrawdown(null)} onSaved={refresh} />
+        <DrawdownModal facility={drawdown} costCategories={costCategories} onClose={() => setDrawdown(null)} onSaved={refresh} />
       )}
     </div>
   );

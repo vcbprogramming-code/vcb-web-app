@@ -21,6 +21,9 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
   const [form, setForm] = useState({ fullName: '', employeeCode: '', kind: 'operation' });
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState(null);
+  const [moving, setMoving] = useState(null);   // พนักงานที่กำลังจะย้ายไซต์
+  const [moveTo, setMoveTo] = useState('');
+  const [sites, setSites] = useState([]);
   const [dirty, setDirty] = useState(false);
 
   const load = () => perfApi.employees(siteKey).then((r) => setList(r.data)).catch((e) => setError(e.message));
@@ -52,6 +55,23 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
     try { await perfApi.updateEmployee(emp.eid, { isActive: false }); setDirty(true); toast.success(t('ปิดใช้งานพนักงานแล้ว')); await load(); }
     catch (e) { toast.error(e.message); } finally { setRowBusy(null); }
   };
+
+  const move = async () => {
+    if (!moving || !moveTo) return;
+    setRowBusy(moving.eid);
+    try {
+      const r = await perfApi.moveEmployee(moving.eid, moveTo);
+      toast.success(t('ย้าย {name} ไป {to} แล้ว', { name: moving.name, to: r.data?.to || moveTo }));
+      setMoving(null); setMoveTo(''); setDirty(true);
+      await load();
+    } catch (e) { toast.error(e.message); }
+    finally { setRowBusy(null); }
+  };
+
+  useEffect(() => {
+    // รายชื่อไซต์สำหรับช่องเลือกปลายทาง โหลดครั้งเดียวพอ
+    perfApi.bootstrap().then((r) => setSites(r.sites || r.data?.sites || [])).catch(() => setSites([]));
+  }, []);
 
   const field = 'field';
   return (
@@ -85,7 +105,14 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
                         {e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'} ⇄
                       </button>
                     </td>
-                    <td className="tbl-td text-right">
+                    <td className="tbl-td text-right whitespace-nowrap">
+                      {/* ย้ายไซต์ — บันทึกงานเก่าเก็บหน่วยงานไว้ในแถวของตัวเอง
+                          ประวัติเดือนก่อนจึงยังอยู่กับไซต์เดิมหลังย้าย */}
+                      <button onClick={() => setMoving(e)} disabled={rowBusy === e.eid}
+                        title={t('ย้ายไปไซต์อื่น')} aria-label={t('ย้ายไปไซต์อื่น')}
+                        className="mr-3 text-sm text-slate-400 hover:text-brand disabled:opacity-50">
+                        <Icon name="arrowRight" className="inline h-4 w-4" />
+                      </button>
                       <button onClick={() => toggleActive(e)} disabled={rowBusy === e.eid} className="text-sm text-red-500 hover:underline disabled:opacity-50">
                         <BusyLabel busy={rowBusy === e.eid} busyText="…">{t('ปิดใช้งาน')}</BusyLabel>
                       </button>
@@ -96,6 +123,24 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
             </table>
           </div>
         )}
+      {moving && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="text-sm font-medium text-slate-700">{t('ย้ายพนักงานไปไซต์อื่น')} · {moving.name}</div>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {t('บันทึกงานของเดือนก่อน ๆ ยังอยู่กับไซต์เดิม — ย้ายมีผลกับวันข้างหน้าเท่านั้น')}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <select value={moveTo} onChange={(ev) => setMoveTo(ev.target.value)} className="field !w-auto">
+              <option value="">{t('— เลือกไซต์ปลายทาง —')}</option>
+              {sites.filter((x) => x.key !== siteKey).map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+            </select>
+            <button onClick={move} disabled={!moveTo || rowBusy === moving.eid} className="btn-primary !py-1.5 !text-sm disabled:opacity-40">
+              {t('ย้าย')}
+            </button>
+            <button onClick={() => { setMoving(null); setMoveTo(''); }} className="btn-outline !py-1.5 !text-sm">{t('ยกเลิก')}</button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

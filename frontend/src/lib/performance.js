@@ -45,6 +45,14 @@ export const perfApi = {
   importTemplateUrl: () => apiBlobUrl('/performance/import/employees/template.xlsx'),
   importEmployees: (file, dryRun) =>
     apiUpload(`/performance/import/employees${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  // ทะเบียนงานและหมวดต้นทุนแก้กันทีละหลายแถว จึงต้องออก-เข้าเป็นไฟล์ได้
+  activitiesXlsxUrl: () => apiBlobUrl('/performance/export/activities.xlsx'),
+  costCategoriesXlsxUrl: () => apiBlobUrl('/performance/export/cost-categories.xlsx'),
+  entriesXlsxUrl: (params) => apiBlobUrl(`/performance/export/entries.xlsx${qs(params)}`),
+  importActivities: (file, dryRun) =>
+    apiUpload(`/performance/import/activities${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  moveEmployee: (id, site, note) =>
+    api(`/performance/employees/${id}/move`, { method: 'POST', body: { site, note } }),
   // ทะเบียนแผนกและตำแหน่ง
   departments: (params) => api(`/performance/departments${qs(params)}`),
   createDepartment: (body) => api('/performance/departments', { method: 'POST', body }),

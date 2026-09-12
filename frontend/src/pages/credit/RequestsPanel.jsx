@@ -19,7 +19,13 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ facilityId: '', amount: '', dueDate: '', note: '' });
+  const [form, setForm] = useState({
+    facilityId: '', amount: '', startDate: '', termDays: '', dueDate: '', note: '',
+    beneficiary: '', costCategory: '', refDocNo: '', refDocFrom: '', refDocTo: '',
+    attachSource: '', attachFrom: '', attachTo: '',
+  });
+  // หมวดค่าใช้จ่ายที่เลือกตรงนี้จะติดไปกับรายการตอนอนุมัติ แล้วไปโผล่ที่หน้าสรุปค่าใช้จ่าย
+  const [costCategories, setCostCategories] = useState([]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const load = useCallback(() => {
@@ -28,6 +34,7 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
   useEffect(() => {
     load();
     creditApi.facilities({}).then((r) => setFacilities(r.data)).catch(() => {});
+    creditApi.costCategories().then((r) => setCostCategories(r.data || [])).catch(() => setCostCategories([]));
   }, [load]);
 
   const projName = Object.fromEntries(projects.map((p) => [p.id, p.name || p.code]));
@@ -43,10 +50,22 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
       await creditApi.addRequest({
         facilityId: form.facilityId,
         amount: Number(form.amount),
+        startDate: form.startDate || null,
+        termDays: form.termDays === '' ? null : Number(form.termDays),
         dueDate: form.dueDate || null,
         note: form.note || null,
+        beneficiary: form.beneficiary || null,
+        costCategory: form.costCategory || null,
+        refDocNo: form.refDocNo || null,
+        refDocFrom: form.refDocFrom || null,
+        refDocTo: form.refDocTo || null,
+        attachSource: form.attachSource || null,
+        attachFrom: form.attachFrom || null,
+        attachTo: form.attachTo || null,
       });
-      setForm({ facilityId: '', amount: '', dueDate: '', note: '' });
+      setForm({ facilityId: '', amount: '', startDate: '', termDays: '', dueDate: '', note: '',
+        beneficiary: '', costCategory: '', refDocNo: '', refDocFrom: '', refDocTo: '',
+        attachSource: '', attachFrom: '', attachTo: '' });
       setAdding(false);
       load();
       onChanged?.();
@@ -98,10 +117,52 @@ export default function RequestsPanel({ projects, onClose, onChanged }) {
               <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" required />
             </div>
             <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('วันที่เริ่ม')}</label>
+              <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" />
+            </div>
+            <div>
+              {/* ใส่จำนวนวันแล้วเว้นวันครบกำหนดไว้ ระบบคำนวณให้เอง */}
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('จำนวนวัน')}</label>
+              <input type="number" value={form.termDays} onChange={(e) => set('termDays', e.target.value)} className="field" />
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">{t('ครบกำหนด')}</label>
               <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
             </div>
             <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('ผู้รับผลประโยชน์')}</label>
+              <input value={form.beneficiary} onChange={(e) => set('beneficiary', e.target.value)} className="field" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('หมวดค่าใช้จ่าย')}</label>
+              <select value={form.costCategory} onChange={(e) => set('costCategory', e.target.value)} className="field">
+                <option value="">{t('— ไม่ระบุ —')}</option>
+                {costCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('เลขที่เอกสารอ้างอิง')}</label>
+              <input value={form.refDocNo} onChange={(e) => set('refDocNo', e.target.value)} className="field" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('วันที่เอกสารอ้างอิง (ช่วง)')}</label>
+              <div className="flex gap-2">
+                <input type="date" value={form.refDocFrom} onChange={(e) => set('refDocFrom', e.target.value)} className="field" />
+                <input type="date" value={form.refDocTo} onChange={(e) => set('refDocTo', e.target.value)} className="field" />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('เอกสารแนบ (อีเมล / แหล่งที่มา)')}</label>
+              <input value={form.attachSource} onChange={(e) => set('attachSource', e.target.value)} className="field" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">{t('วันที่เอกสารแนบ (ช่วง)')}</label>
+              <div className="flex gap-2">
+                <input type="date" value={form.attachFrom} onChange={(e) => set('attachFrom', e.target.value)} className="field" />
+                <input type="date" value={form.attachTo} onChange={(e) => set('attachTo', e.target.value)} className="field" />
+              </div>
+            </div>
+            <div className="col-span-2">
               <label className="mb-1 block text-xs font-medium text-slate-600">{t('หมายเหตุ')}</label>
               <input value={form.note} onChange={(e) => set('note', e.target.value)} className="field" />
             </div>

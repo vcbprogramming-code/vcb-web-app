@@ -88,6 +88,9 @@ export default function WorkIndex() {
   const [error, setError] = useState(null);
   const [editAct, setEditAct] = useState(undefined); // undefined=closed, null=new, obj=edit
   const [editCat, setEditCat] = useState(undefined);
+  const [imp, setImp] = useState(null);          // ผลการตรวจไฟล์ก่อนนำเข้า
+  const [impFile, setImpFile] = useState(null);
+  const [busyImport, setBusyImport] = useState(false);
 
   const load = () => {
     perfApi.activities().then((r) => setActs(r.data)).catch((e) => setError(e.message));
@@ -98,6 +101,27 @@ export default function WorkIndex() {
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
   if (!acts || !cats) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
+  // นำเข้าสองจังหวะเสมอ: ตรวจไฟล์ให้ดูก่อน แล้วค่อยเขียนจริง — ไฟล์ที่มีแถว
+  // เสียจะได้ไม่เข้าไปครึ่งหนึ่งแล้วค้างคา
+  const checkImport = async (file) => {
+    try {
+      const r = await perfApi.importActivities(file, true);
+      setImpFile(file);
+      setImp(r.data);
+    } catch (e) { toast.error(e.message); }
+  };
+  const doImport = async () => {
+    if (!impFile) return;
+    setBusyImport(true);
+    try {
+      const r = await perfApi.importActivities(impFile, false);
+      toast.success(t('นำเข้าแล้ว {n} รายการ', { n: r.data?.imported ?? 0 }));
+      setImp(null); setImpFile(null);
+      load();
+    } catch (e) { toast.error(e.message); }
+    finally { setBusyImport(false); }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -106,8 +130,45 @@ export default function WorkIndex() {
             <button key={k} onClick={() => setTab(k)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>
           ))}
         </div>
-        <button onClick={() => (tab === 'activities' ? setEditAct(null) : setEditCat(null))} className="btn-primary ml-auto !py-1.5"><Icon name="plus" className="h-4 w-4" /> เพิ่ม{tab === 'activities' ? 'กิจกรรม' : 'หมวดต้นทุน'}</button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* ทะเบียนนี้แก้กันทีละหลายสิบแถว — ออกเป็นไฟล์ไปแก้แล้วนำกลับเข้ามา */}
+          <a href={tab === 'activities' ? perfApi.activitiesXlsxUrl() : perfApi.costCategoriesXlsxUrl()}
+            className="btn-outline !py-1.5 !text-sm" title={t('ดาวน์โหลดทะเบียนเป็นไฟล์ Excel')}>
+            <Icon name="download" className="h-4 w-4" /> Excel
+          </a>
+          {tab === 'activities' && (
+            <label className="btn-outline !py-1.5 !text-sm cursor-pointer" title={t('นำเข้าทะเบียนงานจากไฟล์ Excel')}>
+              <input type="file" accept=".xlsx" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) checkImport(f); }} />
+              <Icon name="upload" className="h-4 w-4" /> {t('นำเข้า')}
+            </label>
+          )}
+          <button onClick={() => (tab === 'activities' ? setEditAct(null) : setEditCat(null))} className="btn-primary !py-1.5"><Icon name="plus" className="h-4 w-4" /> เพิ่ม{tab === 'activities' ? 'กิจกรรม' : 'หมวดต้นทุน'}</button>
+        </div>
       </div>
+
+      {imp && (
+        <div className="card space-y-3">
+          <h3 className="font-bold text-slate-800">{t('ตรวจไฟล์ก่อนนำเข้า')}</h3>
+          <p className="text-sm text-slate-600">
+            {t('พร้อมนำเข้า')} <b className="text-emerald-700">{imp.willImport}</b> {t('แถว')}
+            {imp.rejected?.length ? <> · {t('ไม่ผ่าน')} <b className="text-red-600">{imp.rejected.length}</b> {t('แถว')}</> : null}
+          </p>
+          {imp.rejected?.length > 0 && (
+            <ul className="max-h-48 space-y-1 overflow-y-auto text-sm text-slate-600">
+              {imp.rejected.map((r) => (
+                <li key={r.row}>{t('แถวที่')} {r.row} — {r.reason}</li>
+              ))}
+            </ul>
+          )}
+          <div className="flex justify-end gap-2">
+            <button onClick={() => { setImp(null); setImpFile(null); }} className="btn-outline">{t('ยกเลิก')}</button>
+            <button onClick={doImport} disabled={!imp.willImport || busyImport} className="btn-primary disabled:opacity-40">
+              {busyImport ? t('กำลังนำเข้า…') : t('นำเข้าจริง')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card !p-0 overflow-x-auto">
         {tab === 'activities' ? (

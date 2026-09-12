@@ -9,6 +9,8 @@ export const portalApi = {
   createAnnouncement: (body) => api('/announcements', { method: 'POST', body }),
   updateAnnouncement: (id, body) => api(`/announcements/${id}`, { method: 'PATCH', body }),
   deleteAnnouncement: (id) => api(`/announcements/${id}`, { method: 'DELETE' }),
+  // ใครลาวันนี้ + วันเกิดที่ใกล้ถึง — กล่องข้างปฏิทินบนหน้าหลัก
+  today: () => api('/portal/today'),
   // help / report an issue → emails the admins
   sendSupport: ({ area, message }) => api('/support', { method: 'POST', body: { area, message } }),
 };

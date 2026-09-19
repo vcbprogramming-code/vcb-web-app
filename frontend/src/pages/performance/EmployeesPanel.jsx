@@ -23,6 +23,8 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
   const [rowBusy, setRowBusy] = useState(null);
   const [moving, setMoving] = useState(null);   // พนักงานที่กำลังจะย้ายไซต์
   const [moveTo, setMoveTo] = useState('');
+  // วันที่ย้ายมีผล — ค่าเริ่มต้นคือวันนี้ ย้อนหลังได้ (ย้ายไปแล้วแต่เพิ่งมาบันทึก)
+  const [moveDate, setMoveDate] = useState(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
   const [sites, setSites] = useState([]);
   const [dirty, setDirty] = useState(false);
 
@@ -60,8 +62,10 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
     if (!moving || !moveTo) return;
     setRowBusy(moving.eid);
     try {
-      const r = await perfApi.moveEmployee(moving.eid, moveTo);
-      toast.success(t('ย้าย {name} ไป {to} แล้ว', { name: moving.name, to: r.data?.to || moveTo }));
+      const r = await perfApi.moveEmployee(moving.eid, moveTo, moveDate);
+      toast.success(r.data?.reverted
+        ? t('ยกเลิกการย้ายของ {name} แล้ว', { name: moving.name })
+        : t('ย้าย {name} ไป {to} แล้ว', { name: moving.name, to: r.data?.to || moveTo }));
       setMoving(null); setMoveTo(''); setDirty(true);
       await load();
     } catch (e) { toast.error(e.message); }
@@ -127,14 +131,18 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="text-sm font-medium text-slate-700">{t('ย้ายพนักงานไปไซต์อื่น')} · {moving.name}</div>
           <p className="mt-0.5 text-xs text-slate-500">
-            {t('บันทึกงานของเดือนก่อน ๆ ยังอยู่กับไซต์เดิม — ย้ายมีผลกับวันข้างหน้าเท่านั้น')}
+            {t('ก่อนวันที่มีผล คนนี้ยังเป็นของไซต์เดิม — ตารางของไซต์เดิมยังแสดงบันทึกเก่าครบ ย้ายกลับไซต์เดิมในวันเดียวกันคือยกเลิกการย้าย')}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <select value={moveTo} onChange={(ev) => setMoveTo(ev.target.value)} className="field !w-auto">
+            <select value={moveTo} onChange={(ev) => setMoveTo(ev.target.value)} className="field !w-auto" aria-label={t('ไซต์ปลายทาง')}>
               <option value="">{t('— เลือกไซต์ปลายทาง —')}</option>
-              {sites.filter((x) => x.key !== siteKey).map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
+              {sites.filter((x) => x.key !== siteKey && x.active !== false).map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
             </select>
-            <button onClick={move} disabled={!moveTo || rowBusy === moving.eid} className="btn-primary !py-1.5 !text-sm disabled:opacity-40">
+            <label className="flex items-center gap-1.5 text-sm text-slate-600">
+              {t('มีผลตั้งแต่')}
+              <input type="date" value={moveDate} onChange={(ev) => setMoveDate(ev.target.value)} className="field !w-auto" aria-label={t('วันที่มีผล')} />
+            </label>
+            <button onClick={move} disabled={!moveTo || !moveDate || rowBusy === moving.eid} className="btn-primary !py-1.5 !text-sm disabled:opacity-40">
               {t('ย้าย')}
             </button>
             <button onClick={() => { setMoving(null); setMoveTo(''); }} className="btn-outline !py-1.5 !text-sm">{t('ยกเลิก')}</button>

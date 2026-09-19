@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { perfApi, perfPrefs } from '../../lib/performance.js';
+import { perfApi, perfPrefs, downloadAs, mandayReportName } from '../../lib/performance.js';
+import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
@@ -83,6 +84,7 @@ const MODES = [['progress', 'ความคืบหน้า'], ['topact', '�
 
 export default function Dashboard({ cur, onOpenSite }) {
   const t = useT();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('progress');
@@ -116,10 +118,13 @@ export default function Dashboard({ cur, onOpenSite }) {
         </div>
         {/* รายงานของทั้งเดือนทุกโครงการในไฟล์เดียว — อยู่ตรงนี้เพราะคนมาดู
             ภาพรวมแล้วมักอยากได้ไฟล์ไปต่อทันที ไม่ต้องข้ามไปแท็บรายงาน */}
-        <a href={perfApi.monthlyReportUrl(ym)} className="btn-outline ml-auto !py-1.5 !text-sm"
+        {/* เดิมเป็นลิงก์ที่ href เป็น Promise (ไฟล์ต้องขอพร้อม token) กดแล้วไม่ได้ไฟล์
+            ส่งออกเดือนที่หน้าจอกำลังแสดงอยู่ ไม่ใช่เดือนปัจจุบันของปฏิทิน */}
+        <button type="button" onClick={() => downloadAs(perfApi.monthlyReportUrl(ym), mandayReportName(cur.y, cur.m)).catch((e) => toast.error(e.message))}
+          className="btn-outline ml-auto !py-1.5 !text-sm"
           title={t('ดาวน์โหลดรายงานวันทำงานของเดือนนี้ทุกโครงการ')}>
           <Icon name="download" className="h-4 w-4" /> {t('รายงานวันทำงาน')}
-        </a>
+        </button>
       </div>
 
       {rows.length === 0 ? (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { perfApi } from '../../lib/performance.js';
+import { perfApi, downloadAs, mandayReportName } from '../../lib/performance.js';
 import { isoDate } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -130,11 +130,8 @@ export default function ReportsView({ site, features = {} }) {
 
   const download = async () => {
     try {
-      const url = await perfApi.monthlyReportUrl(from.slice(0, 7));
-      const a = document.createElement('a');
-      a.href = url; a.download = `manday-${from.slice(0, 7)}.xlsx`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const [y, m] = from.slice(0, 7).split('-');
+      await downloadAs(perfApi.monthlyReportUrl(from.slice(0, 7)), mandayReportName(y, m));
     } catch (e) { toast.error(e.message); }
   };
 

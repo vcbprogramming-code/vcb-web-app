@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { perfApi } from '../../lib/performance.js';
+import { perfApi, downloadAs, siteWorkLogName } from '../../lib/performance.js';
 import { useToast } from '../../components/Toast.jsx';
 import { PageHeader } from '../../components/ui/index.js';
 import Spinner, { BusyLabel } from '../../components/Spinner.jsx';
@@ -53,11 +53,8 @@ export default function Performance() {
     if (!siteKey) return;
     setExporting(true);
     try {
-      const url = await perfApi.exportUrl(siteKey, cur.y, cur.m);
-      const a = document.createElement('a');
-      a.href = url; a.download = `worklog-${siteKey}-${cur.y}-${String(cur.m).padStart(2, '0')}.xlsx`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const name = (boot?.sites || []).find((x) => x.key === siteKey)?.name || siteKey;
+      await downloadAs(perfApi.exportUrl(siteKey, cur.y, cur.m), siteWorkLogName(name, cur.y, cur.m));
     } catch (e) { toast.error(e.message || 'ส่งออกไม่สำเร็จ'); }
     finally { setExporting(false); }
   };
@@ -70,7 +67,13 @@ export default function Performance() {
 
   useEffect(() => {
     perfApi.bootstrap()
-      .then((r) => { setBoot(r); if (r.sites?.length) setSiteKey(r.sites[0].key); if (!r.canEntry && !sp.get('tab')) setView('dashboard'); })
+      .then((r) => {
+        setBoot(r);
+        // โครงการที่ปิดแล้วไม่รับบันทึกใหม่ — เริ่มที่โครงการแรกที่ยังเปิดอยู่
+        const open = (r.sites || []).filter((x) => x.active !== false);
+        if (open.length) setSiteKey(open[0].key);
+        if (!r.canEntry && !sp.get('tab')) setView('dashboard');
+      })
       .catch((e) => setError(e.message));
   }, []);
 
@@ -135,7 +138,10 @@ export default function Performance() {
                 its text was lifted to near-white (unreadable). */}
             <select aria-label={t('เลือกไซต์งาน')} value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
-              {boot.sites.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
+              {/* โครงการที่ปิดแล้วไม่อยู่ในรายการ ยกเว้นตัวที่กำลังเปิดดูจากหน้าภาพรวม */}
+              {boot.sites.filter((s) => s.active !== false || s.key === siteKey).map((s) => (
+                <option key={s.key} value={s.key}>{s.name}{s.active === false ? ` (${t('ปิดแล้ว')})` : ''}</option>
+              ))}
             </select>
           </div>
         )}
@@ -148,7 +154,8 @@ export default function Performance() {
       {view === 'entry' && (
         boot.sites.length === 0
           ? <NoSites />
-          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur} canEdit={boot.canEntry} isAdmin={boot.isAdmin} />
+          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur}
+              canEdit={boot.canEntry && boot.sites.find((s) => s.key === siteKey)?.active !== false} isAdmin={boot.isAdmin} />
       )}
 
       {view === 'manday' && f.mandayEntry && (
@@ -170,7 +177,8 @@ export default function Performance() {
           features={f}
           sites={boot.sites}
           onOpenSite={(key) => { setSiteKey(key); setRosterKey((k) => k + 1); setView('entry'); }}
-          onSitesChange={(key, lockDays) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, lockDays } : s)) }))}
+          onSitesChange={(key, patch) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, ...(typeof patch === 'object' ? patch : { lockDays: patch }) } : s)) }))}
+          onSiteAdded={(site) => setBoot((b) => ({ ...b, sites: [...b.sites, site].sort((x, y) => x.name.localeCompare(y.name, 'th')) }))}
         />
       )}
     </div>

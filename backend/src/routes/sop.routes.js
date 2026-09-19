@@ -45,7 +45,7 @@ async function allScenariosOrdered() {
  * บวก flows และ modules ที่ระบบเรามีเพิ่ม
  */
 async function readWholeDocument() {
-  const [meta, scenarios, steps, tags, reports, flows, modules] = await Promise.all([
+  const [meta, scenarios, steps, tags, reports, flows, modules, attachments] = await Promise.all([
     queryOne('select * from sop_meta where id = true'),
     query('select * from sop_scenarios order by module, sort_order, no'),
     query('select * from sop_scenario_steps order by scenario_no, step_order'),
@@ -53,11 +53,12 @@ async function readWholeDocument() {
     query('select * from sop_reports order by id'),
     query('select * from sop_flows order by module, id'),
     query('select * from sop_modules order by sort_order, code'),
+    query('select * from sop_scenario_attachments order by scenario_no, sort'),
   ]);
   return {
     meta: meta || null,
     scenarios: scenarios.rows, steps: steps.rows, tags: tags.rows,
-    reports: reports.rows, flows: flows.rows, modules: modules.rows,
+    reports: reports.rows, flows: flows.rows, modules: modules.rows, attachments: attachments.rows,
   };
 }
 
@@ -149,11 +150,12 @@ router.get('/scenarios/:no', canView, asyncHandler(async (req, res) => {
   const all = await allScenariosOrdered();
   const row = all.find((r) => r.no === no);
   if (!row) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
-  const [steps, tags] = await Promise.all([
-    query('select step_order, is_substep, text from sop_scenario_steps where scenario_no = $1 order by step_order', [no]),
+  const [steps, tags, att] = await Promise.all([
+    query('select step_order, is_substep, style, text from sop_scenario_steps where scenario_no = $1 order by step_order', [no]),
     query('select module from sop_scenario_modules where scenario_no = $1', [no]),
+    query('select label, url from sop_scenario_attachments where scenario_no = $1 order by sort', [no]),
   ]);
-  res.json({ data: { ...row, steps: steps.rows, extra_modules: tags.rows.map((t) => t.module) } });
+  res.json({ data: { ...row, steps: steps.rows, extra_modules: tags.rows.map((t) => t.module), attachments: att.rows } });
 }));
 
 /** GET /api/sop/flows?module= — swimlane diagrams (full documents). */
@@ -178,7 +180,23 @@ router.get('/reports', canView, asyncHandler(async (req, res) => {
 
 // ── write (sop.edit) ────────────────────────────────────────────────────────
 
-const stepSchema = z.object({ text: z.string().trim().min(1), isSubstep: z.boolean().optional() });
+/**
+ * ขั้นตอนมีสี่ระดับตามคู่มือของระบบจริง: ลำดับ (1. 2. 3.) · จุด (·) · ย่อย (») ·
+ * ย่อยชั้นสอง (» ») เดิมเรามีแค่สองระดับ ขั้นตอนที่มีชั้นย่อยสองชั้นจึงแบนลง
+ * isSubstep ยังรับอยู่เพื่อให้หน้าจอรุ่นเก่าส่งมาได้
+ */
+const STEP_STYLES = ['num', 'bullet', 'sub', 'sub2'];
+const stepSchema = z.object({
+  text: z.string().trim().min(1),
+  isSubstep: z.boolean().optional(),
+  style: z.enum(STEP_STYLES).optional(),
+});
+const stepStyle = (s) => s.style || (s.isSubstep ? 'sub' : 'num');
+// เอกสารแนบของกรณี — ระบบจริงแนบไฟล์ SOP ฉบับเต็มใน Google Drive ไว้กับทุกกรณี
+const attachmentSchema = z.object({
+  label: z.string().max(300).optional().nullable(),
+  url: z.string().trim().url().max(2000),
+});
 const scenarioSchema = z.object({
   module: z.string().min(1).max(10),
   titleTh: z.string().trim().min(1).max(500),
@@ -187,8 +205,9 @@ const scenarioSchema = z.object({
   ref: z.string().max(500).optional().nullable(),
   note: z.string().max(2000).optional().nullable(),
   dateAdded: z.string().max(100).optional().nullable(),
-  steps: z.array(stepSchema).max(200).optional(),
+  steps: z.array(stepSchema).max(300).optional(),
   extraModules: z.array(z.string().max(10)).max(11).optional(),
+  attachments: z.array(attachmentSchema).max(20).optional(),
 });
 
 async function assertModule(code) {
@@ -197,16 +216,26 @@ async function assertModule(code) {
 }
 
 /** Replace a case's steps + tags inside an open transaction. */
-async function writeChildren(client, no, steps, extraModules, primaryModule) {
+async function writeChildren(client, no, steps, extraModules, primaryModule, attachments) {
   if (steps) {
     await client.query('delete from sop_scenario_steps where scenario_no = $1', [no]);
     let i = 0;
     for (const s of steps) {
       i += 1;
+      const style = stepStyle(s);
       await client.query(
-        'insert into sop_scenario_steps (scenario_no, step_order, is_substep, text) values ($1,$2,$3,$4)',
-        [no, i, Boolean(s.isSubstep), s.text.trim()]
+        'insert into sop_scenario_steps (scenario_no, step_order, is_substep, style, text) values ($1,$2,$3,$4,$5)',
+        [no, i, style === 'sub' || style === 'sub2', style, s.text.trim()]
       );
+    }
+  }
+  if (attachments) {
+    await client.query('delete from sop_scenario_attachments where scenario_no = $1', [no]);
+    let i = 0;
+    for (const a of attachments) {
+      i += 1;
+      await client.query('insert into sop_scenario_attachments (scenario_no, sort, label, url) values ($1,$2,$3,$4)',
+        [no, i, (a.label || '').trim() || null, a.url.trim()]);
     }
   }
   if (extraModules) {
@@ -244,7 +273,7 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
        values ($1,$2,$3,$4,$5,coalesce($6,''),$7,$8,$9)`,
       [no, f.module, so[0].s, f.titleTh, f.titleEn || null, f.problem, f.ref || null, f.note || null, f.dateAdded || null]
     );
-    await writeChildren(client, no, f.steps || [], f.extraModules || [], f.module);
+    await writeChildren(client, no, f.steps || [], f.extraModules || [], f.module, f.attachments || []);
     await client.query('commit');
     res.status(201).json({ data: { no } });
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
@@ -273,7 +302,7 @@ router.patch('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
       vals.push(no);
       await client.query(`update sop_scenarios set ${sets.join(', ')} where no = $${vals.length}`, vals);
     }
-    await writeChildren(client, no, f.steps, f.extraModules, f.module || cur.module);
+    await writeChildren(client, no, f.steps, f.extraModules, f.module || cur.module, f.attachments);
     await client.query('commit');
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
   res.json({ data: { no } });
@@ -375,7 +404,7 @@ router.get('/versions', canEdit, asyncHandler(async (req, res) => {
   // เนื้อหาแต่ละเวอร์ชันคือเอกสารทั้งฉบับ ดึงมา 50 ชุดเพื่อวาดตารางจะเปลืองเปล่า
   const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
   const { rows } = await query(
-    `select v.id, v.note, v.taken_at, p.full_name as taken_by_name,
+    `select v.id, v.note, v.taken_at, coalesce(p.full_name, 'ระบบ (นำเข้าข้อมูล)') as taken_by_name,
             jsonb_array_length(coalesce(v.data->'scenarios','[]'::jsonb)) as scenarios,
             jsonb_array_length(coalesce(v.data->'reports','[]'::jsonb)) as reports
        from sop_versions v left join profiles p on p.id = v.taken_by
@@ -386,7 +415,7 @@ router.get('/versions', canEdit, asyncHandler(async (req, res) => {
 /** GET /api/sop/versions/:id — เวอร์ชันเดียวพร้อมเนื้อหาเต็ม */
 router.get('/versions/:id', canEdit, asyncHandler(async (req, res) => {
   const row = await queryOne(
-    `select v.*, p.full_name as taken_by_name from sop_versions v
+    `select v.*, coalesce(p.full_name, 'ระบบ (นำเข้าข้อมูล)') as taken_by_name from sop_versions v
        left join profiles p on p.id = v.taken_by where v.id = $1`, [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
   res.json({ data: row });
@@ -408,16 +437,19 @@ router.post('/versions/:id/restore', canEdit, asyncHandler(async (req, res) => {
   try {
     await client.query('begin');
     // เขียนทับทั้งเอกสารในทรานแซกชันเดียว — กู้คืนครึ่งใบแย่กว่าไม่กู้คืนเลย
-    for (const t of ['sop_scenario_steps', 'sop_scenario_modules', 'sop_reports', 'sop_flows', 'sop_scenarios']) {
+    for (const t of ['sop_scenario_attachments', 'sop_scenario_steps', 'sop_scenario_modules', 'sop_reports', 'sop_flows', 'sop_scenarios']) {
       await client.query(`delete from ${t}`);
     }
     await insertMany(client, 'sop_scenarios',
       ['no', 'module', 'sort_order', 'title_th', 'title_en', 'problem', 'ref', 'note', 'date_added'],
       (d.scenarios || []).map((r) => [r.no, r.module, r.sort_order, r.title_th, r.title_en,
         r.problem, r.ref, r.note, r.date_added]));
+    // เวอร์ชันที่เก็บก่อนมีระดับขั้นตอนไม่มี style — เดาจาก is_substep แบบเดียวกับตอนย้ายข้อมูล
     await insertMany(client, 'sop_scenario_steps',
-      ['scenario_no', 'step_order', 'is_substep', 'text'],
-      (d.steps || []).map((r) => [r.scenario_no, r.step_order, r.is_substep, r.text]));
+      ['scenario_no', 'step_order', 'is_substep', 'style', 'text'],
+      (d.steps || []).map((r) => [r.scenario_no, r.step_order, r.is_substep, r.style || (r.is_substep ? 'sub' : 'num'), r.text]));
+    await insertMany(client, 'sop_scenario_attachments', ['scenario_no', 'sort', 'label', 'url'],
+      (d.attachments || []).map((r) => [r.scenario_no, r.sort, r.label, r.url]));
     await insertMany(client, 'sop_scenario_modules', ['scenario_no', 'module'],
       (d.tags || []).map((r) => [r.scenario_no, r.module]), 'on conflict do nothing');
     await insertMany(client, 'sop_reports',

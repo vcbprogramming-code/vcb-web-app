@@ -18,14 +18,16 @@ await warm();
 
 const A = U.admin, H = U.hr;
 const MARK = 'ZZSOPUI';
-const startVersions = (await query('select count(*)::int n from sop_versions')).rows[0].n;
+// จำเลขเวอร์ชันล่าสุดตอนเริ่ม แล้วลบเฉพาะที่ใหม่กว่านั้น — เลข id มีช่องว่างได้
+// (เวอร์ชันเก่าถูกลบไปบ้าง) เคยคำนวณจาก min(id)+จำนวน แล้วลบประวัติจริงที่
+// ไม่ใช่ของชุดนี้ทิ้ง รวมถึงฉบับสำรองของคู่มือเล่มเดิม
+const startMaxId = (await query('select coalesce(max(id),0)::int id from sop_versions')).rows[0].id;
 const clean = async () => {
   const list = (await call('/sop/scenarios', { user: A })).data || [];
   for (const x of list.filter((r) => String(r.title_th).startsWith(MARK))) {
     await call(`/sop/scenarios/${x.no}`, { method: 'DELETE', user: A });
   }
-  await query('delete from sop_versions where id > $1', [
-    (await query('select coalesce(min(id),0)+$1-1 id from sop_versions', [startVersions])).rows[0].id || 0]);
+  await query('delete from sop_versions where id > $1', [startMaxId]);
 };
 
 fs.rmSync(`${ROOT}/chrome-sop`, { recursive: true, force: true });

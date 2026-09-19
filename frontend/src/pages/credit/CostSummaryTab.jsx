@@ -55,7 +55,7 @@ export default function CostSummaryTab({ projects = [], canEdit }) {
           <option value="">{t('ทุกโครงการ')}</option>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}
         </select>
-        {(data.overCount > 0 || data.noBudgetCount > 0) && (
+        {(data.overCount > 0 || data.nearCount > 0 || data.noBudgetCount > 0) && (
           <span className="flex flex-wrap items-center gap-2 text-sm">
             {data.overCount > 0 && (
               <span className="chip bg-red-50 text-red-700">
@@ -63,8 +63,11 @@ export default function CostSummaryTab({ projects = [], canEdit }) {
                 {data.overCount} {t('หมวดเกินงบ')}
               </span>
             )}
+            {data.nearCount > 0 && (
+              <span className="chip bg-amber-50 text-amber-700">{data.nearCount} {t('ใกล้เต็ม')}</span>
+            )}
             {data.noBudgetCount > 0 && (
-              <span className="chip bg-amber-50 text-amber-700">{data.noBudgetCount} {t('หมวดยังไม่ได้ตั้งงบ')}</span>
+              <span className="chip bg-slate-100 text-slate-600">{data.noBudgetCount} {t('หมวดยังไม่ได้ตั้งงบ')}</span>
             )}
           </span>
         )}
@@ -85,11 +88,20 @@ export default function CostSummaryTab({ projects = [], canEdit }) {
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-2 text-sm">
               {g.overCount > 0 && <span className="chip bg-red-50 text-red-700">{g.overCount} {t('เกินงบ')}</span>}
-              {g.noBudgetCount > 0 && <span className="chip bg-amber-50 text-amber-700">{g.noBudgetCount} {t('ยังไม่ตั้งงบ')}</span>}
-              <span className="tabular-nums text-slate-600">
-                {g.pct != null ? `${g.pct}%` : '—'}{' · '}
-                {formatMoney(g.spent)} / {g.cap > 0 ? formatMoney(g.cap) : t('ยังไม่ได้ตั้งงบ')}
-              </span>
+              {g.nearCount > 0 && <span className="chip bg-amber-50 text-amber-700">{g.nearCount} {t('ใกล้เต็ม')}</span>}
+              {g.noBudgetCount > 0 && <span className="chip bg-slate-100 text-slate-600">{g.noBudgetCount} {t('ยังไม่ตั้งงบ')}</span>}
+              {!g.overCount && !g.nearCount && !g.noBudgetCount && g.okCount > 0 && (
+                <span className="chip bg-emerald-50 text-emerald-700">{t('ในงบ')}</span>
+              )}
+              {/* ยอดรวมหัวโครงการนับเฉพาะหมวดที่ตั้งงบไว้ — เหมือนระบบจริง
+                  เงินในหมวดที่ไม่มีงบไม่มีอะไรให้เทียบ ถ้ารวมเข้าไปจะได้ % เกินจริง */}
+              {g.cap > 0 ? (
+                <span className="tabular-nums text-slate-600" title={t('รวมเฉพาะหมวดที่ตั้งงบไว้')}>
+                  {g.pct}%{' · '}{formatMoney(g.spent)} / {formatMoney(g.cap)}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">— {t('ยังไม่มีงบที่ตั้งไว้ในโครงการนี้')} —</span>
+              )}
             </div>
           </div>
           <table className="tbl">
@@ -116,11 +128,11 @@ export default function CostSummaryTab({ projects = [], canEdit }) {
                   <td className="tbl-td text-right tabular-nums text-slate-500">
                     {l.cap == null ? <span className="text-amber-700">— {t('ไม่ได้ตั้ง')}</span> : formatMoney(l.cap)}
                   </td>
-                  <td className={`tbl-td text-right tabular-nums font-medium ${l.over ? 'text-red-600' : 'text-slate-600'}`}>
-                    {l.pct == null ? '—' : `${l.pct}%`}
+                  <td className={`tbl-td text-right tabular-nums font-medium ${l.over ? 'text-red-600' : l.near ? 'text-amber-600' : 'text-slate-600'}`}>
+                    {l.pct == null ? '—' : `${l.pct.toFixed(1)}%`}
                   </td>
-                  <td className={`tbl-td text-right tabular-nums ${l.remaining != null && l.remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {l.remaining == null ? '—' : formatMoney(l.remaining)}
+                  <td className={`tbl-td text-right tabular-nums ${l.remaining == null ? 'text-slate-400' : l.remaining < 0 ? 'font-semibold text-red-600' : l.near ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {l.remaining == null ? '—' : l.remaining < 0 ? `−${formatMoney(-l.remaining)}` : formatMoney(l.remaining)}
                   </td>
                   {canEdit && (
                     <td className="tbl-td text-right">

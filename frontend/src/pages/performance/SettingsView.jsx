@@ -6,13 +6,14 @@ import { BusyLabel } from '../../components/Spinner.jsx';
 import { useT } from '../../lib/i18n.jsx';
 import ImportEmployees from './ImportEmployees.jsx';
 import OrgRegistry from './OrgRegistry.jsx';
+import ProjectsAdmin from './ProjectsAdmin.jsx';
 
 /**
  * Module settings. Server-side: per-site back-date lock window (lock-days).
  * Client-side (localStorage): grid cell display (code vs name) + which sites are
  * hidden on the dashboard.
  */
-export default function SettingsView({ sites, onSitesChange, onOpenSite, features = {} }) {
+export default function SettingsView({ sites, onSitesChange, onSiteAdded, onOpenSite, features = {} }) {
   const t = useT();
   const toast = useToast();
   const [prefs, setPrefs] = useState(perfPrefs.get());
@@ -29,7 +30,7 @@ export default function SettingsView({ sites, onSitesChange, onOpenSite, feature
     const v = Number(lockDraft[key]);
     if (!Number.isInteger(v) || v < 0 || v > 60) { toast.error(t('จำนวนวันต้องอยู่ระหว่าง 0–60')); return; }
     setSavingLock(key);
-    try { await perfApi.updateSite(key, { lockDays: v }); onSitesChange?.(key, v); toast.success(t('บันทึกจำนวนวันล็อกแล้ว')); }
+    try { await perfApi.updateSite(key, { lockDays: v }); onSitesChange?.(key, { lockDays: v }); toast.success(t('บันทึกจำนวนวันล็อกแล้ว')); }
     catch (e) { toast.error(e.message); }
     finally { setSavingLock(null); }
   };
@@ -57,6 +58,9 @@ export default function SettingsView({ sites, onSitesChange, onOpenSite, feature
           </div>
         </div>
       </section>
+
+      {/* เพิ่ม/เปิด/ปิดโครงการ — เหมือน "จัดการโครงการ" ในหน้าตั้งค่าของระบบจริง */}
+      <ProjectsAdmin onChanged={onSitesChange} onAdded={onSiteAdded} />
 
       {/* per-site lock window */}
       <section className="card space-y-3">

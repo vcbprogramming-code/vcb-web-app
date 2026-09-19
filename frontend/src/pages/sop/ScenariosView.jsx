@@ -197,13 +197,20 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
                 {detail.steps?.length > 0 && (
                   <section>
                     <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('แนวปฏิบัติ')}</h4>
+                    {/* สี่ระดับเหมือนคู่มือของระบบจริง: ลำดับ · จุด · ย่อย » · ย่อยชั้นสอง » » */}
                     <ol className="space-y-2">
-                      {detail.steps.map((st, i) => (
-                        <li key={i} className={`flex gap-2 text-sm leading-relaxed text-slate-700 ${st.is_substep ? 'ml-6' : ''}`}>
-                          <span className="shrink-0 text-slate-400">{st.is_substep ? '»' : `${detail.steps.slice(0, i + 1).filter((x) => !x.is_substep).length}.`}</span>
-                          <span className="whitespace-pre-line">{st.text}</span>
-                        </li>
-                      ))}
+                      {detail.steps.map((st, i) => {
+                        const style = st.style || (st.is_substep ? 'sub' : 'num');
+                        const n = detail.steps.slice(0, i + 1).filter((x) => (x.style || (x.is_substep ? 'sub' : 'num')) === 'num').length;
+                        const mark = { num: `${n}.`, bullet: '·', sub: '»', sub2: '» »' }[style];
+                        const indent = { num: '', bullet: 'ml-5', sub: 'ml-8', sub2: 'ml-14' }[style];
+                        return (
+                          <li key={i} className={`flex gap-2 text-sm leading-relaxed ${style === 'num' ? 'font-medium text-slate-800' : 'text-slate-700'} ${indent}`}>
+                            <span className="shrink-0 text-slate-400">{mark}</span>
+                            <span className="whitespace-pre-line">{st.text}</span>
+                          </li>
+                        );
+                      })}
                     </ol>
                   </section>
                 )}
@@ -214,6 +221,20 @@ export default function ScenariosView({ modules, module, canEdit, onChanged, sha
                   </p>
                 )}
                 {detail.ref && <p className="text-xs text-slate-500">{t('อ้างอิง:')} {detail.ref}</p>}
+                {/* ไฟล์ SOP ฉบับเต็มของกรณีนี้ — ระบบจริงแนบไว้ทุกกรณี */}
+                {detail.attachments?.length > 0 && (
+                  <section>
+                    <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('ไฟล์แนบ')}</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {detail.attachments.map((a, i) => (
+                        <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-brand hover:border-brand/40 hover:bg-brand-tint">
+                          <Icon name="document" className="h-4 w-4" /> {a.label || t('เอกสารแนบ')}
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </article>
             )}
           </div>

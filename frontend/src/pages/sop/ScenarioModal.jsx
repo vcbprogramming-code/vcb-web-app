@@ -22,7 +22,8 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
     ref: item?.ref || '',
     note: item?.note || '',
   });
-  const [steps, setSteps] = useState([{ _id: rid(), text: '', isSubstep: false }]);
+  const [steps, setSteps] = useState([{ _id: rid(), text: '', style: 'num' }]);
+  const [atts, setAtts] = useState([]);
   const [extra, setExtra] = useState(item?.extra_modules || []);
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -31,15 +32,16 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
   useEffect(() => {
     if (!editing) return;
     sopApi.scenario(item.no).then((r) => {
-      const s = (r.data.steps || []).map((x) => ({ _id: rid(), text: x.text, isSubstep: x.is_substep }));
-      setSteps(s.length ? s : [{ _id: rid(), text: '', isSubstep: false }]);
+      const s = (r.data.steps || []).map((x) => ({ _id: rid(), text: x.text, style: x.style || (x.is_substep ? 'sub' : 'num') }));
+      setSteps(s.length ? s : [{ _id: rid(), text: '', style: 'num' }]);
       setExtra(r.data.extra_modules || []);
+      setAtts((r.data.attachments || []).map((a) => ({ _id: rid(), label: a.label || '', url: a.url })));
     }).catch((e) => toast.error(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, item?.no]);
 
   const setStep = (i, patch) => setSteps((p) => p.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
-  const addStep = () => setSteps((p) => [...p, { _id: rid(), text: '', isSubstep: false }]);
+  const addStep = () => setSteps((p) => [...p, { _id: rid(), text: '', style: 'num' }]);
   const removeStep = (i) => setSteps((p) => (p.length > 1 ? p.filter((_, idx) => idx !== i) : p));
   const moveStep = (i, d) => setSteps((p) => {
     const j = i + d;
@@ -60,8 +62,9 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
         problem: form.problem.trim(),
         ref: form.ref.trim() || null,
         note: form.note.trim() || null,
-        steps: steps.filter((s) => s.text.trim()).map((s) => ({ text: s.text.trim(), isSubstep: s.isSubstep })),
+        steps: steps.filter((s) => s.text.trim()).map((s) => ({ text: s.text.trim(), style: s.style })),
         extraModules: extra,
+        attachments: atts.filter((a) => a.url.trim()).map((a) => ({ label: a.label.trim() || null, url: a.url.trim() })),
       };
       let created = null;
       if (editing) await sopApi.updateScenario(item.no, body);
@@ -107,18 +110,24 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="text-sm font-medium text-slate-600">{t('ขั้นตอนการปฏิบัติ')}</label>
-            <span className="text-xs text-slate-500">{t('ติ๊ก “ย่อย” เพื่อให้เป็นข้อย่อย (»)')}</span>
+            <span className="text-xs text-slate-500">{t('เลือกระดับของแต่ละบรรทัด: ลำดับ · จุด · ย่อย » · ย่อยชั้นสอง » »')}</span>
           </div>
           <div className="space-y-2">
             {steps.map((s, i) => (
-              <div key={s._id} className={`flex items-start gap-2 ${s.isSubstep ? 'pl-6' : ''}`}>
-                <span className="mt-2.5 w-5 shrink-0 text-center text-xs text-slate-500">{s.isSubstep ? '»' : i + 1}</span>
+              <div key={s._id} className={`flex items-start gap-2 ${{ num: '', bullet: 'pl-4', sub: 'pl-7', sub2: 'pl-12' }[s.style] || ''}`}>
+                <span className="mt-2.5 w-6 shrink-0 text-center text-xs text-slate-500">
+                  {{ num: `${steps.slice(0, i + 1).filter((x) => x.style === 'num').length}.`, bullet: '·', sub: '»', sub2: '» »' }[s.style]}
+                </span>
                 <textarea value={s.text} onChange={(e) => setStep(i, { text: e.target.value })} rows={2}
                   placeholder={t('อธิบายสิ่งที่ต้องทำ…')} className="field flex-1 resize-y" />
                 <div className="flex shrink-0 flex-col gap-1 pt-1">
-                  <label className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                    <input type="checkbox" checked={s.isSubstep} onChange={(e) => setStep(i, { isSubstep: e.target.checked })} /> {t('ย่อย')}
-                  </label>
+                  <select value={s.style} onChange={(e) => setStep(i, { style: e.target.value })} aria-label={t('ระดับ')}
+                    className="rounded border border-slate-200 bg-white px-1 py-0.5 text-[11px] text-slate-600">
+                    <option value="num">{t('ลำดับ')}</option>
+                    <option value="bullet">{t('จุด')}</option>
+                    <option value="sub">{t('ย่อย')}</option>
+                    <option value="sub2">{t('ย่อยชั้นสอง')}</option>
+                  </select>
                   <div className="flex gap-0.5">
                     <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0} title={t('เลื่อนขึ้น')}
                       className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30">
@@ -138,6 +147,27 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
             ))}
           </div>
           <button type="button" onClick={addStep} className="mt-2 text-sm font-medium text-brand hover:underline">{t('+ เพิ่มขั้นตอน')}</button>
+        </div>
+
+        {/* attachments */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-600">{t('ไฟล์แนบ')} <span className="text-xs font-normal text-slate-500">{t('(ลิงก์ Google Drive หรือเว็บ)')}</span></label>
+          <div className="space-y-2">
+            {atts.map((a, i) => (
+              <div key={a._id} className="flex flex-wrap items-center gap-2">
+                <input value={a.label} onChange={(e) => setAtts((p) => p.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                  placeholder={t('ชื่อไฟล์ (เว้นว่างได้)')} aria-label={t('ชื่อไฟล์')} className="field !w-48" />
+                <input value={a.url} onChange={(e) => setAtts((p) => p.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                  placeholder="https://drive.google.com/…" aria-label={t('ลิงก์')} className="field min-w-0 flex-1" />
+                <button type="button" onClick={() => setAtts((p) => p.filter((_, j) => j !== i))} title={t('ลบไฟล์แนบ')} aria-label={t('ลบไฟล์แนบ')}
+                  className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                  <Icon name="trash" className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={() => setAtts((p) => [...p, { _id: rid(), label: '', url: '' }])}
+            className="mt-2 text-sm font-medium text-brand hover:underline">{t('+ เพิ่มไฟล์แนบ')}</button>
         </div>
 
         {/* extra module tags */}

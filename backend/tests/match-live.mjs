@@ -22,16 +22,20 @@ await clean();
 const project = (await query('select id, code from projects order by code limit 1')).rows[0];
 
 // ── 1. คู่มือ SOP ─────────────────────────────────────────────────────────
-suite('1. เมนูเรียกรายงานครบ 23 รายการเท่าระบบจริง');
+suite('1. เมนูเรียกรายงานครบ 24 รายการเท่าระบบจริง');
 {
+  // ฉบับปรับปรุงบนหน้าเว็บที่ลูกค้าใช้อยู่ (build 34) มี 24 รายการ — รอบก่อนเราเทียบกับ
+  // ไฟล์ส่งออกเก่าที่มี 23 รายการ ดู migration 0064
   const rows = (await query('select case_no, report_path from sop_reports order by case_no')).rows;
-  happy('มี 23 รายการ', rows.length === 23, `${rows.length}`);
+  happy('มี 24 รายการ', rows.length === 24, `${rows.length}`);
   happy('ลำดับที่ 13 คือ Stock Card Report',
     /IC -> Report -> 2\.2/.test(rows.find((r) => r.case_no === 13)?.report_path || ''), '');
   happy('ลำดับที่ 23 คือ Tracking Billing Subcontractor',
     /OF -> Report -> 5\.1/.test(rows.find((r) => r.case_no === 23)?.report_path || ''), '');
+  happy('ลำดับที่ 24 คือ AP Voucher Tracking',
+    /AP -> Report -> 2\.3/.test(rows.find((r) => r.case_no === 24)?.report_path || ''), '');
   const nos = rows.map((r) => r.case_no);
-  bad('เลขลำดับไม่ซ้ำและไม่ข้าม', new Set(nos).size === 23 && Math.max(...nos) === 23, nos.join(','));
+  bad('เลขลำดับไม่ซ้ำและไม่ข้าม', new Set(nos).size === 24 && Math.max(...nos) === 24, nos.join(','));
 }
 
 // ── 2. วงเงินสินเชื่อ: ปลด/คืนวงเงิน ─────────────────────────────────────

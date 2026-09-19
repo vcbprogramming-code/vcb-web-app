@@ -304,12 +304,13 @@ suite('§12 ประสิทธิภาพและการใช้งา�
   happy('20 คำขอพร้อมกันไม่ล้ม', many.every((r) => r.status === 200), `${many.filter((r) => r.status !== 200).length} ล้มเหลว`);
   happy(`ตอบสนองภายในเกณฑ์ (${secs.toFixed(1)} วิ)`, secs < 20, '');
 
-  await call('/performance/cell', { method: 'POST', user: A, body: { site: site.code, eid: emp.id, date: shift(-2), field: 'detail', value: 'ก' } });
+  // emp เป็นสายปฏิบัติการ ช่องงานหลักจึงเป็น team (ข้อกำหนดฟังก์ชัน §3.2.2)
+  await call('/performance/cell', { method: 'POST', user: A, body: { site: site.code, eid: emp.id, date: shift(-2), field: 'team', value: 'ก' } });
   const cur = await query('select updated_at from work_logs where employee_id = $1 and ymd = $2', [emp.id, shift(-2)]);
   const stale = new Date(new Date(cur.rows[0].updated_at).getTime() - 60000).toISOString();
   bad('สองคนแก้พร้อมกันแล้วไม่เขียนทับเงียบ ๆ',
     (await call('/performance/cell', { method: 'POST', user: A, body: {
-      site: site.code, eid: emp.id, date: shift(-2), field: 'detail', value: 'ข', seenAt: stale } })).status === 409, '');
+      site: site.code, eid: emp.id, date: shift(-2), field: 'team', value: 'ข', seenAt: stale } })).status === 409, '');
 }
 
 // ── เก็บกวาด ──────────────────────────────────────────────────────────────

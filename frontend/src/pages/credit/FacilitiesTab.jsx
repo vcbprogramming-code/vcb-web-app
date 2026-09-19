@@ -28,6 +28,8 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
     facilityNo: facility?.facility_no ?? (types[0]?.no ?? 1),
     limit: facility?.limit ?? '',
     usedBaseline: facility ? '' : '',
+    // ยอดใช้ไปที่ปักเอง — ว่างไว้ = คำนวณจากรายการ (setUsedOverride ของระบบจริง)
+    usedOverride: facility?.used_overridden ? String(facility.used) : '',
     interestRate: facility?.interest_rate ?? '',
     dueDate: facility?.due_date ? String(facility.due_date).slice(0, 10) : '',
     notes: facility?.notes || '',
@@ -52,6 +54,13 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
         notes: form.notes || null,
       };
       if (!editing && form.usedBaseline !== '') body.usedBaseline = Number(form.usedBaseline);
+      if (editing) {
+        const raw = String(form.usedOverride).trim();
+        const next = raw === '' ? null : Number(raw);
+        if (next != null && (Number.isNaN(next) || next < 0)) throw new Error(t('กรอกยอดใช้ไปให้ถูกต้อง'));
+        const prev = facility.used_overridden ? Number(facility.used) : null;
+        if (next !== prev) body.usedOverride = next;
+      }
       if (editing) await creditApi.updateFacility(facility.id, body);
       else await creditApi.addFacility(body);
       onSaved();
@@ -129,6 +138,14 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('ยอดใช้ไปเริ่มต้น (baseline)')}</label>
               <input type="number" value={form.usedBaseline} onChange={(e) => set('usedBaseline', e.target.value)} className="field" />
+            </div>
+          )}
+          {editing && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-600">{t('ยอดใช้ไป (ตั้งเอง)')}</label>
+              <input type="number" value={form.usedOverride} onChange={(e) => set('usedOverride', e.target.value)} className="field"
+                placeholder={`${t('คำนวณอัตโนมัติ')}: ${Number(facility.used_auto ?? facility.used ?? 0).toLocaleString('en-US')}`} />
+              <p className="mt-1 text-xs text-slate-500">{t('เว้นว่างไว้ให้ระบบคำนวณจากรายการ — กรอกเมื่อยอดที่ธนาคารแจ้งไม่ตรงกับที่คำนวณได้')}</p>
             </div>
           )}
           <div>
@@ -344,7 +361,13 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
                 </td>
                 <td className="tbl-td"><span className={`chip ${TYPE_CHIP[f.type] || 'bg-slate-100 text-slate-600'}`}>{f.type}</span></td>
                 <td className="tbl-td text-right tabular-nums">{formatMoney(f.limit)}</td>
-                <td className="tbl-td text-right tabular-nums">{formatMoney(f.used)}</td>
+                <td className="tbl-td text-right tabular-nums">
+                  {formatMoney(f.used)}
+                  {/* ยอดที่ปักเอง ไม่ได้มาจากรายการ — ต้องมองออกทันทีว่าตัวเลขนี้ไม่ได้คำนวณ */}
+                  {f.used_overridden && (
+                    <span className="ml-1 font-bold text-amber-600" title={t('ตั้งเอง — ไม่ได้คำนวณจากรายการ')}>*</span>
+                  )}
+                </td>
                 <td className={`tbl-td text-right tabular-nums font-medium ${f.available <= 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMoney(f.available)}</td>
                 <td className="tbl-td">
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">

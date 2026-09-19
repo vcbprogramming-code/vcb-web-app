@@ -154,8 +154,8 @@ function canEntry(profile) {
 router.get('/bootstrap', asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
   const units = (scoped
-    ? await query('select code, name, company, color, lock_days from units where id = any($1) and code is not null order by name', [scoped])
-    : await query('select code, name, company, color, lock_days from units where code is not null order by name')).rows;
+    ? await query('select code, name, company, color, lock_days, is_active from units where id = any($1) and code is not null order by name', [scoped])
+    : await query('select code, name, company, color, lock_days, is_active from units where code is not null order by name')).rows;
   res.json({
     ok: true,
     email: req.profile.email,
@@ -165,7 +165,8 @@ router.get('/bootstrap', asyncHandler(async (req, res) => {
     // หน้าจอใช้ค่านี้ตัดสินใจว่าจะวาดแท็บ/ปุ่มไหน — ไม่ใช่รายการที่เชื่อถือเพื่อ
     // ความปลอดภัย เพราะแต่ละเส้นทางกันตัวเองด้วย requireFeature อยู่แล้ว
     features: featureMap(),
-    sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, lockDays: u.lock_days ?? 3 })),
+    // โครงการที่ปิดแล้วยังส่งมา (ภาพรวมย้อนหลังยังต้องเห็น) หน้าจอกรองออกจากช่องเลือกบันทึกเอง
+    sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, lockDays: u.lock_days ?? 3, active: u.is_active !== false })),
   });
 }));
 
@@ -230,42 +231,138 @@ router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async 
   res.json({ data: categoryOut(row) });
 }));
 
-// set a site's back-date lock window (admin, Settings screen)
+// ── จัดการโครงการ (admin) — ตามระบบจริง: เพิ่มโครงการ เปิด/ปิดโครงการ ─────────
+/** รายชื่อโครงการพร้อมจำนวนพนักงาน หน้าจอจะได้เตือนก่อนปิดโครงการที่ยังมีคนอยู่ */
+router.get('/sites', requireRole('admin'), asyncHandler(async (req, res) => {
+  const { rows } = await query(
+    `select u.code, u.name, u.company, u.color, u.lock_days, u.is_active,
+            (select count(*)::int from employees e where e.unit_id = u.id and e.is_active) emps
+       from units u where u.code is not null order by u.created_at, u.name`);
+  res.json({ data: rows.map((u) => ({ ...siteOut(u), active: u.is_active !== false, emps: u.emps })) });
+}));
+
+/**
+ * เพิ่มโครงการ — รหัสไม่ให้พิมพ์เอง เพราะเป็นรหัสถาวรที่ทุกบันทึกผูกอยู่
+ * (เหมือน api_addSite) สร้างจากตัวอักษรอังกฤษในชื่อ ชื่อไทยล้วนได้ SITE + เลข
+ */
+router.post('/sites', requireRole('admin'), asyncHandler(async (req, res) => {
+  const p = z.object({ name: z.string().trim().min(1).max(120), company: z.string().trim().max(160).optional().nullable() }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ต้องระบุชื่อโครงการ');
+  const name = p.data.name;
+  // ชื่อซ้ำเป็นกับดักของรายงาน แม้รหัสจะต่างกัน
+  if (await queryOne('select 1 from units where btrim(name) = $1', [name])) throw new ApiError(409, 'มีโครงการชื่อนี้อยู่แล้ว');
+  const base = name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 12) || 'SITE';
+  const taken = new Set((await query('select code from units where code is not null')).rows.map((r) => r.code));
+  let code = base, n = 2;
+  while (taken.has(code)) code = `${base}${n++}`;
+  const row = await queryOne(
+    'insert into units (name, code, company, lock_days) values ($1, $2, $3, 3) returning code, name, company, color, lock_days, is_active',
+    [name, code, p.data.company || null]);
+  await logWork({ actor: req.profile, unitId: null, action: 'site.create', after: { code, name, company: p.data.company || null } });
+  res.status(201).json({ data: { ...siteOut(row), active: true, emps: 0 } });
+}));
+
+// set a site's back-date lock window, or open/close the site (admin, Settings screen)
 router.patch('/sites/:code', requireRole('admin'), asyncHandler(async (req, res) => {
-  const p = z.object({ lockDays: z.number().int().min(0).max(60) }).safeParse(req.body);
+  const p = z.object({ lockDays: z.number().int().min(0).max(60).optional(), active: z.boolean().optional() })
+    .refine((d) => d.lockDays !== undefined || d.active !== undefined, 'ไม่มีข้อมูลให้แก้ไข').safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const unit = await loadUnitByKey(req.params.code);
   if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
-  const row = await queryOne('update units set lock_days = $1 where id = $2 returning code, name, company, color, lock_days', [p.data.lockDays, unit.id]);
-  res.json({ data: siteOut(row) });
+  const row = await queryOne(
+    `update units set lock_days = coalesce($1, lock_days), is_active = coalesce($2, is_active)
+      where id = $3 returning code, name, company, color, lock_days, is_active`,
+    [p.data.lockDays ?? null, p.data.active ?? null, unit.id]);
+  if (p.data.active !== undefined && p.data.active !== (unit.is_active !== false)) {
+    await logWork({ actor: req.profile, unitId: unit.id, action: p.data.active ? 'site.open' : 'site.close',
+      before: { active: unit.is_active !== false }, after: { active: p.data.active } });
+  }
+  res.json({ data: { ...siteOut(row), active: row.is_active !== false } });
 }));
 
 // ── employees ────────────────────────────────────────────────────────────
+/**
+ * การย้ายไซต์ของพนักงาน เรียงตามวันที่มีผล — Map(employeeId → [{from, to, date}])
+ *
+ * ระบบจริง (api_migrateEmployee) เก็บการย้ายเป็นประวัติ: ก่อนวันที่ย้าย คนนั้นยัง
+ * เป็นของไซต์เดิม วันที่ย้ายเป็นต้นไปเป็นของไซต์ใหม่ หนึ่งวันอยู่ได้ไซต์เดียว
+ */
+async function movesFor(employeeIds) {
+  const out = new Map();
+  if (!employeeIds.length) return out;
+  const { rows } = await query(
+    `select id, employee_id, from_unit_id, to_unit_id, effective_date from employee_moves
+      where employee_id = any($1) order by effective_date, created_at`, [employeeIds]);
+  for (const r of rows) {
+    const list = out.get(r.employee_id) || [];
+    list.push({ id: r.id, from: r.from_unit_id, to: r.to_unit_id, date: dateStr(r.effective_date) });
+    out.set(r.employee_id, list);
+  }
+  return out;
+}
+/** ไซต์ที่พนักงานสังกัด ณ วันหนึ่ง — ก่อนการย้ายครั้งแรกคือไซต์ต้นทางของครั้งแรก */
+function unitOn(currentUnitId, moves, ds) {
+  if (!moves || !moves.length) return currentUnitId;
+  let u = moves[0].from;
+  for (const m of moves) { if (m.date <= ds) u = m.to; else break; }
+  return u;
+}
+
 async function employeesForUnit(unitId, month) {
+  // คนที่อยู่ไซต์นี้ตอนนี้ และคนที่เคยย้ายเข้า/ออกจากไซต์นี้ — คนหลังจะขึ้นเฉพาะ
+  // เดือนที่มีวันใดวันหนึ่งสังกัดไซต์นี้ วันที่ไปอยู่ที่อื่นถูกทำเป็นวันที่ไม่อยู่
   const emps = (await query(
     `select e.*, d.name as department_name, p.name as position_name
        from employees e
        left join departments d on d.id = e.department_id
        left join positions p on p.id = e.position_id
-      where e.unit_id = $1 and e.is_active = true
-      order by e.kind, e.full_name`, [unitId]
+      where e.is_active = true
+        and (e.unit_id = $1 or ($2::boolean and e.id in (
+              select employee_id from employee_moves where from_unit_id = $1 or to_unit_id = $1)))
+      order by e.kind, e.full_name`, [unitId, Boolean(month)]
   )).rows;
   const ids = emps.map((e) => e.id);
   let awayBy = {};
   const leaveBy = {};
-  if (ids.length) {
+  const moved = {};
+  let keep = new Set(ids);
+  if (ids.length && month) {
     // real month bounds — a literal `${month}-31` is an invalid date for 30/28-day
     // months and makes the whole query 500.
-    const [mY, mM] = month ? month.split('-').map(Number) : [];
-    const from = month ? `${month}-01` : null;
-    const to = month ? `${month}-${pad(daysInMonthN(mY, mM))}` : null;
+    const [mY, mM] = month.split('-').map(Number);
+    const dim = daysInMonthN(mY, mM);
+    const monthDays = Array.from({ length: dim }, (_, i) => ymd(mY, mM, i + 1));
+    const from = monthDays[0], to = monthDays[dim - 1];
+    const movesBy = await movesFor(ids);
+    const unitNames = new Map((await query('select id, name from units')).rows.map((u) => [u.id, u.name]));
+    keep = new Set();
+    for (const e of emps) {
+      const mv = movesBy.get(e.id);
+      if (!mv) { if (e.unit_id === unitId) keep.add(e.id); continue; }
+      const away = monthDays.filter((ds) => unitOn(e.unit_id, mv, ds) !== unitId);
+      if (away.length === dim) continue;          // ไม่ได้อยู่ไซต์นี้สักวันในเดือนนี้
+      keep.add(e.id);
+      if (away.length) awayBy[e.id] = away;
+      const m = { moved_in: '', moved_in_from: '', moved_out: '', moved_out_to: '' };
+      for (const x of mv) {
+        if (x.date < from || x.date > to) continue;
+        if (x.to === unitId) { m.moved_in = x.date; m.moved_in_from = unitNames.get(x.from) || ''; }
+        if (x.from === unitId) { m.moved_out = x.date; m.moved_out_to = unitNames.get(x.to) || ''; }
+      }
+      moved[e.id] = m;
+    }
     // Carry the leave type along: a blank day says the person was not here, but
     // "ลาป่วย" says why — and that is the whole point of having asked.
-    const rows = month
-      ? (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
+    const rows = (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
                         left join leave_requests r on r.id = a.leave_request_id
-                       where a.employee_id = any($1) and a.ymd >= $2 and a.ymd <= $3`, [ids, from, to])).rows
-      : (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
+                       where a.employee_id = any($1) and a.ymd >= $2 and a.ymd <= $3`, [[...keep], from, to])).rows;
+    for (const r of rows) {
+      const d = dateStr(r.ymd);
+      (awayBy[r.employee_id] ||= []).push(d);
+      if (r.leave_type) (leaveBy[r.employee_id] ||= {})[d] = LEAVE_TH[r.leave_type] || r.leave_type;
+    }
+  } else if (ids.length) {
+    const rows = (await query(`select a.employee_id, a.ymd, r.leave_type from employee_away a
                         left join leave_requests r on r.id = a.leave_request_id
                        where a.employee_id = any($1)`, [ids])).rows;
     for (const r of rows) {
@@ -274,12 +371,13 @@ async function employeesForUnit(unitId, month) {
       if (r.leave_type) (leaveBy[r.employee_id] ||= {})[d] = LEAVE_TH[r.leave_type] || r.leave_type;
     }
   }
-  return emps.map((e) => ({
+  return emps.filter((e) => keep.has(e.id)).map((e) => ({
     eid: e.id, name: e.full_name, emp_id: e.employee_code || '',
     department: e.department_name || '', position: e.position_name || '',
-    kind: e.kind, team: e.team || '', away: awayBy[e.id] || [],
+    kind: e.kind, team: e.team || '', away: [...new Set(awayBy[e.id] || [])].sort(),
     leave: leaveBy[e.id] || {},
-    moved_in: '', moved_out: '',
+    moved_in: moved[e.id]?.moved_in || '', moved_in_from: moved[e.id]?.moved_in_from || '',
+    moved_out: moved[e.id]?.moved_out || '', moved_out_to: moved[e.id]?.moved_out_to || '',
   }));
 }
 
@@ -396,9 +494,35 @@ router.get('/site-month', asyncHandler(async (req, res) => {
   const costs = (await loadCategories()).map((c) => ({ code: c.code, name: c.name }));
   res.json({
     ok: true, days, employees, entries, teams, costs,
-    today: todayStr(), lockDays: unit.lock_days ?? 3, edits: {},
+    today: todayStr(), lockDays: unit.lock_days ?? 3,
+    edits: await retroEdits(unit.id, ymd(Y, M, 1), ymd(Y, M, dim), unit.lock_days ?? 3),
   });
 }));
+
+/**
+ * ช่องที่ถูกแก้ย้อนหลังหลังจากล็อกไปแล้ว — ตามระบบจริง (readMonthRetroEdits_)
+ * ช่องจะถูกทำเครื่องหมายเมื่อวันนั้นล็อกอยู่ตอนนี้ และการแก้เกิดหลังจากที่ล็อกแล้ว
+ * (ห่างจากวันของช่องเกินจำนวนวันล็อก) การแก้ขณะที่ยังอยู่ในช่วงแก้ไขได้ไม่นับ
+ * คืน { "eid|YYYY-MM-DD": { date, by } } ของการแก้ครั้งล่าสุด
+ */
+async function retroEdits(unitId, from, to, lockDays) {
+  const cut = addDaysStr(todayStr(), -lockDays);
+  const { rows } = await query(
+    `select employee_id, ymd, actor_label, created_at from work_log_audit
+      where unit_id = $1 and ymd between $2 and $3 and ymd < $4
+        and employee_id is not null and action in ('create','edit','delete')
+      order by created_at`, [unitId, from, to, cut]).catch(() => ({ rows: [] }));
+  const out = {};
+  for (const r of rows) {
+    const cell = dateStr(r.ymd);
+    // เวลาเซิร์ฟเวอร์ตั้งเป็นเวลาไทยไว้แล้ว (APP_TZ) — ใช้วันที่ตามปฏิทินท้องถิ่น
+    const edited = dateStr(new Date(r.created_at));
+    const diffDays = Math.round((new Date(`${edited}T00:00:00`) - new Date(`${cell}T00:00:00`)) / 86400000);
+    if (diffDays <= lockDays) continue;
+    out[`${r.employee_id}|${cell}`] = { date: edited, by: r.actor_label || '' };
+  }
+  return out;
+}
 
 // ── save one cell field (autosave) ──────────────────────────────────────────
 const cellSaveSchema = z.object({
@@ -422,8 +546,19 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
   assertUnitInScope(scopedUnitIds(req.profile), unit.id);
   const emp = await queryOne('select id, unit_id, kind, is_active from employees where id = $1', [eid]);
-  if (!emp || emp.unit_id !== unit.id) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  if (!emp) throw new ApiError(400, 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  // ย้ายไซต์มีวันที่มีผล — วันนั้นคนนี้ต้องสังกัดไซต์นี้ ไม่ใช่แค่ "ตอนนี้" อยู่ไซต์นี้
+  const mv = (await movesFor([eid])).get(eid);
+  if (unitOn(emp.unit_id, mv, date) !== unit.id) {
+    throw new ApiError(400, mv ? 'วันที่เลือกพนักงานคนนี้ไม่ได้สังกัดไซต์นี้ (ย้ายไซต์แล้ว)' : 'พบพนักงานที่ไม่ได้อยู่ในไซต์นี้');
+  }
   if (emp.is_active === false) throw new ApiError(400, 'พนักงานคนนี้ถูกปิดการใช้งานแล้ว');
+  // ช่องงานหลักอยู่คนละคอลัมน์ตามสายงาน: สายปฏิบัติการ = team, สายสนับสนุน = detail
+  // ส่งผิดช่องมาแล้วเก็บไว้จะได้ค่าค้างที่ไม่มีรายงานไหนนับ — ปฏิเสธไปเลย
+  if ((field === 'team' && emp.kind !== 'operation') || (field === 'detail' && emp.kind === 'operation')) {
+    throw new ApiError(400, 'ช่องนี้ไม่ใช่ช่องงานหลักของพนักงานสายนี้');
+  }
+  if (!unit.is_active) throw new ApiError(409, 'โครงการนี้ปิดแล้ว ไม่รับบันทึกใหม่');
 
   // §3 validation — a day in the future is a typo, not a record of work
   if (date > addDaysStr(todayStr(), 1)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
@@ -432,11 +567,11 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   const closed = await closedMonthsFor(unit.id);
   if (closed.has(date.slice(0, 7))) throw new ApiError(409, 'เดือนนี้ปิดงวดแล้ว แก้ไขข้อมูลไม่ได้');
   const canUnlock = req.profile.role === 'admin' && adminUnlock;
+  // ผู้ดูแลระบบแก้ย้อนหลังได้ไม่จำกัด ไม่ต้องให้เหตุผล — ตามระบบจริงและข้อกำหนด
+  // ฟังก์ชัน §6 ("Admin ไม่มีข้อจำกัดด้านการย้อนหลัง") การแก้ยังถูกบันทึกลงประวัติ
+  // พร้อมชื่อคนแก้ และตารางขึ้นเครื่องหมายช่องที่แก้หลังล็อก (retroEdits)
+  // เดิมเราบังคับเหตุผล แต่หน้าจอไม่เคยส่งเหตุผลมา ผู้ดูแลระบบจึงแก้ย้อนหลังไม่ได้เลย
   if (isLocked(date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว (ผู้ดูแลระบบปลดล็อกได้)');
-  // §4 an override is allowed, but never silently
-  if (isLocked(date, lockDays) && canUnlock && !(p.data.reason || '').trim()) {
-    throw new ApiError(400, 'การแก้ไขข้อมูลที่ล็อกแล้วต้องระบุเหตุผล');
-  }
 
   const existing = await queryOne(
     'select id, team, detail, pm, man_day, hours, work_status, verified_at, updated_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
@@ -467,7 +602,10 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
      values ($1,$2,$3,$4,$5,$6,$7,'',$8)
      on conflict (employee_id, ymd) do update set
        unit_id=excluded.unit_id, kind=excluded.kind, team=excluded.team, detail=excluded.detail,
-       pm=excluded.pm, updated_by=excluded.updated_by, updated_at=now()`,
+       pm=excluded.pm, updated_by=excluded.updated_by, updated_at=now(),
+       -- ช่องที่เคยล้างแล้วพิมพ์ใหม่ต้องกลับมามีชีวิต ไม่งั้นค่าที่พิมพ์ใหม่
+       -- จะหายจากตารางทันทีที่โหลดใหม่ (แถวยังติดสถานะลบอยู่)
+       deleted_at=null, deleted_by=null`,
     [eid, unit.id, date, emp.kind, next.team, next.detail, next.pm, req.profile.id]
   );
   const saved = await queryOne('select id, team, detail, pm, man_day, hours, work_status, updated_at from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
@@ -478,83 +616,119 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
 }));
 
 // ── admin summary (dashboard) ────────────────────────────────────────────────
+/**
+ * ตัวจับคู่ค่าในช่องกับทะเบียน — ตรงกับระบบจริง (_api_adminSummary_)
+ * เทียบแบบไม่สนตัวพิมพ์และรวบช่องว่าง ค่าที่ไม่อยู่ในทะเบียน (วันหยุด ข้อความอิสระ
+ * รหัสที่พิมพ์ผิด) ไม่ถูกนับในกราฟ แต่ยังนับเป็นการกรอกในความครบถ้วน
+ */
+async function slotResolvers() {
+  const norm = (x) => String(x || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const acts = (await query('select code, name from work_types where code is not null')).rows;
+  const cats = (await query('select code, name from cost_categories')).rows;
+  const codeName = new Map(acts.map((a) => [norm(a.code), a.name]));
+  const indexNames = new Set(acts.map((a) => norm(a.name)));
+  const costName = new Map(cats.map((c) => [norm(c.code), c.name]));
+  return {
+    norm,
+    /** ชื่องานของช่องนี้ หรือ '' ถ้าไม่ใช่งานในทะเบียน */
+    workTypeOf(v) {
+      const s = String(v || '').trim(); if (!s) return '';
+      const wc = norm(s.split('/')[0]);
+      if (codeName.has(wc)) return codeName.get(wc);
+      if (indexNames.has(norm(s))) return s;          // ข้อมูลเก่าที่เก็บเป็นชื่องาน
+      return '';
+    },
+    /** ชื่อหมวดต้นทุนครึ่งหลังของ "A-1 / 5" หรือ '' */
+    costOf(v) {
+      const s = String(v || ''); const i = s.indexOf('/'); if (i < 0) return '';
+      return costName.get(norm(s.slice(i + 1))) || '';
+    },
+  };
+}
+const hasText = (v) => Boolean(v && String(v).trim());
+
 router.get('/admin-summary', asyncHandler(async (req, res) => {
   const Y = Number(req.query.year), M = Number(req.query.month);
   if (!Y || !M) throw new ApiError(400, 'year, month are required');
   const scoped = scopedUnitIds(req.profile);
   const units = (scoped
-    ? await query('select * from units where id = any($1) and code is not null order by name', [scoped])
-    : await query('select * from units where code is not null order by name')).rows;
+    ? await query('select * from units where id = any($1) and code is not null order by created_at, name', [scoped])
+    : await query('select * from units where code is not null order by created_at, name')).rows;
 
   const dim = daysInMonthN(Y, M);
   const tStr = todayStr();
-  const actMap = new Map((await loadActivities()).map((a) => [a.code, a.name]));
-  const catMap = new Map((await loadCategories()).map((c) => [c.code, c.name]));
+  const R = await slotResolvers();
+  const days = Array.from({ length: dim }, (_, i) => ({ date: ymd(Y, M, i + 1), weekend: isWeekend(Y, M, i + 1) }));
+  // วันทำงานที่ผ่านมาแล้ว (ไม่นับวันอาทิตย์) — ตัวหารของความครบถ้วน
+  const workdaysPassed = days.filter((d) => d.date <= tStr && !d.weekend).length;
 
   const rows = [];
   for (const u of units) {
-    const emps = (await query("select id, kind from employees where unit_id = $1 and is_active = true", [u.id])).rows;
-    const awayRows = emps.length ? (await query('select employee_id, ymd from employee_away where employee_id = any($1) and ymd >= $2 and ymd <= $3', [emps.map((e) => e.id), ymd(Y, M, 1), ymd(Y, M, dim)])).rows : [];
-    const awayBy = {}; for (const a of awayRows) (awayBy[a.employee_id] ||= new Set()).add(dateStr(a.ymd));
-    const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [u.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
-    const cellBy = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
-
+    const emps = (await query('select id, kind from employees where unit_id = $1 and is_active = true', [u.id])).rows;
     const nOp = emps.filter((e) => e.kind === 'operation').length;
-    const nSup = emps.length - nOp;
+    const nEmp = emps.length;
+    const logs = (await query(
+      `select w.employee_id, w.ymd, w.team, w.detail, w.pm, w.note, e.kind
+         from work_logs w join employees e on e.id = w.employee_id
+        where w.unit_id = $1 and w.ymd >= $2 and w.ymd <= $3 and w.deleted_at is null`,
+      [u.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+
     const startedOp = new Set(), startedSup = new Set();
-    const daysFilled = [];
-    let fillRateDenom = 0, filledSum = 0, entriesCount = 0;
+    const perDay = new Map(days.map((d) => [d.date, new Set()]));
     const actAgg = new Map(), costAgg = new Map();
-    let topTotal = 0;
-
-    for (let d = 1; d <= dim; d++) {
-      const ds = ymd(Y, M, d);
-      const weekend = isWeekend(Y, M, d);
-      let total = 0, filled = 0;
-      for (const e of emps) {
-        const away = awayBy[e.id]?.has(ds);
-        if (!weekend && !away) total++;
-        const c = cellBy.get(`${e.id}_${ds}`);
-        if (cellFilled(c)) {
-          entriesCount++;
-          // count toward the fill rate only when this employee/day is in the denominator
-          // (not a weekend, not marked away) — otherwise an away day with a stray log
-          // could push filled past total and show >100%.
-          if (!weekend && !away) filled++;
-          (e.kind === 'operation' ? startedOp : startedSup).add(e.id);
-          // top lists — slots weighted 0.5 each when a 2nd task exists
-          const slots = [c.team || c.detail, c.pm].filter((s) => s && s.trim());
-          const w = slots.length > 1 ? 0.5 : 1;
-          for (const s of slots) {
-            const [actCode, costCode] = s.split(' / ').map((x) => x && x.trim());
-            const actName = actMap.get(actCode) || actCode;
-            actAgg.set(actName, (actAgg.get(actName) || 0) + w);
-            if (costCode) { const cn = catMap.get(costCode) || costCode; costAgg.set(cn, (costAgg.get(cn) || 0) + w); }
-            topTotal += w;
-          }
-        }
+    let entries = 0;
+    for (const l of logs) {
+      // หนึ่งช่องที่มีอะไรสักอย่าง (งานหลัก งานเสริม หรือหมายเหตุ) = หนึ่งรายการ
+      if (!hasText(l.team) && !hasText(l.detail) && !hasText(l.pm) && !hasText(l.note)) continue;
+      entries++;
+      (l.kind === 'operation' ? startedOp : startedSup).add(l.employee_id);
+      perDay.get(dateStr(l.ymd))?.add(l.employee_id);
+      // หนึ่งวัน = 1 แรงงาน-วัน แบ่งตามจำนวนงานที่ลง (สองงาน = 0.5/0.5)
+      const primary = l.kind === 'operation' ? l.team : l.detail;
+      const slots = [primary, l.pm].filter(hasText);
+      const w = slots.length ? 1 / slots.length : 0;
+      for (const sv of slots) {
+        const nm = R.workTypeOf(sv); if (nm) actAgg.set(nm, (actAgg.get(nm) || 0) + w);
+        const cn = R.costOf(sv); if (cn) costAgg.set(cn, (costAgg.get(cn) || 0) + w);
       }
-      daysFilled.push({ date: ds, weekend, total, filled });
-      if (ds <= tStr && !weekend) { fillRateDenom += total; filledSum += filled; }
     }
-    const toTop = (agg) => [...agg.entries()]
-      .map(([name, x]) => ({ name, count: Math.round(x * 10) / 10, pct: topTotal ? Math.round((x / topTotal) * 100) : 0 }))
-      .sort((a, b) => b.count - a.count);
-
+    // เปอร์เซ็นต์ของแต่ละกราฟคิดจากยอดรวมของกราฟนั้นเอง
+    const toTop = (agg) => {
+      const list = [...agg.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+      const total = list.reduce((a, x) => a + x.count, 0);
+      return list.map((x) => ({ name: x.name, count: Math.round(x.count * 10) / 10, pct: total > 0 ? Math.round((x.count / total) * 100) : 0 }));
+    };
+    const fillTotal = nEmp * workdaysPassed;
     rows.push({
-      site_key: u.code, site_name: u.name, company: u.company, color: u.color,
-      n_emp: emps.length, n_support: nSup, n_operation: nOp,
+      site_key: u.code, site_name: u.name, company: u.company, color: u.color, active: u.is_active !== false,
+      n_emp: nEmp, n_support: nEmp - nOp, n_operation: nOp,
       support_started: startedSup.size, operation_started: startedOp.size,
-      entries: entriesCount,
-      fillRate: fillRateDenom ? Math.round((filledSum / fillRateDenom) * 100) : 0,
-      fillRateDenom, daysFilled,
+      entries,
+      // ความครบถ้วน = รายการที่กรอก ÷ (จำนวนคน × วันทำงานที่ผ่านมา) ไม่เกิน 100
+      fillRate: fillTotal > 0 ? Math.min(100, Math.round((entries / fillTotal) * 100)) : 0,
+      fillRateDenom: fillTotal,
+      // จำนวน "คน" ที่กรอกในวันนั้น ไม่ใช่จำนวนช่อง — ตัวตั้งคือคนทั้งไซต์ทุกวัน
+      daysFilled: days.map((d) => ({ date: d.date, weekend: d.weekend, filled: perDay.get(d.date).size, total: nEmp })),
       topActivities: toTop(actAgg), topCostCodes: toTop(costAgg),
     });
   }
+  // ไซต์ใหญ่ขึ้นก่อน เหมือนหน้าภาพรวมของระบบจริง
+  rows.sort((a, b) => b.n_emp - a.n_emp);
   res.json({ ok: true, rows, today: tStr, lockDays: 3 });
 }));
 
 // ── export xlsx ───────────────────────────────────────────────────────────
+/** ชื่อไฟล์ภาษาไทยต้องส่งแบบ RFC 5987 ไม่งั้นเบราว์เซอร์ได้ชื่อเพี้ยน */
+const attachmentHeader = (name) =>
+  `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+/** ปี พ.ศ.-เดือน แบบที่ไฟล์ของระบบจริงใช้ เช่น 2569-08 */
+const beYm = (Y, M) => `${Y + 543}-${pad(M)}`;
+
+/**
+ * ไฟล์ Excel รายไซต์ — รูปแบบเดียวกับปุ่มดาวน์โหลดของระบบจริง (api_exportSiteXlsx)
+ * คอลัมน์ eid/emp_id/name/kind/department แล้วหนึ่งคอลัมน์ต่อวัน ช่องหนึ่งแสดง
+ * งานหลัก และงานเสริมต่อท้ายด้วย "  +  " เมื่อมี
+ */
 router.get('/export', asyncHandler(async (req, res) => {
   const key = req.query.site;
   const Y = Number(req.query.year), M = Number(req.query.month);
@@ -564,32 +738,41 @@ router.get('/export', asyncHandler(async (req, res) => {
   assertUnitInScope(scopedUnitIds(req.profile), unit.id);
   const dim = daysInMonthN(Y, M);
   const employees = await employeesForUnit(unit.id, `${Y}-${pad(M)}`);
-  const logs = (await query('select employee_id, ymd, team, detail, pm from work_logs where unit_id = $1 and ymd >= $2 and ymd <= $3', [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
+  const logs = (await query(
+    `select employee_id, ymd, team, detail, pm from work_logs
+      where unit_id = $1 and ymd >= $2 and ymd <= $3 and deleted_at is null`,
+    [unit.id, ymd(Y, M, 1), ymd(Y, M, dim)])).rows;
   const byKey = new Map(logs.map((l) => [`${l.employee_id}_${dateStr(l.ymd)}`, l]));
 
+  const label = `${unit.name} ${beYm(Y, M)}`;
   const wb = new ExcelJS.Workbook();
   // Excel sheet names reject * ? : \ / [ ] and cap at 31 chars — sanitize or addWorksheet throws 500
-  const wsName = `${unit.name} ${Y}-${pad(M)}`.replace(/[*?:\\/\[\]]/g, ' ').slice(0, 30) || 'Sheet1';
-  const ws = wb.addWorksheet(wsName);
-  const header = ['พนักงาน', 'ประเภท'];
-  for (let d = 1; d <= dim; d++) header.push(String(d));
+  const ws = wb.addWorksheet(label.replace(/[*?:\\/\[\]]/g, ' ').slice(0, 31) || 'Sheet1');
+  const header = ['eid', 'emp_id', 'name', 'kind', 'department'];
+  for (let d = 1; d <= dim; d++) header.push(`Day ${d}`);
   ws.addRow(header);
   for (const e of employees) {
-    const row = [e.name, e.kind === 'operation' ? 'ปฏิบัติการ' : 'สนับสนุน'];
+    const row = [e.eid, e.emp_id, e.name, e.kind, e.department];
     for (let d = 1; d <= dim; d++) {
       const l = byKey.get(`${e.eid}_${ymd(Y, M, d)}`);
       let v = '';
       if (l) {
-        const primary = e.kind === 'operation' ? l.team : l.detail;
-        v = [primary, l.pm].filter(Boolean).join(' + ');
+        const p1 = String((e.kind === 'operation' ? l.team : l.detail) || '').trim();
+        const p2 = String(l.pm || '').trim();
+        v = p1 && p2 ? `${p1}  +  ${p2}` : (p1 || p2);
       }
       row.push(v);
     }
     ws.addRow(row);
   }
+  ws.views = [{ state: 'frozen', xSplit: 5, ySplit: 1 }];
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4E89' } };
+  ws.getColumn(3).width = 28;
+  for (let c = 6; c <= header.length; c++) ws.getColumn(c).width = 14;
   const buf = await wb.xlsx.writeBuffer();
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename="worklog-${key}-${Y}-${pad(M)}.xlsx"`);
+  res.setHeader('Content-Disposition', attachmentHeader(`HR Work Log - ${label} - ${todayStr()}.xlsx`));
   res.send(Buffer.from(buf));
 }));
 
@@ -1240,13 +1423,15 @@ async function mandayReport(profile, from, to, groupBy) {
   if (scoped) { params.push(scoped); where.push(`s.unit_id = any($${params.length}::uuid[])`); }
   const W = `where ${where.join(' and ')}`;
   const SQL = {
-    cost:     `select coalesce(s.cost_code,'-') key, coalesce(c.name,'(ไม่ระบุหมวดต้นทุน)') label,
+    // รหัสที่ไม่อยู่ในทะเบียน (พิมพ์ผิด ข้อความอิสระ) รวมเป็นแถวเดียว — รายงานของ
+    // ระบบจริงไม่นับแถวพวกนี้เลย ของเรายังแสดงไว้ให้เห็นว่ามีแรงงาน-วันที่หาหมวดไม่ได้
+    cost:     `select coalesce(c.code,'-') key, coalesce(c.name,'(ไม่อยู่ในทะเบียนหมวดต้นทุน)') label,
                       sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
-                 from worklog_slots s left join cost_categories c on c.code = s.cost_code ${W}
+                 from worklog_slots s left join cost_categories c on lower(c.code) = lower(s.cost_code) ${W}
                 group by 1,2 order by 3 desc`,
-    worktype: `select coalesce(s.work_code,'-') key, coalesce(w.name,'(ไม่ระบุงาน)') label,
+    worktype: `select coalesce(w.code,'-') key, coalesce(w.name,'(ไม่อยู่ในทะเบียนงาน)') label,
                       sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
-                 from worklog_slots s left join work_types w on w.code = s.work_code ${W}
+                 from worklog_slots s left join work_types w on upper(w.code) = s.work_code ${W}
                 group by 1,2 order by 3 desc`,
     project:  `select u.code key, u.name label, sum(s.manday)::numeric manday,
                       count(distinct s.employee_id)::int people
@@ -1274,57 +1459,111 @@ router.get('/report/manday', asyncHandler(async (req, res) => {
   res.json({ data: { groupBy, meta: reportMeta(req, from, to), total, rows } });
 }));
 
-/** §8 the monthly report has to be one file covering every project. */
+/** เรียงรหัสแบบธรรมชาติ A-1, A-2, … A-10 — เหมือน cmpCode_ ของระบบจริง */
+function cmpCode(a, b) {
+  a = String(a || ''); b = String(b || '');
+  const ma = a.match(/^(\D*)(\d*)/), mb = b.match(/^(\D*)(\d*)/);
+  if (ma[1] !== mb[1]) return ma[1] < mb[1] ? -1 : 1;
+  const na = ma[2] ? parseInt(ma[2], 10) : 0, nb = mb[2] ? parseInt(mb[2], 10) : 0;
+  if (na !== nb) return na - nb;
+  return a < b ? -1 : (a > b ? 1 : 0);
+}
+
+/**
+ * รายงานวันทำงานรายเดือน — ไฟล์เดียวกับปุ่ม "รายงานวันทำงาน" ของระบบจริง
+ * (api_exportMandayReport) สองแผ่นแรกตรงกันทุกคอลัมน์:
+ *   หมวดงาน Work Category · กิจกรรม Activity
+ *   เดือน (พ.ศ.) | หน่วยงาน | รหัส | ชื่อ | วันทำงาน
+ * หนึ่งวันของหนึ่งคน = 1 วันทำงาน แบ่งเท่า ๆ กันตามจำนวนงานที่ลง นับเฉพาะรหัส
+ * ที่อยู่ในทะเบียน (ไม่สนตัวพิมพ์) ปัดทศนิยมหนึ่งตำแหน่ง
+ * แผ่นที่สามเป็นรายละเอียดรายวันของเรา ต่อท้ายไว้ ไม่กระทบสองแผ่นแรก
+ */
 router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
   const ym = String(req.query.ym || '');
   if (!/^\d{4}-\d{2}$/.test(ym)) throw new ApiError(400, 'ต้องระบุเดือน (ym=YYYY-MM)');
   const [Y, M] = ym.split('-').map(Number);
   const from = ymd(Y, M, 1), to = ymd(Y, M, daysInMonthN(Y, M));
   const scoped = scopedUnitIds(req.profile);
+  const units = (scoped
+    ? await query('select id, code, name from units where id = any($1) and code is not null order by created_at, name', [scoped])
+    : await query('select id, code, name from units where code is not null order by created_at, name')).rows;
+  const lc = (x) => String(x || '').trim().toLowerCase();
+  const codeName = new Map((await query('select code, name from work_types where code is not null')).rows.map((a) => [lc(a.code), a]));
+  const costName = new Map((await query('select code, name from cost_categories')).rows.map((c) => [lc(c.code), c]));
+  const logs = (await query(
+    `select w.unit_id, w.team, w.detail, w.pm, e.kind
+       from work_logs w join employees e on e.id = w.employee_id
+      where w.ymd >= $1 and w.ymd <= $2 and w.deleted_at is null`, [from, to])).rows;
+
+  const label = beYm(Y, M);
+  const catRows = [['เดือน', 'หน่วยงาน', 'รหัสหมวดงาน', 'หมวดงาน', 'วันทำงาน']];
+  const actRows = [['เดือน', 'หน่วยงาน', 'รหัสกิจกรรม', 'กิจกรรม', 'วันทำงาน']];
+  // รหัสหมวดเป็นตัวเลข — ให้ Excel รวมได้เหมือนไฟล์ของระบบจริง
+  const asCell = (code) => (/^\d+$/.test(code) ? Number(code) : code);
+  for (const u of units) {
+    const costAgg = new Map(), actAgg = new Map();
+    for (const l of logs) {
+      if (l.unit_id !== u.id) continue;
+      const primary = l.kind === 'operation' ? l.team : l.detail;
+      const slots = [primary, l.pm].filter((v) => v && String(v).trim());
+      const w = slots.length ? 1 / slots.length : 0;
+      for (const sv of slots) {
+        const a = codeName.get(lc(String(sv).split('/')[0]));
+        if (a) { const x = actAgg.get(a.code) || { ...a, md: 0 }; x.md += w; actAgg.set(a.code, x); }
+        const i = String(sv).indexOf('/');
+        if (i >= 0) {
+          const c = costName.get(lc(String(sv).slice(i + 1)));
+          if (c) { const x = costAgg.get(c.code) || { ...c, md: 0 }; x.md += w; costAgg.set(c.code, x); }
+        }
+      }
+    }
+    [...costAgg.values()].sort((a, b) => cmpCode(a.code, b.code))
+      .forEach((r) => catRows.push([label, u.name, asCell(r.code), r.name, Math.round(r.md * 10) / 10]));
+    [...actAgg.values()].sort((a, b) => cmpCode(a.code, b.code))
+      .forEach((r) => actRows.push([label, u.name, r.code, r.name, Math.round(r.md * 10) / 10]));
+  }
+
+  const wb = new ExcelJS.Workbook();
+  const sheet = (name, rows) => {
+    const ws = wb.addWorksheet(name);
+    ws.addRows(rows);
+    ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4E89' } };
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    ws.getColumn(5).numFmt = '0.0';
+    [10, 28, 14, 44, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  };
+  sheet('หมวดงาน Work Category', catRows);
+  sheet('กิจกรรม Activity', actRows);
+
+  // ── แผ่นที่สาม: รายละเอียดรายวัน (ของเราเพิ่มเอง) ──
   const params = [from, to]; let scopeSql = '';
   if (scoped) { params.push(scoped); scopeSql = ` and w.unit_id = any($${params.length}::uuid[])`; }
-  // แรงงาน-วันของแถวหนึ่ง = 1 เมื่อวันนั้นมีงานลงอย่างน้อยหนึ่งช่อง มิฉะนั้น 0
-  // ช่องงานหลักคนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) จึงต้องดู e.kind
-  // ทุกคำสั่งที่ใช้ค่านี้ join employees e ไว้แล้ว
-  const md = `(case when coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') <> ''
-                      or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
+  // ช่องงานหลักอยู่คนละคอลัมน์ตามสายงาน (ข้อกำหนดฟังก์ชัน §3.2.2) — ต้องดู e.kind
+  const slot1 = `(case when e.kind = 'operation' then w.team else w.detail end)`;
+  const md = `(case when coalesce(${slot1}, '') <> '' or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const { rows } = await query(
-    `select u.code site, u.name site_name, e.employee_code, e.full_name, coalesce(w.team,'') team,
+    `select u.code site, u.name site_name, e.employee_code, e.full_name,
             w.ymd, ${md}::numeric manday,
-            coalesce(w.detail,'') as slot1, coalesce(w.pm,'') as slot2,
+            coalesce(${slot1},'') as slot1, coalesce(w.pm,'') as slot2,
             coalesce(a1.name,'') as slot1_name, coalesce(c1.name,'') as slot1_cost,
             coalesce(a2.name,'') as slot2_name, coalesce(c2.name,'') as slot2_cost
        from work_logs w
        join units u on u.id = w.unit_id
        join employees e on e.id = w.employee_id
-       left join work_types a1 on a1.code = nullif(btrim(split_part(w.detail, '/', 1)), '')
-       left join cost_categories c1 on c1.code = nullif(btrim(split_part(w.detail, '/', 2)), '')
-       left join work_types a2 on a2.code = nullif(btrim(split_part(w.pm, '/', 1)), '')
+       left join work_types a1 on upper(a1.code) = nullif(upper(btrim(split_part(${slot1}, '/', 1))), '')
+       left join cost_categories c1 on c1.code = nullif(btrim(split_part(${slot1}, '/', 2)), '')
+       left join work_types a2 on upper(a2.code) = nullif(upper(btrim(split_part(w.pm, '/', 1))), '')
        left join cost_categories c2 on c2.code = nullif(btrim(split_part(w.pm, '/', 2)), '')
       where w.ymd >= $1 and w.ymd <= $2 and w.deleted_at is null${scopeSql}
       order by u.name, e.full_name, w.ymd`, params);
-
-  const wb = new ExcelJS.Workbook();
-  const meta = reportMeta(req, from, to);
-  const info = wb.addWorksheet('ข้อมูลรายงาน');
-  info.columns = [{ width: 26 }, { width: 52 }];
-  info.addRows([
-    ['รายงานแรงงาน-วัน รายเดือน', ''],
-    ['ช่วงข้อมูล', `${from} ถึง ${to}`],
-    ['วันเวลาที่ดึงข้อมูล', new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })],
-    ['ผู้ดึงข้อมูล', meta.generatedBy || ''],
-    ['จำนวนรายการ', rows.length],
-  ]);
-  const ws = wb.addWorksheet('รายละเอียด');
+  const ws = wb.addWorksheet('รายละเอียดรายวัน');
   ws.columns = [
     { header: 'รหัสโครงการ', key: 'site', width: 14 },
     { header: 'โครงการ', key: 'site_name', width: 28 },
     { header: 'รหัสพนักงาน', key: 'employee_code', width: 14 },
     { header: 'ชื่อ-สกุล', key: 'full_name', width: 26 },
-    { header: 'ทีม', key: 'team', width: 16 },
     { header: 'วันที่ปฏิบัติงาน', key: 'ymd', width: 16 },
-    // งานหลัก/งานเสริมเก็บเป็น "รหัสงาน / รหัสหมวดต้นทุน" — แยกชื่อออกมาให้ด้วย
-    // เพื่อให้คนอ่านไฟล์ไม่ต้องเปิดทะเบียนควบคู่ไปด้วย
     { header: 'งานหลัก (รหัส)', key: 'slot1', width: 14 },
     { header: 'งานหลัก', key: 'slot1_name', width: 30 },
     { header: 'หมวดต้นทุน (งานหลัก)', key: 'slot1_cost', width: 30 },
@@ -1333,17 +1572,12 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
     { header: 'หมวดต้นทุน (งานเสริม)', key: 'slot2_cost', width: 30 },
     { header: 'แรงงาน-วัน', key: 'manday', width: 12 },
   ];
-  for (const r of rows) {
-    ws.addRow({
-      ...r, ymd: dateStr(r.ymd),
-      // §8 numbers have to arrive as numbers, or the client cannot total them
-      manday: Number(r.manday),
-    });
-  }
+  for (const r of rows) ws.addRow({ ...r, ymd: dateStr(r.ymd), manday: Number(r.manday) });
   ws.getRow(1).font = { bold: true };
   ws.getColumn('manday').numFmt = '0.00';
+
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename="manday-${ym}.xlsx"`);
+  res.setHeader('Content-Disposition', attachmentHeader(`HR Manday Report ${label} - ${todayStr()}.xlsx`));
   await wb.xlsx.write(res);
   res.end();
 }));
@@ -1554,9 +1788,20 @@ router.get('/export/entries.xlsx', asyncHandler(async (req, res) => {
  * บันทึกงานเก่าเก็บ unit_id ไว้ในแถวของตัวเองอยู่แล้ว การย้ายจึงไม่ทำให้
  * ประวัติเพี้ยน — เดือนที่ผ่านมายังอยู่กับไซต์เดิม ส่วนวันข้างหน้าไปไซต์ใหม่
  */
+/**
+ * ย้ายพนักงานไปไซต์อื่น มีผลตั้งแต่วันที่ระบุ — ตามระบบจริง (api_migrateEmployee)
+ * ก่อนวันนั้นคนนี้ยังเป็นของไซต์เดิม ตารางของไซต์เดิมยังแสดงแถวและบันทึกเก่าครบ
+ * ย้ายวันเดียวกับการย้ายครั้งล่าสุด = แก้การย้ายครั้งนั้น: ย้ายกลับต้นทางคือยกเลิก
+ * การย้าย ย้ายไปที่อื่นคือเปลี่ยนปลายทาง จะได้ไม่มีประวัติซ้อนที่อ่านไม่ออก
+ */
 router.post('/employees/:id/move', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
-  const p = z.object({ site: z.string().min(1), note: z.string().optional().nullable() }).safeParse(req.body);
-  if (!p.success) throw new ApiError(400, 'ต้องระบุไซต์ปลายทาง');
+  const p = z.object({
+    site: z.string().min(1),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    note: z.string().optional().nullable(),
+  }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ต้องระบุไซต์ปลายทางและวันที่มีผล');
+  const date = p.data.date || todayStr();
   const emp = await queryOne('select * from employees where id = $1', [req.params.id]);
   if (!emp) throw new ApiError(404, 'ไม่พบพนักงาน');
   const to = await loadUnitByKey(p.data.site);
@@ -1565,15 +1810,51 @@ router.post('/employees/:id/move', requirePermission('performance', 'edit'), asy
   assertUnitInScope(scoped, emp.unit_id);
   assertUnitInScope(scoped, to.id);
   if (emp.unit_id === to.id) throw new ApiError(400, 'พนักงานอยู่ไซต์นี้อยู่แล้ว');
-  const fromUnit = await queryOne('select code, name from units where id = $1', [emp.unit_id]);
+  const moves = (await movesFor([emp.id])).get(emp.id) || [];
+  const last = moves[moves.length - 1];
+  if (last && date < last.date) throw new ApiError(400, `วันที่ย้ายต้องไม่ก่อนการย้ายครั้งล่าสุด (${last.date})`);
+  const unitName = async (id) => (await queryOne('select name from units where id = $1', [id]))?.name || null;
+  const fromName = await unitName(emp.unit_id);
+
+  let result;
+  if (last && date === last.date) {
+    if (to.id === last.from) {
+      // ย้ายกลับต้นทางในวันเดียวกัน = การย้ายครั้งนั้นไม่เคยเกิดขึ้น
+      await query('delete from employee_moves where id = $1', [last.id]);
+      result = { moved: true, reverted: true, from: fromName, to: to.name, date };
+    } else {
+      await query('update employee_moves set to_unit_id = $1 where id = $2', [to.id, last.id]);
+      result = { moved: true, replaced: true, from: await unitName(last.from), to: to.name, date };
+    }
+  } else {
+    await query(
+      `insert into employee_moves (employee_id, from_unit_id, to_unit_id, effective_date, note, created_by)
+       values ($1, $2, $3, $4, $5, $6)`, [emp.id, emp.unit_id, to.id, date, p.data.note || null, req.profile.id]);
+    result = { moved: true, from: fromName, to: to.name, date };
+  }
   await query('update employees set unit_id = $1, updated_at = now() where id = $2', [to.id, emp.id]);
   await logWork({
-    actor: req.profile, employeeId: emp.id, unitId: to.id, action: 'employee.move',
-    before: { unit: fromUnit?.name || null }, after: { unit: to.name }, reason: p.data.note || null,
+    actor: req.profile, employeeId: emp.id, unitId: to.id, ymd: date, action: 'employee.move',
+    before: { unit: fromName }, after: { unit: to.name, effective: date }, reason: p.data.note || null,
   });
-  res.json({ data: { moved: true, from: fromUnit?.name || null, to: to.name } });
+  res.json({ data: result });
 }));
 
+/** ประวัติการย้ายของไซต์หนึ่ง (หรือทั้งหมดสำหรับผู้ดูแลระบบ) ล่าสุดก่อน */
+router.get('/moves', asyncHandler(async (req, res) => {
+  const scoped = scopedUnitIds(req.profile);
+  const { rows } = await query(
+    `select m.id, m.effective_date, m.note, m.created_at, e.full_name, e.employee_code,
+            f.name from_name, t.name to_name, pr.full_name by_name
+       from employee_moves m
+       join employees e on e.id = m.employee_id
+       join units f on f.id = m.from_unit_id
+       join units t on t.id = m.to_unit_id
+       left join profiles pr on pr.id = m.created_by
+      where ($1::uuid[] is null or m.from_unit_id = any($1) or m.to_unit_id = any($1))
+      order by m.created_at desc limit 500`, [scoped]);
+  res.json({ data: rows.map((r) => ({ ...r, effective_date: dateStr(r.effective_date) })) });
+}));
 
 /**
  * §2 bring the employee register in from a spreadsheet, and say plainly which

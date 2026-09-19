@@ -51,8 +51,8 @@ export const perfApi = {
   entriesXlsxUrl: (params) => apiBlobUrl(`/performance/export/entries.xlsx${qs(params)}`),
   importActivities: (file, dryRun) =>
     apiUpload(`/performance/import/activities${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
-  moveEmployee: (id, site, note) =>
-    api(`/performance/employees/${id}/move`, { method: 'POST', body: { site, note } }),
+  moveEmployee: (id, site, date, note) =>
+    api(`/performance/employees/${id}/move`, { method: 'POST', body: { site, date, note } }),
   // ทะเบียนแผนกและตำแหน่ง
   departments: (params) => api(`/performance/departments${qs(params)}`),
   createDepartment: (body) => api('/performance/departments', { method: 'POST', body }),
@@ -92,8 +92,11 @@ export const perfApi = {
   saveCell: ({ site, eid, date, field, value, adminUnlock }) =>
     api('/performance/cell', { method: 'POST', body: { site, eid, date, field, value, adminUnlock } }),
 
-  // site settings (lock-days window)
+  // site settings (lock-days window, open/close) + จัดการโครงการ
   updateSite: (code, body) => api(`/performance/sites/${encodeURIComponent(code)}`, { method: 'PATCH', body }),
+  listSites: () => api('/performance/sites'),
+  addSite: (body) => api('/performance/sites', { method: 'POST', body }),
+  moves: () => api('/performance/moves'),
 
   // dashboard summary across all visible sites
   adminSummary: (year, month) => api(`/performance/admin-summary${qs({ year, month })}`),
@@ -101,6 +104,23 @@ export const perfApi = {
   // Excel export (blob URL)
   exportUrl: (site, year, month) => apiBlobUrl(`/performance/export${qs({ site, year, month })}`),
 };
+
+/**
+ * ดาวน์โหลดไฟล์จาก blob URL ด้วยชื่อที่กำหนด — ชื่อไฟล์ตรงกับที่ระบบเดิมตั้ง
+ * ("HR Manday Report 2569-08 - 2026-09-19.xlsx") คนที่มีโฟลเดอร์เก็บไฟล์เดิมจะได้ไม่งง
+ */
+export async function downloadAs(urlPromise, name) {
+  const url = await urlPromise;
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+const todayIso = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+/** "2569-08" จากปี ค.ศ. และเดือน */
+export const beYm = (y, m) => `${Number(y) + 543}-${String(m).padStart(2, '0')}`;
+export const mandayReportName = (y, m) => `HR Manday Report ${beYm(y, m)} - ${todayIso()}.xlsx`;
+export const siteWorkLogName = (siteName, y, m) => `HR Work Log - ${siteName} ${beYm(y, m)} - ${todayIso()}.xlsx`;
 
 // ── shared helpers (composite cell value "A-1 / 5" = activityCode / costCode) ──
 export const splitSlot = (s) => {

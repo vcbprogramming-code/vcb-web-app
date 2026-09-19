@@ -13,14 +13,15 @@ const STATUS_CHIP = {
   'void': 'bg-slate-100 text-slate-400',
 };
 
-export default function LedgerTab({ projects, onChanged }) {
+export default function LedgerTab({ projects, onChanged, preset }) {
   const t = useT();
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
   const [projectId, setProjectId] = useState('');
-  const [status, setStatus] = useState('');
+  // การ์ดบนหน้าแรกกดแล้วมาที่นี่พร้อมตัวกรอง เหมือน "ดูรายการ →" ของระบบจริง
+  const [status, setStatus] = useState(preset?.status || '');
   // ช่วงเวลาครบกำหนด — "ครบใน 7 วัน" เป็นกลุ่มอิสระ ไม่ได้อยู่ใต้เดือนนี้
-  const [due, setDue] = useState('');
+  const [due, setDue] = useState(preset?.due || '');
 
   const load = useCallback(() => {
     creditApi.ledger({ projectId, status, due }).then((r) => setRows(r.data)).catch((e) => setError(e.message));

@@ -23,11 +23,12 @@ const TABS = [
 
 function FacilityStat({ label, item }) {
   const t = useT();
-  if (!item) {
+  // ระบบจริงขึ้น "— ไม่มีข้อมูล" เมื่อทั้งวงเงินและยอดใช้เป็นศูนย์
+  if (!item || (!item.limit && !item.used)) {
     return (
       <div className="card-sm">
         <div className="text-xs font-semibold text-slate-500">{label}</div>
-        <div className="mt-1 text-xl font-bold text-slate-300">—</div>
+        <div className="mt-1 text-sm font-medium text-slate-300">— {t('ไม่มีข้อมูล')}</div>
       </div>
     );
   }
@@ -37,26 +38,31 @@ function FacilityStat({ label, item }) {
         <div className="text-xs font-semibold text-slate-500">{label}</div>
         <Icon name="arrowRight" className="h-4 w-4 text-slate-300" />
       </div>
-      <div className="mt-1 text-xl font-bold text-slate-900">{formatMoney(item.used)}</div>
+      {/* ตัวเลขใหญ่คือวงเงินคงเหลือ เหมือนการ์ดของระบบจริง — คำถามแรกของคนเปิดหน้านี้
+          คือยังเบิกได้อีกเท่าไร ไม่ใช่ใช้ไปแล้วเท่าไร */}
+      <div className={`mt-1 text-xl font-bold ${item.available < 0 ? 'text-red-600' : 'text-slate-900'}`}
+        title={t('วงเงินคงเหลือ')}>{formatMoney(item.available)}</div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${item.pct >= 100 ? 'bg-red-500' : item.pct >= 80 ? 'bg-amber-400' : 'bg-brand'}`}
+          style={{ width: `${Math.min(100, item.pct)}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[11px] text-slate-400">
+        {t('ใช้ไปแล้ว')} {item.pct}% · {t('วงเงิน')} {formatMoney(item.limit)}
+      </div>
       {/* กล่องนี้อาจรวมวงเงินหลายประเภทที่ธนาคารให้เป็นก้อนเดียว — บอกว่ามาจากอะไรบ้าง
           ไม่งั้นยอดที่เห็นจะกระทบยอดกับเอกสารธนาคารไม่ได้ */}
       {(item.parts || []).length > 1 && (
-        <ul className="mt-1.5 space-y-0.5">
+        <ul className="mt-1.5 space-y-0.5 border-t border-dashed border-slate-200 pt-1.5">
           {item.parts.map((p) => (
             <li key={p.no} className="flex items-baseline justify-between gap-2 text-[11px] text-slate-400">
               <span className="truncate">{p.name}</span>
-              <span className="tabular-nums">{formatMoney(p.used)}</span>
+              <span className="tabular-nums text-slate-600">{t('ใช้')} {formatMoney(p.used)}</span>
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className={`h-full rounded-full ${item.pct >= 90 ? 'bg-red-500' : item.pct >= 70 ? 'bg-amber-400' : 'bg-brand'}`}
-          style={{ width: `${Math.min(100, item.pct)}%` }}
-        />
-      </div>
-      <div className="mt-1 text-[11px] text-slate-400">{t('ใช้ไปแล้ว')} {item.pct}{t('% · วงเงิน')} {formatMoney(item.limit)}</div>
     </div>
   );
 }
@@ -95,6 +101,9 @@ export default function CreditFacility() {
   const [showRequests, setShowRequests] = useState(false);
   // set by the empty state so its button opens the add form, not just the tab
   const [openNew, setOpenNew] = useState(0);
+  // ตัวกรองที่การ์ดส่งไปให้แท็บรายการสินเชื่อ — nonce บังคับให้แท็บเริ่มใหม่ทุกครั้งที่กด
+  const [ledgerPreset, setLedgerPreset] = useState({ nonce: 0 });
+  const openLedger = (preset) => { setLedgerPreset((p) => ({ ...preset, nonce: p.nonce + 1 })); setTab('ledger'); };
 
   const loadOverview = useCallback(() => {
     creditApi.overview().then((r) => setOverview(r.data)).catch((e) => setError(e.message));
@@ -189,9 +198,9 @@ export default function CreditFacility() {
               label={t('ครบกำหนด — เดือนนี้')} bucket={overview?.buckets?.thisMonth} accent="text-amber-600"
               extra={overview?.buckets?.overdue?.amount
                 ? `${t('เกินกำหนดค้าง')} ${formatMoney(overview.buckets.overdue.amount)}` : ''}
-              onOpen={() => setTab('ledger')} />
+              onOpen={() => openLedger({ due: 'thisMonth' })} />
             <BucketStat label={t('ครบกำหนด — เดือนหน้า')} bucket={overview?.buckets?.nextMonth}
-              onOpen={() => setTab('ledger')} />
+              onOpen={() => openLedger({ due: 'nextMonth' })} />
           </div>
           {overview?.buckets?.overdue?.count ? (
             <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -201,17 +210,19 @@ export default function CreditFacility() {
           ) : null}
         </div>
         <div className="card">
-          <h3 className="mb-3 font-bold text-slate-800">{t('สถานะคำขอ')}</h3>
+          <h3 className="mb-3 font-bold text-slate-800">{t('สถานะ')}</h3>
           <div className="grid grid-cols-2 gap-3">
-            <div className="card-sm">
+            {/* นับจำนวน + ยอดเงินตามสถานะของรายการ เหมือนการ์ดสถานะของระบบจริง */}
+            <button onClick={() => setShowRequests(true)} className="card-sm text-left transition hover:border-brand/40">
               <div className="text-xs font-semibold text-slate-500">{t('อยู่ระหว่างเสนออนุมัติ')}</div>
               <div className="mt-1 text-xl font-bold text-slate-900">{overview?.pendingCount || 0} {t('รายการ')}</div>
               <div className="mt-1 text-[11px] text-slate-400">{formatMoney(overview?.pendingAmount || 0)}</div>
-            </div>
-            <div className="card-sm">
-              <div className="text-xs font-semibold text-slate-500">{t('อนุมัติแล้ว (คำขอ)')}</div>
+            </button>
+            <button onClick={() => openLedger({ status: 'อนุมัติแล้ว' })} className="card-sm text-left transition hover:border-brand/40">
+              <div className="text-xs font-semibold text-slate-500">{t('อนุมัติ')}</div>
               <div className="mt-1 text-xl font-bold text-emerald-600">{overview?.approvedCount || 0} {t('รายการ')}</div>
-            </div>
+              <div className="mt-1 text-[11px] text-slate-400">{formatMoney(overview?.approvedAmount || 0)}</div>
+            </button>
           </div>
         </div>
       </div>
@@ -233,6 +244,8 @@ export default function CreditFacility() {
       </div>
 
       <TabComp
+        key={tab === 'ledger' ? `ledger-${ledgerPreset.nonce}` : tab}
+        preset={tab === 'ledger' ? ledgerPreset : undefined}
         projects={projects}
         onChanged={loadOverview}
         openNew={openNew}

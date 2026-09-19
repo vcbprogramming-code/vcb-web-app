@@ -14,18 +14,45 @@ export async function authorizedUsedMap(facilityIds) {
   return new Map(rows.map((r) => [r.facility_id, r.total]));
 }
 
-/** Build a facility view from a precomputed authorized-used amount. */
+/**
+ * Build a facility view from a precomputed authorized-used amount.
+ *
+ * ยอดใช้ไปตามระบบจริง (getData ใน Code.js): ถ้ามีคนปักยอดไว้ (used_override)
+ * ใช้ตัวเลขนั้นตรง ๆ ไม่งั้นคำนวณจากยอดตั้งต้น + รายการที่อนุมัติ แล้วตัดที่ศูนย์
+ * — ตัดเฉพาะยอดที่คำนวณ ยอดที่ปักเองเชื่อตามที่กรอก
+ */
 export function facilityView(f, authorizedUsed = 0) {
-  const used = Number(f.used_baseline || 0) + Number(authorizedUsed || 0);
+  const auto = Math.max(0, Number(f.used_baseline || 0) + Number(authorizedUsed || 0));
+  const pinned = f.used_override != null;
+  const used = pinned ? Number(f.used_override) : auto;
   const limit = Number(f.limit || 0);
   return {
     id: f.id, project_id: f.project_id, company: f.company, bank: f.bank,
     facility_no: f.facility_no, type: f.type, limit, used, available: limit - used,
-    pct: limit ? Math.round((used / limit) * 100) : 0,
+    used_auto: auto, used_overridden: pinned,
+    // หลอดและตัวเลขเปอร์เซ็นต์ของระบบจริงไม่เกิน 100 และวงเงินศูนย์ที่มีการใช้ = 100
+    pct: limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : (used > 0 ? 100 : 0),
     interest_rate: f.interest_rate != null ? Number(f.interest_rate) : null,
     fee_rate: f.fee_rate != null ? Number(f.fee_rate) : null,
     approved_date: f.approved_date, due_date: f.due_date, notes: f.notes, is_active: f.is_active,
   };
+}
+
+/**
+ * รายการที่ยัง "ต้องจ่าย" สำหรับการ์ดครบกำหนด — ตรงกับหน้าแรกของระบบจริง:
+ * ตัดเฉพาะที่ชำระแล้วกับยกเลิก (void) และนับเฉพาะยอดบวก รายการที่ยังรออนุมัติ
+ * ก็นับด้วย เพราะเป็นตั๋วที่จะถึงกำหนดจ่ายเหมือนกัน
+ */
+export const isOutstanding = (status, amount) =>
+  status !== 'ชำระแล้ว' && String(status).toLowerCase() !== 'void' && Number(amount) > 0;
+
+/** ครบภายใน 7 วัน นับรวมวันนี้และวันที่ 7 — เป็นกลุ่มซ้อน ไม่แย่งกับเดือนนี้/เดือนหน้า */
+export function isDueWithin7(dueDate, now = new Date()) {
+  if (!dueDate) return false;
+  const d = new Date(dueDate);
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const t7 = new Date(t0.getTime() + 7 * 86400000);
+  return d >= t0 && d <= t7;
 }
 
 /** Maturity bucket for a due date. */

@@ -279,7 +279,10 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
                     {e.name}
                   </td>
                   {d.days.map((day) => {
-                    if (awaySet.has(day.date)) return <td key={day.date}><div className="flex h-7 w-7 items-center justify-center rounded text-[10px] text-slate-400" style={{ background: '#e7ebf1' }}>—</div></td>;
+                    if (awaySet.has(day.date)) {
+                      const why = e.leave?.[day.date] || t('ไม่ได้สังกัดหน่วยงานนี้');
+                      return <td key={day.date} title={`${day.date} · ${why}`}><div className="flex h-7 w-7 items-center justify-center rounded text-[10px] text-slate-400" style={{ background: '#e7ebf1' }}>—</div></td>;
+                    }
                     const v = by[day.date] || {};
                     const amv = v.team || v.detail || '', pmv = v.pm || '', has = !!(amv || pmv);
                     const future = day.date > ahead, locked = day.date < cutoff, editable = !future && !locked;
@@ -369,9 +372,22 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                   <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1 align-top text-xs text-slate-700">
                     <div><span className={`mr-1 rounded px-1 py-0.5 text-[9px] font-bold ${op ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}`}>{op ? 'OP' : 'SUP'}</span>{e.name}</div>
                     {(e.emp_id || e.department) && <div className="pl-1 text-[10px] text-slate-400">{[e.emp_id, e.department].filter(Boolean).join(' · ')}</div>}
+                    {/* ย้ายไซต์กลางเดือน — บอกว่ามาจากไหน/ไปไหน เหมือนระบบจริง */}
+                    {e.moved_in && <div className="pl-1 text-[10px] font-medium text-emerald-700" title={`${t('ย้ายเข้าจาก')} ${e.moved_in_from} ${e.moved_in}`}>→ {e.moved_in_from}</div>}
+                    {e.moved_out && <div className="pl-1 text-[10px] font-medium text-amber-700" title={`${t('ย้ายออกไป')} ${e.moved_out_to} ${e.moved_out}`}>{e.moved_out_to} →</div>}
                   </td>
                   {visible.map((day) => {
-                    if (awaySet.has(day.date)) return <td key={day.date} className="rounded bg-slate-50" />;
+                    if (awaySet.has(day.date)) {
+                      // วันที่คนนี้ไม่ได้สังกัดไซต์นี้ (ย้ายเข้า/ออก) หรือลาที่อนุมัติแล้ว
+                      const isOut = day.date === e.moved_out;
+                      const why = e.leave?.[day.date]
+                        || `${t('ไม่ได้สังกัดหน่วยงานนี้')}${isOut ? ` · ${t('ย้ายออกไป')} ${e.moved_out_to}` : e.moved_in_from ? ` · ${t('ย้ายเข้าจาก')} ${e.moved_in_from}` : ''}`;
+                      return (
+                        <td key={day.date} title={why} className="rounded bg-slate-50 align-top">
+                          {isOut && <div className="truncate px-1 text-[9px] font-bold text-slate-400">{e.moved_out_to} →</div>}
+                        </td>
+                      );
+                    }
                     const v = (d.entries[e.eid] || {})[day.date] || {};
                     const amVal = (op ? v.team : v.detail) || '';
                     const lv = leaveNote(v.note);
@@ -387,6 +403,17 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                           <div title={lv.ref ? `${t('จากคำขอลาเลขที่')} ${lv.ref}` : undefined}
                             className="mt-0.5 truncate rounded bg-indigo-50 px-1 text-[9px] font-medium leading-4 text-indigo-700">
                             ✓ {t(lv.type, null, 'leave')}
+                          </div>
+                        )}
+                        {day.date === e.moved_in && (
+                          <div className="mt-0.5 truncate rounded bg-emerald-50 px-1 text-[9px] font-medium leading-4 text-emerald-700"
+                            title={`${t('ย้ายเข้าจาก')} ${e.moved_in_from}`}>→ {t('ย้ายเข้า')}</div>
+                        )}
+                        {/* ช่องที่ถูกแก้หลังจากล็อกแล้ว — ระบบจริงทำเครื่องหมายไว้ให้ตรวจย้อนได้ */}
+                        {d.edits?.[`${e.eid}|${day.date}`] && (
+                          <div className="mt-0.5 truncate rounded bg-amber-50 px-1 text-[9px] font-medium leading-4 text-amber-700"
+                            title={`${t('แก้ไขย้อนหลัง')} ${d.edits[`${e.eid}|${day.date}`].date}${d.edits[`${e.eid}|${day.date}`].by ? ` · ${d.edits[`${e.eid}|${day.date}`].by}` : ''}`}>
+                            {t('แก้ย้อนหลัง')}
                           </div>
                         )}
                       </td>

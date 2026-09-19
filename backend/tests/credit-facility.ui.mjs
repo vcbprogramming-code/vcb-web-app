@@ -193,7 +193,8 @@ suite('4. เบิกใช้แล้วยอดคงเหลือลด�
   happy('ยอดคงเหลือลดลงเท่าที่เบิก', Number(bg?.available) === 2600000, `${bg?.available}`);
   await as(A);
   const overviewText = await bodyText();
-  happy('กล่องภาพรวมแสดงยอดที่ใช้ไปแล้ว', overviewText.includes('400,000'), '');
+  // ตัวเลขใหญ่บนกล่องคือวงเงินคงเหลือ เหมือนการ์ดของระบบจริง
+  happy('กล่องภาพรวมแสดงวงเงินคงเหลือ', overviewText.includes('2,600,000'), '');
   happy('กล่องภาพรวมกำกับวงเงินเต็มไว้ด้วย', overviewText.includes('3,000,000'), '');
   await shot('06-หลังเบิกใช้');
 

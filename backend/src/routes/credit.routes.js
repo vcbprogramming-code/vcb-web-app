@@ -5,7 +5,7 @@ import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff, AUTHORIZED_STATUSES } from '../services/credit.js';
+import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff, AUTHORIZED_STATUSES, isOutstanding, isDueWithin7 } from '../services/credit.js';
 
 /**
  * การพับรวมวงเงินบนหน้าจอ — ธนาคารไม่ได้แยกวงเงินเหล่านี้ออกจากกัน
@@ -99,6 +99,8 @@ const facilitySchema = z.object({
   facilityNo: z.number().int().min(1).max(10), limit: z.number().nonnegative(),
   usedBaseline: z.number().optional(), interestRate: z.number().optional().nullable(), feeRate: z.number().optional().nullable(),
   approvedDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(), notes: z.string().optional().nullable(),
+  // ปักยอดใช้ไปเอง — null คือกลับไปคำนวณจากรายการ (setUsedOverride ของระบบจริง)
+  usedOverride: z.number().nonnegative().nullable().optional(),
 });
 router.post('/facilities', asyncHandler(async (req, res) => {
   const parsed = facilitySchema.safeParse(req.body);
@@ -127,11 +129,19 @@ router.patch('/facilities/:id', asyncHandler(async (req, res) => {
     interestRate: 'interest_rate', feeRate: 'fee_rate', approvedDate: 'approved_date', dueDate: 'due_date', notes: 'notes' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] || null); sets.push(`${col} = $${vals.length}`); }
+  // ศูนย์เป็นค่าที่ปักได้จริง (ธนาคารแจ้งว่าไม่มียอดใช้) จึงแยกออกจาก `|| null` ด้านบน
+  if (d.usedOverride !== undefined) { vals.push(d.usedOverride); sets.push(`used_override = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
   vals.push(req.params.id);
   const after = await queryOne(`update facilities set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
-  await writeAudit({ actor: req.profile, action: 'update', target: 'facility', targetId: req.params.id,
-    changes: diff(before, after, ['limit', 'interest_rate', 'due_date', 'type', 'bank', 'facility_no', 'company', 'notes']) });
+  const changes = diff(before, after, ['limit', 'interest_rate', 'due_date', 'type', 'bank', 'facility_no', 'company', 'notes']);
+  if (changes) await writeAudit({ actor: req.profile, action: 'update', target: 'facility', targetId: req.params.id, changes });
+  if (d.usedOverride !== undefined && String(before.used_override ?? '') !== String(after.used_override ?? '')) {
+    await writeAudit({ actor: req.profile, action: after.used_override == null ? 'usedclear' : 'usedoverride',
+      target: 'facility', targetId: req.params.id,
+      changes: { used_override: { before: before.used_override == null ? null : Number(before.used_override),
+        after: after.used_override == null ? null : Number(after.used_override) } } });
+  }
   const used = (await authorizedUsedMap([after.id])).get(after.id) || 0;
   res.json({ data: facilityView(after, used) });
 }));
@@ -194,10 +204,21 @@ const ledgerSchema = z.object({
   termDays: z.number().int().optional().nullable(),
 });
 
-/** ปลดวงเงินได้ไม่เกินที่เคยใช้ไป — ไม่งั้นยอดคงเหลือจะโตเกินที่ธนาคารให้ */
+/**
+ * ปลดวงเงินได้ไม่เกินที่เคยใช้ไป — ไม่งั้นยอดคงเหลือจะโตเกินที่ธนาคารให้
+ *
+ * "ที่ใช้ไป" ต้องรวมยอดตั้งต้นของวงเงินด้วย วงเงินที่ย้ายมาจากระบบเดิมส่วนใหญ่
+ * มียอดใช้อยู่แล้วโดยไม่มีรายการสักแถว ถ้านับแค่ผลรวมรายการ การปลดหนังสือ
+ * ค้ำประกันใบแรกของวงเงินพวกนั้นจะถูกปฏิเสธทั้งที่ถูกต้อง
+ *
+ * ระบบจริงไม่ปฏิเสธ แต่ตัดยอดที่ศูนย์ — ซึ่งทำให้ยอดปลดส่วนเกินไปกลืนการเบิก
+ * ครั้งถัดไปแบบมองไม่เห็น เราจึงยังปฏิเสธส่วนที่เกิน
+ */
 async function assertNotOverReleased(facilityId, delta, excludeId) {
   const cur = await queryOne(
-    `select coalesce(sum(amount), 0)::float8 used from credit_ledger
+    `select coalesce((select used_baseline from facilities where id = $1), 0)::float8
+          + coalesce(sum(amount), 0)::float8 used
+       from credit_ledger
       where facility_id = $1 and status = any($2) and ($3::uuid is null or id <> $3)`,
     [facilityId, AUTHORIZED_STATUSES, excludeId || null]);
   if (Number(cur.used) + delta < -0.005) {
@@ -342,15 +363,18 @@ router.get('/facility-types', asyncHandler(async (req, res) => {
 }));
 
 router.get('/overview', asyncHandler(async (req, res) => {
-  const [facilities, authorized, pending, approved] = await Promise.all([
+  // ระบบจริงมีรายการชุดเดียว (Transactions) ที่ถือทุกสถานะ ของเราแยกคำขอที่ยัง
+  // รออนุมัติไว้ใน credit_requests — การ์ดที่นับ "ทุกรายการที่ยังค้าง" จึงต้อง
+  // อ่านทั้งสองตาราง ไม่งั้นตั๋วที่รออนุมัติจะหายไปจากยอดครบกำหนด
+  const [facilities, ledger, pendingReqs] = await Promise.all([
     query('select * from facilities where is_active = true'),
-    query(`select * from credit_ledger where status = 'อนุมัติแล้ว'`),
-    query(`select amount from credit_requests where status = 'อยู่ระหว่างเสนออนุมัติ'`),
-    queryOne(`select count(*)::int n from credit_requests where status = 'อนุมัติ'`),
+    query('select * from credit_ledger'),
+    query(`select * from credit_requests where status = 'อยู่ระหว่างเสนออนุมัติ'`),
   ]);
   const rateBy = Object.fromEntries(facilities.rows.map((f) => [f.id, f.interest_rate]));
+  const authorized = ledger.rows.filter((i) => AUTHORIZED_STATUSES.includes(i.status));
   const usedBy = new Map();
-  for (const i of authorized.rows) usedBy.set(i.facility_id, (usedBy.get(i.facility_id) || 0) + Number(i.amount));
+  for (const i of authorized) usedBy.set(i.facility_id, (usedBy.get(i.facility_id) || 0) + Number(i.amount));
   // จัดกลุ่มตามกล่องที่พับรวมแล้ว พร้อมเก็บรายละเอียดของแต่ละประเภทย่อยไว้ให้กาง
   // ดูได้ — ผู้ใช้ต้องเห็นว่ากล่อง BG ก้อนเดียวมาจากค้ำประกันสามใบอะไรบ้าง
   const types = Object.fromEntries((await query('select * from facility_types')).rows.map((t) => [t.no, t]));
@@ -368,16 +392,28 @@ router.get('/overview', asyncHandler(async (req, res) => {
     }
     byType[key] = t;
   }
-  const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 }, later: { count: 0, amount: 0 } };
-  let overdueInt = 0;
-  for (const i of authorized.rows) {
-    const b = dueBucket(i.due_date); buckets[b].count++; buckets[b].amount += Number(i.amount || 0);
-    overdueInt += overdueInterest(i, rateBy[i.facility_id]);
+  // การ์ดครบกำหนด: ทุกรายการที่ยังต้องจ่าย (ไม่ใช่เฉพาะที่อนุมัติแล้ว) ยอดบวกเท่านั้น
+  const buckets = { overdue: { count: 0, amount: 0 }, thisMonth: { count: 0, amount: 0 }, nextMonth: { count: 0, amount: 0 },
+    later: { count: 0, amount: 0 }, due7: { count: 0, amount: 0 } };
+  for (const i of [...ledger.rows, ...pendingReqs.rows]) {
+    if (!isOutstanding(i.status, i.amount) || !i.due_date) continue;
+    const b = dueBucket(i.due_date); buckets[b].count++; buckets[b].amount += Number(i.amount);
+    if (isDueWithin7(i.due_date)) { buckets.due7.count++; buckets.due7.amount += Number(i.amount); }
   }
+  let overdueInt = 0;
+  for (const i of authorized) overdueInt += overdueInterest(i, rateBy[i.facility_id]);
+  // การ์ดสถานะนับรายการ (จำนวน + ยอดเงิน) ตามสถานะของรายการ เหมือนระบบจริง
+  const tally = (rows) => ({ count: rows.length, amount: rows.reduce((a, r) => a + Number(r.amount || 0), 0) });
+  const newItems = tally(ledger.rows.filter((i) => i.status === 'คำขอใหม่'));
+  const pending = tally([...ledger.rows.filter((i) => i.status === 'อยู่ระหว่างเสนออนุมัติ'), ...pendingReqs.rows]);
+  const approved = tally(authorized);
   res.json({ data: {
-    byType: Object.values(byType).map((t) => ({ ...t, available: t.limit - t.used, pct: t.limit ? Math.round((t.used / t.limit) * 100) : 0 })),
+    byType: Object.values(byType).map((t) => ({ ...t, available: t.limit - t.used,
+      pct: t.limit > 0 ? Math.min(100, Math.round((t.used / t.limit) * 100)) : (t.used > 0 ? 100 : 0) })),
     buckets, overdueInterest: Math.round(overdueInt),
-    pendingCount: pending.rows.length, pendingAmount: pending.rows.reduce((s, r) => s + Number(r.amount || 0), 0), approvedCount: approved.n,
+    newCount: newItems.count, newAmount: newItems.amount,
+    pendingCount: pending.count, pendingAmount: pending.amount,
+    approvedCount: approved.count, approvedAmount: approved.amount,
   } });
 }));
 router.get('/overdue', asyncHandler(async (req, res) => {
@@ -486,6 +522,13 @@ router.put('/category-caps', requirePermission('credit', 'edit'), asyncHandler(a
   }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
+  // งบศูนย์ = ล้างงบ ลบแถวทิ้ง — ระบบจริงเก็บแถวงบว่างไว้ ทำให้หน้าสรุปขึ้นหมวด
+  // "ไม่ได้ตั้ง" ยอด 0 ค้างอยู่และนับเป็นหมวดที่ยังไม่ตั้งงบเพิ่มทุกครั้งที่ล้าง
+  if (d.cap === 0) {
+    await query('delete from credit_category_caps where project_id = $1 and cost_category = $2', [d.projectId, d.costCategory]);
+    await writeAudit({ actor: req.profile, action: 'delete', target: 'categoryCap', targetId: `${d.projectId}|${d.costCategory}` });
+    return res.json({ data: { project_id: d.projectId, cost_category: d.costCategory, cap: null, cleared: true } });
+  }
   const row = await queryOne(
     `insert into credit_category_caps (project_id, cost_category, cap, note, updated_by, updated_at)
      values ($1,$2,$3,$4,$5, now())
@@ -501,52 +544,69 @@ router.put('/category-caps', requirePermission('credit', 'edit'), asyncHandler(a
 /**
  * GET /api/credit/cost-summary — ใช้ไปเทียบงบ แยกตามโครงการและหมวดค่าใช้จ่าย
  *
- * นับเฉพาะรายการที่อนุมัติแล้ว และรวมรายการที่ไม่ได้ระบุหมวดไว้เป็นกลุ่มของ
- * ตัวเองด้วย — ไม่ซ่อน เพราะเงินก้อนนั้นออกไปจริงและต้องกระทบยอดได้
+ * นับตามระบบจริง (categorySummary): ทุกรายการยกเว้นที่ยกเลิก (void) — รายการที่
+ * ชำระแล้วยังนับ เพราะถ้าไม่นับ จ่ายคืนแล้วก็ขอหมวดเดิมได้ไม่รู้จบ และคำขอที่
+ * ยังรออนุมัติก็นับ รายการที่ไม่ระบุหมวดรวมเป็นกลุ่มของตัวเอง ไม่ซ่อน
+ * งบที่ตั้งไว้แต่ยังไม่มีการใช้ขึ้นเป็นแถวว่าง ("งบ ฿X · ใช้ไป ฿0")
  */
 router.get('/cost-summary', asyncHandler(async (req, res) => {
-  const params = []; let where = "where l.status = any($1)";
-  params.push(AUTHORIZED_STATUSES);
-  if (req.query.projectId) { params.push(req.query.projectId); where += ` and l.project_id = $${params.length}`; }
+  const pid = req.query.projectId || null;
   const { rows } = await query(
-    `select p.id project_id, p.code project_code, p.name project_name,
-            coalesce(nullif(btrim(l.cost_category), ''), '(ไม่ระบุหมวด)') cost_category,
-            count(*)::int items, sum(l.amount)::float8 spent
-       from credit_ledger l join projects p on p.id = l.project_id
-       ${where}
-      group by 1,2,3,4 order by p.code, 4`, params);
-  const caps = (await query('select project_id, cost_category, cap::float8 cap, note from credit_category_caps')).rows;
-  const capOf = new Map(caps.map((c) => [`${c.project_id}|${c.cost_category}`, c]));
+    `select x.project_id, coalesce(nullif(btrim(x.cost_category), ''), '(ไม่ระบุหมวด)') cost_category,
+            count(*)::int items, sum(x.amount)::float8 spent
+       from (select project_id, cost_category, amount from credit_ledger
+              where lower(status) <> 'void' and amount <> 0
+             union all
+             select project_id, cost_category, amount from credit_requests
+              where status = 'อยู่ระหว่างเสนออนุมัติ' and amount <> 0) x
+      where ($1::uuid is null or x.project_id = $1)
+      group by 1, 2`, [pid]);
+  const caps = (await query(
+    'select project_id, cost_category, cap::float8 cap, note from credit_category_caps where ($1::uuid is null or project_id = $1)',
+    [pid])).rows;
+  const projects = new Map((await query('select id, code, name from projects')).rows.map((p) => [p.id, p]));
 
-  const byProject = new Map();
-  for (const r of rows) {
-    const cap = capOf.get(`${r.project_id}|${r.cost_category}`);
-    const line = {
-      cost_category: r.cost_category, items: r.items, spent: r.spent,
-      cap: cap ? cap.cap : null, note: cap?.note || null,
-      pct: cap && cap.cap > 0 ? Math.round((r.spent / cap.cap) * 1000) / 10 : null,
-      remaining: cap ? cap.cap - r.spent : null,
-      over: Boolean(cap && cap.cap > 0 && r.spent > cap.cap),
-    };
-    const key = r.project_id;
-    if (!byProject.has(key)) {
-      byProject.set(key, { project_id: key, project_code: r.project_code, project_name: r.project_name,
-        lines: [], spent: 0, cap: 0, overCount: 0, noBudgetCount: 0 });
-    }
-    const g = byProject.get(key);
-    g.lines.push(line);
-    g.spent += r.spent;
-    if (line.cap != null) g.cap += line.cap;
-    if (line.over) g.overCount += 1;
-    if (line.cap == null) g.noBudgetCount += 1;
+  const groups = new Map();
+  for (const r of rows) groups.set(`${r.project_id}|${r.cost_category}`, { project_id: r.project_id, cost_category: r.cost_category, items: r.items, spent: r.spent, cap: null, note: null });
+  for (const c of caps) {
+    const k = `${c.project_id}|${c.cost_category}`;
+    const g = groups.get(k) || { project_id: c.project_id, cost_category: c.cost_category, items: 0, spent: 0 };
+    groups.set(k, { ...g, cap: c.cap, note: c.note || null });
   }
-  const projects = [...byProject.values()].map((g) => ({
-    ...g, pct: g.cap > 0 ? Math.round((g.spent / g.cap) * 1000) / 10 : null,
-  }));
+  const byProject = new Map();
+  for (const g of [...groups.values()].sort((a, b) => (a.cost_category < b.cost_category ? -1 : 1))) {
+    // มีงบ = ตั้งไว้มากกว่าศูนย์ ตั้งศูนย์ไว้ถือว่ายังไม่ได้ตั้ง เหมือนระบบจริง
+    const budgeted = g.cap != null && g.cap > 0;
+    const ratio = budgeted ? g.spent / g.cap : null;
+    const line = {
+      cost_category: g.cost_category, items: g.items, spent: g.spent, cap: budgeted ? g.cap : null, note: g.note,
+      pct: budgeted ? Math.round(ratio * 1000) / 10 : null,
+      remaining: budgeted ? g.cap - g.spent : null,
+      over: budgeted && ratio >= 1,
+      near: budgeted && ratio >= 0.8 && ratio < 1,
+    };
+    if (!byProject.has(g.project_id)) {
+      const p = projects.get(g.project_id) || {};
+      byProject.set(g.project_id, { project_id: g.project_id, project_code: p.code || '', project_name: p.name || '',
+        lines: [], spent: 0, cap: 0, overCount: 0, nearCount: 0, noBudgetCount: 0, okCount: 0 });
+    }
+    const P = byProject.get(g.project_id);
+    P.lines.push(line);
+    // หัวโครงการรวมเฉพาะหมวดที่ตั้งงบไว้ — เงินในหมวดที่ไม่มีงบไม่มีอะไรให้เทียบ
+    if (budgeted) { P.cap += g.cap; P.spent += g.spent; }
+    if (line.over) P.overCount += 1;
+    else if (line.near) P.nearCount += 1;
+    else if (!budgeted) P.noBudgetCount += 1;
+    else P.okCount += 1;
+  }
+  const out = [...byProject.values()]
+    .sort((a, b) => (a.project_code < b.project_code ? -1 : 1))
+    .map((g) => ({ ...g, pct: g.cap > 0 ? Math.min(150, Math.round((g.spent / g.cap) * 100)) : null }));
   res.json({ data: {
-    projects,
-    overCount: projects.reduce((a, g) => a + g.overCount, 0),
-    noBudgetCount: projects.reduce((a, g) => a + g.noBudgetCount, 0),
+    projects: out,
+    overCount: out.reduce((a, g) => a + g.overCount, 0),
+    nearCount: out.reduce((a, g) => a + g.nearCount, 0),
+    noBudgetCount: out.reduce((a, g) => a + g.noBudgetCount, 0),
   } });
 }));
 

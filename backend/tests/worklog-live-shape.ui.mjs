@@ -4,7 +4,7 @@
  * ชุดนี้คู่กับ worklog-uat: ชุดนั้นตรวจความสามารถที่มาจากเอกสารเกณฑ์ตรวจรับ
  * ชุดนี้ตรวจว่าเมื่อปิดส่วนเสริมทั้งหมดแล้ว สิ่งที่เหลือตรงกับระบบ Apps Script
  * ที่พนักงานเปิดใช้อยู่ทุกวัน — ห้าหน้าจอ ทะเบียน 44/20 ตัวเลือกสองขั้นที่กรอง
- * ตามหมวดต้นทุนที่อนุญาต และแรงงาน-วันที่คำนวณเอง ไม่ใช่ตัวเลขที่ใครพิมพ์
+ * ตามหมวดงานที่อนุญาต และแรงงาน-วันที่คำนวณเอง ไม่ใช่ตัวเลขที่ใครพิมพ์
  */
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -38,20 +38,20 @@ const emp = (await query(
 await query('insert into profile_units (profile_id, unit_id) values ($1,$2) on conflict do nothing', [A.id, site.id]);
 
 // ── ทะเบียนและกติกาการนับ (ตรวจผ่าน API ก่อน เพราะเป็นฐานของทุกหน้าจอ) ─────
-suite('ทะเบียนงานและหมวดต้นทุนตรงกับระบบจริง');
+suite('ทะเบียนงานและหมวดงานตรงกับระบบจริง');
 {
   const acts = (await call('/performance/activities', { user: A })).data || [];
   const cats = (await call('/performance/cost-categories', { user: A })).data || [];
   happy(`ประเภทงาน 44 รหัส (พบ ${acts.length})`, acts.length === 44, `${acts.length}`);
-  happy(`หมวดต้นทุน 20 หมวด (พบ ${cats.length})`, cats.length === 20, `${cats.length}`);
+  happy(`หมวดงาน 20 หมวด (พบ ${cats.length})`, cats.length === 20, `${cats.length}`);
 
   const a1 = acts.find((x) => x.code === 'A-1');
   happy('A-1 คือ "งานผูก-ตัด-ดัดเหล็ก" ตามทะเบียนจริง', a1?.name === 'งานผูก-ตัด-ดัดเหล็ก', a1?.name || '—');
-  happy('หมวดต้นทุน 1 คือ "งานรื้อย้ายโครงสร้างเดิม"',
+  happy('หมวดงาน 1 คือ "งานรื้อย้ายโครงสร้างเดิม"',
     cats.find((c) => c.code === '1')?.name === 'งานรื้อย้ายโครงสร้างเดิม',
     cats.find((c) => c.code === '1')?.name || '—');
 
-  happy('A-1 ระบุหมวดต้นทุนที่ใช้ได้ 7 หมวด', (a1?.allowed_cost || '') === '5,7,8,9,15,17,19', a1?.allowed_cost || '—');
+  happy('A-1 ระบุหมวดงานที่ใช้ได้ 7 หมวด', (a1?.allowed_cost || '') === '5,7,8,9,15,17,19', a1?.allowed_cost || '—');
   const a6 = acts.find((x) => x.code === 'A-6');
   happy('A-6 ผูกหมวดเดียว จึงข้ามขั้นที่สอง',
     a6?.mapping === 'one-to-one' && a6?.fixed_cost === '3', `${a6?.mapping} / ${a6?.fixed_cost}`);
@@ -84,7 +84,7 @@ suite('แรงงาน-วันคำนวณจากงานที่ล
   const s2 = await slots();
   happy('แบ่งเป็น 0.5 ต่อช่อง', s2.length === 2 && s2.every((x) => Number(x.manday) === 0.5),
     s2.map((x) => `${x.work_code}/${x.cost_code}=${x.manday}`).join(' '));
-  happy('แยกรหัสงานและรหัสหมวดต้นทุนออกจากกันได้',
+  happy('แยกรหัสงานและรหัสหมวดงานออกจากกันได้',
     s2[0].work_code === 'A-1' && s2[0].cost_code === '5', JSON.stringify(s2[0]));
 
   const totals = {};
@@ -170,7 +170,7 @@ suite('หน้าจอเหลือห้าหน้าเท่าระ�
   bad('ลิงก์เก่า ?tab=manday ไม่พาไปหน้าว่าง', txt.includes('ภาพรวม') && !txt.includes('รวมวันนี้'), txt.slice(0, 120).replace(/\n/g, ' | '));
 }
 
-suite('ตัวเลือกสองขั้นกรองตามหมวดต้นทุนที่อนุญาต');
+suite('ตัวเลือกสองขั้นกรองตามหมวดงานที่อนุญาต');
 {
   await as(A);
   await page.evaluate((n) => {

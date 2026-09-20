@@ -3,7 +3,7 @@ import { useT } from '../../lib/i18n.jsx';
 
 /**
  * Two-step searchable picker (port of the reference oppOpen/oppRender flow).
- * Step 1 = กิจกรรม (Activity), Step 2 = หมวดงาน (Cost Category). A one-to-one
+ * Step 1 = กิจกรรม (Activity), Step 2 = หมวดงาน (Work Category). A one-to-one
  * activity skips step 2 and auto-applies its fixed cost. Stored value = "A-1 / 5".
  * ลอยอยู่ข้างช่องที่คลิก โดยรับ `rect` = พิกัดที่วัดไว้ตอนคลิก ไม่ใช่ตัว element
  * เพราะตารางอาจวาดใหม่จน element เดิมหลุดออกจากหน้าจอก่อนกล่องจะวัดตำแหน่งได้
@@ -67,7 +67,7 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
     };
   }, [step, onClose]);
 
-  // ขั้นที่สองต้องเหลือเฉพาะหมวดต้นทุนที่รหัสงานนั้นใช้ได้จริง (allowed_cost)
+  // ขั้นที่สองต้องเหลือเฉพาะหมวดงานที่รหัสงานนั้นใช้ได้จริง (allowed_cost)
   // ระบบเดิมของลูกค้ากรองตรงนี้ การปล่อยให้เลือกได้ทุกหมวดทำให้ค่าแรงลงผิดหมวด
   // โดยไม่มีอะไรฟ้อง — รหัสที่ไม่ระบุไว้ (กลุ่ม Z) ยังเลือกได้ทั้งหมดตามเดิม
   const allowed = String(pending?.allowed_cost || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -80,7 +80,7 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
 
   const groups = {}; const order = [];
   filtered.forEach((it) => {
-    const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดต้นทุน';
+    const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดงาน';
     if (!groups[c]) { groups[c] = []; order.push(c); }
     groups[c].push(it);
   });
@@ -93,7 +93,7 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
         setWarn(t('งานทั้งสองช่องเหมือนกัน — เลือกงานคนละประเภทเพื่อบันทึก 2 งาน'));
         return;
       }
-      // งานที่ใช้หมวดต้นทุนได้หมวดเดียว ไม่ต้องถามขั้นที่สอง
+      // งานที่ใช้หมวดงานได้หมวดเดียว ไม่ต้องถามขั้นที่สอง
       const only = String(it.allowed_cost || '').split(',').map((x) => x.trim()).filter(Boolean);
       const oneToOne = (it.mapping || 'one-to-many') === 'one-to-one';
       if (oneToOne) { onApply(it.fixed_cost ? `${it.code} / ${it.fixed_cost}` : it.code); return; }
@@ -117,7 +117,7 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
           : <>
               <span className="text-lg leading-none">‹</span>
               <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">2/2</span>
-              {t('เลือกหมวดต้นทุน · งาน:')} <b>{pending?.code}</b>
+              {t('เลือกหมวดงาน · งาน:')} <b>{pending?.code}</b>
               {allowed.length > 0 && (
                 <span className="ml-auto text-[11px] font-normal text-slate-400">
                   {t('ใช้ได้ {n} หมวด', { n: allowed.length })}
@@ -145,7 +145,7 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
                     <div className="flex items-center gap-1.5 text-sm text-slate-800">
                       {it.code && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{it.code}</span>}
                       {step === 1 && it.code && (
-                        <span title={oneToOne ? 'กำหนดต้นทุนอัตโนมัติ · ขั้นตอนเดียว' : 'เลือกหมวดต้นทุนต่อ · 2 ขั้นตอน'}
+                        <span title={oneToOne ? 'กำหนดหมวดงานอัตโนมัติ · ขั้นตอนเดียว' : 'เลือกหมวดงานต่อ · 2 ขั้นตอน'}
                           className={`inline-block h-1.5 w-1.5 rounded-full ${oneToOne ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                       )}
                       <span className="truncate">{it.name}</span>

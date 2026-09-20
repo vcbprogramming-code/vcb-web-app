@@ -72,11 +72,11 @@ suite('§2 ข้อมูลหลัก (Master Data)');
     happy(`ทะเบียนประเภทงานครอบคลุม "${w}"`, names.includes(w), '');
   }
   const cats = await call('/performance/cost-categories', { user: A });
-  happy('ประเภทงานแยก 2 ระดับ (กิจกรรม + หมวดต้นทุน)', cats.status === 200, '');
-  happy(`หมวดต้นทุนครบตามระบบจริง (${(cats.data || []).length} หมวด)`,
+  happy('ประเภทงานแยก 2 ระดับ (กิจกรรม + หมวดงาน)', cats.status === 200, '');
+  happy(`หมวดงานครบตามระบบจริง (${(cats.data || []).length} หมวด)`,
     (cats.data || []).length === 20, `${(cats.data || []).length}`);
-  // รหัสงานแต่ละตัวต้องบอกได้ว่าใช้กับหมวดต้นทุนไหน มิฉะนั้นขั้นที่สองกรองไม่ได้
-  happy('รหัสงานระบุหมวดต้นทุนที่ใช้ได้',
+  // รหัสงานแต่ละตัวต้องบอกได้ว่าใช้กับหมวดงานไหน มิฉะนั้นขั้นที่สองกรองไม่ได้
+  happy('รหัสงานระบุหมวดงานที่ใช้ได้',
     rows.filter((r) => (r.allowed_cost || '').trim()).length >= 41,
     `${rows.filter((r) => (r.allowed_cost || '').trim()).length}/44`);
 }

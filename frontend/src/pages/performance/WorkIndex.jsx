@@ -33,14 +33,14 @@ function ActivityModal({ item, onClose, onSaved }) {
           <label className="text-sm"><span className="mb-1 block font-medium text-slate-600">{t('หมวดหมู่ *')}</span><input value={f.category} onChange={(e) => set('category', e.target.value)} placeholder={t('A · งานสำนักงาน')} className={field} /></label>
         </div>
         <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('ชื่อกิจกรรม *')}</span><input value={f.name} onChange={(e) => set('name', e.target.value)} className={field} /></label>
-        <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('การจับคู่หมวดต้นทุน')}</span>
+        <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('การจับคู่หมวดงาน')}</span>
           <select value={f.mapping} onChange={(e) => set('mapping', e.target.value)} className={field}>
-            <option value="one-to-many">{t('เลือกหมวดต้นทุนเอง (2 ขั้นตอน)')}</option>
-            <option value="one-to-one">{t('กำหนดหมวดต้นทุนอัตโนมัติ (ขั้นตอนเดียว)')}</option>
+            <option value="one-to-many">{t('เลือกหมวดงานเอง (2 ขั้นตอน)')}</option>
+            <option value="one-to-one">{t('กำหนดหมวดงานอัตโนมัติ (ขั้นตอนเดียว)')}</option>
           </select>
         </label>
         {f.mapping === 'one-to-one' && (
-          <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('รหัสหมวดต้นทุนอัตโนมัติ')}</span><input value={f.fixedCost} onChange={(e) => set('fixedCost', e.target.value)} placeholder={t('เช่น 5')} className={field} /></label>
+          <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('รหัสหมวดงานอัตโนมัติ')}</span><input value={f.fixedCost} onChange={(e) => set('fixedCost', e.target.value)} placeholder={t('เช่น 5')} className={field} /></label>
         )}
         {err && <div className="rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{err}</div>}
       </form>
@@ -67,7 +67,7 @@ function CategoryModal({ item, onClose, onSaved }) {
   };
   const field = 'field';
   return (
-    <Modal title={editing ? 'แก้ไขหมวดต้นทุน' : 'เพิ่มหมวดต้นทุน'} onClose={onClose} size="md"
+    <Modal title={editing ? 'แก้ไขหมวดงาน' : 'เพิ่มหมวดงาน'} onClose={onClose} size="md"
       footer={<><button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button><button type="submit" form="cat-form" disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button></>}>
       <form id="cat-form" onSubmit={submit} className="space-y-3">
         <label className="block text-sm"><span className="mb-1 block font-medium text-slate-600">{t('รหัส *')}</span><input value={f.code} onChange={(e) => set('code', e.target.value)} disabled={editing} placeholder={t('เช่น 5')} className={`${field} ${editing ? 'bg-slate-100' : ''}`} /></label>
@@ -126,8 +126,12 @@ export default function WorkIndex() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {[['activities', `กิจกรรม (${acts.length})`], ['categories', `หมวดต้นทุน (${cats.length})`]].map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>
+          {/* ชื่อแท็บตรงกับระบบที่ลูกค้าใช้อยู่ — "กิจกรรม (Activity)" และ "หมวดงาน (Work Category)"
+              จำนวนแถวย้ายไปเป็นตัวเลขจาง ๆ ต่อท้าย ยังเห็นได้แต่ไม่แย่งชื่อทางการของหมวด */}
+          {[['activities', 'กิจกรรม (Activity)', acts.length], ['categories', 'หมวดงาน (Work Category)', cats.length]].map(([k, label, n]) => (
+            <button key={k} onClick={() => setTab(k)} className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+              {label} <span className={tab === k ? 'text-white/70' : 'text-slate-400'}>{n}</span>
+            </button>
           ))}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -143,7 +147,7 @@ export default function WorkIndex() {
               <Icon name="upload" className="h-4 w-4" /> {t('นำเข้า')}
             </label>
           )}
-          <button onClick={() => (tab === 'activities' ? setEditAct(null) : setEditCat(null))} className="btn-primary !py-1.5"><Icon name="plus" className="h-4 w-4" /> เพิ่ม{tab === 'activities' ? 'กิจกรรม' : 'หมวดต้นทุน'}</button>
+          <button onClick={() => (tab === 'activities' ? setEditAct(null) : setEditCat(null))} className="btn-primary !py-1.5"><Icon name="plus" className="h-4 w-4" /> เพิ่ม{tab === 'activities' ? 'กิจกรรม' : 'หมวดงาน'}</button>
         </div>
       </div>
 
@@ -208,7 +212,7 @@ export default function WorkIndex() {
       </div>
 
       {editAct !== undefined && <ActivityModal item={editAct} onClose={() => setEditAct(undefined)} onSaved={() => { setEditAct(undefined); toast.success(t('บันทึกกิจกรรมแล้ว')); load(); }} />}
-      {editCat !== undefined && <CategoryModal item={editCat} onClose={() => setEditCat(undefined)} onSaved={() => { setEditCat(undefined); toast.success(t('บันทึกหมวดต้นทุนแล้ว')); load(); }} />}
+      {editCat !== undefined && <CategoryModal item={editCat} onClose={() => setEditCat(undefined)} onSaved={() => { setEditCat(undefined); toast.success(t('บันทึกหมวดงานแล้ว')); load(); }} />}
     </div>
   );
 }

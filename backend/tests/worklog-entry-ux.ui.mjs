@@ -114,7 +114,7 @@ suite('3. เลือกกิจกรรมแล้วบันทึกจ�
 {
   await clickCell(TODAY);
   await new Promise((r) => setTimeout(r, 800));
-  // เลือกกิจกรรมตัวแรกในรายการ แล้วเลือกหมวดต้นทุนถ้ามีขั้นที่สอง
+  // เลือกกิจกรรมตัวแรกในรายการ แล้วเลือกหมวดงานถ้ามีขั้นที่สอง
   const pickFirst = () => page.evaluate(() => {
     const row = [...document.querySelectorAll('[data-pick-code]')][0];
     if (!row) return null;

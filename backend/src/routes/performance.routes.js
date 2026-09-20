@@ -111,7 +111,7 @@ const workFields = (r) => ({
 const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
 const siteOut = (u) => ({ key: u.code, name: u.name, company: u.company, color: u.color, lockDays: u.lock_days ?? 3 });
-// allowed_cost คือรายการรหัสหมวดต้นทุนที่รหัสงานนี้ใช้ได้ ระบบจริงใช้มันกรอง
+// allowed_cost คือรายการรหัสหมวดงานที่รหัสงานนี้ใช้ได้ ระบบจริงใช้มันกรอง
 // ตัวเลือกขั้นที่สอง — ส่งออกไปด้วย ไม่งั้นหน้าจอต้องเดาเอง
 const activityOut = (a) => ({
   code: a.code, name: a.name, name_en: a.name_en || '', desc: a.description || '',
@@ -216,7 +216,7 @@ router.post('/cost-categories', requireRole('admin'), asyncHandler(async (req, r
   const row = await queryOne(
     `insert into cost_categories (code, name, name_en, sort_order) values ($1,$2,$3,$4) returning *`,
     [d.code, d.name, d.nameEn || null, d.sortOrder ?? 0]
-  ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสหมวดต้นทุนนี้มีอยู่แล้ว'); throw e; });
+  ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสหมวดงานนี้มีอยู่แล้ว'); throw e; });
   res.status(201).json({ data: categoryOut(row) });
 }));
 router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async (req, res) => {
@@ -228,7 +228,7 @@ router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async 
   if (!sets.length) throw new ApiError(400, 'No fields to update');
   vals.push(req.params.code);
   const row = await queryOne(`update cost_categories set ${sets.join(', ')} where code = $${vals.length} returning *`, vals);
-  if (!row) throw new ApiError(404, 'ไม่พบหมวดต้นทุน');
+  if (!row) throw new ApiError(404, 'ไม่พบหมวดงาน');
   res.json({ data: categoryOut(row) });
 }));
 
@@ -639,7 +639,7 @@ async function slotResolvers() {
       if (indexNames.has(norm(s))) return s;          // ข้อมูลเก่าที่เก็บเป็นชื่องาน
       return '';
     },
-    /** ชื่อหมวดต้นทุนครึ่งหลังของ "A-1 / 5" หรือ '' */
+    /** ชื่อหมวดงานครึ่งหลังของ "A-1 / 5" หรือ '' */
     costOf(v) {
       const s = String(v || ''); const i = s.indexOf('/'); if (i < 0) return '';
       return costName.get(norm(s.slice(i + 1))) || '';
@@ -1426,7 +1426,7 @@ async function mandayReport(profile, from, to, groupBy) {
   const SQL = {
     // รหัสที่ไม่อยู่ในทะเบียน (พิมพ์ผิด ข้อความอิสระ) รวมเป็นแถวเดียว — รายงานของ
     // ระบบจริงไม่นับแถวพวกนี้เลย ของเรายังแสดงไว้ให้เห็นว่ามีแรงงาน-วันที่หาหมวดไม่ได้
-    cost:     `select coalesce(c.code,'-') key, coalesce(c.name,'(ไม่อยู่ในทะเบียนหมวดต้นทุน)') label,
+    cost:     `select coalesce(c.code,'-') key, coalesce(c.name,'(ไม่อยู่ในทะเบียนหมวดงาน)') label,
                       sum(s.manday)::numeric manday, count(distinct s.employee_id)::int people
                  from worklog_slots s left join cost_categories c on lower(c.code) = lower(s.cost_code) ${W}
                 group by 1,2 order by 3 desc`,
@@ -1567,10 +1567,10 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
     { header: 'วันที่ปฏิบัติงาน', key: 'ymd', width: 16 },
     { header: 'งานหลัก (รหัส)', key: 'slot1', width: 14 },
     { header: 'งานหลัก', key: 'slot1_name', width: 30 },
-    { header: 'หมวดต้นทุน (งานหลัก)', key: 'slot1_cost', width: 30 },
+    { header: 'หมวดงาน (งานหลัก)', key: 'slot1_cost', width: 30 },
     { header: 'งานเสริม (รหัส)', key: 'slot2', width: 14 },
     { header: 'งานเสริม', key: 'slot2_name', width: 30 },
-    { header: 'หมวดต้นทุน (งานเสริม)', key: 'slot2_cost', width: 30 },
+    { header: 'หมวดงาน (งานเสริม)', key: 'slot2_cost', width: 30 },
     { header: 'แรงงาน-วัน', key: 'manday', width: 12 },
   ];
   for (const r of rows) ws.addRow({ ...r, ymd: dateStr(r.ymd), manday: Number(r.manday) });
@@ -1678,9 +1678,9 @@ router.get('/export/activities.xlsx', asyncHandler(async (req, res) => {
     { header: 'ชื่อภาษาอังกฤษ', key: 'name_en', width: 34 },
     { header: 'คำอธิบาย', key: 'description', width: 52 },
     { header: 'หมวดหมู่', key: 'category', width: 26 },
-    { header: 'การจับคู่หมวดต้นทุน', key: 'mapping', width: 18 },
-    { header: 'หมวดต้นทุนตายตัว', key: 'fixed_cost', width: 16 },
-    { header: 'หมวดต้นทุนที่อนุญาต', key: 'allowed_cost', width: 24 },
+    { header: 'การจับคู่หมวดงาน', key: 'mapping', width: 18 },
+    { header: 'หมวดงานตายตัว', key: 'fixed_cost', width: 16 },
+    { header: 'หมวดงานที่อนุญาต', key: 'allowed_cost', width: 24 },
     { header: 'เปิดใช้งาน', key: 'is_active', width: 10 },
   ], rows);
   await sendXlsx(res, wb, 'ทะเบียนงาน.xlsx');
@@ -1689,13 +1689,13 @@ router.get('/export/activities.xlsx', asyncHandler(async (req, res) => {
 router.get('/export/cost-categories.xlsx', asyncHandler(async (req, res) => {
   const { rows } = await query(
     `select code, name, coalesce(name_en, '') name_en, is_active from cost_categories order by length(code), code`);
-  const wb = sheetToWorkbook('หมวดต้นทุน', [
+  const wb = sheetToWorkbook('หมวดงาน', [
     { header: 'รหัส', key: 'code', width: 10 },
-    { header: 'ชื่อหมวดต้นทุน', key: 'name', width: 44 },
+    { header: 'ชื่อหมวดงาน', key: 'name', width: 44 },
     { header: 'ชื่อภาษาอังกฤษ', key: 'name_en', width: 34 },
     { header: 'เปิดใช้งาน', key: 'is_active', width: 10 },
   ], rows);
-  await sendXlsx(res, wb, 'หมวดต้นทุน.xlsx');
+  await sendXlsx(res, wb, 'หมวดงาน.xlsx');
 }));
 
 /**
@@ -1724,17 +1724,17 @@ router.post('/import/activities', requirePermission('performance', 'edit'), impo
       if (!code) { bad.push({ row: r._row, reason: 'ไม่มีรหัสงาน' }); continue; }
       if (!name) { bad.push({ row: r._row, reason: 'ไม่มีชื่องาน' }); continue; }
       if (!/^[A-Z]-\d+$/i.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ผิดรูปแบบ (ต้องเป็นแบบ A-1)` }); continue; }
-      const allowed = String(pick(r, 'หมวดต้นทุนที่อนุญาต', 'allowed_cost') || '')
+      const allowed = String(pick(r, 'หมวดงานที่อนุญาต', 'allowed_cost') || '')
         .split(/[,\s]+/).filter(Boolean);
       const unknown = allowed.filter((c) => !costCodes.has(c));
-      if (unknown.length) { bad.push({ row: r._row, reason: `หมวดต้นทุนไม่มีในทะเบียน: ${unknown.join(', ')}` }); continue; }
+      if (unknown.length) { bad.push({ row: r._row, reason: `หมวดงานไม่มีในทะเบียน: ${unknown.join(', ')}` }); continue; }
       ok.push({
         code: code.toUpperCase(), name,
         name_en: pick(r, 'ชื่อภาษาอังกฤษ', 'name_en') || null,
         description: pick(r, 'คำอธิบาย', 'description') || null,
         category: pick(r, 'หมวดหมู่', 'category') || null,
-        mapping: pick(r, 'การจับคู่หมวดต้นทุน', 'mapping') || 'one-to-many',
-        fixed_cost: pick(r, 'หมวดต้นทุนตายตัว', 'fixed_cost') || null,
+        mapping: pick(r, 'การจับคู่หมวดงาน', 'mapping') || 'one-to-many',
+        fixed_cost: pick(r, 'หมวดงานตายตัว', 'fixed_cost') || null,
         allowed_cost: allowed.length ? allowed.join(',') : null,
       });
     }
@@ -2053,7 +2053,7 @@ router.post('/bulk', requireFeature('mandayEntry'), requirePermission('performan
 }));
 
 // ── §8 รายงานเป็น PDF ─────────────────────────────────────────────────────
-const GROUP_TH = { cost: 'รายหมวดต้นทุน', worktype: 'รายประเภทงาน', project: 'รายโครงการ', employee: 'รายพนักงาน' };
+const GROUP_TH = { cost: 'รายหมวดงาน', worktype: 'รายประเภทงาน', project: 'รายโครงการ', employee: 'รายพนักงาน' };
 router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');

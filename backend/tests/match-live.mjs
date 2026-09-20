@@ -129,7 +129,7 @@ suite('6. ทะเบียนงานออก-เข้าเป็น Excel
 {
   for (const [path, label] of [
     ['/performance/export/activities.xlsx', 'ทะเบียนงาน'],
-    ['/performance/export/cost-categories.xlsx', 'หมวดต้นทุน'],
+    ['/performance/export/cost-categories.xlsx', 'หมวดงาน'],
   ]) {
     const r = await call(path, { user: A, raw: true });
     const buf = Buffer.from(await r.arrayBuffer());

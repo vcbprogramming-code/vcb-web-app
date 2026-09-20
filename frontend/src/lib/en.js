@@ -257,7 +257,7 @@ export const EN = {
   'พนักงาน (': 'Employees (',
   'คลิกเซลล์เพื่อกระโดดไปแก้พนักงาน/วันนั้นในมุมมองสัปดาห์':
     'Click a cell to jump to that person and day in the weekly view',
-  'คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · เซลล์ที่เกิน':
+  'คลิกช่องเพื่อเลือกกิจกรรม → หมวดงาน · เซลล์ที่เกิน':
     'Click a cell to pick an activity → cost category · cells past',
   'วันจะล็อกอัตโนมัติ': 'days lock automatically',
   'ลงบันทึกรายวัน': 'Daily log',
@@ -267,7 +267,7 @@ export const EN = {
   'ส่งออก Excel': 'Export Excel',
   'เลือกไซต์งาน': 'Choose a site',
   'เลือกกิจกรรม': 'Choose an activity',
-  'เลือกหมวดต้นทุน · งาน:': 'Choose a cost category · activity:',
+  'เลือกหมวดงาน · งาน:': 'Choose a work category · activity:',
   'ไม่พบรายการ "': 'Nothing found for "',
   'จำนวนวันต้องอยู่ระหว่าง 0–60': 'The number of days must be between 0 and 60',
   'บันทึกจำนวนวันล็อกแล้ว': 'Lock window saved',
@@ -284,10 +284,10 @@ export const EN = {
   'หมวดหมู่ *': 'Category *',
   'A · งานสำนักงาน': 'A · Office work',
   'ชื่อกิจกรรม *': 'Activity name *',
-  'การจับคู่หมวดต้นทุน': 'Cost-category mapping',
-  'เลือกหมวดต้นทุนเอง (2 ขั้นตอน)': 'Pick the cost category by hand (two steps)',
-  'กำหนดหมวดต้นทุนอัตโนมัติ (ขั้นตอนเดียว)': 'Set the cost category automatically (one step)',
-  'รหัสหมวดต้นทุนอัตโนมัติ': 'Automatic cost-category code',
+  'การจับคู่หมวดงาน': 'Work-category mapping',
+  'เลือกหมวดงานเอง (2 ขั้นตอน)': 'Pick the work category by hand (two steps)',
+  'กำหนดหมวดงานอัตโนมัติ (ขั้นตอนเดียว)': 'Set the work category automatically (one step)',
+  'รหัสหมวดงานอัตโนมัติ': 'Automatic work-category code',
   'เช่น 5': 'e.g. 5',
   'ชื่อ (ไทย) *': 'Name (Thai) *',
   'กิจกรรม': 'Activities',
@@ -296,7 +296,7 @@ export const EN = {
   'เลือกเอง': 'By hand',
   'ชื่อ (ไทย)': 'Name (Thai)',
   'บันทึกกิจกรรมแล้ว': 'Activity saved',
-  'บันทึกหมวดต้นทุนแล้ว': 'Cost category saved',
+  'บันทึกหมวดงานแล้ว': 'Work category saved',
 
   // ── การลาและใบลา ────────────────────────────────────────────────────────
   'บันทึกผู้อนุมัติแล้ว': 'Approvers saved',
@@ -1188,7 +1188,7 @@ export const EN = {
   'ดูทั้งหมด ({n})': 'Show all ({n})',
   'ความคืบหน้า': 'Progress',
   'กิจกรรมหลัก': 'Main activities',
-  'หมวดงานหลัก': 'Main cost categories',
+  'หมวดงานหลัก': 'Main work categories',
 
   // ── หน้าอนุมัติจากลิงก์อีเมล ────────────────────────────────────────────
   'ส่งต่อให้ผู้อนุมัติลำดับถัดไปแล้ว': 'passed to the next approver',
@@ -1481,7 +1481,7 @@ export const EN = {
   'หนึ่งวันที่มีงานลง = 1 แรงงาน-วัน · ลงสองงานในวันเดียวแบ่งเป็น 0.5/0.5':
     'A day with any task logged is 1 man-day; two tasks on one day split 0.5/0.5.',
   'จำนวนรายการในรายงาน': 'Rows in report',
-  'รายหมวดต้นทุน': 'By cost category',
+  'รายหมวดงาน': 'By work category',
   'จากคำขอลาเลขที่': 'From leave request',
 
   // ── แผนผังระบบ: คำอธิบายสัญลักษณ์และการแสดงเส้นเชื่อม ────────────────────
@@ -1711,7 +1711,7 @@ export const EN = {
   'แก้ไขย้อนหลัง (ผู้ดูแลระบบ)': 'Back-date edit (admin)',
   'เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้': 'Past the edit window — an admin can switch on back-date edit',
   'สัปดาห์': 'Week',
-  'คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · บันทึกให้อัตโนมัติทันทีที่เลือก · เซลล์ที่เกิน': 'Click a cell to pick activity → cost category · saved automatically · cells older than',
+  'คลิกช่องเพื่อเลือกกิจกรรม → หมวดงาน · บันทึกให้อัตโนมัติทันทีที่เลือก · เซลล์ที่เกิน': 'Click a cell to pick activity → work category · saved automatically · cells older than',
   'วันจะล็อกอัตโนมัติ (ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้)': 'days lock automatically (admins can switch on back-date edit)',
   'ปกติหนึ่งวันเลือกงานเดียว ถ้าทำสองงานให้เพิ่มที่ช่อง “+ งานที่ 2” — หนึ่งวันเท่ากับหนึ่งวันทำงานเสมอ ถ้าทำสองงานจะนับงานละครึ่งวัน': 'One task per day is the norm; for a second task use “+ งานที่ 2”. A day is always one man-day — two tasks count half each.',
   'คำขอรออนุมัติ': 'requests awaiting approval',

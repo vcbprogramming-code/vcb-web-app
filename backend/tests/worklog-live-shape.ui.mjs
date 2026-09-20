@@ -158,7 +158,8 @@ suite('หน้าจอเหลือห้าหน้าเท่าระ�
 {
   await as(A);
   const tabs = await page.evaluate(() => [...document.querySelectorAll('button')]
-    .map((b) => b.innerText.trim())
+    // แท็บการลามีตัวเลขคำขอที่รออนุมัติต่อท้าย ("การลา 3") — ตัดตัวเลขก่อนเทียบชื่อ
+    .map((b) => b.innerText.trim().replace(/\s*\d+\+?$/, ''))
     .filter((x) => ['ภาพรวม', 'ลงบันทึกรายวัน', 'แรงงาน-วัน', 'รายงาน', 'การลา', 'ทะเบียนงาน', 'ตั้งค่า'].includes(x)));
   happy(`เห็นแท็บ ${tabs.length} แท็บ`, tabs.length === 6, tabs.join(' · ')); // 5 + ทะเบียนงาน (admin)
   bad('ไม่มีแท็บ "แรงงาน-วัน" แล้ว', !tabs.includes('แรงงาน-วัน'), tabs.join(' · '));

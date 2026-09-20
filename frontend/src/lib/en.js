@@ -1705,4 +1705,15 @@ export const EN = {
   'ชื่อไฟล์ (เว้นว่างได้)': 'File name (optional)',
   'ชื่อไฟล์': 'File name',
   '+ เพิ่มไฟล์แนบ': '+ Add attachment',
+  // ── หน้าลงบันทึกรายวัน รอบเทียบ UX (2026-09-20)
+  'เฉพาะผู้ดูแลระบบ — เปิดไว้เพื่อแก้ข้อมูลของวันที่เลยกำหนดแล้ว': 'Admins only — turn on to edit days that are already locked',
+  'แก้ไขย้อนหลังเปิดอยู่': 'Back-date edit ON',
+  'แก้ไขย้อนหลัง (ผู้ดูแลระบบ)': 'Back-date edit (admin)',
+  'เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้': 'Past the edit window — an admin can switch on back-date edit',
+  'สัปดาห์': 'Week',
+  'คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · บันทึกให้อัตโนมัติทันทีที่เลือก · เซลล์ที่เกิน': 'Click a cell to pick activity → cost category · saved automatically · cells older than',
+  'วันจะล็อกอัตโนมัติ (ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้)': 'days lock automatically (admins can switch on back-date edit)',
+  'ปกติหนึ่งวันเลือกงานเดียว ถ้าทำสองงานให้เพิ่มที่ช่อง “+ งานที่ 2” — หนึ่งวันเท่ากับหนึ่งวันทำงานเสมอ ถ้าทำสองงานจะนับงานละครึ่งวัน': 'One task per day is the norm; for a second task use “+ งานที่ 2”. A day is always one man-day — two tasks count half each.',
+  'คำขอรออนุมัติ': 'requests awaiting approval',
+  'ล็อก (อ่านอย่างเดียว · เกิน {n} วัน)': 'Locked (read-only · older than {n} days)',
 };

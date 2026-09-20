@@ -48,6 +48,9 @@ export default function Performance() {
   const [roster, setRoster] = useState([]);
   const [rosterKey, setRosterKey] = useState(0);
   const [exporting, setExporting] = useState(false);
+  // จำนวนคำขอลาที่รออนุมัติ — ขึ้นเป็นตัวเลขบนแท็บ "การลา" เหมือนระบบจริง
+  // ไม่งั้นคำขอค้างได้หลายวันโดยไม่มีใครรู้ว่ามีคนรออยู่
+  const [pendingLeave, setPendingLeave] = useState(0);
 
   const downloadExcel = async () => {
     if (!siteKey) return;
@@ -58,6 +61,13 @@ export default function Performance() {
     } catch (e) { toast.error(e.message || 'ส่งออกไม่สำเร็จ'); }
     finally { setExporting(false); }
   };
+
+  useEffect(() => {
+    perfApi.pendingLeave()
+      // เส้นทางนี้ตอบเป็น { ok, rows } ไม่ใช่ { data } — อ่านผิดคีย์แล้วป้ายจะเป็น 0 เสมอ
+      .then((r) => setPendingLeave((r.rows || r.data || []).length))
+      .catch(() => setPendingLeave(0));
+  }, [rosterKey, rawView]);
 
   // The leave form picks a person, so it needs the roster of the site in view.
   useEffect(() => {
@@ -92,7 +102,7 @@ export default function Performance() {
     { key: 'entry', label: t('ลงบันทึกรายวัน'), show: boot.canEntry },
     { key: 'manday', label: t('แรงงาน-วัน'), show: Boolean(f.mandayEntry) },
     { key: 'reports', label: t('รายงาน'), show: true },
-    { key: 'leave', label: t('การลา'), show: true },
+    { key: 'leave', label: t('การลา'), show: true, badge: pendingLeave },
     { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
   ].filter((x) => x.show);
@@ -119,8 +129,14 @@ export default function Performance() {
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         {tabs.map((tab) => (
           <button key={tab.key} onClick={() => setView(tab.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === tab.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            className={`relative rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${view === tab.key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
             {tab.label}
+            {tab.badge > 0 && (
+              <span title={`${tab.badge} ${t('คำขอรออนุมัติ')}`}
+                className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                {tab.badge > 99 ? '99+' : tab.badge}
+              </span>
+            )}
           </button>
         ))}
         {/* Which site you are looking at matters to both views: the grid shows its
@@ -154,7 +170,8 @@ export default function Performance() {
       {view === 'entry' && (
         boot.sites.length === 0
           ? <NoSites />
-          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name} cur={cur}
+          : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name}
+              siteColor={boot.sites.find((s) => s.key === siteKey)?.color} cur={cur}
               canEdit={boot.canEntry && boot.sites.find((s) => s.key === siteKey)?.active !== false} isAdmin={boot.isAdmin} />
       )}
 

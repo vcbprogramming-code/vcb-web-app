@@ -5,9 +5,11 @@ import { useT } from '../../lib/i18n.jsx';
  * Two-step searchable picker (port of the reference oppOpen/oppRender flow).
  * Step 1 = กิจกรรม (Activity), Step 2 = หมวดงาน (Cost Category). A one-to-one
  * activity skips step 2 and auto-applies its fixed cost. Stored value = "A-1 / 5".
- * Floats next to `anchor`; onApply('') clears the cell.
+ * ลอยอยู่ข้างช่องที่คลิก โดยรับ `rect` = พิกัดที่วัดไว้ตอนคลิก ไม่ใช่ตัว element
+ * เพราะตารางอาจวาดใหม่จน element เดิมหลุดออกจากหน้าจอก่อนกล่องจะวัดตำแหน่งได้
+ * (เคยทำให้กล่องไปเกาะมุมซ้ายบนทุกครั้ง) onApply('') = ล้างค่าในช่อง
  */
-export default function Picker({ anchor, activities, categories, siblingCode = '', onApply, onClose }) {
+export default function Picker({ rect, activities, categories, siblingCode = '', onApply, onClose }) {
   const t = useT();
   const [step, setStep] = useState(1);
   const [warn, setWarn] = useState('');
@@ -18,19 +20,30 @@ export default function Picker({ anchor, activities, categories, siblingCode = '
   const [pos, setPos] = useState({ left: 0, top: 0, width: 360, maxHeight: 460 });
 
   useLayoutEffect(() => {
-    if (!anchor) return;
-    const r = anchor.getBoundingClientRect();
-    const vw = window.innerWidth, vh = window.innerHeight, margin = 8, gap = 4;
-    const w = Math.min(560, vw - 2 * margin);
-    const left = Math.max(margin, Math.min(r.left, vw - w - margin));
-    const spaceBelow = vh - r.bottom - margin - gap;
-    const spaceAbove = r.top - margin - gap;
-    let h, top;
-    if (Math.max(spaceBelow, spaceAbove) < 260) { h = Math.min(460, vh - 2 * margin); top = Math.max(margin, Math.round((vh - h) / 2)); }
-    else if (spaceBelow >= spaceAbove) { h = Math.min(460, spaceBelow); top = r.bottom + gap; }
-    else { h = Math.min(460, spaceAbove); top = Math.max(margin, r.top - gap - h); }
-    setPos({ left, top, width: w, maxHeight: h });
-  }, [anchor, step]);
+    const place = () => {
+      const vw = window.innerWidth, vh = window.innerHeight, margin = 8, gap = 4;
+      const w = Math.min(560, vw - 2 * margin);
+      const h0 = Math.min(460, vh - 2 * margin);
+      // วัดตำแหน่งไม่ได้ (ไม่มีพิกัด หรือพิกัดเป็นศูนย์) → วางกลางจอ ดีกว่าไปกองมุมซ้ายบน
+      if (!rect || (!rect.width && !rect.height)) {
+        setPos({ left: Math.round((vw - w) / 2), top: Math.max(margin, Math.round((vh - h0) / 2)), width: w, maxHeight: h0 });
+        return;
+      }
+      const left = Math.max(margin, Math.min(rect.left, vw - w - margin));
+      const spaceBelow = vh - rect.bottom - margin - gap;
+      const spaceAbove = rect.top - margin - gap;
+      let h, top;
+      if (Math.max(spaceBelow, spaceAbove) < 260) { h = h0; top = Math.max(margin, Math.round((vh - h) / 2)); }
+      else if (spaceBelow >= spaceAbove) { h = Math.min(460, spaceBelow); top = rect.bottom + gap; }
+      else { h = Math.min(460, spaceAbove); top = Math.max(margin, rect.top - gap - h); }
+      setPos({ left, top, width: w, maxHeight: h });
+    };
+    place();
+    // เลื่อนตารางหรือย่อ-ขยายหน้าต่างแล้วกล่องต้องไม่ค้างอยู่ที่เดิมจนหลุดจอ
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [rect, step]);
 
   useEffect(() => { searchRef.current?.focus(); }, [step]);
   // ตัวปิดเมื่อคลิกนอกกล่องต้องทำงานที่ capture phase
@@ -127,7 +140,7 @@ export default function Picker({ anchor, activities, categories, siblingCode = '
               {groups[c].map((it) => {
                 const oneToOne = step === 1 && (it.mapping || 'one-to-many') === 'one-to-one';
                 return (
-                  <div key={it.code} onMouseDown={(e) => { e.preventDefault(); pick(it); }}
+                  <div key={it.code} data-pick-code={it.code} onMouseDown={(e) => { e.preventDefault(); pick(it); }}
                     className="cursor-pointer px-3 py-1.5 hover:bg-brand-tint">
                     <div className="flex items-center gap-1.5 text-sm text-slate-800">
                       {it.code && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{it.code}</span>}

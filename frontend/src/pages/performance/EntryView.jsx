@@ -20,6 +20,8 @@ const isoAdd = (iso, n) => {
   return dt.toISOString().slice(0, 10);
 };
 const dnum = (iso) => Number(iso.slice(8, 10));
+const TH_MONTH_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const thaiMonthShort = (iso) => TH_MONTH_SHORT[Number(iso.slice(5, 7)) - 1] || '';
 
 /**
  * Entry screen — record what each employee did each day. Two sub-views:
@@ -40,7 +42,7 @@ const leaveNote = (note) => {
 };
 
 
-export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) {
+export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, isAdmin }) {
   const t = useT();
   const toast = useToast();
   const [base, setBase] = useState(null);   // SiteMonth from server
@@ -55,7 +57,9 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
   // effect ที่ผูก listener ในตัวเลือกจะถอดแล้วติดใหม่ไม่หยุด และมีจังหวะที่กลืนคลิก
   // ที่ควรพาไปขั้นที่สอง — ข้อกำหนดฟังก์ชัน §3.2.3 ระบุจุดนี้ไว้ตรง ๆ
   const closePicker = useCallback(() => setPicker(null), []);
-  const [flash, setFlash] = useState('');
+  const [saveState, setSaveState] = useState('idle');   // idle | saving | saved | error
+  // ผู้ดูแลระบบต้องเปิดโหมดก่อนถึงจะแก้วันที่ล็อกแล้วได้ — กันแก้โดนโดยไม่ตั้งใจ
+  const [unlocked, setUnlocked] = useState(false);
   const [showEmp, setShowEmp] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const flashTimer = useRef();
@@ -100,7 +104,7 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
     return (a && p && a !== p) ? [a, p] : [a || p].filter(Boolean);
   };
 
-  const doFlash = (msg) => { setFlash(msg); clearTimeout(flashTimer.current); flashTimer.current = setTimeout(() => setFlash(''), 1400); };
+  const markSaved = () => { setSaveState('saved'); clearTimeout(flashTimer.current); flashTimer.current = setTimeout(() => setSaveState('idle'), 2500); };
   useEffect(() => () => clearTimeout(flashTimer.current), []); // clear pending flash on unmount
 
   // update one cell field locally + autosave. On failure revert ONLY this field
@@ -134,10 +138,11 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
       return next;
     };
     const prevValue = entries[eid]?.[date]?.[field] || null;
+    setSaveState('saving');
     setEntries((prev) => applyField(prev, value));
     perfApi.saveCell({ site: siteKey, eid, date, field, value, adminUnlock: unlock })
-      .then(() => doFlash(value ? 'บันทึกแล้ว ✓' : 'ล้างเซลล์'))
-      .catch((e) => { toast.error(e.message || 'บันทึกไม่สำเร็จ'); setEntries((prev) => applyField(prev, prevValue)); });
+      .then(markSaved)
+      .catch((e) => { setSaveState('error'); toast.error(e.message || 'บันทึกไม่สำเร็จ'); setEntries((prev) => applyField(prev, prevValue)); });
   };
 
   const jump = (eid, date) => {
@@ -162,7 +167,9 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
 
   return (
     <div className="space-y-3">
-      {/* sub-view toggle + manage employees + flash */}
+      {/* แถบสีประจำหน่วยงาน — เปิดสลับหลายหน่วยงานทั้งวันแล้วต้องรู้ได้ทันทีว่าอยู่ที่ไหน */}
+      {siteColor && <div className="h-1 rounded-full" style={{ background: siteColor }} />}
+      {/* sub-view toggle + manage employees + save state */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
           {/* "ความครบถ้วน", not "ภาพรวม" — the page already carries a top-level
@@ -186,8 +193,35 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
           title={t('ดาวน์โหลดตารางเดือนนี้เป็นไฟล์ Excel')}>
           <Icon name="download" className="h-4 w-4" /> Excel
         </a>
-        {flash && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">{flash}</span>}
+        {/* โหมดแก้ย้อนหลังของผู้ดูแลระบบ — ปิดไว้เป็นค่าเริ่มต้น ต้องกดเปิดก่อนถึงแก้วันที่ล็อกแล้วได้ */}
+        {isAdmin && canEdit && (
+          <button onClick={() => setUnlocked((v) => !v)}
+            title={t('เฉพาะผู้ดูแลระบบ — เปิดไว้เพื่อแก้ข้อมูลของวันที่เลยกำหนดแล้ว')}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+              unlocked ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+            <Icon name={unlocked ? 'undo' : 'lock'} className="h-4 w-4" />
+            {unlocked ? t('แก้ไขย้อนหลังเปิดอยู่') : t('แก้ไขย้อนหลัง (ผู้ดูแลระบบ)')}
+          </button>
+        )}
+        {/* ป้ายสถานะค้างอยู่ตลอด ไม่ใช่ข้อความวาบแล้วหาย — คนกรอกต้องรู้ได้ทุกเมื่อว่าบันทึกแล้วหรือยัง */}
+        <span className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+          { idle: 'bg-slate-100 text-slate-500', saving: 'bg-sky-50 text-sky-700', saved: 'bg-emerald-50 text-emerald-700', error: 'bg-red-50 text-red-700' }[saveState]}`}>
+          {saveState === 'saving' && <Icon name="clock" className="h-3.5 w-3.5" />}
+          {saveState === 'saved' && <Icon name="check" className="h-3.5 w-3.5" />}
+          {saveState === 'error' && <Icon name="warning" className="h-3.5 w-3.5" />}
+          {t({ idle: 'พร้อมแก้ไข', saving: 'กำลังบันทึก…', saved: 'บันทึกแล้ว', error: 'บันทึกไม่สำเร็จ' }[saveState])}
+        </span>
         {!canEdit && <span className="text-xs text-slate-400">{t('· โหมดดูอย่างเดียว')}</span>}
+      </div>
+
+      {/* คำอธิบายสีของช่อง — ของเดิมมีแต่ข้อความ ต้องเดาเองว่าสีไหนคืออะไร */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-dashed border-slate-200 pt-2 text-[11px] text-slate-500">
+        {[['#fdf0d4', 'วันหยุด'], ['#1d4e89', 'วันนี้'], ['#eef2f8', 'ล็อก (อ่านอย่างเดียว · เกิน {n} วัน)'], ['#1f9d55', 'บันทึกแล้ว']].map(([c, label]) => (
+          <span key={label} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded-sm border border-slate-200" style={{ background: c }} />
+            {t(label).replace('{n}', lockDays)}
+          </span>
+        ))}
       </div>
 
       {base.employees.length === 0 ? (
@@ -199,11 +233,12 @@ export default function EntryView({ siteKey, siteName, cur, canEdit, isAdmin }) 
       ) : mode === 'coverage'
         ? <Coverage d={d} today={today} cutoff={cutoff} ahead={ahead} lockDays={lockDays} jump={jump} ccodes={ccodes} cellTitle={cellTitle} />
         : <Weekly d={d} today={today} cutoff={cutoff} ahead={ahead} lockDays={lockDays} weekStart={weekStart} setWeekStart={setWeekStart}
-            focus={focus} canEdit={canEdit} isAdmin={isAdmin} openPicker={(eid, date, field, anchor, unlock) => setPicker({ eid, date, field, anchor, unlock })}
+            focus={focus} canEdit={canEdit} isAdmin={isAdmin} unlocked={unlocked}
+            openPicker={(eid, date, field, rect, unlock) => setPicker({ eid, date, field, rect, unlock })}
             cellDisplay={cellDisplay} cellTitle={cellTitle} />}
 
       {picker && (
-        <Picker anchor={picker.anchor} activities={base.teams} categories={base.costs}
+        <Picker rect={picker.rect} activities={base.teams} categories={base.costs}
           siblingCode={siblingCodeOf(picker)}
           onApply={(value) => { setCell(picker.eid, picker.date, picker.field, value, picker.unlock); setPicker(null); }}
           onClose={closePicker} />
@@ -315,36 +350,51 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
 }
 
 // ── Weekly: 7-day grid, each cell has primary + 2nd (pm) slot ─────────────────
-function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, focus, canEdit, isAdmin, openPicker, cellDisplay, cellTitle }) {
+/**
+ * ช่องงานหนึ่งช่องในตารางรายสัปดาห์
+ *
+ * ต้องอยู่นอก Weekly — ถ้าประกาศไว้ข้างในจะกลายเป็นคอมโพเนนต์ตัวใหม่ทุกครั้งที่
+ * ตารางวาดใหม่ React จึงถอดช่องทั้งหมดทิ้งแล้วสร้างใหม่ ผลคือ element ที่เพิ่ง
+ * ถูกคลิกหลุดออกจากหน้าจอก่อนที่กล่องเลือกกิจกรรมจะวัดตำแหน่งได้ กล่องเลยไป
+ * เกาะมุมซ้ายบนแทนที่จะโผล่ตรงช่องที่คลิก
+ */
+function Slot({ val, field, isSecond, weekend, locked, unlocked, canEdit, cellDisplay, cellTitle, onOpen }) {
+  const t = useT();
+  const ph = isSecond ? '+ งานที่ 2' : (weekend ? 'วันหยุด' : '+');
+  // ผู้ดูแลระบบแก้ช่องที่ล็อกได้เมื่อเปิดโหมดแก้ย้อนหลังไว้เท่านั้น
+  const clickable = (!locked || unlocked) && canEdit;
+  const hint = locked && !unlocked ? t('เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้') : undefined;
+  return (
+    <div
+      data-slot={field}
+      title={val ? cellTitle(val) : hint}
+      onClick={clickable ? (ev) => onOpen(field, ev.currentTarget.getBoundingClientRect()) : undefined}
+      className={`min-h-[22px] rounded px-1 py-0.5 text-[11px] leading-tight ${isSecond ? 'mt-0.5 border-t border-dashed border-slate-200 pt-1' : ''} ${
+        val ? 'font-medium text-slate-800' : 'text-slate-300'
+      } ${clickable ? 'cursor-pointer hover:bg-brand-tint' : ''} ${
+        // ช่องว่างที่คลิกได้ต้องดูออกว่าคลิกได้ ไม่ใช่ที่ว่างเปล่า
+        clickable && !val && !isSecond ? 'border border-dashed border-slate-200' : ''}`}>
+      {val ? cellDisplay(val) : (clickable ? ph : '')}
+    </div>
+  );
+}
+
+function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, focus, canEdit, isAdmin, unlocked, openPicker, cellDisplay, cellTitle }) {
   const t = useT();
   const start = Math.min(Math.max(0, weekStart), Math.max(0, d.days.length - 1));
   const count = Math.min(7, d.days.length - start);
   const visible = d.days.slice(start, start + count);
-  const wkLabel = visible.length ? `${dnum(visible[0].date)}–${dnum(visible[visible.length - 1].date)}` : '';
-
-  const Slot = ({ val, field, isSecond, weekend, locked, onOpen }) => {
-    const ph = isSecond ? '+ งานที่ 2' : (weekend ? 'วันหยุด' : '');
-    // admins may still edit locked (back-dated) cells — the save carries an
-    // adminUnlock flag; everyone else can only touch cells inside the window.
-    const clickable = (!locked || isAdmin) && canEdit;
-    const hint = locked && isAdmin ? 'เลยกำหนดแก้ไข — ผู้ดูแลระบบแก้ได้ (ปลดล็อก)' : undefined;
-    return (
-      <div
-        title={val ? cellTitle(val) : hint}
-        onClick={clickable ? (ev) => onOpen(field, ev.currentTarget) : undefined}
-        className={`min-h-[22px] rounded px-1 py-0.5 text-[11px] leading-tight ${isSecond ? 'mt-0.5 border-t border-dashed border-slate-200 pt-1' : ''} ${
-          val ? 'font-medium text-slate-800' : 'text-slate-300'
-        } ${clickable ? 'cursor-pointer hover:bg-brand-tint' : ''}`}>
-        {val ? cellDisplay(val) : (clickable ? ph : '')}
-      </div>
-    );
-  };
+  // ป้ายสัปดาห์บอกเดือนด้วย — "15 – 21" เฉย ๆ อ่านแล้วไม่รู้ว่าเดือนไหน
+  const wkLabel = visible.length
+    ? `${dnum(visible[0].date)} – ${dnum(visible[visible.length - 1].date)} ${thaiMonthShort(visible[visible.length - 1].date)}`
+    : '';
 
   return (
     <div className="card !p-3">
       <div className="mb-2 flex items-center gap-2">
         <button onClick={() => setWeekStart(Math.max(0, start - 7))} disabled={start <= 0} className="btn-outline !px-2 !py-1 disabled:opacity-40" title={t('สัปดาห์ก่อนหน้า')} aria-label={t('สัปดาห์ก่อนหน้า')}><Icon name="arrowLeft" className="h-4 w-4" /></button>
-        <span className="text-sm font-semibold text-slate-700">{t('วันที่')} {wkLabel}</span>
+        <span className="text-xs text-slate-400">{t('สัปดาห์')}</span>
+        <span className="text-sm font-semibold text-slate-700">{wkLabel}</span>
         <button onClick={() => setWeekStart(Math.min(Math.max(0, d.days.length - 1), start + 7))} disabled={start + 7 >= d.days.length} className="btn-outline !px-2 !py-1 disabled:opacity-40" title={t('สัปดาห์ถัดไป')} aria-label={t('สัปดาห์ถัดไป')}><Icon name="arrowRight" className="h-4 w-4" /></button>
       </div>
       <div className="overflow-x-auto">
@@ -394,11 +444,17 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                     const locked = day.date < cutoff || day.date > ahead;
                     const isFocus = focus && focus.eid === e.eid && focus.date === day.date;
                     // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window
-                    const onOpen = (field, anchor) => openPicker(e.eid, day.date, field, anchor, locked && isAdmin);
+                    const onOpen = (field, rect) => openPicker(e.eid, day.date, field, rect, locked && isAdmin && unlocked);
                     return (
-                      <td key={day.date} className={`rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
-                        <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked} onOpen={onOpen} />
-                        <Slot val={v.pm || ''} field="pm" isSecond weekend={day.weekend} locked={locked} onOpen={onOpen} />
+                      <td key={day.date} data-cell={day.date} className={`relative rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked && !(isAdmin && unlocked) ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
+                        {/* กุญแจเล็ก ๆ มุมขวาบน บอกว่าช่องนี้ล็อกแล้ว ไม่ใช่แค่จางเพราะว่าง */}
+                        {locked && (
+                          <Icon name="lock" className={`pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 ${isAdmin && unlocked ? 'text-amber-500' : 'text-slate-300'}`} />
+                        )}
+                        <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked}
+                          unlocked={isAdmin && unlocked} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
+                        <Slot val={v.pm || ''} field="pm" isSecond weekend={day.weekend} locked={locked}
+                          unlocked={isAdmin && unlocked} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
                         {lv && (
                           <div title={lv.ref ? `${t('จากคำขอลาเลขที่')} ${lv.ref}` : undefined}
                             className="mt-0.5 truncate rounded bg-indigo-50 px-1 text-[9px] font-medium leading-4 text-indigo-700">
@@ -425,7 +481,11 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-400">{t('คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · เซลล์ที่เกิน')} {lockDays} {t('วันจะล็อกอัตโนมัติ')}</p>
+      {/* คำอธิบายใต้ตาราง: บอกให้ครบเหมือนระบบจริง ทั้งการล็อก การบันทึกอัตโนมัติ และการนับแรงงาน-วัน */}
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+        {t('คลิกช่องเพื่อเลือกกิจกรรม → หมวดต้นทุน · บันทึกให้อัตโนมัติทันทีที่เลือก · เซลล์ที่เกิน')} {lockDays} {t('วันจะล็อกอัตโนมัติ (ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้)')}
+        {' · '}{t('ปกติหนึ่งวันเลือกงานเดียว ถ้าทำสองงานให้เพิ่มที่ช่อง “+ งานที่ 2” — หนึ่งวันเท่ากับหนึ่งวันทำงานเสมอ ถ้าทำสองงานจะนับงานละครึ่งวัน')}
+      </p>
     </div>
   );
 }

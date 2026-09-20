@@ -166,7 +166,8 @@ router.get('/bootstrap', asyncHandler(async (req, res) => {
     // ความปลอดภัย เพราะแต่ละเส้นทางกันตัวเองด้วย requireFeature อยู่แล้ว
     features: featureMap(),
     // โครงการที่ปิดแล้วยังส่งมา (ภาพรวมย้อนหลังยังต้องเห็น) หน้าจอกรองออกจากช่องเลือกบันทึกเอง
-    sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, lockDays: u.lock_days ?? 3, active: u.is_active !== false })),
+    sites: units.map((u) => ({ key: u.code, name: u.name, company: u.company, color: u.color || null,
+      lockDays: u.lock_days ?? 3, active: u.is_active !== false })),
   });
 }));
 

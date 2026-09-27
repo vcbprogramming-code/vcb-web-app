@@ -347,11 +347,26 @@ suite('3ง. ทางเข้าคำขอสินเชื่อใช้�
   happy('ขึ้นบรรทัดบอกวงเงินคงเหลือใต้ช่องจำนวนเงิน',
     (await body()).includes('คงเหลือใช้ได้'), '');
   await shot('03ง-ฟอร์มคำขอ');
-  await page.evaluate(() => {
+  const submit = () => page.evaluate(() => {
     const dlg = document.querySelector('[role="dialog"]');
     const b = dlg && [...dlg.querySelectorAll('button')].find((x) => x.innerText.trim() === 'ยื่นคำขอ');
     if (b) b.click();
   });
+  // ผู้รับผลประโยชน์เป็นช่องบังคับเหมือนฟอร์มของระบบจริง (saveReq กันไว้สี่ช่อง) —
+  // กดบันทึกโดยยังไม่กรอกต้องถูกทัก ไม่ใช่บันทึกคำขอที่ไม่รู้ว่าเงินออกไปให้ใคร
+  await submit();
+  await settle(1800);
+  bad('ยังไม่กรอกผู้รับผลประโยชน์ → ถูกทัก ไม่บันทึก',
+    (await body()).includes('กรอกข้อมูลที่จำเป็น (*) ให้ครบ'), '');
+  await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const inp = [...dlg.querySelectorAll('input')].find((x) => (x.placeholder || '').includes('สิริวัฒน์'));
+    if (!inp) return;
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, 'ZZUI ผู้รับผลประโยชน์');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await settle(700);
+  await submit();
   await settle(3200);
   const saved = (await query(
     'select amount, status from credit_requests where facility_id = $1 order by created_at desc limit 1',

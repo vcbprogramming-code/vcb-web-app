@@ -16,7 +16,7 @@ const IMPACT_TH = { High: 'สูง', Medium: 'ปานกลาง', Low: '�
 export default function NodeDetail({
   node, nodes, conns, depts, modules, lang, aiOpp,
   relatedFns = [], relatedForms = [], functionAi = [],
-  onSelect, onClose, onEdit, onOpenFunction,
+  onSelect, onClose, onEdit, onOpenFunction, onTrace,
 }) {
   const t = useT();
   const [pane, setPane] = useState('steps');
@@ -43,7 +43,9 @@ export default function NodeDetail({
   const items = (lang === 'th' && node.items_th?.length ? node.items_th : node.items_en) || [];
 
   const tabs = [
-    { key: 'steps', label: `${t('ขั้นตอน', null, 'sysmap')} (${items.length})` },
+    // กล่อง ERP เรียกว่า "ขั้นตอน" กล่องงานด้วยมือเรียกว่า "งาน" แบบระบบจริง —
+    // งานที่คั่นระหว่าง ERP ไม่ใช่ขั้นตอนในระบบ
+    { key: 'steps', label: `${node.node_type === 'erp' ? t('ขั้นตอน', null, 'sysmap') : t('งาน')} (${items.length})` },
     { key: 'conns', label: t('การเชื่อมต่อ') },
     ...(aiOpp ? [{ key: 'ai', label: t('โอกาส AI') }] : []),
   ];
@@ -117,7 +119,11 @@ export default function NodeDetail({
               {t(node.node_type === 'erp' ? NODE_KIND.erp : NODE_KIND.manual)}
             </span>
             {node.at_site && <span className="rounded-full bg-orange-400/20 px-2 py-0.5 text-[11px] font-semibold text-orange-200">{t('ทำที่หน้างาน')}</span>}
-            {node.unverified && <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200">{t('ยังไม่ยืนยัน')}</span>}
+            {/* ยืนยันแล้ว/ยังไม่ยืนยัน ขึ้นทั้งสองทางอย่างระบบจริง — ผังนี้อ่านในที่ประชุม
+                และ "ไม่มีป้าย" ถูกอ่านได้ทั้งว่ายืนยันแล้วและว่าลืมติดป้าย */}
+            {node.unverified
+              ? <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[11px] font-semibold text-amber-200">{t('ยังไม่ยืนยัน')}</span>
+              : <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">{t('ยืนยันแล้ว')}</span>}
           </div>
           <h3 className="mt-2 whitespace-pre-line text-lg font-bold leading-snug" style={{ color: CANVAS.text }}>
             {pick(lang, node.label_th, node.label_en)}
@@ -126,9 +132,18 @@ export default function NodeDetail({
             <p className="text-sm" style={{ color: CANVAS.muted }}>{pick(lang, node.sub_th, node.sub_en)}</p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {onEdit && (
             <button onClick={() => onEdit(node)} className="text-sm font-medium text-sky-300 hover:underline">{t('แก้ไข')}</button>
+          )}
+          {/* ไล่เส้นทาง — แผงนี้บอกได้แค่ว่ากล่องนี้ต่อกับใครหนึ่งช่วง คำถามที่คนถาม
+              จริงคือ "ของมาจากไหนและไปจบที่ไหน" ซึ่งต้องไล่ต่อไปหลายช่วง
+              อย่างปุ่ม ⤢ Trace ของระบบจริงที่อยู่ข้างปุ่มปิดตำแหน่งเดียวกันนี้ */}
+          {onTrace && (
+            <button onClick={onTrace} data-trace-open="1"
+              className="inline-flex items-center gap-1 rounded-lg border border-sky-400/50 bg-sky-400/10 px-2.5 py-1 text-sm font-semibold text-sky-200 transition hover:border-sky-300 hover:bg-sky-400/20">
+              <Icon name="flow" className="h-3.5 w-3.5" /> {t('ไล่เส้นทาง')}
+            </button>
           )}
           <button onClick={onClose}
             className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1 text-sm font-medium text-slate-300 transition hover:border-white/60 hover:text-white">

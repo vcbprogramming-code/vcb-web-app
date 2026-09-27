@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { holidaysForYear } from '../lib/portal.js';
 import Icon from './Icon.jsx';
-import { useT } from '../lib/i18n.jsx';
+import { useLang, useT } from '../lib/i18n.jsx';
 
 // Thai public-holiday month calendar (ported from the client's portal): month
 // grid with prev/next nav, weekend/holiday/today highlighting, a legend, and a
 // "next upcoming holiday" callout computed from the real today (not the viewed
 // month). Fixed-date holidays only — see lib/portal.js.
 
-const DOW = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+// หัวคอลัมน์วันสองภาษา — ระบบจริงสลับตามภาษาที่เลือก ของเราเคยตายเป็นไทย
+// ปฏิทินจึงเป็นไทยค้างอยู่ทั้งใบเวลาอ่านเป็นอังกฤษ
+const DOW_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+const DOW_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
 const keyOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 
@@ -46,6 +49,7 @@ function findNextHoliday(from) {
 
 export default function HolidayCalendar() {
   const t = useT();
+  const { lang } = useLang();
   const [view, setView] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   // re-evaluate "today" every minute so the today-highlight and the countdown
   // don't go stale on a dashboard left open past midnight
@@ -60,7 +64,11 @@ export default function HolidayCalendar() {
   const year = view.getFullYear();
   const month = view.getMonth();
   const holidays = useMemo(() => holidaysForYear(year), [year]);
-  const monthLabel = useMemo(() => view.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }), [view]);
+  // ไทยได้ปี พ.ศ. อังกฤษได้ปี ค.ศ. — มาจาก locale ตรง ๆ ไม่ได้คำนวณเอง
+  const monthLabel = useMemo(
+    () => view.toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { month: 'long', year: 'numeric' }),
+    [view, lang]);
+  const DOW = lang === 'en' ? DOW_EN : DOW_TH;
   const nextHoliday = useMemo(() => findNextHoliday(today), [today]);
 
   const cells = buildCells(year, month);
@@ -100,7 +108,7 @@ export default function HolidayCalendar() {
           else if (isWeekend) cls += 'text-rose-400';
           else cls += 'text-slate-600';
           return (
-            <div key={i} className="py-0.5" title={name || undefined}>
+            <div key={i} className="py-0.5" title={name ? t(name) : undefined}>
               <div className={cls}>
                 {c.day}
                 {/* centred under the digit; also shown on today (white so it reads on the brand fill) */}
@@ -122,7 +130,9 @@ export default function HolidayCalendar() {
       {nextHoliday && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
           <span className="min-w-0 text-slate-600">{t('วันหยุดถัดไป:')} <b>{t(nextHoliday.name)}</b> ({nextHoliday.date})</span>
-          <span className="shrink-0 font-semibold text-brand">{nextHoliday.daysAway === 0 ? 'วันนี้' : `อีก ${nextHoliday.daysAway} วัน`}</span>
+          <span className="shrink-0 font-semibold text-brand">
+            {nextHoliday.daysAway === 0 ? t('วันนี้') : t('อีก {n} วัน', { n: nextHoliday.daysAway })}
+          </span>
         </div>
       )}
     </div>

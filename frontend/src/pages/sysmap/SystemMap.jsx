@@ -11,6 +11,8 @@ import FunctionsView from './FunctionsView.jsx';
 import AiView from './AiView.jsx';
 import DocFlow from './DocFlow.jsx';
 import EditModal from './EditModal.jsx';
+import FocusTrace from './FocusTrace.jsx';
+import { pushTrail } from './trace.js';
 import { useLang, useT } from '../../lib/i18n.jsx';
 
 /**
@@ -51,10 +53,17 @@ export default function SystemMap() {
   // เส้นเงื่อนไขทับกันเต็มจอ ปิดข้างหนึ่งแล้วอีกข้างอ่านออกทันที
   const [showDirect, setShowDirect] = useState(true);
   const [showIndirect, setShowIndirect] = useState(true);
-  const [selected, setSelected] = useState(sp.get('node') || null);
-  // กดชิปรหัสหน้าที่บนแผงกล่องงานแล้วเปิดทะเบียนไปที่แถวนั้น — ส่งคำค้นข้ามแท็บ
-  const [fnQuery, setFnQuery] = useState('');
+  // ลิงก์ที่เปิดผังไล่เส้นทางมาเลย ให้กล่องนั้นเป็นกล่องที่เลือกไว้ด้วย อย่าง
+  // openFocus ของระบบจริงที่เปิดแผงรายละเอียดควบไปเสมอ — ปิดผังไล่เส้นทางแล้ว
+  // ต้องเจอรายละเอียดของกล่องเดิมรออยู่ ไม่ใช่ผังเปล่าที่ไม่รู้ว่าเพิ่งดูอะไรไป
+  const [selected, setSelected] = useState(sp.get('node') || sp.get('trace') || null);
+  // กดชิปรหัสหน้าที่บนแผงกล่องงานแล้วเปิดทะเบียนไปเน้นแถวนั้น — ส่งรหัสข้ามแท็บ
+  const [fnFocus, setFnFocus] = useState('');
   const [edit, setEdit] = useState(null); // { kind, row }
+  // ไล่เส้นทางของกล่องหนึ่งเป็นผังเชิงเส้น อย่างปุ่ม Trace ของระบบจริง — traceId คือ
+  // กล่องที่กำลังไล่ trail คือขั้นที่กดมา (เจ็ดขั้นล่าสุด ดู pushTrail)
+  const [traceId, setTraceId] = useState(sp.get('trace') || null);
+  const [trail, setTrail] = useState(sp.get('trace') ? [sp.get('trace')] : []);
 
   const load = () => {
     setError(null);
@@ -64,13 +73,36 @@ export default function SystemMap() {
   };
   useEffect(() => { load(); }, []);
 
+  /** เปิดหรือไล่ต่อจากกล่องหนึ่ง — กดกล่องในผังเชิงเส้นแล้วไล่ต่อได้เรื่อย ๆ */
+  const openTrace = (id) => {
+    if (!id) return;
+    setTraceId(id);
+    setTrail((cur) => pushTrail(cur, id));
+    setSelected(id);
+  };
+  const closeTrace = () => { setTraceId(null); setTrail([]); };
+
+  // Esc ปิดสิ่งที่เปิดทับอยู่ชั้นในสุดก่อน: ผังไล่เส้นทางกางเต็มจอ ปิดมันก่อนแผง
+  // รายละเอียดที่อยู่ข้างใต้ ไม่งั้นกด Esc ทีเดียวปิดทั้งสองชั้นพร้อมกัน
+  useEffect(() => {
+    if (!selected && !traceId) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (traceId) closeTrace();
+      else setSelected(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selected, traceId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // keep the shared link honest: what you see is what a copied URL reopens
   useEffect(() => {
     const next = {};
     if (tab !== 'map') next.tab = tab;
     if (selected) next.node = selected;
+    if (traceId) next.trace = traceId;
     setSp(next, { replace: true });
-  }, [tab, selected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, selected, traceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const node = useMemo(
     () => (boot && selected ? boot.nodes.find((n) => n.id === selected) : null),
@@ -134,7 +166,7 @@ export default function SystemMap() {
 
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
         {TABS.map((it) => (
-          <button key={it.key} onClick={() => { setTab(it.key); if (it.key !== 'map') setSelected(null); }}
+          <button key={it.key} onClick={() => { setTab(it.key); if (it.key !== 'map') { setSelected(null); closeTrace(); } }}
             className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
               tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
             <Icon name={it.icon} className="h-4 w-4" /> {t(it.label)}
@@ -201,8 +233,13 @@ export default function SystemMap() {
                 </button>
               );
             })()}
-            {(dept || onlySite || layer !== 'all') && (
-              <button onClick={() => { setDept(''); setOnlySite(false); setLayer('all'); }}
+            {(dept || onlySite || layer !== 'all' || !showDirect || !showIndirect) && (
+              /* ล้างทุกอย่างที่ผู้อ่านตั้งไว้ รวมสวิตช์ชนิดเส้นด้วย อย่างปุ่ม ✕ ของเขา —
+                 ปิดเส้นไว้แล้วกดล้างตัวกรองแต่เส้นยังไม่กลับมา คือกดแล้วเหมือนไม่ครบ */
+              <button onClick={() => {
+                setDept(''); setOnlySite(false); setLayer('all');
+                setShowDirect(true); setShowIndirect(true);
+              }}
                 title={t('ล้างตัวกรอง')}
                 className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-white/50 hover:text-white">
                 <Icon name="x" className="h-3.5 w-3.5" /> {t('ล้างตัวกรอง')}
@@ -257,7 +294,10 @@ export default function SystemMap() {
                   node={node} nodes={nodes} conns={conns} depts={depts} modules={modules} lang={lang}
                   aiOpp={nodeAi} relatedFns={relatedFns} relatedForms={relatedForms} functionAi={functionAi}
                   onSelect={setSelected} onClose={() => setSelected(null)}
-                  onOpenFunction={(code) => { setFnQuery(code); setSelected(null); setTab('functions'); }}
+                  onTrace={() => openTrace(node.id)}
+                  /* กล่องที่เลือกไว้ไม่ถูกปิด — กดกลับมาแท็บผังแล้วยังอยู่ที่เดิม
+                     แบบระบบจริงที่ทะเบียนเปิดทับผังไว้ ไม่ได้แทนที่ */
+                  onOpenFunction={(code) => { setFnFocus(code); setTab('functions'); }}
                   onEdit={canEdit ? (n) => setEdit({ kind: 'node', row: n }) : null}
                 />
               )}
@@ -270,7 +310,7 @@ export default function SystemMap() {
 
       {tab === 'functions' && (
         <FunctionsView rows={fns} depts={depts} lang={lang} canEdit={canEdit} functionAi={functionAi}
-          initialQuery={fnQuery} onQueryUsed={() => setFnQuery('')}
+          focusCode={fnFocus} onFocusUsed={() => setFnFocus('')}
           onEdit={(r) => setEdit({ kind: 'fn', row: r })} onNew={() => setEdit({ kind: 'fn' })} />
       )}
 
@@ -278,6 +318,27 @@ export default function SystemMap() {
         <AiView rows={ai} nodes={nodes} lang={lang} canEdit={canEdit}
           onOpenNode={(id) => { setTab('map'); setSelected(id); }}
           onEdit={(r) => setEdit({ kind: 'ai', row: r })} onNew={() => setEdit({ kind: 'ai' })} />
+      )}
+
+      {/* ผังไล่เส้นทาง — กางเต็มจอทับผังใหญ่ อย่างชั้น focus ของระบบจริง กล่องที่
+          ไล่อยู่ยังเป็นกล่องที่เลือกไว้ในผังใหญ่ด้วย ปิดแล้วจึงกลับมาเจอที่เดิม */}
+      {traceId && nodes.some((n) => n.id === traceId) && (
+        <FocusTrace
+          focusId={traceId} trail={trail}
+          lanes={lanes} nodes={nodes} conns={conns} depts={depts} lang={lang} aiByNode={ai}
+          onFocus={openTrace}
+          onBack={() => { const prev = trail[trail.length - 2]; if (prev) openTrace(prev); }}
+          onShowOnMap={() => {
+            const id = traceId;
+            closeTrace();
+            setSelected(id);
+            requestAnimationFrame(() => {
+              document.getElementById(`sysmap-node-${id}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            });
+          }}
+          onClose={closeTrace}
+        />
       )}
 
       {edit && (

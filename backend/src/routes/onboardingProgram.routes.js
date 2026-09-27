@@ -286,6 +286,14 @@ router.put('/progress/:itemId', asyncHandler(async (req, res) => {
   const content = await loadContent();
   const status = await statusFor(req.profile.id, content);
   if (!status.enrolled || !status.department) throw new ApiError(409, 'ยังไม่ได้เลือกแผนก');
+  // ข้อของแผนกอื่นไม่ใช่ของคนนี้ — และเหตุผลต้องบอกให้ตรง
+  //
+  // status.unlocked มีแต่คีย์ของเฟสในแผนกที่ลงทะเบียนไว้ ข้อของแผนกอื่นจึงได้
+  // undefined แล้วตกไปเข้าข้อความ "ต้องทำเฟสก่อนหน้าให้ครบก่อน" ซึ่งชี้ให้คนไปทำ
+  // สิ่งที่ทำแล้วก็ไม่ช่วย (เฟสก่อนหน้าของแผนกที่ไม่ได้เรียนไม่มีทางครบ)
+  if (!Object.prototype.hasOwnProperty.call(status.unlocked, item.phase_id)) {
+    throw new ApiError(409, 'รายการนี้ไม่อยู่ในแผนกที่คุณเลือกไว้');
+  }
   if (!status.unlocked[item.phase_id]) {
     throw new ApiError(409, status.lockReason[item.phase_id] === 'documents'
       ? 'ต้องส่งเอกสารให้ครบก่อนจึงจะเริ่มเฟสนี้ได้'

@@ -52,9 +52,15 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
 page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text().slice(0, 160)); });
 
-const as = async (user, path = '/sop') => {
+// ตั้งหน้าเริ่มต้นเป็น "กรณีทั้งหมด" ให้ทุกรอบ เพราะชุดนี้ตรวจรายการกรณีเป็นหลัก
+// ถ้าไม่ตั้ง ระบบจะเปิดมาที่ผังกระบวนการตามค่าเริ่มต้นของระบบจริง (ตรวจไว้ในข้อ 1)
+const as = async (user, path = '/sop', view = 'ALL') => {
   await page.goto(APP, { waitUntil: 'domcontentloaded' });
-  await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('hr_access_token', t); }, tok(user));
+  await page.evaluate((t, v) => {
+    localStorage.clear();
+    localStorage.setItem('hr_access_token', t);
+    if (v) localStorage.setItem('vcb_sop_default_view', v);
+  }, tok(user), view);
   await page.goto(`${APP}${path}`, { waitUntil: 'networkidle2' }).catch(() => {});
   await settle(3000);
 };
@@ -74,6 +80,24 @@ suite('1. เปิดคู่มือแล้วอ่านได้');
     t.includes('กรณีเฉพาะ') && t.includes('ผังกระบวนการ') && t.includes('วิธีเรียก Report'), '');
   happy('ผู้ดูแลเห็นแท็บประวัติเวอร์ชัน', t.includes('ประวัติเวอร์ชัน'), '');
   await shot('01-หน้าคู่มือ');
+
+  // ยังไม่เคยตั้งหน้าเริ่มต้น → เปิดมาที่ผังกระบวนการ ตามระบบจริง และหมวดของผัง
+  // กางอยู่ ส่วนหมวดของกรณียังพับ (กางได้ทีละกลุ่ม)
+  await as(A, '/sop', '');
+  const first = await page.evaluate(() => ({
+    flows: !!document.querySelector('[data-flowmod]'),
+    cases: !!document.querySelector('[data-mod]'),
+    open: document.querySelector('[data-group="flows"]')?.getAttribute('aria-expanded'),
+  }));
+  happy('ยังไม่ตั้งค่า → เปิดมาที่ผังกระบวนการ', first.flows && first.open === 'true', JSON.stringify(first));
+  happy('กางทีละกลุ่ม — หมวดของกรณียังพับอยู่', first.cases === false, JSON.stringify(first));
+  // กดหัวกลุ่มที่กางอยู่แล้ว = พับเก็บ ไม่ใช่เปลี่ยนหน้า
+  await page.evaluate(() => document.querySelector('[data-group="flows"]')?.click());
+  await settle(400);
+  happy('กดหัวกลุ่มซ้ำแล้วพับเก็บ',
+    await page.evaluate(() => !document.querySelector('[data-flowmod]')
+      && document.querySelector('[data-group="flows"]')?.getAttribute('aria-expanded') === 'false'), '');
+  await as(A);
 }
 
 // ── 2. ค้นหาและกรอง ──────────────────────────────────────────────────────

@@ -247,9 +247,18 @@ suite('3b. แผงรายละเอียดกล่องงาน — �
   happy('กดชิปรหัสหน้าที่แล้วเปิดทะเบียนไปที่แถวนั้น', await click('ACC-10'), '');
   await settle(1800);
   const jumped = await body();
-  happy('ทะเบียนถูกกรองเหลือรหัสที่กด',
-    jumped.includes('ACC-10') && /แสดง [1-3] จาก/.test(jumped),
+  // ระบบจริงเปิดทะเบียนทั้งฉบับแล้วเลื่อนไปเน้นแถวนั้น ไม่ได้กรองให้เหลือแถวเดียว —
+  // ผู้อ่านต้องยังเห็นหน้าที่อื่นของแผนกเดียวกันรอบ ๆ ซึ่งเป็นคำถามถัดไปเสมอ
+  happy('ทะเบียนเปิดมาทั้งฉบับ ไม่ถูกกรองเหลือแถวเดียว',
+    jumped.includes('ACC-10') && /แสดง 1[0-9][0-9] จาก/.test(jumped),
     (jumped.match(/แสดง \d+ จาก \d+/) || [''])[0]);
+  happy('แถวที่กดถูกเน้นและเลื่อนมาให้เห็น', await page.evaluate(() => {
+    const row = [...document.querySelectorAll('tr')]
+      .find((r) => (r.querySelector('td') || {}).innerText?.trim() === 'ACC-10');
+    if (!row) return false;
+    const r = row.getBoundingClientRect();
+    return /ring/.test(row.className) && r.top > 0 && r.top < window.innerHeight;
+  }), '');
   await shot('06e-กระโดดเข้าทะเบียน');
 
   await as(A, '/sysmap?node=n-gl');

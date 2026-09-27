@@ -118,6 +118,9 @@ export const EN = {
   'โหลดหน้าใหม่': 'Reload page',
   'ลองใหม่อีกครั้ง': 'Try again',
   'กรุณากรอกข้อความ': 'Please enter a message',
+  // กล่องช่วยเหลือ: ต้องเลือกส่วนที่เกี่ยวข้องและอธิบายปัญหาก่อนส่ง (อย่างระบบจริง)
+  'กรุณาเลือกสิ่งที่คุณกำลังทำอยู่': 'Choose what you were trying to do.',
+  'กรุณาอธิบายปัญหาก่อนส่ง': 'Describe the issue before sending.',
   'ส่งเรื่องถึงผู้ดูแลระบบแล้ว ขอบคุณครับ': 'Sent to your administrator. Thank you.',
   'ส่งเรื่อง': 'Send',
   'พบปัญหาการใช้งานหรือมีข้อสงสัย ส่งข้อความถึงผู้ดูแลระบบได้ที่นี่':
@@ -1882,6 +1885,9 @@ export const EN = {
   'เฉพาะหน้างาน': 'Site only',
   'เฉพาะขั้นตอนที่ทำที่หน้างาน': 'Only the steps done at the site',
   'ล้างตัวกรอง': 'Clear filters',
+  // บรรทัดสรุปของทะเบียนฟังก์ชัน — ชุดตัวเลขเดียวกับระบบจริง
+  'จุดที่คนนอกเป็นผู้กรอก': 'external entry points',
+  'งานที่ทำที่หน้างาน': 'field activities',
   'คำอธิบายสัญลักษณ์': 'Key',
   'ประเภทโหนด': 'Node types',
   'ขั้นตอน Mango ERP': 'Mango ERP step',
@@ -1908,6 +1914,22 @@ export const EN = {
   'ออก →': 'OUT →',
   'ไม่มีการเชื่อมต่อข้ามสายงาน โหนดนี้เชื่อมตามลำดับภายในเลน':
     'No cross-flow connections defined for this node. It connects sequentially within its lane.',
+  // ── แผนผังระบบ: ไล่เส้นทางของกล่องงาน (Trace) ───────────────────────────
+  // คำอังกฤษชุดนี้คือคำบนหน้าจอ Trace ของระบบจริง ไม่ใช่คำที่เราแปลขึ้นใหม่ —
+  // ผังสองระบบถูกเปิดเทียบกันในที่ประชุม สองคำศัพท์ต่อหนึ่งผังคือการแปลที่ไม่มีใครสั่ง
+  'ไล่เส้นทาง': 'Trace',
+  'เส้นทางเข้าและออกทั้งหมด · กดกล่องไหนก็ไล่ต่อจากกล่องนั้น':
+    'full in/out pathways · click any box to re-trace',
+  'แสดงบนผังใหญ่': 'Show on big map',
+  'ขั้นที่ไล่มา': 'Trace history',
+  'ผังเชิงเส้น — กล่องที่กำลังไล่ (ขอบเหลือง) พร้อมทุกอย่างที่ไหลเข้า (ซ้าย) และไหลออก (ขวา) ชี้ที่กล่องเพื่อเน้นเฉพาะเส้นของกล่องนั้น':
+    'Linear trace — the focused box (gold) with everything that flows IN (left) and OUT (right). Hover a box to highlight just its lines.',
+  'ไล่ให้ไม่เกิน {n} ช่วงต่อข้าง': 'Traced up to {n} hops each way.',
+  'กล่องนี้เป็นปลายทาง ไม่มีอะไรไหลออกต่อ': 'This box is the end of the line — nothing flows out of it.',
+  'กล่องนี้เป็นต้นทาง ไม่มีอะไรไหลเข้ามา': 'This box is a starting point — nothing flows into it.',
+  'กล่องนี้ไม่มีเส้นเชื่อมเข้าหรือออก จึงไม่มีเส้นทางให้ไล่':
+    'This box has no connections in or out, so there is no pathway to trace.',
+
   'ผลกระทบทางธุรกิจ': 'Business Impact',
   'ความยากในการนำไปใช้': 'Implementation Effort',
   'ความยาก': 'Effort',
@@ -2015,6 +2037,21 @@ export const EN = {
   'เพิ่มกรณีเฉพาะแล้ว': 'Case added',
   'กรุณากรอกชื่อกรณีเฉพาะ': 'Enter the case title',
   'ชื่อกรณีเฉพาะ (ไทย) *': 'Case title (Thai) *',
+  // ── หน้าต่างแก้ไขกรณี: หัวหน้าต่าง สลับตำแหน่ง และปุ่มลบในท้ายหน้าต่าง ──
+  'แก้ไขกรณีที่': 'Edit case',
+  'เพิ่มกรณีเฉพาะใหม่ · New case': 'New case',
+  'ลบกรณีนี้ · Delete': 'Delete this case',
+  'สลับตำแหน่ง': 'Swap position',
+  'สลับ': 'Swap',
+  'สลับตำแหน่งแล้ว': 'Positions swapped',
+  'เลือกกรณีที่จะสลับตำแหน่งด้วย': 'Pick the case to swap with',
+  'กรุณาเลือกกรณีที่ต้องการสลับตำแหน่งจากรายการ': 'Choose a case from the list to swap positions with.',
+  'สลับเลขกับกรณีที่เลือกในหมวดเดียวกัน · กรณีอื่นไม่ถูกเลื่อนตำแหน่ง':
+    'Swaps numbers with the chosen case in the same module · no other case moves',
+  // ── หัวเอกสารและตารางรายงาน: คำเดียวกับระบบจริง ──
+  'คำบรรยาย': 'Description',
+  'ระบบอ้างอิง': 'Reference manual',
+  'เลขกรณี · Case #': 'Case #',
   // บรรทัดนับผลลัพธ์เหนือรายการ (showingFmt ของเขา)
   'แสดง {n} จาก {total} กรณี': 'Showing {n} of {total} cases',
   'แสดง {n} จาก {total} ผัง': 'Showing {n} of {total} flows',

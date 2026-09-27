@@ -16,6 +16,8 @@ export const sopApi = {
   updateScenario: (no, body) => api(`/sop/scenarios/${no}`, { method: 'PATCH', body }),
   deleteScenario: (no) => api(`/sop/scenarios/${no}`, { method: 'DELETE' }),
   moveScenario: (no, direction) => api(`/sop/scenarios/${no}/move`, { method: 'POST', body: { direction } }),
+  /** สลับตำแหน่งกับกรณีที่เลือกไว้ทีเดียว (รหัสแสดงผล เช่น 'PO-5') แบบระบบจริง */
+  swapScenario: (no, swapWith) => api(`/sop/scenarios/${no}/swap`, { method: 'POST', body: { swapWith } }),
 
   /** หัวเอกสาร: ชื่อคู่มือ ฉบับ วันมีผล ขอบเขต วัตถุประสงค์ หมายเหตุ */
   updateMeta: (body) => api('/sop/meta', { method: 'PATCH', body }),
@@ -38,16 +40,59 @@ export const sopApi = {
  *
  * เก็บในเครื่องผู้ใช้เท่านั้น เป็นความสะดวกของคนคนเดียว ไม่ใช่ข้อมูลที่ต้องแชร์
  * และต้องอ่านไม่ขึ้นก็ยังใช้งานได้ปกติ (โหมดส่วนตัวของเบราว์เซอร์ทำให้ throw ได้)
+ *
+ * ค่าที่เก็บได้: 'ALL' = กรณีทั้งหมด · 'flows' = ผังกระบวนการ · 'reports' = วิธีเรียก
+ * Report หรือรหัสหมวด — ชุดเดียวกับตัวเลือกในหน้าตั้งค่าของระบบจริง (เดิมเก็บได้แต่
+ * หมวด คนที่ทำงานกับผังทุกวันจึงตั้งให้เปิดมาที่ผังไม่ได้)
  */
 export const SOP_DEFAULT_VIEW_KEY = 'vcb_sop_default_view';
+/**
+ * "ทั้งหมด" ต้องมีค่าเก็บของตัวเอง แยกจาก "ยังไม่เคยตั้งค่า" เพราะสองอย่างนี้พาไป
+ * คนละหน้า — ของเขาเก็บคำว่า ALL ไว้ตรง ๆ เราใช้คำเดียวกัน
+ */
+export const SOP_ALL_CASES = 'ALL';
 export function readDefaultView() {
   try { return localStorage.getItem(SOP_DEFAULT_VIEW_KEY) || ''; } catch { return ''; }
+}
+/**
+ * แปลงค่าที่เก็บไว้เป็น { tab, module } ที่หน้าจอใช้ได้ตรง ๆ
+ *
+ * ยังไม่เคยตั้งค่า = เปิดมาที่ผังกระบวนการ ตามระบบจริง (`getDefaultView()` ของเขา
+ * คืน 'flows' พร้อมหมายเหตุว่าผังเป็นสาขาหลักของคู่มือ) ของเราเคยเปิดมาที่รายการ
+ * กรณีทั้งหมด ซึ่งเป็นรายการยาวที่ต้องกวาดตาหาก่อนจะเจออะไร
+ */
+export function defaultViewToState(v) {
+  if (v === 'reports') return { tab: 'reports', module: '' };
+  if (v === SOP_ALL_CASES) return { tab: 'cases', module: '' };
+  if (!v || v === 'flows') return { tab: 'flows', module: '' };
+  return { tab: 'cases', module: v };
 }
 export function writeDefaultView(code) {
   try {
     if (code) localStorage.setItem(SOP_DEFAULT_VIEW_KEY, code);
     else localStorage.removeItem(SOP_DEFAULT_VIEW_KEY);
   } catch { /* โหมดส่วนตัว — ข้ามไป ไม่ใช่เรื่องที่ต้องเตือนผู้ใช้ */ }
+}
+
+/**
+ * ลำดับหมวดของผังกระบวนการ — ชุดและลำดับเดียวกับที่ระบบจริงจัดหัวข้อกลุ่มในรายการผัง
+ * ไม่ใช่ลำดับหมวดของกรณีเฉพาะ (ผังเริ่มที่ BD เพราะงานเริ่มจากงบประมาณ)
+ */
+export const FLOW_MODULE_ORDER = ['BD', 'PO', 'IC', 'OF', 'AP', 'AR', 'FA', 'GL'];
+
+/**
+ * ชื่อสองภาษาของข้อมูล — ภาษาที่เลือกขึ้นเป็นบรรทัดหลัก อีกภาษาเป็นบรรทัดรอง
+ *
+ * กรณีเฉพาะและผังทุกใบมีชื่อไทยและชื่ออังกฤษเก็บไว้คู่กัน ระบบจริงสลับให้ตามภาษา
+ * ที่เลือก (อังกฤษ → ชื่ออังกฤษขึ้นก่อน ไทยอยู่บรรทัดล่าง) ของเราเคยขึ้นไทยก่อน
+ * เสมอ กดเป็นอังกฤษแล้วชื่อทุกใบยังเป็นไทย · ไม่มีชื่ออังกฤษก็ถอยไปใช้ไทย
+ * ไม่ใช่ปล่อยว่าง — และนี่คือการ "เลือกค่าที่เก็บไว้" ไม่ใช่การแปลข้อความ
+ */
+export function titlePair(lang, th, en) {
+  const t = (th || '').trim();
+  const e = (en || '').trim();
+  if (lang === 'en' && e) return { primary: e, secondary: t };
+  return { primary: t || e, secondary: t && e ? e : '' };
 }
 
 /** Per-module accent, so a case/flow reads as belonging to its area at a glance. */

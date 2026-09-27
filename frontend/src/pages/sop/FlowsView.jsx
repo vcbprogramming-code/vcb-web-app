@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { sopApi, toneOf } from '../../lib/sop.js';
+import { sopApi, toneOf, titlePair, dotOf, FLOW_MODULE_ORDER } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
 import Swimlane from './Swimlane.jsx';
 import ShareButton from './ShareButton.jsx';
-import { useT } from '../../lib/i18n.jsx';
+import { useLang, useT } from '../../lib/i18n.jsx';
 
 /** ผังกระบวนการ: เลือกผังทางซ้าย อ่านผังทางขวา — ค้นหาจากแถบหัวโมดูลอันเดียว */
-export default function FlowsView({ module, q = '', sharedId, total }) {
+export default function FlowsView({ module, q = '', sharedId, total, modules = [] }) {
   const t = useT();
+  const { lang } = useLang();
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
   // a ?flow=ID link lands on that diagram; an id that no longer exists just
@@ -49,6 +50,21 @@ export default function FlowsView({ module, q = '', sharedId, total }) {
   if (!shown) return <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดผังกระบวนการ…')} /></div>;
 
   const flow = shown.find((f) => f.id === openId) || shown[0];
+  // 33 ผังในรายการเดียวอ่านไม่ออก ระบบจริงคั่นหัวข้อหมวดไว้ตามลำดับที่งานเดินจริง
+  // (BD ก่อน เพราะเริ่มจากงบประมาณ) แล้วต่อด้วยหมวดที่ไม่อยู่ในลำดับนั้น
+  const nameOf = new Map(modules.map((m) => [m.code, m]));
+  const groups = (() => {
+    const bucket = new Map();
+    for (const f of shown) {
+      if (!bucket.has(f.module)) bucket.set(f.module, []);
+      bucket.get(f.module).push(f);
+    }
+    const codes = [
+      ...FLOW_MODULE_ORDER.filter((c) => bucket.has(c)),
+      ...[...bucket.keys()].filter((c) => !FLOW_MODULE_ORDER.includes(c)),
+    ];
+    return codes.map((c) => ({ code: c, mod: nameOf.get(c), items: bucket.get(c) }));
+  })();
 
   return (
     <div className="space-y-3">
@@ -77,15 +93,27 @@ export default function FlowsView({ module, q = '', sharedId, total }) {
           </select>
 
           <div className="hidden max-h-[74vh] space-y-1.5 overflow-y-auto pr-1 xl:block">
-            {shown.map((f) => (
-              <button key={f.id} onClick={() => setOpenId(f.id)}
-                className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
-                  flow.id === f.id ? 'border-navy ring-1 ring-navy/30' : 'border-slate-200 hover:border-slate-300'
-                } bg-white`}>
-                <span className={`chip font-semibold ${toneOf(f.module)}`}>{f.id}</span>
-                <div className="mt-1 text-sm font-bold leading-snug text-slate-800">{f.title_th}</div>
-                {f.title_en && <div className="truncate text-[11px] text-slate-500">{f.title_en}</div>}
-              </button>
+            {groups.map((g) => (
+              <div key={g.code} className="space-y-1.5">
+                <div className="flex items-center gap-2 px-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${dotOf(g.code)}`} />
+                  {g.code} · {g.mod?.name_th_short || ''}
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+                {g.items.map((f) => {
+                  const name = titlePair(lang, f.title_th, f.title_en);
+                  return (
+                    <button key={f.id} onClick={() => setOpenId(f.id)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                        flow.id === f.id ? 'border-navy ring-1 ring-navy/30' : 'border-slate-200 hover:border-slate-300'
+                      } bg-white`}>
+                      <span className={`chip font-semibold ${toneOf(f.module)}`}>{f.id}</span>
+                      <div className="mt-1 text-sm font-bold leading-snug text-slate-800">{name.primary}</div>
+                      {name.secondary && <div className="truncate text-[11px] text-slate-500">{name.secondary}</div>}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
@@ -93,8 +121,15 @@ export default function FlowsView({ module, q = '', sharedId, total }) {
             <header className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <span className={`chip font-semibold ${toneOf(flow.module)}`}>{flow.id}</span>
-                <h3 className="mt-2 text-lg font-bold text-slate-800">{flow.title_th}</h3>
-                {flow.title_en && <p className="text-sm text-slate-500">{flow.title_en}</p>}
+                {(() => {
+                  const name = titlePair(lang, flow.title_th, flow.title_en);
+                  return (
+                    <>
+                      <h3 className="mt-2 text-lg font-bold text-slate-800">{name.primary}</h3>
+                      {name.secondary && <p className="text-sm text-slate-500">{name.secondary}</p>}
+                    </>
+                  );
+                })()}
               </div>
               <ShareButton param="flow" value={flow.id} className="shrink-0" />
             </header>

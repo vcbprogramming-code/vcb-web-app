@@ -77,7 +77,7 @@ export default function MetaModal({ meta, onClose, onSaved }) {
           <input value={form.title} onChange={(e) => set('title', e.target.value)} className="field" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('คำบรรยายใต้ชื่อ')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('คำบรรยาย')}</label>
           <input value={form.subtitle} onChange={(e) => set('subtitle', e.target.value)} className="field" />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -90,7 +90,7 @@ export default function MetaModal({ meta, onClose, onSaved }) {
             <input value={form.effective} onChange={(e) => set('effective', e.target.value)} placeholder={t('เช่น เมษายน 2569')} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('คู่มืออ้างอิง')}</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ระบบอ้างอิง')}</label>
             <input value={form.manual} onChange={(e) => set('manual', e.target.value)} placeholder="Mango ERP Manual 14.3.68" className="field" />
           </div>
         </div>

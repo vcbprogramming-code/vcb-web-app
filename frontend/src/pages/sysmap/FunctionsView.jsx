@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { pick, SITE_DEPT, deptOf, fnTypeLabel, fnTypeIsErp } from '../../lib/sysmap.js';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
@@ -16,24 +16,40 @@ import { useT } from '../../lib/i18n.jsx';
  * argument about scope actually happens.
  */
 export default function FunctionsView({
-  rows, depts, lang, canEdit, functionAi = [], initialQuery = '', onQueryUsed, onEdit, onNew,
+  rows, depts, lang, canEdit, functionAi = [], focusCode = '', onFocusUsed, onEdit, onNew,
 }) {
   const t = useT();
   const [dept, setDept] = useState('');
-  const [q, setQ] = useState(initialQuery);
+  const [q, setQ] = useState('');
   const [onlySite, setOnlySite] = useState(false);
   const [onlyManual, setOnlyManual] = useState(false);
+  // แถวที่ถูกชี้มาจากชิปรหัสบนแผงกล่องงาน — เน้นไว้ชั่วครู่แล้วปล่อย
+  const [hl, setHl] = useState('');
+  const rowRefs = useRef(new Map());
 
-  // มาจากชิปรหัสบนแผงกล่องงาน — เปิดทะเบียนมาแล้วต้องเห็นแถวนั้นทันที
-  // ไม่ใช่ให้ผู้อ่านพิมพ์รหัสตามที่เพิ่งกดไปเอง
+  /**
+   * มาจากชิปรหัสบนแผงกล่องงาน — ระบบจริงเปิดทะเบียนทั้งฉบับแล้วเลื่อนไปเน้นแถวนั้น
+   * ไม่ได้กรองให้เหลือแถวเดียว ผู้อ่านจึงยังเห็นหน้าที่อื่นของแผนกเดียวกันอยู่รอบ ๆ
+   * ซึ่งเป็นคำถามถัดไปเสมอ (ของเราเคยยัดรหัสลงช่องค้นหา เหลือแถวเดียวโดด ๆ)
+   */
   useEffect(() => {
-    if (!initialQuery) return;
-    setQ(initialQuery);
+    if (!focusCode) return;
+    setQ('');
     setDept('');
     setOnlySite(false);
     setOnlyManual(false);
-    onQueryUsed?.();
-  }, [initialQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+    setHl(focusCode);
+    onFocusUsed?.();
+    const timer = setTimeout(() => setHl(''), 2800);
+    return () => clearTimeout(timer);
+  }, [focusCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // เลื่อนหาแถวหลังจากตารางวาดเสร็จแล้ว ไม่ใช่ตอนกด (ตอนนั้นแถวยังไม่มีในหน้า)
+  useEffect(() => {
+    if (!hl) return;
+    const el = rowRefs.current.get(hl);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [hl]);
 
   const aiOf = useMemo(() => new Map(functionAi.map((a) => [a.code, a])), [functionAi]);
   // แผนกในทะเบียนมีหน้างานเพิ่มมาอีกกลุ่ม ต่อท้ายชุดแผนกจริง
@@ -57,6 +73,7 @@ export default function FunctionsView({
 
   const inDept = (k) => rows.filter((r) => r.dept === k).length;
   const siteCount = rows.filter((r) => r.at_site).length;
+  const extCount = rows.filter((r) => r.external_entry).length;
   const aiCount = rows.filter((r) => aiOf.get(r.code)?.in_registry).length;
   const chip = (on) => `rounded-full border px-3 py-1.5 text-sm font-medium transition ${
     on ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'}`;
@@ -111,8 +128,12 @@ export default function FunctionsView({
         {canEdit && <button onClick={onNew} className="btn-primary !py-2 !text-sm"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มฟังก์ชัน')}</button>}
       </div>
 
+      {/* บรรทัดสรุปของระบบจริงบอกสามตัวเลข: จำนวนแถว จุดที่คนนอกเป็นผู้กรอก และงาน
+          ที่ทำที่หน้างาน — สองตัวหลังเป็นข้อมูลที่ใช้เถียงเรื่องขอบเขตกันจริง ๆ */}
       <p className="text-xs text-slate-500">
         {t('แสดง')} {list.length} {t('จาก')} {rows.length} {t('รายการ')}
+        {' · '}{extCount} {t('จุดที่คนนอกเป็นผู้กรอก')}
+        {' · '}{siteCount} {t('งานที่ทำที่หน้างาน')}
         {aiCount > 0 && <> · {aiCount} {t('รายการมีเครื่องมือ AI รองรับ')}</>}
       </p>
 
@@ -136,7 +157,8 @@ export default function FunctionsView({
               const g = deptOf(depts, r.dept);
               const ai = aiOf.get(r.code);
               return (
-                <tr key={r.code} className="align-top">
+                <tr key={r.code} ref={(el) => { if (el) rowRefs.current.set(r.code, el); else rowRefs.current.delete(r.code); }}
+                  className={`align-top transition ${hl === r.code ? 'bg-brand-tint ring-2 ring-inset ring-brand/50' : ''}`}>
                   <td className="tbl-td font-mono text-xs text-slate-500">{r.code}</td>
                   <td className="tbl-td">
                     <div className="font-medium text-slate-800">{pick(lang, r.name_th, r.name_en)}</div>

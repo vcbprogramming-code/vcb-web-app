@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { sopApi, readDefaultView, writeDefaultView } from '../../lib/sop.js';
+import { sopApi, readDefaultView, writeDefaultView, defaultViewToState } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
 import ScenariosView from './ScenariosView.jsx';
 import FlowsView from './FlowsView.jsx';
@@ -41,9 +41,12 @@ export default function Sop() {
 
   const [boot, setBoot] = useState(null);
   const [error, setError] = useState(null);
-  const [tab, setTab] = useState(sharedFlow ? 'flows' : 'cases');
   // หน้าเริ่มต้นที่ผู้ใช้เลือกไว้ในการตั้งค่า — ลิงก์ตรงมีสิทธิ์เหนือกว่าเสมอ
-  const [module, setModule] = useState(() => (sharedCase || sharedFlow ? '' : readDefaultView()));
+  // ค่าที่ตั้งได้ไม่ใช่แค่หมวด แต่รวม "ผังกระบวนการ" และ "วิธีเรียก Report" ด้วย
+  // แบบระบบจริง (คนที่เปิดมาดูผังทุกวันเคยตั้งให้เปิดมาที่ผังไม่ได้)
+  const startAt = () => (sharedCase || sharedFlow ? null : defaultViewToState(readDefaultView()));
+  const [tab, setTab] = useState(() => (sharedFlow ? 'flows' : (startAt()?.tab || 'cases')));
+  const [module, setModule] = useState(() => startAt()?.module || '');
   const [q, setQ] = useState('');          // ช่องค้นหาเดียว ใช้กับทุกมุมมอง
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);   // หน้าต่าง "แก้ไขหัวเอกสาร" แบบของเขา
@@ -67,8 +70,9 @@ export default function Sop() {
   useEffect(() => {
     if (!boot || checkedDefault.current) return;
     checkedDefault.current = true;
-    if (module && !boot.counts.scenarios[module]) setModule('');
-  }, [boot, module]);
+    const per = tab === 'flows' ? boot.counts.flows : boot.counts.scenarios;
+    if (module && !per[module]) setModule('');
+  }, [boot, module, tab]);
 
   if (error) {
     return (
@@ -94,9 +98,10 @@ export default function Sop() {
         <div className="min-w-0 space-y-4">
           {tab === 'cases' && (
             <ScenariosView modules={modules} module={module} q={q} canEdit={canEdit} onChanged={load}
-              sharedNo={sharedCase} total={counts.scenarioTotal} onClearModule={() => setModule('')} />
+              sharedNo={sharedCase} total={counts.scenarioTotal} onClearModule={() => setModule('')}
+              meta={meta} reportCount={counts.reports} />
           )}
-          {tab === 'flows' && <FlowsView module={module} q={q} sharedId={sharedFlow} total={counts.flowTotal} />}
+          {tab === 'flows' && <FlowsView module={module} q={q} sharedId={sharedFlow} total={counts.flowTotal} modules={modules} />}
           {tab === 'reports' && <ReportsView canEdit={canEdit} q={q} onChanged={load} />}
           {tab === 'versions' && <VersionsView canEdit={canEdit} onRestored={load} />}
 
@@ -140,7 +145,15 @@ export default function Sop() {
 
       {settingsOpen && (
         <SopSettings modules={modules} counts={counts.scenarios} onClose={() => setSettingsOpen(false)}
-          onDefaultView={(code) => { writeDefaultView(code); }} />
+          onDefaultView={(code) => {
+            writeDefaultView(code);
+            // ระบบจริงพาไปหน้านั้นทันทีที่เลือก ไม่ใช่รอเปิดแอปครั้งถัดไป — เลือกแล้ว
+            // ไม่เห็นอะไรเปลี่ยนเลยทำให้คนไม่แน่ใจว่าตั้งค่าติดหรือยัง
+            const next = defaultViewToState(code);
+            setTab(next.tab);
+            setModule(next.module);
+            if (sharedCase || sharedFlow) setSp({}, { replace: true });
+          }} />
       )}
     </div>
   );

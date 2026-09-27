@@ -29,10 +29,13 @@ export default function HelpModal({ onClose }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!message.trim()) { toast.error(t('กรุณากรอกข้อความ')); return; }
+    // ระบบจริงบังคับให้เลือกส่วนที่เกี่ยวข้องก่อนส่ง — เรื่องที่เข้ามาโดยไม่บอกว่า
+    // มาจากส่วนไหนทำให้ผู้ดูแลต้องถามกลับทุกครั้ง
+    if (!area) { toast.error(t('กรุณาเลือกสิ่งที่คุณกำลังทำอยู่')); return; }
+    if (!message.trim()) { toast.error(t('กรุณาอธิบายปัญหาก่อนส่ง')); return; }
     setBusy(true);
     try {
-      await portalApi.sendSupport({ area: area || 'ทั่วไป', message: message.trim() });
+      await portalApi.sendSupport({ area, message: message.trim() });
       toast.success(t('ส่งเรื่องถึงผู้ดูแลระบบแล้ว ขอบคุณครับ'));
       onClose();
     } catch (err) {
@@ -53,7 +56,7 @@ export default function HelpModal({ onClose }) {
       <form onSubmit={submit} className="space-y-3">
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('พบปัญหาการใช้งานหรือมีข้อสงสัย ส่งข้อความถึงผู้ดูแลระบบได้ที่นี่')}</p>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{t('ส่วนที่เกี่ยวข้อง')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{t('ส่วนที่เกี่ยวข้อง')} *</label>
           <select value={area} onChange={(e) => setArea(e.target.value)} className={field}>
             <option value="">{t('— เลือกส่วนที่เกี่ยวข้อง —')}</option>
             {areaOptions.map((a) => <option key={a.to} value={a.title}>{t(a.title)}</option>)}
@@ -61,7 +64,7 @@ export default function HelpModal({ onClose }) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{t('รายละเอียด')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{t('รายละเอียด')} *</label>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} maxLength={2000}
             placeholder={t('อธิบายปัญหาหรือข้อสงสัย…')} className={`${field} resize-none`} />
           <div className="mt-1 text-right text-[11px] text-slate-400">{message.length}/2000</div>

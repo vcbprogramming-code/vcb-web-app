@@ -104,4 +104,36 @@ suite('4. กลุ่มการประชุมเป็นชุดขอ�
   happy('งบการเงินทุกโครงการมีบันทึกของตัวเอง', (own.FIN || 0) > 0, JSON.stringify(own));
 }
 
+/**
+ * ลำดับของกรณีเฉพาะคือข้อมูลของลูกค้า ไม่ใช่แค่การจัดหน้าจอ — "PO-2" คือชื่อที่เขา
+ * ใช้เรียกกันในที่ประชุม ถ้ารอบทดสอบไหนสลับตำแหน่งแล้วไม่สลับกลับ เลขจะเลื่อนทั้ง
+ * หมวดโดยไม่มีใครรู้ · เคยเกิดมาแล้วหนึ่งครั้ง (PO-1 กลายเป็น PO-3)
+ */
+suite('5. ลำดับและเลขของกรณีเฉพาะยังเป็นชุดที่นำเข้ามา');
+{
+  const rows = (await query(
+    'select no, module, display_no, sort_order from sop_scenarios order by module, sort_order, no')).rows;
+  const byMod = {};
+  for (const r of rows) (byMod[r.module] ||= []).push(r);
+
+  const wrong = Object.entries(byMod)
+    .flatMap(([m, list]) => list.filter((r, i) => r.display_no !== `${m}-${i + 1}`)
+      .map((r) => `${r.display_no}≠${m}-${list.indexOf(r) + 1}`));
+  happy('เลขที่แสดงเรียงต่อกันไม่มีขาดทุกหมวด', wrong.length === 0, wrong.join(' '));
+
+  const gaps = Object.entries(byMod)
+    .filter(([, list]) => list.some((r, i) => r.sort_order !== i + 1))
+    .map(([m, list]) => `${m}:${list.map((r) => r.sort_order).join(',')}`);
+  happy('ลำดับที่เก็บไว้ยังแน่นเป็น 1..n ทุกหมวด', gaps.length === 0, gaps.join(' '));
+
+  // เลขกรณี (no) ผูกกับตัวเอกสารตอนนำเข้า จึงบอกได้ว่าแถวไหนควรอยู่ตำแหน่งไหน
+  const PO = ['PO-1', 'PO-2', 'PO-3'];
+  const po = (byMod.PO || []).filter((r) => r.no <= 3).map((r) => r.display_no);
+  happy('กรณีหมวด PO สามใบแรกยังเป็น PO-1 PO-2 PO-3 ตามลำดับที่นำเข้า',
+    po.join(',') === PO.join(','), po.join(','));
+
+  const left = (await query("select display_no from sop_scenarios where title_th like 'ZZ%'")).rows;
+  happy('ไม่มีกรณีทดสอบค้างอยู่ในคู่มือ', left.length === 0, left.map((r) => r.display_no).join(' '));
+}
+
 process.exit(report() ? 1 : 0);

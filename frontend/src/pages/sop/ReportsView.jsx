@@ -29,7 +29,8 @@ export default function ReportsView({ canEdit, q = '', onChanged }) {
     if (!rows) return null;
     const needle = q.trim().toLowerCase();
     if (!needle) return rows;
-    return rows.filter((r) => `${r.scenario_text} ${r.report_path}`.toLowerCase().includes(needle));
+    // ระบบจริงค้นเลขรายการด้วย ไม่ใช่แค่ข้อความกับเมนู — คนอ้างถึงรายงานด้วยเลข
+    return rows.filter((r) => `${r.case_no ?? ''} ${r.scenario_text} ${r.report_path}`.toLowerCase().includes(needle));
   }, [rows, q]);
 
   const remove = async (r) => {
@@ -105,20 +106,23 @@ export default function ReportsView({ canEdit, q = '', onChanged }) {
       )}
 
       {edit !== undefined && (
-        <ReportModal item={edit} onClose={() => setEdit(undefined)}
+        <ReportModal item={edit} nextCaseNo={(rows || []).reduce((m, r) => Math.max(m, Number(r.case_no) || 0), 0) + 1}
+          onClose={() => setEdit(undefined)}
           onSaved={() => { setEdit(undefined); load(); onChanged?.(); }} />
       )}
     </div>
   );
 }
 
-function ReportModal({ item, onClose, onSaved }) {
+function ReportModal({ item, nextCaseNo, onClose, onSaved }) {
   const t = useT();
   const toast = useToast();
   const editing = Boolean(item?.id);
   const [scenarioText, setScenarioText] = useState(item?.scenario_text || '');
   const [reportPath, setReportPath] = useState(item?.report_path || '');
-  const [caseNo, setCaseNo] = useState(item?.case_no ?? '');
+  // รายการใหม่เติมเลขต่อจากรายการสุดท้ายให้เลย แบบระบบจริง — คนกรอกไม่ต้องไล่ดู
+  // ว่าตารางจบที่เลขอะไร
+  const [caseNo, setCaseNo] = useState(item?.case_no ?? (item?.id ? '' : String(nextCaseNo ?? 1)));
   const [busy, setBusy] = useState(false);
 
   const save = async (e) => {
@@ -158,7 +162,7 @@ function ReportModal({ item, onClose, onSaved }) {
             placeholder={t('เช่น AP -&gt; Report -&gt; 10.2.1 (AP Aging Report)')} className="field font-mono text-[13px]" />
         </div>
         <div className="sm:w-40">
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ลำดับที่')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('เลขกรณี · Case #')}</label>
           <input type="number" min={1} value={caseNo} onChange={(e) => setCaseNo(e.target.value)}
             placeholder={t('ต่อจากรายการสุดท้าย')} className="field tabular-nums" />
         </div>

@@ -10,10 +10,14 @@ import { useT } from '../../lib/i18n.jsx';
 const rid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'r' + Math.random().toString(36).slice(2));
 
 /** Create / edit one SOP case: header fields, ordered steps, extra module tags. */
-export default function ScenarioModal({ item, modules, onClose, onSaved }) {
+export default function ScenarioModal({ item, modules, onClose, onSaved, onDelete, onSwapped }) {
   const t = useT();
   const toast = useToast();
   const editing = Boolean(item?.no);
+  // สลับตำแหน่ง — รายการกรณีในหมวดเดียวกัน เพื่อเลือกคู่ที่จะสลับเลขกัน
+  const [swapWith, setSwapWith] = useState('');
+  const [peers, setPeers] = useState([]);
+  const [swapping, setSwapping] = useState(false);
   const [form, setForm] = useState({
     module: item?.module || modules[0]?.code || '',
     titleTh: item?.title_th || '',
@@ -39,6 +43,27 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
     }).catch((e) => toast.error(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, item?.no]);
+
+  // กรณีอื่นในหมวดเดียวกัน — ดึงจากหมวดของกรณีที่กำลังแก้ ไม่ใช่รายการที่กรองไว้
+  // บนหน้าจอ (ค้างคำค้นอยู่แล้วรายการจะขาด และคู่ที่ควรสลับได้จะหายไป)
+  useEffect(() => {
+    if (!editing || !item?.module) return;
+    sopApi.scenarios({ module: item.module })
+      .then((r) => setPeers((r.data || []).filter((x) => x.module === item.module && x.no !== item.no)))
+      .catch(() => setPeers([]));
+  }, [editing, item?.module, item?.no]);
+
+  const doSwap = async () => {
+    if (!swapWith) { toast.error(t('กรุณาเลือกกรณีที่ต้องการสลับตำแหน่งจากรายการ')); return; }
+    setSwapping(true);
+    try {
+      await sopApi.swapScenario(item.no, swapWith);
+      toast.success(t('สลับตำแหน่งแล้ว'));
+      onSwapped?.();
+      return;
+    } catch (e) { toast.error(e.message); }
+    setSwapping(false);
+  };
 
   const setStep = (i, patch) => setSteps((p) => p.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const addStep = () => setSteps((p) => [...p, { _id: rid(), text: '', style: 'num' }]);
@@ -77,8 +102,16 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={editing ? `${t('แก้ไขกรณีเฉพาะ')} ${item.display_no || ''}` : t('เพิ่มกรณีใหม่')} onClose={onClose} size="2xl"
+    /* หัวหน้าต่างบอกทั้งรหัสและชื่อกรณี แบบระบบจริง — เปิดหลายกรณีสลับกันแก้
+       แล้วมีแต่รหัสจะจำไม่ได้ว่ากำลังแก้ใบไหน */
+    <Modal title={editing ? `${t('แก้ไขกรณีที่')} ${item.display_no || item.no} · ${item.title_th || ''}` : t('เพิ่มกรณีเฉพาะใหม่ · New case')}
+      onClose={onClose} size="2xl"
       footer={<>
+        {editing && onDelete && (
+          <button onClick={onDelete} className="mr-auto text-sm font-medium text-rose-600 hover:underline">
+            {t('ลบกรณีนี้ · Delete')}
+          </button>
+        )}
         <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
         <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button>
       </>}>
@@ -100,6 +133,31 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
           <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อภาษาอังกฤษ')}</label>
           <input value={form.titleEn} onChange={(e) => set('titleEn', e.target.value)} placeholder={t('เช่น PO Decrement')} className="field" />
         </div>
+
+        {/* สลับตำแหน่ง — เลือกคู่จากรายการแล้วกดครั้งเดียว อย่างระบบจริง ไม่ต้อง
+            กดเลื่อนขึ้น/ลงทีละขั้นจนถึงตำแหน่งที่ต้องการ */}
+        {editing && (
+          <div>
+            <label htmlFor="sop-swap" className="mb-1 block text-sm font-medium text-slate-600">{t('สลับตำแหน่ง')}</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <select id="sop-swap" value={swapWith} onChange={(e) => setSwapWith(e.target.value)}
+                className="field min-w-0 flex-1">
+                <option value="">— {t('เลือกกรณีที่จะสลับตำแหน่งด้วย')} —</option>
+                {peers.map((p) => (
+                  <option key={p.no} value={p.display_no || ''} title={p.title_th}>
+                    {p.display_no} · {String(p.title_th).length > 42 ? `${String(p.title_th).slice(0, 42).trim()}…` : p.title_th}
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={doSwap} disabled={swapping} className="btn-outline shrink-0 !py-2 !text-sm">
+                <BusyLabel busy={swapping} busyText="กำลังสลับ…">↔ {t('สลับ')}</BusyLabel>
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {t('สลับเลขกับกรณีที่เลือกในหมวดเดียวกัน · กรณีอื่นไม่ถูกเลื่อนตำแหน่ง')}
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">{t('ปัญหา / สถานการณ์ (เมื่อไรจึงใช้)')}</label>

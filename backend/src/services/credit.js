@@ -111,6 +111,14 @@ export function overdueInterestInfo(item, facilityRate, now = new Date()) {
   if (!(Number(item.amount) > 0)) return none;
   const rate = item.interest_rate != null ? Number(item.interest_rate) : facilityRate;
   const days = Math.floor((now - due) / 86400000);
+  // ยังไม่เลยกำหนดเต็มวัน = ยังไม่มีดอกเบี้ย และยังไม่ใช่ปัญหาว่า "ระบุอัตราไม่ได้"
+  //
+  // ตั๋วที่ครบกำหนด "วันนี้" มีวันครบกำหนดเป็นเที่ยงคืนของวันนี้ ซึ่งน้อยกว่าเวลา
+  // ปัจจุบันเสมอ จึงเล็ดลอดผ่านด่านบนมาได้ทั้งที่ยังไม่ค้าง แล้วถ้าวงเงินนั้นเขียน
+  // อัตราไว้เป็นข้อความ (MLR) มันจะถูกนับเข้า "N รายการระบุอัตราไม่ได้" บนแดชบอร์ด
+  // ทั้งที่ไม่มีดอกเบี้ยอะไรให้คิด — ตัวเลขเตือนที่โตเกินจริงคือตัวเลขที่คนเลิกเชื่อ
+  // ระบบจริงกันด้วยเงื่อนไขเดียวกัน (daysOverdue คืน 0 แล้ว overdueInterest คืน '—')
+  if (days <= 0) return { ...none, days: 0 };
   if (rate == null || Number.isNaN(Number(rate))) return { ...none, days, rateUnavailable: true };
   return { amount: Number(item.amount || 0) * (Number(rate) / 100) * (days / 365), days, rate: Number(rate), rateUnavailable: false };
 }

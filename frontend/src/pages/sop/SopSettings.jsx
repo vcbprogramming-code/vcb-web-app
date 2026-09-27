@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal } from '../../components/ui/index.js';
 import LangToggle from '../../components/LangToggle.jsx';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { readDefaultView } from '../../lib/sop.js';
+import { readDefaultView, SOP_ALL_CASES } from '../../lib/sop.js';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
@@ -15,7 +15,8 @@ import { useT } from '../../lib/i18n.jsx';
 export default function SopSettings({ modules, counts, onClose, onDefaultView }) {
   const t = useT();
   const { profile, user } = useAuth();
-  const [defaultView, setDefaultView] = useState(readDefaultView);
+  // ยังไม่เคยตั้งค่าก็ต้องขึ้นตัวเลือกที่ระบบพาไปจริง ไม่ใช่ช่องว่าง
+  const [defaultView, setDefaultView] = useState(() => readDefaultView() || 'flows');
 
   const pick = (code) => {
     setDefaultView(code);
@@ -50,13 +51,18 @@ export default function SopSettings({ modules, counts, onClose, onDefaultView })
             <label htmlFor="sop-default-view" className="mb-1 block text-sm font-medium text-slate-700">
               {t('หน้าเริ่มต้น · Default view')}
             </label>
+            {/* ตัวเลือกชุดเดียวกับระบบจริง: ผังกระบวนการ · ทั้งหมด · แต่ละหมวด ·
+                วิธีเรียก Report — เดิมมีแต่หมวด คนที่เปิดมาใช้ผังหรือตารางรายงาน
+                เป็นหลักจึงตั้งค่าไม่ได้ */}
             <select id="sop-default-view" value={defaultView} onChange={(e) => pick(e.target.value)} className="field">
-              <option value="">{t('ทั้งหมด')}</option>
+              <option value="flows">{t('ผังกระบวนการ')}</option>
+              <option value={SOP_ALL_CASES}>{t('ทั้งหมด')}</option>
               {modules.map((m) => (
                 <option key={m.code} value={m.code} disabled={!counts?.[m.code]}>
                   {m.code} · {m.name_th_short}
                 </option>
               ))}
+              <option value="reports">{t('วิธีเรียก Report')}</option>
             </select>
             <p className="mt-1 text-xs text-slate-500">{t('เลือกหมวดที่จะเปิดโดยอัตโนมัติเมื่อเข้าใช้งานครั้งถัดไป')}</p>
           </div>

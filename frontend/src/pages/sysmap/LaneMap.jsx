@@ -195,6 +195,9 @@ export default function LaneMap({
                     return (
                       <button
                         key={n.id}
+                        /* ชื่อจุดยึดของกล่องบนผัง — "แสดงบนผังใหญ่" ในผังไล่เส้นทาง
+                           เลื่อนหน้ามาหากล่องนี้ด้วย id นี้ */
+                        id={`sysmap-node-${n.id}`}
                         ref={(el) => { if (el) boxRefs.current.set(n.id, el); else boxRefs.current.delete(n.id); }}
                         onClick={() => onSelect(isSel ? null : n.id)}
                         aria-pressed={isSel}

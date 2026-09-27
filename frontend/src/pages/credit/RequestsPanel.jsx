@@ -141,6 +141,13 @@ export default function RequestsPanel({ projects, onClose, onChanged, openAdd = 
 
   const submit = async (e) => {
     e.preventDefault();
+    // ผู้รับผลประโยชน์เป็นช่องบังคับในฟอร์มของระบบจริง (saveReq กันไว้พร้อมกับ
+    // โครงการ ประเภท และจำนวนเงิน) — คำขอที่ไม่บอกว่าเงินจะออกไปให้ใคร อนุมัติ
+    // ไม่ได้อยู่แล้ว และจะไปโผล่ในตารางว่า "—" ตรงคอลัมน์ที่คนใช้ไล่เรื่อง
+    if (!form.facilityId || !Number(form.amount) || !String(form.beneficiary).trim()) {
+      toast.error(t('กรอกข้อมูลที่จำเป็น (*) ให้ครบ'));
+      return;
+    }
     setError(null);
     try {
       await creditApi.addRequest({
@@ -191,7 +198,14 @@ export default function RequestsPanel({ projects, onClose, onChanged, openAdd = 
     if (ok) await send(id, 'อนุมัติ', null);
   };
 
-  const canDecide = profile?.role === 'admin' || profile?.role === 'executive';
+  /**
+   * ใครเห็นปุ่มอนุมัติ — ดูที่สิทธิ์ ไม่ใช่ที่ตำแหน่ง
+   *
+   * ฝั่ง API กันด้วยสิทธิ์ "วงเงินสินเชื่อ → แก้ไขข้อมูล" มาตั้งแต่รอบที่เปิดโมดูล
+   * นี้ให้ใช้จริง แต่ปุ่มบนจอยังดูที่ role เจ้าหน้าที่การเงินที่ผู้ดูแลเปิดสิทธิ์ให้
+   * แล้วจึงอนุมัติได้จริงทาง API แต่หาปุ่มไม่เจอบนจอ — เท่ากับเปิดสิทธิ์แล้วไม่มีผล
+   */
+  const canDecide = profile?.effective_permissions?.credit?.edit === true;
 
   return (
     <Modal
@@ -244,9 +258,11 @@ export default function RequestsPanel({ projects, onClose, onChanged, openAdd = 
               <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">{t('ผู้รับผลประโยชน์')}</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                {t('ผู้รับผลประโยชน์')} <span className="text-red-500">*</span>
+              </label>
               <input value={form.beneficiary} onChange={(e) => set('beneficiary', e.target.value)} className="field"
-                placeholder={t('เช่น บริษัท สิริวัฒน์ ค้าเหล็ก จำกัด')} />
+                aria-required="true" placeholder={t('เช่น บริษัท สิริวัฒน์ ค้าเหล็ก จำกัด')} />
             </div>
             <div>
               {/* ทะเบียนหมวดยาวขึ้นทุกเดือน — เลือกได้ พิมพ์เองก็ได้ */}

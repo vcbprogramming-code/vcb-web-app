@@ -39,15 +39,22 @@ function withDisplayNo(rows) {
  * ระบบของเขาคำนวณใหม่ทุกครั้งที่อ่าน ของเราเก็บเป็นคอลัมน์ (หน้าจอและชุดทดสอบ
  * อ่านจากคอลัมน์ได้ตรง ๆ) จึงต้องเขียนใหม่ทุกครั้งที่ลำดับในหมวดขยับ
  */
+/**
+ * เรียงเลขที่แสดงของหมวดใหม่ให้ต่อกัน และอัดลำดับที่เก็บไว้ให้แน่นเป็น 1..n ด้วย
+ *
+ * ลำดับที่เก็บเคยปล่อยให้มีช่อง (เพิ่มใหม่ = max+1 ลบแล้วเลขที่เหลือไม่ขยับ) เลขที่
+ * ผู้ใช้เห็นยังถูกเพราะคิดจากอันดับ แต่ข้อมูลของลูกค้าจะเพี้ยนไปจากชุดที่นำเข้าเรื่อย ๆ
+ * และเทียบกับระบบจริงทีหลังไม่ได้ — คู่มือของเขาเป็นเอกสารเรียงแถวเดียว ไม่มีช่องว่าง
+ */
 async function renumberModule(runner, module) {
   if (!module) return;
   await runner.query(
     `update sop_scenarios s
-        set display_no = $1::text || '-' || x.rn::text
+        set display_no = $1::text || '-' || x.rn::text, sort_order = x.rn
        from (select no, row_number() over (order by sort_order, no) as rn
                from sop_scenarios where module = $1) x
       where s.no = x.no
-        and coalesce(s.display_no, '') <> $1::text || '-' || x.rn::text`,
+        and (coalesce(s.display_no, '') <> $1::text || '-' || x.rn::text or s.sort_order <> x.rn)`,
     [module]
   );
 }
@@ -67,6 +74,40 @@ const displayIndex = (r) => {
   const m = /-(\d+)$/.exec(r.display_no || '');
   return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
 };
+
+/**
+ * บทที่ในคู่มือ ERP ของแต่ละหมวด — ชุดเดียวกับ MODULE_CHAPTER ในระบบจริง
+ *
+ * ระบบของเขาไม่มีช่องเก็บหมวดแยก หมวดถูกอ่านออกมาจากคำว่า "บทที่ N" ในบรรทัด
+ * อ้างอิง ดังนั้นเวลาย้ายกรณีข้ามหมวด เขาจึงเขียนเลขบทในบรรทัดอ้างอิงใหม่ด้วย
+ * ของเราเก็บหมวดเป็นคอลัมน์ ย้ายหมวดแล้วบรรทัดอ้างอิงเคยค้างบทเดิมไว้ —
+ * ย้าย PO → IC แล้วยังเขียนว่า "บทที่ 4 (PO)" ซึ่งอ่านแล้วขัดกับหมวดที่เห็น
+ * FIN ไม่มีบทของตัวเองในคู่มือ (เหมือนของเขา) จึงไม่แตะบรรทัดอ้างอิง
+ */
+const MODULE_CHAPTER = {
+  SE: '1', BD: '2', OF: '3', PO: '4', IC: '5', AP: '6', AR: '7', PM: '8', FA: '9', GL: '10',
+};
+
+/** เขียนบทแรกในบรรทัดอ้างอิงให้ตรงหมวดใหม่ — คืนค่าเดิมถ้าหมวดนั้นไม่มีบท */
+function refForModule(ref, moduleCode) {
+  const chapter = MODULE_CHAPTER[moduleCode];
+  if (!chapter) return ref;
+  const text = ref || '';
+  const replacement = `บทที่ ${chapter} (${moduleCode})`;
+  const first = /บทที่\s*\d+(\s*\([^)]*\))?/;
+  if (first.test(text)) return text.replace(first, replacement);
+  return text ? `${text} | ${replacement}` : replacement;
+}
+
+/** วันที่แบบไทย "28 กันยายน 2569" — รูปแบบเดียวกับที่ระบบจริงประทับให้กรณีใหม่ */
+const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+function formatThaiDate(d = new Date()) {
+  // เวลาไทยเสมอ ไม่ใช่ UTC — เซิร์ฟเวอร์รันเป็น UTC กรณีที่เพิ่มหลัง 19:00
+  // จะได้วันที่ของ "เมื่อวาน" ติดไปกับกรณีใหม่
+  const bkk = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+  return `${bkk.getUTCDate()} ${THAI_MONTHS[bkk.getUTCMonth()]} ${bkk.getUTCFullYear() + 543}`;
+}
 
 // ── ประวัติเวอร์ชัน ─────────────────────────────────────────────────────────
 
@@ -183,11 +224,18 @@ router.get('/scenarios', canView, asyncHandler(async (req, res) => {
     rows = [...primaries, ...rows.filter((r) => r.module !== mod)];
   }
   if (q) {
+    // ช่องค้นหาของเขากวาดทุกอย่างที่ระบุตัวกรณีได้ ไม่ใช่แค่ชื่อกับขั้นตอน:
+    // ชื่อไทย ชื่ออังกฤษ ปัญหา ขั้นตอน รหัสหมวด บรรทัดอ้างอิง รหัสแสดงผล และ
+    // หมวดเสริม — คนของเขาค้นด้วยรหัส ("PO-3") และด้วยหมวด ("AP") เป็นปกติ
+    // ก่อนหน้านี้พิมพ์ "PO-3" แล้วไม่เจออะไรเลย (หมายเหตุไม่อยู่ในชุดนี้ — ของเขาก็ไม่มี)
     const { rows: hits } = await query(
       `select distinct s.no from sop_scenarios s
          left join sop_scenario_steps st on st.scenario_no = s.no
+         left join sop_scenario_modules sm on sm.scenario_no = s.no
         where s.title_th ilike $1 or coalesce(s.title_en,'') ilike $1
-           or s.problem ilike $1 or coalesce(st.text,'') ilike $1`,
+           or s.problem ilike $1 or coalesce(st.text,'') ilike $1
+           or s.module ilike $1 or coalesce(s.ref,'') ilike $1
+           or coalesce(s.display_no,'') ilike $1 or coalesce(sm.module,'') ilike $1`,
       [`%${q}%`]
     );
     const ok = new Set(hits.map((h) => h.no));
@@ -324,7 +372,11 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
     await client.query(
       `insert into sop_scenarios (no, module, sort_order, title_th, title_en, problem, ref, note, date_added)
        values ($1,$2,$3,$4,$5,coalesce($6,''),$7,$8,$9)`,
-      [no, f.module, so[0].s, f.titleTh, f.titleEn || null, f.problem, f.ref || null, f.note || null, f.dateAdded || null]
+      // บรรทัดอ้างอิงต้องชี้บทของหมวดที่เลือกเสมอ และกรณีใหม่ต้องมีวันที่เพิ่ม
+      // ประทับไว้ — สองอย่างนี้ระบบจริงเติมให้ตอนสร้าง ของเราเคยปล่อยว่างทั้งคู่
+      // (กรณีที่เพิ่มจากหน้าจอจึงไม่มีบรรทัด "วันที่เพิ่ม:" ขึ้นในรายละเอียด)
+      [no, f.module, so[0].s, f.titleTh, f.titleEn || null, f.problem,
+        refForModule(f.ref, f.module) || null, f.note || null, f.dateAdded || formatThaiDate()]
     );
     await writeChildren(client, no, f.steps || [], f.extraModules || [], f.module, f.attachments || []);
     await renumberModule(client, f.module);   // กรณีใหม่ได้รหัสถัดไปของหมวด เช่น PO-4
@@ -341,8 +393,12 @@ router.patch('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const f = p.data;
   if (f.module) await assertModule(f.module);
-  const cur = await queryOne('select module from sop_scenarios where no = $1', [no]);
+  const cur = await queryOne('select module, ref from sop_scenarios where no = $1', [no]);
   if (!cur) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
+  // ย้ายหมวด = บรรทัดอ้างอิงต้องชี้บทของหมวดใหม่ ไม่ใช่ค้างบทเดิมไว้
+  if (f.module && f.module !== cur.module) {
+    f.ref = refForModule(f.ref !== undefined ? f.ref : cur.ref, f.module);
+  }
 
   const map = { module: 'module', titleTh: 'title_th', titleEn: 'title_en', problem: 'problem', ref: 'ref', note: 'note', dateAdded: 'date_added' };
   const sets = []; const vals = [];
@@ -410,6 +466,44 @@ router.post('/scenarios/:no/move', canEdit, asyncHandler(async (req, res) => {
     await client.query('commit');
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
   res.json({ data: { moved: true } });
+}));
+
+/**
+ * POST /api/sop/scenarios/:no/swap — สลับตำแหน่งกับกรณีที่ระบุด้วยรหัสแสดงผล
+ *
+ * ระบบจริงให้ผู้แก้ไขเลือก "สลับตำแหน่งกับ" จากรายการในหน้าต่างแก้ไข แล้วกด
+ * ↔ สลับ ครั้งเดียว — ไม่ต้องกดเลื่อนขึ้น/ลงทีละขั้น รหัสแสดงผลของทั้งสองกรณี
+ * สลับกันทันที (PO-3 ↔ PO-5) และกรณีอื่นในหมวดไม่ขยับ
+ *
+ * ของเราเก็บลำดับเป็น sort_order รายหมวด การสลับจึงทำได้ในหมวดเดียวกันเท่านั้น
+ * (ของเขาลำดับเป็นตำแหน่งแถวในเอกสารเดียวทั้งเล่ม จึงเลือกข้ามหมวดได้ด้วย)
+ */
+router.post('/scenarios/:no/swap', canEdit, asyncHandler(async (req, res) => {
+  const no = Number(req.params.no);
+  if (!Number.isInteger(no)) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
+  const want = String(req.body?.swapWith || '').trim().toUpperCase();
+  if (!want) throw new ApiError(400, 'กรุณาเลือกกรณีที่ต้องการสลับตำแหน่งจากรายการ');
+
+  const me = await queryOne('select no, module, sort_order, display_no from sop_scenarios where no = $1', [no]);
+  if (!me) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
+  const all = await allScenariosOrdered();
+  const target = all.find((r) => String(r.display_no || '').toUpperCase() === want);
+  if (!target) throw new ApiError(400, `ไม่พบกรณี "${want}" — ตรวจรหัสแล้วลองใหม่`);
+  if (target.no === me.no) throw new ApiError(400, 'สลับกับกรณีเดียวกันไม่ได้');
+  if (target.module !== me.module) {
+    throw new ApiError(400, 'สลับตำแหน่งได้เฉพาะกรณีในหมวดเดียวกัน');
+  }
+
+  await snapshot(req.profile, 'สลับตำแหน่งกรณีศึกษา');
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query('update sop_scenarios set sort_order = $1 where no = $2', [target.sort_order, me.no]);
+    await client.query('update sop_scenarios set sort_order = $1 where no = $2', [me.sort_order, target.no]);
+    await renumberModule(client, me.module);
+    await client.query('commit');
+  } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
+  res.json({ data: { swapped: true, with: want } });
 }));
 
 // ── reports register (sop.edit) ─────────────────────────────────────────────

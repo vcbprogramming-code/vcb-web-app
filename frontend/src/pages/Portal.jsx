@@ -8,6 +8,7 @@ import { portalApi, birthdayWhen } from '../lib/portal.js';
 import Icon from '../components/Icon.jsx';
 import LangToggle from '../components/LangToggle.jsx';
 import { useLang, useT } from '../lib/i18n.jsx';
+import { EN } from '../lib/en.js';
 import GlobeMark from '../components/GlobeMark.jsx';
 import HolidayCalendar from '../components/HolidayCalendar.jsx';
 import HelpModal from '../components/HelpModal.jsx';
@@ -172,7 +173,11 @@ function TodayPanel() {
                   <div className="truncate text-sm text-slate-700">
                     {p.full_name}{p.nickname ? ` (${p.nickname})` : ''}
                   </div>
-                  {p.dept && <div className="truncate text-[11px] text-slate-400">{p.dept}</div>}
+                  {/* ป้ายแผนกของระบบจริงขึ้นเป็น "Acct" ไม่ใช่ "ACCT" — ข้อมูลเก็บเป็น
+                      ตัวพิมพ์ใหญ่ทั้งคำ จัดรูปด้วย CSS ไม่ใช่ไปแก้ค่าที่เก็บไว้ */}
+                  {p.dept && (
+                    <div className="truncate text-[11px] lowercase text-slate-400 first-letter:uppercase">{p.dept}</div>
+                  )}
                 </div>
                 {/* วันนี้/พรุ่งนี้ เป็นป้าย ส่วนวันอื่นเป็นวันที่ย่อ — เหมือนระบบจริง */}
                 {p.days <= 1 ? (
@@ -282,7 +287,12 @@ export default function Portal() {
   }, [navOpen]);
 
   const term = q.trim().toLowerCase();
-  const match = (a) => !term || `${t(a.title)} ${t(a.desc)}`.toLowerCase().includes(term);
+  // ค้นได้ทั้งไทยและอังกฤษไม่ว่าหน้าจอกำลังเป็นภาษาไหน — ระบบจริงเก็บคำค้นเป็น
+  // อังกฤษชุดเดียว พิมพ์ไทยจึงไม่เจออะไรเลย ของเราเคยกลับกัน (พิมพ์ "credit"
+  // ตอนหน้าจอเป็นไทยแล้วไม่เจอ) รวมสองชุดไว้ด้วยกันจึงตอบได้ทั้งสองทาง
+  const match = (a) => !term
+    || [a.title, a.navTitle, a.desc, EN[a.title], EN[a.navTitle], EN[a.desc]]
+      .filter(Boolean).join(' ').toLowerCase().includes(term);
   const shownMain = mainApps.filter(match);
   const shownMore = moreApps.filter(match);
   const shownSoon = soonApps.filter(match); // searchable too — "แผนผัง" must find System Map

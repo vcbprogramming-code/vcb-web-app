@@ -84,23 +84,58 @@ const cashPlanOut = (c) => ({
  */
 const kindList = (v) => String(v || '').split(',').map((s) => s.trim()).filter(Boolean);
 
+/** กลุ่มที่หน้าสรุปค่าใช้จ่ายใช้รวมรายการที่ยังไม่ได้ระบุหมวด — ไม่ใช่ชื่อหมวดจริง */
+const NO_CATEGORY = '(ไม่ระบุหมวด)';
+
+/**
+ * เงื่อนไขของช่อง "ระยะเวลา" — กฎเดียวกับ dueBucket ที่การ์ดบนหน้าภาพรวมใช้
+ *
+ * "เกินกำหนด" คือก่อน**เดือนนี้** ไม่ใช่ก่อนวันนี้ ตั๋วที่ครบกำหนดต้นเดือนแล้วยัง
+ * ไม่ได้จ่ายยังนับเป็นของ "เดือนนี้" ตามที่ระบบจริงเขียนกำกับไว้ (dueBucket ใน
+ * index.html: "The whole current month counts as this month even if the day has
+ * already passed") เดิมที่นี่ใช้ "ก่อนวันนี้" ทำให้ตั๋วใบเดียวโผล่ทั้งในตัวกรอง
+ * เกินกำหนดและในตัวกรองเดือนนี้ แล้วยอดในตารางไม่เท่ากับยอดบนการ์ดที่กดมา
+ *
+ * คนละเรื่องกับ /overdue (ดอกเบี้ยเกินกำหนด) ซึ่งนับจาก "เลยวันครบกำหนดแล้ว"
+ * เพราะดอกเบี้ยเริ่มเดินวันถัดจากวันครบกำหนด ไม่ได้รอสิ้นเดือน
+ */
+const dueFilterSql = (due, col = 'due_date') => ({
+  due7: `${col} between current_date and current_date + 7`,
+  overdue: `${col} < date_trunc('month', current_date)`,
+  thisMonth: `date_trunc('month', ${col}) = date_trunc('month', current_date)`,
+  nextMonth: `date_trunc('month', ${col}) = date_trunc('month', current_date + interval '1 month')`,
+}[due] || null);
+
 // ── facilities ──────────────────────────────────────────────────────────
 router.get('/facilities', asyncHandler(async (req, res) => {
   const { projectId, type, search, company, facilityNo, kinds } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
-  if (projectId) add('project_id = $$', projectId);
-  if (type) add('type = $$', type);
-  if (company) add('company = $$', company);
-  if (facilityNo) add('facility_no = $$', Number(facilityNo));
-  if (kindList(kinds).length) add('facility_no in (select no from facility_types where kind = any($$))', kindList(kinds));
+  if (projectId) add('f.project_id = $$', projectId);
+  if (type) add('f.type = $$', type);
+  if (company) add('f.company = $$', company);
+  if (facilityNo) add('f.facility_no = $$', Number(facilityNo));
+  if (kindList(kinds).length) add('f.facility_no in (select no from facility_types where kind = any($$))', kindList(kinds));
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
-  const { rows } = await query(`select * from facilities ${whereSql} order by created_at`, params);
+  // ชื่อโครงการและชื่อประเภทวงเงินมาด้วย เพราะช่องค้นหาต้องหาจากสิ่งที่เห็นบนตาราง
+  const { rows } = await query(
+    `select f.*, p.code project_code, p.name project_name, t.name_th type_name
+       from facilities f
+       join projects p on p.id = f.project_id
+       left join facility_types t on t.no = f.facility_no
+      ${whereSql}
+      order by f.created_at`, params);
   const usedMap = await authorizedUsedMap(rows.map((r) => r.id));
   let views = rows.map((f) => facilityView(f, usedMap.get(f.id) || 0));
   if (search) {
+    // ระบบจริงค้นตารางวงเงินจาก "ชื่อประเภท + รหัสโครงการ" (inc(facTypeName_+project)
+    // ใน exportXlsx) ของเดิมค้นแต่ธนาคาร/บริษัท/เลขประเภท — พิมพ์รหัสโครงการหรือ
+    // ชื่อประเภทลงไปจึงได้ศูนย์แถว ทั้งที่สองคอลัมน์นั้นอยู่บนจอตรงหน้า
     const rx = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    views = views.filter((v) => rx.test(v.facility_no || '') || rx.test(v.bank || '') || rx.test(v.company || ''));
+    const hay = new Map(rows.map((f) => [f.id, [
+      f.facility_no, f.bank, f.company, f.project_code, f.project_name, f.type_name, f.type,
+    ].filter(Boolean).join(' ')]));
+    views = views.filter((v) => rx.test(hay.get(v.id) || ''));
   }
   res.json({ data: views });
 }));
@@ -180,11 +215,17 @@ router.put('/facilities/:id/limit', asyncHandler(async (req, res) => {
 
 // ── ledger ────────────────────────────────────────────────────────────────
 router.get('/ledger', asyncHandler(async (req, res) => {
-  const { facilityId, projectId, status, costCategory, company, due, kinds, search } = req.query;
+  const { facilityId, projectId, status, costCategory, company, due, kinds, search, facilityNo } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (facilityId) add('facility_id = $$', facilityId);
   if (projectId) add('project_id = $$', projectId);
+  // ช่อง "ประเภทวงเงิน" บนแถบตัวกรองส่งเลขประเภทมาเมื่อเลือกประเภทเดียว และส่ง
+  // kinds มาเมื่อเลือกกล่องรวม (BG / B/E) — เดิมที่นี่รับแต่ kinds เลขประเภทเดียว
+  // จึงถูกทิ้งเงียบ ๆ เลือก "6. B/E รับรอง/อาวัลตั๋ว" แล้วตารางรายการสินเชื่อไม่
+  // กรองอะไรเลย ทั้งที่ช่องบนจอค้างอยู่ที่ประเภทนั้น (ระบบจริงกรอง q.t ที่ตาราง
+  // รายการด้วย: txnTable → (!q.t || String(t.facilityNo) === q.t))
+  if (facilityNo) add('facility_id in (select id from facilities where facility_no = $$)', Number(facilityNo));
   // สถานะรับได้หลายค่าคั่นด้วยจุลภาค — ตัวกรอง "รออนุมัติ (ใหม่/เสนอ)" ของระบบ
   // จริงส่งสองสถานะมาพร้อมกัน ("คำขอใหม่,อยู่ระหว่างเสนออนุมัติ")
   if (status) {
@@ -194,16 +235,22 @@ router.get('/ledger', asyncHandler(async (req, res) => {
   }
   if (costCategory) add('cost_category = $$', costCategory);
   if (kindList(kinds).length) add('facility_id in (select id from facilities where facility_no in (select no from facility_types where kind = any($$)))', kindList(kinds));
-  // ค้นหาเดียวกับช่องบนหน้าจอ: เลขที่เอกสาร · รายละเอียด · ผู้รับผลประโยชน์
-  if (search) add(`(coalesce(ref,'') || ' ' || coalesce(counterparty,'') || ' ' || coalesce(beneficiary,'') || ' ' || coalesce(note,'')) ilike '%' || $$ || '%'`, String(search));
+  // ค้นหาเดียวกับช่องบนหน้าจอ: เลขที่เอกสาร · รายละเอียด · ผู้รับผลประโยชน์ ·
+  // ป้ายประเภท — ระบบจริงค้นคำว่า kind ด้วย (ref+desc+kind+beneficiary) และ
+  // "ประเภท" เป็นคอลัมน์ที่เห็นอยู่บนตาราง พิมพ์ B/E แล้วไม่เจออะไรอ่านเหมือนพัง
+  if (search) {
+    add(`(coalesce(ref,'') || ' ' || coalesce(counterparty,'') || ' ' || coalesce(beneficiary,'')
+          || ' ' || coalesce(purpose,'') || ' ' || coalesce(note,'') || ' '
+          || coalesce((select t.doc_kind from facilities f join facility_types t on t.no = f.facility_no
+                        where f.id = credit_ledger.facility_id), '')
+         ) ilike '%' || $$ || '%'`, String(search));
+  }
   // บริษัทอยู่ที่ตัววงเงิน ไม่ได้อยู่ที่รายการ — กรองผ่านวงเงินที่สังกัด
   if (company) add('facility_id in (select id from facilities where company = $$)', company);
   // "ครบใน 7 วัน" นับแยกอิสระจากกลุ่มเดือนนี้/เดือนหน้าตามข้อกำหนด §5
   // รายการหนึ่งจึงอยู่ได้ทั้งสองกลุ่มพร้อมกัน
-  if (due === 'due7') where.push('due_date between current_date and current_date + 7');
-  else if (due === 'overdue') where.push('due_date < current_date');
-  else if (due === 'thisMonth') where.push("date_trunc('month', due_date) = date_trunc('month', current_date)");
-  else if (due === 'nextMonth') where.push("date_trunc('month', due_date) = date_trunc('month', current_date + interval '1 month')");
+  const dueSql = dueFilterSql(due);
+  if (dueSql) where.push(dueSql);
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const { rows } = await query(`select * from credit_ledger ${whereSql} order by start_date desc nulls last, created_at desc`, params);
   res.json({ data: rows.map(ledgerOut) });
@@ -291,6 +338,14 @@ router.patch('/ledger/:id', asyncHandler(async (req, res) => {
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] ?? null); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
+  // เลื่อนสถานะเป็น "ชำระแล้ว" จากฟอร์มแก้ไข = ปิดรายการ ต้องมีวันชำระเหมือนกดปุ่ม
+  // ชำระ ไม่งั้นจอรายละเอียดจะไม่มีบรรทัด "ชำระเมื่อ" ทั้งที่ปิดไปแล้ว (ระบบจริง
+  // ก็มีรูนี้: updateRequest เขียนแต่ Status ส่วน PaidDate ตั้งที่ settleTxn เท่านั้น)
+  // และถอยกลับออกจากชำระแล้ว วันชำระต้องหายไปด้วย ไม่ค้างเป็นวันของการปิดครั้งก่อน
+  if (d.status !== undefined && d.status !== before.status) {
+    if (d.status === 'ชำระแล้ว') sets.push('settled_date = coalesce(settled_date, current_date)');
+    else if (before.status === 'ชำระแล้ว') sets.push('settled_date = null');
+  }
   vals.push(req.params.id);
   const after = await queryOne(`update credit_ledger set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
   await writeAudit({ actor: req.profile, action: 'update', target: 'ledger', targetId: req.params.id,
@@ -298,9 +353,14 @@ router.patch('/ledger/:id', asyncHandler(async (req, res) => {
   res.json({ data: ledgerOut(after) });
 }));
 router.post('/ledger/:id/settle', asyncHandler(async (req, res) => {
-  const before = await queryOne('select status from credit_ledger where id = $1', [req.params.id]);
+  const before = await queryOne('select status, amount from credit_ledger where id = $1', [req.params.id]);
   if (!before) throw new ApiError(404, 'Ledger item not found');
-  if (before.status === 'ชำระแล้ว') throw new ApiError(409, 'รายการนี้บันทึกชำระแล้ว');
+  if (before.status === 'ชำระแล้ว') throw new ApiError(409, 'รายการนี้ชำระแล้ว');
+  // ยอดที่ไม่เป็นบวกไม่ใช่หนี้ที่ปิดได้ — แถวยอดติดลบคือการ "ปลดวงเงินคืน" ซึ่ง
+  // ทำหน้าที่ของมันไปแล้วตอนบันทึก ถ้าปิดมันได้ ยอดปลดจะถูกถอนออกจากยอดใช้ไป
+  // (สถานะ ชำระแล้ว ไม่ถูกนับ) แล้วยอดใช้ไปเด้งกลับขึ้นเอง ทั้งที่ธนาคารปลดแล้ว
+  // ระบบจริงกันไว้ด้วยข้อความเดียวกันนี้ (settleTxn: 'รายการนี้ไม่ใช่ยอดค้างชำระ')
+  if (!(Number(before.amount) > 0)) throw new ApiError(409, 'รายการนี้ไม่ใช่ยอดค้างชำระ');
   const after = await queryOne(`update credit_ledger set status='ชำระแล้ว', settled_date=current_date where id=$1 returning *`, [req.params.id]);
   await writeAudit({ actor: req.profile, action: 'settle', target: 'ledger', targetId: req.params.id, changes: { status: { before: before.status, after: 'ชำระแล้ว' } } });
   res.json({ data: ledgerOut(after) });
@@ -1291,6 +1351,13 @@ router.put('/category-caps', requirePermission('credit', 'edit'), asyncHandler(a
   }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
+  // "(ไม่ระบุหมวด)" เป็นกองที่หน้าสรุปใช้รวมรายการที่ยังไม่ได้กรอกหมวด ไม่ใช่หมวด
+  // ที่มีอยู่จริง ตั้งงบให้มันได้จะเกิดแถวงบที่จอสรุปปฏิเสธจะเปิดให้แก้ (ระบบจริง
+  // ก็เตือนตรงนี้: openCapModal ตอบ toast แล้วไม่เปิดกล่อง) — แถวนั้นจึงล้างไม่ได้
+  // อีกเลยจากหน้าจอ กฎเดียวกันต้องอยู่ที่นี่ ไม่ใช่ที่ปุ่มอย่างเดียว
+  if (d.costCategory === NO_CATEGORY) {
+    throw new ApiError(400, 'รายการกลุ่มนี้ยังไม่ได้ระบุหมวด — แก้คำขอให้กรอกหมวดก่อน แล้วค่อยตั้งงบ');
+  }
   // งบศูนย์ = ล้างงบ ลบแถวทิ้ง — ระบบจริงเก็บแถวงบว่างไว้ ทำให้หน้าสรุปขึ้นหมวด
   // "ไม่ได้ตั้ง" ยอด 0 ค้างอยู่และนับเป็นหมวดที่ยังไม่ตั้งงบเพิ่มทุกครั้งที่ล้าง
   if (d.cap === 0) {
@@ -1445,7 +1512,21 @@ router.get('/export', asyncHandler(async (req, res) => {
   }
   if (req.query.company) add('f.company = $$', req.query.company);
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
-  const facilities = (await query(`select f.*, p.name as project_name, p.code as project_code from facilities f join projects p on p.id=f.project_id ${whereSql} order by p.code, f.facility_no, f.created_at`, params)).rows;
+  let facilities = (await query(
+    `select f.*, p.name as project_name, p.code as project_code, t.name_th as type_name
+       from facilities f
+       join projects p on p.id = f.project_id
+       left join facility_types t on t.no = f.facility_no
+      ${whereSql} order by p.code, f.facility_no, f.created_at`, params)).rows;
+  // คำค้นต้องกรองแผ่นวงเงินด้วย ไม่ใช่แผ่นรายการอย่างเดียว — ไฟล์ที่กดส่งออกต้อง
+  // เป็นสิ่งเดียวกับที่คนกดเห็นอยู่บนจอ กฎเดียวกับ GET /facilities (และของเขา
+  // ที่กรองแผ่นวงเงินด้วย inc(facTypeName_+project) เหมือนกัน)
+  if (req.query.search) {
+    const rx = new RegExp(String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    facilities = facilities.filter((f) => rx.test([
+      f.facility_no, f.bank, f.company, f.project_code, f.project_name, f.type_name, f.type,
+    ].filter(Boolean).join(' ')));
+  }
   const usedMap = await authorizedUsedMap(facilities.map((f) => f.id));
   const kinds = Object.fromEntries((await query('select no, doc_kind, name_th from facility_types')).rows.map((r) => [r.no, r]));
 
@@ -1469,13 +1550,14 @@ router.get('/export', asyncHandler(async (req, res) => {
     const list = String(req.query.status).split(',').map((s) => s.trim()).filter(Boolean);
     if (list.length > 1) ladd('l.status = any($$)', list); else ladd('l.status = $$', list[0]);
   }
-  const due = req.query.due;
-  if (due === 'due7') lw.push('l.due_date between current_date and current_date + 7');
-  else if (due === 'overdue') lw.push('l.due_date < current_date');
-  else if (due === 'thisMonth') lw.push("date_trunc('month', l.due_date) = date_trunc('month', current_date)");
-  else if (due === 'nextMonth') lw.push("date_trunc('month', l.due_date) = date_trunc('month', current_date + interval '1 month')");
+  // กฎเดียวกับ GET /ledger และการ์ดบนหน้าภาพรวม (dueFilterSql) ที่เดียว
+  const dueSqlX = dueFilterSql(req.query.due, 'l.due_date');
+  if (dueSqlX) lw.push(dueSqlX);
   if (req.query.search) {
-    ladd(`(coalesce(l.ref,'') || ' ' || coalesce(l.counterparty,'') || ' ' || coalesce(l.beneficiary,'') || ' ' || coalesce(l.note,'')) ilike '%' || $$ || '%'`, String(req.query.search));
+    ladd(`(coalesce(l.ref,'') || ' ' || coalesce(l.counterparty,'') || ' ' || coalesce(l.beneficiary,'')
+           || ' ' || coalesce(l.purpose,'') || ' ' || coalesce(l.note,'') || ' '
+           || coalesce((select t.doc_kind from facility_types t where t.no = f.facility_no), '')
+          ) ilike '%' || $$ || '%'`, String(req.query.search));
   }
   const ledger = facIds.length ? (await query(
     `select l.*, p.name as project_name, p.code as project_code, f.company, f.facility_no, f.interest_rate, f.interest_note

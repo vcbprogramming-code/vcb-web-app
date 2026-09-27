@@ -278,6 +278,44 @@ suite('7. กล่องยืนยันการกู้คืนไม่�
   await settle(1200);
 }
 
+suite('10. แก้ไขหัวเอกสารได้จากหน้าจอ');
+{
+  // ระบบจริงของลูกค้ามีหน้าต่าง "แก้ไขหัวเอกสาร" สำหรับแก้ชื่อคู่มือ/ฉบับ/วันมีผล
+  // ของเราเพิ่งเพิ่ม — ตรวจทั้งเส้นทาง: เปิดหน้าต่าง แก้ฉบับ บันทึก แล้วคืนค่าเดิม
+  const before = (await call('/sop/bootstrap', { user: A })).data.meta;
+  await page.goto(`${APP}/sop`, { waitUntil: 'networkidle2' });
+  await settle(1500);
+  const opened = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim().startsWith('แก้ไขหัวเอกสาร'));
+    if (!b) return false; b.click(); return true;
+  });
+  happy('มีปุ่ม "แก้ไขหัวเอกสาร" ในเมนูซ้าย (เฉพาะผู้แก้ไข)', opened, '');
+  await settle(900);
+  const title = await page.evaluate(() => document.body.innerText.includes('แก้ไขหัวเอกสาร · Edit document header'));
+  happy('หน้าต่างใช้ชื่อเดียวกับระบบจริง', title, '');
+  const typed = await page.evaluate((v) => {
+    const lab = [...document.querySelectorAll('label')].find((l) => l.innerText.trim().startsWith('เวอร์ชัน'));
+    const inp = lab && lab.parentElement ? lab.parentElement.querySelector('input') : null;
+    if (!inp) return false;
+    const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    set.call(inp, v); inp.dispatchEvent(new Event('input', { bubbles: true })); return true;
+  }, `${before.version} ZZMETA`);
+  happy('กรอกช่องเวอร์ชันได้', typed, '');
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'บันทึก');
+    if (b) b.click();
+  });
+  await settle(1800);
+  const after = (await call('/sop/bootstrap', { user: A })).data.meta;
+  happy('บันทึกแล้วค่าที่เก็บเปลี่ยนจริง', after.version === `${before.version} ZZMETA`, after.version);
+  bad('ชื่อเอกสารว่างต้องถูกปฏิเสธ',
+    (await call('/sop/meta', { method: 'PATCH', user: A, body: { title: '' } })).status === 400, '');
+  // คืนค่าเดิมและลบเวอร์ชันที่เกิดจากการทดสอบ (clean() ลบให้ตอนท้ายอยู่แล้ว)
+  await call('/sop/meta', { method: 'PATCH', user: A, body: { version: before.version } });
+  const back = (await call('/sop/bootstrap', { user: A })).data.meta;
+  happy('คืนค่าหัวเอกสารเดิมแล้ว', back.version === before.version, back.version);
+}
+
 suite('8. ไม่มีข้อผิดพลาดซ่อนอยู่');
 bad('ไม่มี error บนหน้าจอตลอดการทดสอบ', errors.length === 0, errors.slice(0, 3).join(' | '));
 

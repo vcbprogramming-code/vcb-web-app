@@ -119,6 +119,16 @@ const PATHS = {
   menu: <path d="M3 6h18M3 12h18M3 18h18" />,
   arrowLeft: <path d="M19 12H5M12 19l-7-7 7-7" />,
   arrowRight: <path d="M5 12h14M12 5l7 7-7 7" />,
+  // ย้ายรายการขึ้น/ลงไปยังส่วนที่อยู่ติดกันบนแผนการเงิน (T-bar)
+  arrowUp: <path d="M12 19V5M5 12l7-7 7 7" />,
+  arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" />,
+  // คัดลอกโครงของเดือนก่อน
+  copy: (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </>
+  ),
   calendar: (
     <>
       <rect x="3" y="4" width="18" height="18" rx="2" />

@@ -29,7 +29,7 @@ function GroupRow({ title, desc, count, active, onClick }) {
  * ประวัติเวอร์ชันเป็นของระบบเรา วางไว้ท้ายสุดและเห็นเฉพาะผู้มีสิทธิ์แก้ไข
  */
 export default function SopSidebar({
-  modules, counts, meta, tab, module, canEdit, onPick,
+  modules, counts, meta, tab, module, canEdit, onPick, onEditMeta,
 }) {
   const t = useT();
   const perModule = tab === 'flows' ? counts.flows : counts.scenarios;
@@ -85,11 +85,17 @@ export default function SopSidebar({
         </button>
       )}
 
-      {/* ข้อมูลฉบับเอกสาร — ท้ายเมนูเหมือนของเขา */}
+      {/* ข้อมูลฉบับเอกสาร — ท้ายเมนูเหมือนของเขา พร้อมทางเข้าแก้ไขหัวเอกสารสำหรับผู้แก้ไข */}
       <div className="space-y-0.5 px-2 pt-3 text-[11px] leading-relaxed text-slate-400">
         {meta?.version && <p>{t('เวอร์ชัน:')} {meta.version} · {t('มีผล:')} {meta.effective || '—'}</p>}
         {meta?.scope && <p>{t('ขอบเขต:')} {meta.scope}</p>}
         {meta?.manual && <p>{meta.manual}</p>}
+        {canEdit && (
+          <button type="button" onClick={onEditMeta}
+            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-brand">
+            <Icon name="edit" className="h-3 w-3" /> {t('แก้ไขหัวเอกสาร')}
+          </button>
+        )}
       </div>
 
       <Link to="/" className="inline-flex items-center gap-1.5 px-2 pt-1 text-xs font-medium text-slate-500 hover:text-brand">

@@ -16,6 +16,7 @@ import supportRoutes from './support.routes.js';
 import sopRoutes from './sop.routes.js';
 import sysmapRoutes from './sysmap.routes.js';
 import meetingRoutes from './meetings.routes.js';
+import meetingVerifyRoutes from './meetingVerify.routes.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 
@@ -66,5 +67,9 @@ router.use('/sop', moduleGate('sop'), sopRoutes);
 router.use('/sysmap', moduleGate('sysmap'), sysmapRoutes);
 // รายงานการประชุม: minutes per project, versioned
 router.use('/meetings', moduleGate('meetings'), meetingRoutes);
+// ตรวจสอบความแท้ของรายงานการประชุมที่พิมพ์ออกมา — สาธารณะ เข้าถึงด้วยการสแกน QR
+// บนกระดาษ จึงไม่มี requireAuth (ความปลอดภัย = กุญแจที่เดาไม่ได้) แต่ยังอยู่ใต้
+// ประตูโมดูลเดียวกัน: ถ้าโมดูลถูกปิด หน้าตรวจสอบก็ต้องไม่ตอบอะไรเลย
+router.use('/mtg', moduleGate('meetings'), meetingVerifyRoutes);
 
 export default router;

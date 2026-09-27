@@ -420,6 +420,42 @@ const reportSchema = z.object({
   reportPath: z.string().trim().min(1).max(500),
 });
 
+/** หัวเอกสารของคู่มือ — ชื่อ ฉบับ วันมีผล ขอบเขต วัตถุประสงค์ และหมายเหตุท้ายเล่ม */
+const metaSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  subtitle: z.string().trim().max(300).optional().nullable(),
+  manual: z.string().trim().max(200).optional().nullable(),
+  version: z.string().trim().max(60).optional().nullable(),
+  effective: z.string().trim().max(60).optional().nullable(),
+  scope: z.string().trim().max(2000).optional().nullable(),
+  purpose: z.string().trim().max(8000).optional().nullable(),
+  notes: z.array(z.string().trim().max(1000)).max(20).optional(),
+});
+
+/**
+ * PATCH /api/sop/meta — แก้ไขหัวเอกสาร (ระบบจริงเรียก "แก้ไขหัวเอกสาร")
+ * เก็บภาพทั้งเล่มก่อนเขียนเหมือนการแก้ไขอย่างอื่น จะได้ย้อนกลับได้จากประวัติเวอร์ชัน
+ */
+router.patch('/meta', canEdit, asyncHandler(async (req, res) => {
+  const p = metaSchema.partial().safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
+  const f = p.data;
+  if (!Object.keys(f).length) throw new ApiError(400, 'ไม่มีข้อมูลที่จะแก้');
+  await snapshot(req.profile, 'แก้ไขหัวเอกสาร');
+  const cur = await queryOne('select * from sop_meta where id = true');
+  if (!cur) throw new ApiError(404, 'ยังไม่มีหัวเอกสารในระบบ');
+  const pick = (k) => (f[k] === undefined ? cur[k] : f[k]);
+  const row = await queryOne(
+    `update sop_meta set title=$1, subtitle=$2, manual=$3, version=$4, effective=$5,
+                         scope=$6, purpose=$7, notes=$8, updated_at=now()
+      where id = true
+      returning title, subtitle, manual, version, effective, scope, purpose, notes, updated_at`,
+    [pick('title'), pick('subtitle'), pick('manual'), pick('version'), pick('effective'),
+     pick('scope'), pick('purpose'), f.notes === undefined ? cur.notes : f.notes]
+  );
+  res.json({ data: row });
+}));
+
 router.post('/reports', canEdit, asyncHandler(async (req, res) => {
   await snapshot(req.profile, 'เพิ่มรายการรายงาน');
   const p = reportSchema.safeParse(req.body);

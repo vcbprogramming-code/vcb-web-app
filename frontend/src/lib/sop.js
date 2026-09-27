@@ -17,6 +17,9 @@ export const sopApi = {
   deleteScenario: (no) => api(`/sop/scenarios/${no}`, { method: 'DELETE' }),
   moveScenario: (no, direction) => api(`/sop/scenarios/${no}/move`, { method: 'POST', body: { direction } }),
 
+  /** หัวเอกสาร: ชื่อคู่มือ ฉบับ วันมีผล ขอบเขต วัตถุประสงค์ หมายเหตุ */
+  updateMeta: (body) => api('/sop/meta', { method: 'PATCH', body }),
+
   flows: ({ module } = {}) => api(`/sop/flows${qs({ module })}`),
 
   reports: () => api('/sop/reports'),

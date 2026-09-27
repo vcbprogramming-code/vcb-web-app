@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import QRCode from 'qrcode';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { query, queryOne } from '../config/db.js';
@@ -148,6 +149,34 @@ function isoDate(v) {
 /** ผู้ใช้พิมพ์ 'yyyy-mm-dd' มาตรง ๆ ไม่ต้องเก็บเป็น date_label — ฟอร์มจะได้
  *  แสดงวันที่แบบไทยสวย ๆ กลับมา ไม่ใช่คืนตัวเลข ISO ที่เครื่องเป็นคนเขียน */
 const isPlainIso = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim());
+
+/**
+ * เก็บเนื้อหาที่มีอยู่ตอนนี้ไว้เป็นเวอร์ชันหนึ่ง แล้วคืนเลขลำดับที่เก็บได้
+ *
+ * (meeting_id, seq) มีดัชนีไม่ซ้ำ ถ้าสองคนแก้รายงานฉบับเดียวกันพร้อมกันทั้งคู่
+ * อ่าน max ได้เลขเดียวกันแล้วคนหลังชนกุญแจซ้ำ — ชนเมื่อไรก็คำนวณเลขใหม่แล้วลอง
+ * อีกครั้ง เก็บประวัติไว้ได้ทั้งสองฉบับ ไม่ใช่ให้คนหลังเห็น 500
+ *
+ * ต้องถ่ายภาพชื่อเรื่องและวันที่ ณ ขณะนี้ไปด้วย ไม่ใช่อ่านย้อนจากแถวที่มีชีวิต:
+ * เปลี่ยนชื่อวันนี้แล้วแก้เนื้อหาพรุ่งนี้ เวอร์ชันนั้นจะจับคำของเมื่อวานคู่กับชื่อ
+ * ของวันนี้ ซึ่งคือสิ่งที่ทำให้คนอ่านเข้าใจผิดพอดี
+ */
+async function snapshotVersion(cur, actorId) {
+  for (let attempt = 0; ; attempt += 1) {
+    const seq = await queryOne(
+      'select coalesce(max(seq), 0) + 1 as n from mtg_versions where meeting_id = $1', [cur.id]);
+    try {
+      await query(
+        `insert into mtg_versions (meeting_id, seq, content, title, meeting_date, time_label, saved_by)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
+        [cur.id, seq.n, cur.content, cur.title, cur.meeting_date, cur.time_label, actorId]
+      );
+      return seq.n;
+    } catch (e) {
+      if (e?.code !== '23505' || attempt >= 4) throw e;   // 23505 = กุญแจซ้ำ
+    }
+  }
+}
 
 /** ใส่แถวประวัติการทำงานหนึ่งแถว ล้มเหลวก็ไม่ควรทำให้การกระทำหลักพัง */
 async function logAudit(meetingId, action, actorId, details = {}) {
@@ -365,6 +394,44 @@ router.get('/:id/versions/:seq', canView, asyncHandler(async (req, res) => {
   res.json({ data: { ...v, meeting_date: isoDate(v.meeting_date) } });
 }));
 
+/**
+ * GET /api/meetings/:id/print — สิ่งที่หน้าพิมพ์ต้องมีแต่เบราว์เซอร์ทำเองไม่ได้
+ *
+ * QR ต้องฝังเข้าไปใน srcdoc ของ iframe ที่สั่งพิมพ์ในรูปของ data: URI — กรอบนั้น
+ * ไม่มีโทเค็นของผู้ใช้ จึงขอรูปจาก API ที่ต้องยืนยันตัวตนไม่ได้ และภาพที่ฝังใน
+ * @page{@top-right} ต้องมาถึงพร้อมเอกสารตั้งแต่แรก ไม่ใช่โหลดทีหลัง ไม่อย่างนั้น
+ * กล่องขอบกระดาษว่างตอนเครื่องพิมพ์วัดหน้า
+ *
+ * เป็น SVG ไม่ใช่ PNG: Chrome เรนเดอร์ภาพในกล่องขอบกระดาษตามขนาดที่ตัวไฟล์บอก
+ * เองและไม่สนใจ width/height ที่ CSS สั่ง (ข้อค้นพบของลูกค้าใน buildQrPageCss_)
+ * ถ้าใช้ PNG 60 พิกเซลก็จะได้บิตแมป 60 พิกเซลจริงบนกระดาษ ซึ่งแตกจนสแกนไม่ออก
+ * SVG เป็นเวกเตอร์ จึงคมทุกความละเอียดของเครื่องพิมพ์ ขณะที่ยังบอกขนาดของตัวเอง
+ * ว่า 60×60 ได้ตามที่กล่องขอบกระดาษต้องการ
+ */
+router.get('/:id/print', canView, asyncHandler(async (req, res) => {
+  const m = await queryOne(
+    'select m.id, m.verify_token, m.visible, m.group_id from mtg_meetings m where m.id = $1',
+    [req.params.id]);
+  if (!m) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
+  const ids = await visibleGroupIds(req.profile);
+  if (ids !== null && !ids.includes(m.group_id)) throw new ApiError(403, 'ไม่มีสิทธิ์เปิดรายงานฉบับนี้');
+
+  const verifyUrl = `${env.appBaseUrl.replace(/\/$/, '')}/mtg/${m.verify_token}`;
+  let qr = '';
+  try {
+    let svg = await QRCode.toString(verifyUrl, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    // node-qrcode ไม่ใส่ width/height มาให้ มีแต่ viewBox — เติมขนาดจริงเข้าไป
+    // โดยไม่แตะ viewBox ลายในโค้ดจึงย่อลงพอดีกรอบเท่าไรก็ได้
+    svg = svg.replace('<svg ', '<svg width="60" height="60" ');
+    qr = `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+  } catch { /* ไม่มี QR ก็ยังพิมพ์ได้ ดีกว่าพิมพ์ไม่ออกเพราะ QR */ }
+
+  // ฉบับที่ยังไม่เผยแพร่พิมพ์ได้ (ผู้เขียนตรวจทานบนกระดาษเป็นเรื่องปกติ) แต่ QR
+  // จะพาไปหน้าที่ตอบ 404 อยู่ดี — บอกหน้าจอไว้ตรง ๆ ดีกว่าให้คนแจกกระดาษที่
+  // สแกนแล้วขึ้นว่าไม่พบเอกสาร
+  res.json({ data: { verifyUrl, qrDataUri: qr, verifiable: m.visible === true } });
+}));
+
 // ── write ───────────────────────────────────────────────────────────────────
 
 const meetingSchema = z.object({
@@ -468,25 +535,7 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
       timeLabel: cur.time_label }[k];
     return String(given ?? '') !== String(before ?? '');
   });
-  if (changed && cur.content) {
-    // (meeting_id, seq) มีดัชนีไม่ซ้ำ ถ้าสองคนแก้รายงานฉบับเดียวกันพร้อมกัน
-    // ทั้งคู่อ่าน max ได้เลขเดียวกันแล้วคนหลังชนกุญแจซ้ำ — ชนเมื่อไรก็คำนวณ
-    // เลขใหม่แล้วลองอีกครั้ง เก็บประวัติไว้ได้ทั้งสองฉบับ ไม่ใช่ให้คนหลังเห็น 500
-    for (let attempt = 0; ; attempt += 1) {
-      const seq = await queryOne(
-        'select coalesce(max(seq), 0) + 1 as n from mtg_versions where meeting_id = $1', [cur.id]);
-      try {
-        await query(
-          `insert into mtg_versions (meeting_id, seq, content, title, meeting_date, time_label, saved_by)
-           values ($1,$2,$3,$4,$5,$6,$7)`,
-          [cur.id, seq.n, cur.content, cur.title, cur.meeting_date, cur.time_label, req.profile.id]
-        );
-        break;
-      } catch (e) {
-        if (e?.code !== '23505' || attempt >= 4) throw e;   // 23505 = กุญแจซ้ำ
-      }
-    }
-  }
+  if (changed && cur.content) await snapshotVersion(cur, req.profile.id);
 
   const html = p.data.content !== undefined ? sanitizeHtml(p.data.content) : null;
   // ล้างวันที่ต้องทำได้จริง coalesce เพียว ๆ ทำให้ค่าว่างกลายเป็น "ไม่เปลี่ยน"
@@ -527,6 +576,44 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
     await logAudit(cur.id, p.data.visible ? 'publish' : 'unpublish', req.profile.id);
   }
   res.json({ data: row });
+}));
+
+/**
+ * POST /api/meetings/:id/versions/:seq/restore — เอาเนื้อหาของเวอร์ชันเก่ากลับมา
+ *
+ * ของลูกค้าเปิดดูเวอร์ชันเก่าได้ (getVersionContent / getOriginalContent) แต่ไม่มี
+ * ทางเอากลับ ทางเดียวคือ "เปิดดู คัดลอกด้วยตา พิมพ์ใหม่ในตัวแก้ไข" ซึ่งเป็นการ
+ * คัดลอกด้วยมือที่ยาวเป็นหน้า ๆ และพลาดได้เงียบ ๆ — ของเราจึงกู้คืนให้ได้จริง
+ *
+ * การกู้คืนคือการแก้ไขครั้งหนึ่ง ไม่ใช่การย้อนเวลา: เนื้อหาที่มีอยู่ตอนนี้ถูกเก็บ
+ * เป็นเวอร์ชันใหม่ก่อนเสมอ ฉะนั้นกดกู้คืนผิดฉบับก็กู้คืนกลับได้อีก ประวัติไม่มี
+ * ช่วงไหนหายไป และแถวประวัติการทำงานบอกว่ากู้มาจากครั้งที่เท่าไร
+ *
+ * ชื่อเรื่องและวันที่ไม่ถูกเขียนทับ — คนกดปุ่มนี้ต้องการ "ข้อความที่เคยเขียนไว้"
+ * กลับมา ไม่ใช่ให้ชื่อเรื่องที่แก้ถูกแล้วถอยกลับไปเป็นชื่อที่สะกดผิดพร้อมกัน
+ */
+router.post('/:id/versions/:seq/restore', canEdit, asyncHandler(async (req, res) => {
+  const cur = await queryOne('select * from mtg_meetings where id = $1', [req.params.id]);
+  if (!cur) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
+  const seq = Number(req.params.seq);
+  if (!Number.isInteger(seq) || seq < 1) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
+  const v = await queryOne(
+    'select seq, content, title from mtg_versions where meeting_id = $1 and seq = $2',
+    [cur.id, seq]);
+  if (!v) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
+  // กู้คืนสิ่งที่เหมือนเดิมอยู่แล้วไม่ควรงอกเวอร์ชันเปล่าเพิ่ม — เงียบ ๆ แต่ทำให้
+  // ประวัติบวมด้วยแถวที่ไม่ได้เล่าอะไร
+  if (String(v.content || '') === String(cur.content || '')) {
+    throw new ApiError(409, 'เนื้อหาปัจจุบันเหมือนเวอร์ชันนี้อยู่แล้ว');
+  }
+  await snapshotVersion(cur, req.profile.id);
+  const html = sanitizeHtml(v.content || '');
+  await query(
+    `update mtg_meetings set content = $2, excerpt = $3, updated_by = $4, updated_at = now()
+      where id = $1`,
+    [cur.id, html, htmlToText(html).slice(0, 200), req.profile.id]);
+  await logAudit(cur.id, 'restore', req.profile.id, { seq: v.seq });
+  res.json({ data: { ok: true, seq: v.seq } });
 }));
 
 router.post('/:id/pin', canEdit, asyncHandler(async (req, res) => {

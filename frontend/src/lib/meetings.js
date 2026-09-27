@@ -18,6 +18,11 @@ export const meetingsApi = {
   get: (id) => api(`/meetings/${id}`),
   version: (id, seq) => api(`/meetings/${id}/versions/${seq}`),
 
+  // สิ่งที่หน้าพิมพ์ต้องมีแต่เบราว์เซอร์ทำเองไม่ได้ (QR + ลิงก์ตรวจสอบ)
+  print: (id) => api(`/meetings/${id}/print`),
+  // เอาเนื้อหาของเวอร์ชันเก่ากลับมา — เป็นการแก้ไขครั้งหนึ่ง ไม่ใช่การย้อนเวลา
+  restore: (id, seq) => api(`/meetings/${id}/versions/${seq}/restore`, { method: 'POST' }),
+
   create: (body) => api('/meetings', { method: 'POST', body }),
   update: (id, body) => api(`/meetings/${id}`, { method: 'PATCH', body }),
   togglePin: (id) => api(`/meetings/${id}/pin`, { method: 'POST' }),
@@ -59,9 +64,9 @@ export const thaiDateTime = (v) => {
   return `${thaiDate(v)} ${hh}:${mm}`;
 };
 
-const TH_MONTHS_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+export const TH_MONTHS_ABBR = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-const EN_MONTHS_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+export const EN_MONTHS_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
@@ -209,3 +214,75 @@ export const isAiSourced = (m) => m?.source === 'fathom' || m?.source === 'trans
 /** ป้ายแหล่งที่มา — แสดงเฉพาะเมื่อไม่ใช่ที่คนพิมพ์เอง */
 export const sourceLabel = (m) => (m?.source === 'fathom' ? 'Fathom'
   : m?.source === 'transkriptor' ? 'Transkriptor' : '');
+
+// ── สิ่งที่หน้ากระดาษต้องมี ─────────────────────────────────────────────────
+
+/** หัวจดหมายของบริษัท — ค่าเดียวกับ COMPANY_NAME ในระบบจริงของลูกค้า */
+export const MTG_COMPANY = 'บริษัท วิจิตรภัณฑ์ก่อสร้าง จำกัด';
+
+const TH_MONTHS_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+/** "วันที่ 12 มิถุนายน 2569" — บรรทัดวันที่ใต้หัวจดหมาย เหมือน fmtThaiDate ของเขา
+ *  ปีเป็นพุทธศักราชเสมอ เพราะนี่คือกระดาษที่ออกจากบริษัทไทย ไม่ใช่หน้าจอสองภาษา */
+export const thaiLongDate = (m) => {
+  const iso = m?.meeting_date ? String(m.meeting_date).slice(0, 10) : '';
+  const p = iso.split('-');
+  if (p.length !== 3) return '';
+  const y = +p[0]; const mo = +p[1]; const d = +p[2];
+  if (!y || !(mo >= 1 && mo <= 12) || !d) return '';
+  return `วันที่ ${d} ${TH_MONTHS_FULL[mo - 1]} ${y + 543}`;
+};
+
+/**
+ * ท้ายชื่อไฟล์ PDF — "12.6.69" (วัน.เดือน.ปี พ.ศ. สองหลัก ไม่เติมศูนย์)
+ *
+ * รูปแบบนี้ไม่ได้เลือกเอง มันคือชื่อไฟล์ที่อยู่ในโฟลเดอร์ส่งออกของลูกค้าอยู่แล้ว
+ * (pdfDateSuffix_ ของเขา) จุดใช้ได้ในชื่อไฟล์ทุกระบบปฏิบัติการ ทับไม่ได้
+ *
+ * ถอยไปอ่านจากข้อความวันที่ที่ผู้ใช้พิมพ์ถ้าไม่มีวันที่จริง — ไฟล์ที่ไม่มีวันที่
+ * ในชื่อจะแยกจากกันไม่ออกเลยเมื่ออยู่ในโฟลเดอร์เดียวกัน
+ */
+export const pdfDateSuffix = (m) => {
+  let y; let mo; let d;
+  const iso = m?.meeting_date ? String(m.meeting_date).slice(0, 10) : '';
+  const p = iso.split('-');
+  if (p.length === 3) { y = +p[0]; mo = +p[1]; d = +p[2]; }
+  if (!(y && mo >= 1 && mo <= 12 && d)) {
+    const hit = String(m?.date_label || '').match(/(\d{1,2})\s*[/.\-]\s*(\d{1,2})\s*[/.\-]\s*(\d{2,4})/);
+    if (hit) { d = +hit[1]; mo = +hit[2]; y = +hit[3]; }
+  }
+  if (!(y && mo >= 1 && mo <= 12 && d)) return '';
+  if (y < 100) y += 2500;          // "69" คือ 2569 ไม่ใช่ ค.ศ. 1969
+  if (y < 2400) y += 543;          // ที่เก็บไว้เป็นคริสต์ศักราช → พุทธศักราช
+  return `${d}.${mo}.${y % 100}`;
+};
+
+/** ชื่อไฟล์ที่เบราว์เซอร์จะเสนอตอนกด "บันทึกเป็น PDF" — <ชื่อเรื่อง> d.m.yy
+ *  ถอดอักขระที่ใช้ในชื่อไฟล์ไม่ได้ออก ไม่อย่างนั้นเบราว์เซอร์จะตัดชื่อทิ้งเงียบ ๆ */
+export const pdfFileName = (m) => {
+  const base = String(m?.title || 'รายงานการประชุม').replace(/[\\/:*?"<>|]/g, '').trim()
+    || 'รายงานการประชุม';
+  const suffix = pdfDateSuffix(m);
+  return suffix ? `${base} ${suffix}` : base;
+};
+
+// ── ขนาดตัวอักษรสำหรับอ่านบันทึก ────────────────────────────────────────────
+// ของเขาเก็บค่านี้ต่อเครื่องไว้ใน localStorage และให้มีผลกับเนื้อหาที่อ่านเท่านั้น
+// ไม่ใช่ทั้งแอป (ปุ่มกับแถบข้างขยายตามแล้วหน้าจอแตก) เราทำเหมือนกัน
+const SIZE_KEY = 'mtg_reading_size';
+export const READING_SIZES = ['small', 'normal', 'large'];
+/** ตัวคูณขนาด ไม่ใช่ค่าพิกเซลตายตัว — เนื้อหามีหัวข้อหลายระดับ ถ้ากำหนดพิกเซล
+ *  เดียวหัวข้อก็จะเท่ากับเนื้อความ */
+export const READING_SCALE = { small: 0.9, normal: 1, large: 1.18 };
+
+export const readReadingSize = () => {
+  try {
+    const v = localStorage.getItem(SIZE_KEY);
+    return READING_SIZES.includes(v) ? v : 'normal';
+  } catch { return 'normal'; }   // โหมดส่วนตัว / ปิดที่เก็บของเว็บไซต์
+};
+
+export const writeReadingSize = (v) => {
+  try { if (READING_SIZES.includes(v)) localStorage.setItem(SIZE_KEY, v); } catch { /* อ่านอย่างเดียวก็ยังใช้งานได้ */ }
+};

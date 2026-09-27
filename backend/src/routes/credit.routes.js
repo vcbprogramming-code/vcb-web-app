@@ -6,6 +6,9 @@ import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { facilityView, authorizedUsedMap, dueBucket, overdueInterestInfo, ratePct, writeAudit, diff, AUTHORIZED_STATUSES, isOutstanding, isDueWithin7 } from '../services/credit.js';
+// เลขทุกตัวของแผนการเงิน (T-bar) คำนวณที่ไฟล์เดียว — หน้าจอ ไฟล์ Excel และเทสต์
+// จึงอ่านสูตรชุดเดียวกัน
+import * as tbar from '../services/creditTbar.js';
 
 /**
  * การพับรวมวงเงินบนหน้าจอ — ธนาคารไม่ได้แยกวงเงินเหล่านี้ออกจากกัน
@@ -532,6 +535,596 @@ router.delete('/cash-plan/:id', asyncHandler(async (req, res) => {
   await query('delete from cash_plans where id = $1', [req.params.id]);
   await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan', targetId: req.params.id });
   res.json({ data: { deleted: true } });
+}));
+
+// ── แผนการเงิน (T-bar) · หักค่างานตามจริง ───────────────────────────────────
+//
+// เส้นทางชุดนี้เพิ่มเข้ามาใหม่ทั้งชุด ไม่แตะ /cash-plan เดิมด้านบน — ของเดิมยัง
+// รับ-ส่งโครงเดิม (income/newPN/deductions เป็นตัวเลขเดียว) ได้เหมือนเคย
+//
+// หนึ่งเดือนของหนึ่งโครงการ = "ส่วน" (period) ไม่เกิน 5 ส่วน ทุกยอดบนหน้าจอ
+// คำนวณที่ services/creditTbar.js ที่เดียว แล้วส่งมาพร้อมข้อมูล เพื่อให้เลขที่
+// คนอ่านบนจอ เลขในไฟล์ Excel และเลขที่เทสต์ตรวจ เป็นเลขก้อนเดียวกัน
+
+const KINDS = ['plan', 'actual'];
+const tbarKind = (v) => (v === 'actual' ? 'actual' : 'plan');
+const MONTH_RX = /^\d{4}-\d{2}$/;
+/** เดือนก่อนหน้าในรูป 'YYYY-MM' */
+const prevMonthOf = (month) => {
+  const [y, m] = String(month).split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * ตั๋วที่ยังต้องจ่าย — เกณฑ์เดียวกับ planAllOutstanding ของเขา: อนุมัติแล้ว ·
+ * ยังไม่ชำระ · ไม่ถูกยกเลิก · ยอดเป็นบวก · มีวันครบกำหนด
+ * (หน้าจอกรอง "ครบกำหนดเดือนนี้" จากวันครบกำหนดอีกชั้น ส่วนที่เหลือคือ "ล่วงหน้า")
+ */
+async function tbarOutstanding(projectId) {
+  const params = [AUTHORIZED_STATUSES];
+  let extra = '';
+  if (projectId) { params.push(projectId); extra = ` and l.project_id = $${params.length}`; }
+  const { rows } = await query(
+    `select l.id, l.project_id, l.amount, l.due_date, l.ref, l.counterparty, l.beneficiary, l.note,
+            f.facility_no, t.doc_kind
+       from credit_ledger l
+       join facilities f on f.id = l.facility_id
+       left join facility_types t on t.no = f.facility_no
+      where l.status = any($1) and l.amount > 0 and l.due_date is not null${extra}
+      order by l.due_date, l.created_at`, params);
+  return rows.map((r) => ({
+    id: r.id, project_id: r.project_id, amount: Number(r.amount), due: dateStr(r.due_date),
+    ref: r.ref || '', desc: [r.counterparty, r.beneficiary, r.note].filter(Boolean).join(' · '),
+    facility_no: r.facility_no, kind_short: r.doc_kind || '-',
+  }));
+}
+
+/** อ่านส่วนของเดือนหนึ่ง (ทุกโครงการหรือโครงการเดียว) พร้อม paid_ids ครบทุกแถว */
+async function tbarPeriods(month, kind, projectId) {
+  const params = [month, kind];
+  let extra = '';
+  if (projectId) { params.push(projectId); extra = ` and project_id = $${params.length}`; }
+  const { rows } = await query(
+    `select * from cash_plans where month = $1 and kind = $2${extra}
+      order by project_id, period_idx`, params);
+  if (rows.length) {
+    const paid = await query(
+      'select cash_plan_id, ledger_id from cash_plan_paid where cash_plan_id = any($1::uuid[])',
+      [rows.map((r) => r.id)]);
+    const by = new Map();
+    for (const p of paid.rows) {
+      if (!by.has(p.cash_plan_id)) by.set(p.cash_plan_id, []);
+      by.get(p.cash_plan_id).push(p.ledger_id);
+    }
+    for (const r of rows) r.paid_ids = by.get(r.id) || [];
+  }
+  return rows;
+}
+
+/** แถวหนึ่งส่วน ในรูปที่หน้าจอใช้ — พร้อมยอดที่คำนวณแล้ว */
+const tbarOut = (r, { amountById, pnSold }) => {
+  const totals = tbar.sectionTotals(r, { amountById, pnSold });
+  const rate = r.pn_rate == null ? tbar.DEFAULT_PN_RATE : Number(r.pn_rate);
+  return {
+    id: r.id, project_id: r.project_id, month: r.month, kind: r.kind || 'plan',
+    period_idx: Number(r.period_idx) || 0, period_label: r.period_label || '',
+    period_date: dateStr(r.period_date), period_type: r.period_type || 'mixed',
+    income: Number(r.income) || 0, work_ref: r.work_ref || '',
+    paid_ids: r.paid_ids || [], new_pn_amount: Number(r.new_pn) || 0, new_pn_note: r.new_pn_note || '',
+    note: r.note || '',
+    deductions: Array.isArray(r.deductions_json) ? r.deductions_json : [],
+    income_break: (r.income_break && !Array.isArray(r.income_break)) ? r.income_break : {},
+    extra_rows: Array.isArray(r.extra_rows) ? r.extra_rows : [],
+    aval_amount: Number(r.aval_amount) || 0, show_all_due: Boolean(r.show_all_due),
+    pn_rate: rate, updated_at: r.updated_at,
+    // ยอดที่คำนวณแล้ว — หน้าจอคิดซ้ำฝั่งตัวเองตอนพิมพ์ (ให้ตัวเลขขยับทันมือ)
+    // แต่ค่าที่บันทึกไว้จริงคือชุดนี้ เทสต์จึงตรวจได้ว่าสองฝั่งได้เลขเดียวกัน
+    totals: {
+      cash_in: totals.cashIn, cash_out: totals.cashOut, net: totals.net,
+      ded_sum: totals.dedSum, balance: totals.balance, paid_sum: totals.paidSum, extra: totals.extra,
+    },
+    calc: r.period_type === 'income' ? tbar.incomeCalc(r) : null,
+    deduction_rows: r.period_type === 'deduction' ? tbar.deductionRows(r, pnSold) : null,
+    interest: r.period_type === 'income' ? tbar.interestRows(r, rate) : null,
+  };
+};
+
+/**
+ * GET /credit/cash-plan/tbar?month=YYYY-MM&kind=plan|actual[&projectId=]
+ *
+ * ทุกอย่างที่จอ T-bar ต้องใช้ในหนึ่งรอบ: ส่วนของเดือนนี้ · ตั๋วที่ยังต้องจ่าย ·
+ * รวม P/N ที่ขายของเดือนก่อน (ค่าเริ่มต้นของแถว "หัก PN") · ยอดรวมรายโครงการ
+ */
+router.get('/cash-plan/tbar', asyncHandler(async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RX.test(month)) throw new ApiError(400, 'ต้องระบุเดือนในรูป YYYY-MM');
+  const kind = tbarKind(req.query.kind);
+  const projectId = req.query.projectId || null;
+  const [rows, prevRows, outstanding] = await Promise.all([
+    tbarPeriods(month, kind, projectId),
+    tbarPeriods(prevMonthOf(month), kind, projectId),
+    tbarOutstanding(projectId),
+  ]);
+  const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
+  const byProject = new Map();
+  for (const r of rows) {
+    if (!byProject.has(r.project_id)) byProject.set(r.project_id, []);
+    byProject.get(r.project_id).push(r);
+  }
+  const periods = [];
+  const projects = [];
+  for (const [pid, list] of byProject) {
+    const pnSold = tbar.pnSoldThisMonth(list);
+    for (const r of list) periods.push(tbarOut(r, { amountById, pnSold }));
+    const t = tbar.projectTotals(list, { amountById });
+    projects.push({ project_id: pid, cash_in: t.cashIn, cash_out: t.cashOut, net: t.net });
+  }
+  // รวม P/N ที่ขายของเดือนก่อนรายโครงการ — ค่าตั้งต้นของแถว "หัก PN" (PN Work
+  // Done ของงวดก่อน) และเป็นตัวบอกว่าเดือนก่อนมีแผนของโครงการไหนให้คัดลอกได้
+  const prevByProject = new Map();
+  for (const r of prevRows) {
+    if (!prevByProject.has(r.project_id)) prevByProject.set(r.project_id, []);
+    prevByProject.get(r.project_id).push(r);
+  }
+  const prevPn = {};
+  for (const [pid, list] of prevByProject) prevPn[pid] = tbar.pnSoldFrom(list);
+  res.json({ data: {
+    month, kind, periods, projects, outstanding, prev_pn: prevPn,
+    prev_projects: [...prevByProject.keys()],
+    totals: projects.reduce((a, p) => ({
+      cash_in: a.cash_in + p.cash_in, cash_out: a.cash_out + p.cash_out, net: a.net + p.net,
+    }), { cash_in: 0, cash_out: 0, net: 0 }),
+  } });
+}));
+
+const moneyRow = z.object({ label: z.string().max(200).optional().nullable(), amount: z.number().optional() });
+const tbarPeriodSchema = z.object({
+  id: z.string().uuid().optional(),
+  projectId: z.string().uuid(),
+  month: z.string().regex(MONTH_RX),
+  kind: z.enum(['plan', 'actual']).optional(),
+  periodIdx: z.number().int().min(1).max(tbar.MAX_PERIODS),
+  periodType: z.enum(['income', 'deduction', 'aval', 'mixed']).optional(),
+  periodLabel: z.string().max(40).optional().nullable(),
+  periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  income: z.number().optional(),
+  workRef: z.string().max(200).optional().nullable(),
+  note: z.string().max(2000).optional().nullable(),
+  newPNAmount: z.number().optional(), newPNNote: z.string().max(500).optional().nullable(),
+  paidIds: z.array(z.string().uuid()).optional(),
+  deductions: z.array(moneyRow).max(20).optional(),
+  incomeBreak: z.object({
+    kind: z.enum(['work', 'progress']).optional(),
+    work: z.number().optional(), segment: z.number().optional(), pnSold: z.number().optional(),
+    rt: z.number().optional(), daysNew: z.number().optional(), daysRT: z.number().optional(),
+  }).optional(),
+  extraRows: z.array(moneyRow).max(20).optional(),
+  avalAmount: z.number().optional(), showAllDue: z.boolean().optional(),
+  pnRate: z.number().min(0).max(1).optional(),
+});
+
+/** เขียน paid_ids ของส่วนหนึ่ง — ตั๋วที่ไม่มีอยู่จริงหรือคนละโครงการถูกทิ้ง ไม่ล้ม */
+async function writePaidIds(client, planId, projectId, ids) {
+  await client.query('delete from cash_plan_paid where cash_plan_id = $1', [planId]);
+  if (!ids || !ids.length) return [];
+  const { rows } = await client.query(
+    'select id from credit_ledger where id = any($1::uuid[]) and project_id = $2', [ids, projectId]);
+  const ok = rows.map((r) => r.id);
+  for (const id of ok) {
+    await client.query(
+      'insert into cash_plan_paid (cash_plan_id, ledger_id) values ($1,$2) on conflict do nothing',
+      [planId, id]);
+  }
+  return ok;
+}
+
+/**
+ * ค่าที่เขียนลงคอลัมน์เดิม (income / new_pn / deductions / available) —
+ * เก็บเป็น "ยอดสรุปของส่วนนั้น" เพื่อให้ endpoint เดิมกับหน้าผลต่างเดิมยังอ่าน
+ * ได้ตัวเลขที่มีความหมาย ไม่ใช่ศูนย์
+ *   income    — ส่วน income เก็บ "ค่างานที่ส่ง" · ส่วน deduction เก็บ "รับเงินค่างานสุทธิ"
+ *               (ตรงกับคอลัมน์ Income ของชีตเขา ซึ่ง p.income=c.work สำหรับส่วน income)
+ *   new_pn    — รวม P/N ที่ขายของส่วนนั้น
+ *   deductions— ผลรวมห้าแถวหัก
+ *   available — สุทธิงวดนี้ (รับ − จ่าย) ของส่วนนั้น
+ */
+function legacyFigures(row, pnSold, amountById) {
+  const s = tbar.sectionTotals(row, { pnSold, amountById });
+  if (row.period_type === 'income') {
+    const c = tbar.incomeCalc(row);
+    return { income: c.work, newPn: c.totalPN, dedSum: 0, available: s.net };
+  }
+  return { income: Number(row.income) || 0, newPn: 0, dedSum: s.dedSum, available: s.net };
+}
+
+/** POST /credit/cash-plan/tbar/period — สร้างหรือแก้ส่วนหนึ่ง (upsert) */
+router.post('/cash-plan/tbar/period', asyncHandler(async (req, res) => {
+  const parsed = tbarPeriodSchema.safeParse(req.body);
+  if (!parsed.success) throw new ApiError(400, 'Invalid input', parsed.error.flatten());
+  const d = parsed.data;
+  const kind = tbarKind(d.kind);
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    // สูงสุด 5 ส่วนต่อเดือน — นับเฉพาะตอนเพิ่มส่วนใหม่ (แก้ของเดิมไม่กระทบ)
+    const existing = (await client.query(
+      'select * from cash_plans where project_id = $1 and month = $2 and kind = $3 order by period_idx',
+      [d.projectId, d.month, kind])).rows;
+    const mine = d.id ? existing.find((x) => x.id === d.id) : existing.find((x) => x.period_idx === d.periodIdx);
+    if (!mine && existing.length >= tbar.MAX_PERIODS) {
+      await client.query('rollback');
+      throw new ApiError(400, `ใส่ได้สูงสุด ${tbar.MAX_PERIODS} ส่วนต่อเดือน`);
+    }
+    const draft = {
+      period_idx: d.periodIdx,
+      period_type: d.periodType || 'mixed',
+      income: d.income ?? 0,
+      deductions_json: d.deductions ?? [],
+      income_break: d.incomeBreak ?? {},
+      extra_rows: d.extraRows ?? [],
+      aval_amount: d.avalAmount ?? 0,
+      paid_ids: d.paidIds ?? [],
+    };
+    // ยอดตั๋วที่ส่วนนี้จ่าย — ใช้คิดคอลัมน์ available ให้เป็นสุทธิจริงของส่วน
+    const amountById = new Map();
+    if (draft.paid_ids.length) {
+      const amt = await client.query(
+        'select id, amount from credit_ledger where id = any($1::uuid[]) and project_id = $2',
+        [draft.paid_ids, d.projectId]);
+      for (const r of amt.rows) amountById.set(r.id, Number(r.amount));
+    }
+    // "หัก PN ขอเบิกใหม่" ของส่วน deduction อ่านจากส่วน income ส่วนแรกของเดือนนั้น
+    // — ส่วนที่กำลังบันทึกต้องนับด้วย (ถ้าเป็น income) ไม่ใช่ค่าเก่าในฐาน
+    const siblings = existing.filter((x) => x.id !== (mine ? mine.id : null));
+    const pnSold = tbar.pnSoldThisMonth([...siblings, draft]);
+    const L = legacyFigures(draft, pnSold, amountById);
+    const vals = [d.projectId, d.month, String(d.periodIdx), kind, d.periodIdx,
+      d.periodLabel ?? '', d.periodDate || null, draft.period_type,
+      L.income, d.workRef ?? null, L.newPn, d.newPNNote ?? null, d.note ?? null,
+      JSON.stringify(draft.deductions_json), JSON.stringify(draft.income_break),
+      JSON.stringify(draft.extra_rows), draft.aval_amount, d.showAllDue ?? false,
+      d.pnRate == null ? tbar.DEFAULT_PN_RATE : d.pnRate, L.dedSum, L.available];
+    let row;
+    if (mine) {
+      row = (await client.query(
+        `update cash_plans set project_id=$1, month=$2, period=$3, kind=$4, period_idx=$5,
+           period_label=$6, period_date=$7, period_type=$8, income=$9, work_ref=$10, new_pn=$11,
+           new_pn_note=$12, note=$13, deductions_json=$14::jsonb, income_break=$15::jsonb,
+           extra_rows=$16::jsonb, aval_amount=$17, show_all_due=$18, pn_rate=$19,
+           deductions=$20, available=$21, updated_at=now()
+         where id=$22 returning *`, [...vals, mine.id])).rows[0];
+    } else {
+      row = (await client.query(
+        `insert into cash_plans (project_id, month, period, kind, period_idx, period_label, period_date,
+           period_type, income, work_ref, new_pn, new_pn_note, note, deductions_json, income_break,
+           extra_rows, aval_amount, show_all_due, pn_rate, deductions, available, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,
+                 $17,$18,$19,$20,$21,$22)
+         returning *`, [...vals, req.profile.id])).rows[0];
+    }
+    row.paid_ids = await writePaidIds(client, row.id, d.projectId, draft.paid_ids);
+    await client.query('commit');
+    await writeAudit({ actor: req.profile, action: mine ? 'update' : 'create',
+      target: 'cashplan-tbar', targetId: row.id,
+      note: `${d.month} · ${kind} · ส่วน ${d.periodIdx} (${draft.period_type})` });
+    const out = await tbarOutstanding(d.projectId);
+    const list = await tbarPeriods(d.month, kind, d.projectId);
+    res.status(mine ? 200 : 201).json({
+      data: tbarOut(row, {
+        amountById: new Map(out.map((o) => [o.id, o.amount])),
+        pnSold: tbar.pnSoldThisMonth(list),
+      }) });
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}));
+
+/** DELETE /credit/cash-plan/tbar/period/:id — ลบส่วนนี้ */
+router.delete('/cash-plan/tbar/period/:id', asyncHandler(async (req, res) => {
+  const row = await queryOne('delete from cash_plans where id = $1 returning id, month, kind, period_idx',
+    [req.params.id]);
+  if (!row) throw new ApiError(404, 'ไม่พบรายการ');
+  await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan-tbar', targetId: row.id,
+    note: `${row.month} · ${row.kind} · ส่วน ${row.period_idx}` });
+  res.json({ data: { deleted: true } });
+}));
+
+/**
+ * POST /credit/cash-plan/tbar/project — เพิ่มโครงการเข้าแผนเดือนนี้
+ *
+ * สร้างสามส่วนเหมือน planAddProject ของเขา: รับเงินค่างาน + หักหนี้ · ขอเบิก P/N
+ * ค่างาน · ขอเบิก P/N Workdone โดยส่วน deduction ตั้ง "หัก PN" จากรวม P/N ที่ขาย
+ * ของเดือนก่อน และส่วน income ส่วนแรกรับตั๋วที่ครบกำหนดเดือนนี้ไปทั้งหมด
+ */
+router.post('/cash-plan/tbar/project', asyncHandler(async (req, res) => {
+  const body = z.object({
+    projectId: z.string().uuid(), month: z.string().regex(MONTH_RX),
+    kind: z.enum(['plan', 'actual']).optional(),
+  }).safeParse(req.body);
+  if (!body.success) throw new ApiError(400, 'Invalid input', body.error.flatten());
+  const { projectId, month } = body.data;
+  const kind = tbarKind(body.data.kind);
+  const already = await tbarPeriods(month, kind, projectId);
+  if (already.length) throw new ApiError(409, 'โครงการนี้มีอยู่ในแผนแล้ว');
+  const prev = await tbarPeriods(prevMonthOf(month), kind, projectId);
+  const prevPn = tbar.pnSoldFrom(prev);
+  const outstanding = await tbarOutstanding(projectId);
+  // ตั๋วที่ครบกำหนด "เดือนนี้" — ส่วน income ส่วนแรกรับไปทั้งหมด
+  const eligible = outstanding.filter((o) => String(o.due).slice(0, 7) === month).map((o) => o.id);
+
+  const client = await pool.connect();
+  const made = [];
+  try {
+    await client.query('begin');
+    let incomeOrd = 0;
+    for (let i = 0; i < tbar.NEW_PROJECT_SECTIONS.length; i += 1) {
+      const type = tbar.NEW_PROJECT_SECTIONS[i];
+      const idx = i + 1;
+      let deductionsJson = [];
+      let incomeBreak = {};
+      if (type === 'deduction') {
+        deductionsJson = tbar.defaultDeductions().map((d) => (
+          // "หัก PN" (ไม่ใช่ "หัก PN ขอเบิกใหม่") = PN Work Done ของงวดก่อน
+          d.label.indexOf('หัก PN') === 0 && d.label.indexOf('ใหม่') < 0 && prevPn > 0
+            ? { ...d, amount: prevPn } : d));
+      } else if (type === 'income') {
+        incomeOrd += 1;
+        incomeBreak = tbar.defaultIncome(incomeOrd >= 2 ? 'progress' : 'work');
+      }
+      const label = type === 'income' ? String(incomeOrd) : '';
+      const row = (await client.query(
+        `insert into cash_plans (project_id, month, period, kind, period_idx, period_label,
+           period_type, income, new_pn, deductions_json, income_break, extra_rows, aval_amount,
+           pn_rate, deductions, available, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,0,0,$8::jsonb,$9::jsonb,'[]'::jsonb,0,$10,0,0,$11)
+         returning *`,
+        [projectId, month, String(idx), kind, idx, label, type,
+          JSON.stringify(deductionsJson), JSON.stringify(incomeBreak), tbar.DEFAULT_PN_RATE, req.profile.id]
+      )).rows[0];
+      row.paid_ids = (type === 'income' && incomeOrd === 1)
+        ? await writePaidIds(client, row.id, projectId, eligible) : [];
+      made.push(row);
+    }
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan-tbar',
+    targetId: projectId, note: `${month} · ${kind} · เพิ่มโครงการเข้าแผน ${made.length} ส่วน` });
+  const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
+  const pnSold = tbar.pnSoldThisMonth(made);
+  res.status(201).json({ data: made.map((r) => tbarOut(r, { amountById, pnSold })) });
+}));
+
+/** DELETE /credit/cash-plan/tbar/project — ลบ T-bar ของโครงการนี้ทั้งเดือน */
+router.delete('/cash-plan/tbar/project', asyncHandler(async (req, res) => {
+  const { projectId } = req.query;
+  const month = String(req.query.month || '');
+  if (!projectId || !MONTH_RX.test(month)) throw new ApiError(400, 'ต้องระบุ projectId และเดือน');
+  const kind = tbarKind(req.query.kind);
+  const { rowCount } = await query(
+    'delete from cash_plans where project_id = $1 and month = $2 and kind = $3', [projectId, month, kind]);
+  await writeAudit({ actor: req.profile, action: 'delete', target: 'cashplan-tbar', targetId: projectId,
+    note: `${month} · ${kind} · ลบทั้งโครงการ ${rowCount} ส่วน` });
+  res.json({ data: { deleted: rowCount } });
+}));
+
+/**
+ * POST /credit/cash-plan/tbar/copy — คัดลอกจากเดือนก่อน
+ *
+ * ลอกโครงและยอดที่กรอกไว้ (ประเภทส่วน · เลขงวด · รับเงินค่างาน · ห้าแถวหัก ·
+ * ตารางซ้ายของ P/N · ยอด Aval) แต่ไม่ลอกวันที่ส่งงานและตั๋วที่จ่าย ตาม planCopyPrev
+ * ของเขา — เดือนใหม่มีตั๋วครบกำหนดคนละชุด
+ */
+router.post('/cash-plan/tbar/copy', asyncHandler(async (req, res) => {
+  const body = z.object({
+    projectId: z.string().uuid(), month: z.string().regex(MONTH_RX),
+    kind: z.enum(['plan', 'actual']).optional(),
+  }).safeParse(req.body);
+  if (!body.success) throw new ApiError(400, 'Invalid input', body.error.flatten());
+  const { projectId, month } = body.data;
+  const kind = tbarKind(body.data.kind);
+  const src = await tbarPeriods(prevMonthOf(month), kind, projectId);
+  if (!src.length) throw new ApiError(404, 'ไม่พบแผนเดือนก่อนของโครงการนี้');
+  const client = await pool.connect();
+  const made = [];
+  try {
+    await client.query('begin');
+    for (const p of src.slice(0, tbar.MAX_PERIODS)) {
+      const row = (await client.query(
+        `insert into cash_plans (project_id, month, period, kind, period_idx, period_label,
+           period_type, income, new_pn, deductions_json, income_break, extra_rows, aval_amount,
+           pn_rate, deductions, available, created_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,$15,$16,$17)
+         on conflict (project_id, month, period, kind) do update set
+           period_idx = excluded.period_idx, period_label = excluded.period_label,
+           period_type = excluded.period_type, income = excluded.income, new_pn = excluded.new_pn,
+           deductions_json = excluded.deductions_json, income_break = excluded.income_break,
+           extra_rows = excluded.extra_rows, aval_amount = excluded.aval_amount,
+           pn_rate = excluded.pn_rate, deductions = excluded.deductions,
+           available = excluded.available, updated_at = now()
+         returning *`,
+        [projectId, month, String(p.period_idx), kind, p.period_idx, p.period_label || '',
+          p.period_type, Number(p.income) || 0, Number(p.new_pn) || 0,
+          JSON.stringify(p.deductions_json || []), JSON.stringify(p.income_break || {}),
+          JSON.stringify(p.extra_rows || []), Number(p.aval_amount) || 0,
+          p.pn_rate == null ? tbar.DEFAULT_PN_RATE : Number(p.pn_rate),
+          Number(p.deductions) || 0, Number(p.available) || 0, req.profile.id])).rows[0];
+      row.paid_ids = [];
+      made.push(row);
+    }
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan-tbar', targetId: projectId,
+    note: `${month} · ${kind} · คัดลอกจาก ${prevMonthOf(month)} ${made.length} ส่วน` });
+  const outstanding = await tbarOutstanding(projectId);
+  const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
+  const pnSold = tbar.pnSoldThisMonth(made);
+  res.status(201).json({ data: made.map((r) => tbarOut(r, { amountById, pnSold })) });
+}));
+
+/**
+ * GET /credit/cash-plan/tbar/variance?month=YYYY-MM — ผลต่างรายโครงการ
+ *
+ * รับเงิน (Received) / หักจ่าย (Deducted) / คงเหลือสุทธิ (Net) แต่ละกลุ่มแตกเป็น
+ * แผน · จริง · ผลต่าง — ตาม renderVariance ของเขา (ผลต่าง = จริง − แผน)
+ */
+router.get('/cash-plan/tbar/variance', asyncHandler(async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RX.test(month)) throw new ApiError(400, 'ต้องระบุเดือนในรูป YYYY-MM');
+  const projectId = req.query.projectId || null;
+  const [planRows, actualRows, outstanding] = await Promise.all([
+    tbarPeriods(month, 'plan', projectId),
+    tbarPeriods(month, 'actual', projectId),
+    tbarOutstanding(projectId),
+  ]);
+  const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
+  const group = (rows) => {
+    const m = new Map();
+    for (const r of rows) {
+      if (!m.has(r.project_id)) m.set(r.project_id, []);
+      m.get(r.project_id).push(r);
+    }
+    return m;
+  };
+  const P = group(planRows); const A = group(actualRows);
+  const codes = [...new Set([...P.keys(), ...A.keys()])];
+  const names = codes.length
+    ? Object.fromEntries((await query('select id, code, name from projects where id = any($1::uuid[])', [codes]))
+      .rows.map((r) => [r.id, r]))
+    : {};
+  const data = codes.map((pid) => {
+    const pt = tbar.varianceTotals(P.get(pid) || [], { amountById });
+    const at = tbar.varianceTotals(A.get(pid) || [], { amountById });
+    const f = (k) => ({ plan: pt[k], actual: at[k], diff: at[k] - pt[k] });
+    return { project_id: pid, project_code: names[pid]?.code || '', project_name: names[pid]?.name || '',
+      received: f('received'), deducted: f('deducted'), net: f('net'),
+      has_plan: P.has(pid), has_actual: A.has(pid) };
+  }).sort((a, b) => String(a.project_code).localeCompare(String(b.project_code)));
+  res.json({ data, month });
+}));
+
+/**
+ * GET /credit/cash-plan/tbar/export?month=YYYY-MM&kind= — ส่งออก T-bar เป็น Excel
+ *
+ * ปุ่มของระบบจริงยังเป็น stub ("จะออกแบบรูปแบบไฟล์ Excel ในขั้นตอนถัดไป") ไฟล์นี้
+ * จึงวางตามสิ่งที่หน้าจอแสดง: หนึ่งชีตรวมทุกโครงการ ไล่ทีละส่วน ซ้ายเป็นรายการ
+ * รับ ขวาเป็นตั๋วที่ส่วนนั้นจ่าย ปิดท้ายด้วยรวมรับ/รวมจ่าย/คงเหลือของโครงการ
+ * แล้วรวมทุก T-bar — คนที่เปิดไฟล์นี้อ่านเทียบกับจอได้บรรทัดต่อบรรทัด
+ */
+router.get('/cash-plan/tbar/export', asyncHandler(async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!MONTH_RX.test(month)) throw new ApiError(400, 'ต้องระบุเดือนในรูป YYYY-MM');
+  const kind = tbarKind(req.query.kind);
+  const projectId = req.query.projectId || null;
+  const [rows, outstanding] = await Promise.all([
+    tbarPeriods(month, kind, projectId), tbarOutstanding(projectId)]);
+  const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
+  const itemById = new Map(outstanding.map((o) => [o.id, o]));
+  const ids = [...new Set(rows.map((r) => r.project_id))];
+  const projects = ids.length
+    ? Object.fromEntries((await query('select id, code, name from projects where id = any($1::uuid[])', [ids]))
+      .rows.map((r) => [r.id, r]))
+    : {};
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(kind === 'actual' ? 'หักค่างานตามจริง' : 'แผนการเงิน');
+  ws.columns = [{ width: 42 }, { width: 16 }, { width: 16 }, { width: 8 },
+    { width: 12 }, { width: 10 }, { width: 18 }, { width: 30 }, { width: 16 }];
+  const head = (text) => { const r = ws.addRow([text]); r.font = { bold: true }; return r; };
+  head(`${kind === 'actual' ? 'หักค่างานตามจริง' : 'แผนการเงิน (T-bar)'} · เดือน ${month}`);
+  ws.addRow([]);
+  let grandIn = 0; let grandOut = 0;
+  const byProject = new Map();
+  for (const r of rows) {
+    if (!byProject.has(r.project_id)) byProject.set(r.project_id, []);
+    byProject.get(r.project_id).push(r);
+  }
+  for (const [pid, list] of byProject) {
+    const p = projects[pid] || {};
+    head(`${p.code || ''} · ${p.name || ''}`);
+    const pnSold = tbar.pnSoldThisMonth(list);
+    let totalIn = 0; let totalOut = 0;
+    for (const period of list) {
+      const s = tbar.sectionTotals(period, { amountById, pnSold });
+      const typeLabel = { income: 'ขอเบิก P/N', deduction: 'รับเงินค่างาน + หักหนี้',
+        aval: 'ขอออก Aval จัดสรร', mixed: 'งวดผสม' }[period.period_type];
+      const label = period.period_type === 'income'
+        ? `${typeLabel} ${tbar.incomeKind(period) === 'progress' ? 'Workdone' : 'ค่างาน'}`
+        : typeLabel;
+      const hr = ws.addRow([`  ${period.period_idx}. ${label}`,
+        period.period_label ? `งวดที่ ${period.period_label}` : '', dateStr(period.period_date)]);
+      hr.font = { bold: true };
+      ws.addRow(['    รายการ', 'จำนวน', 'คำนวณ', '%']).font = { italic: true };
+      if (period.period_type === 'income') {
+        const c = tbar.incomeCalc(period);
+        const g = tbar.incomeKind(period) === 'progress';
+        if (g) {
+          ws.addRow([`    ผลงานที่ทำได้ งวด ${period.period_label || period.period_idx} (Workdone)`,
+            c.work, c.totalPN, '50%']);
+        } else {
+          ws.addRow([`    ส่งงานงวด ${period.period_label || period.period_idx} (ค่างานที่ส่ง)`, c.work, c.ceil1, '80%']);
+          ws.addRow(['    หัก ค่า segment CVE', c.seg, c.seg60, '60%']);
+          ws.addRow([`    เหลือค่างวด ${period.period_label || period.period_idx}`, '', c.remain]);
+          ws.addRow(['    หัก PN ที่ขายไว้ (เดือนก่อน)', '', c.pnSold]);
+          ws.addRow(['    จะคงเหลือ P/N ที่ขายได้', '', c.newPN]);
+          ws.addRow([`    ขาย PN RT งวด ${period.period_label || period.period_idx} (เงินประกัน)`, c.rt, c.rtPN, '80%']);
+        }
+        ws.addRow(['    รวม P/N ที่ขาย', '', c.totalPN]).font = { bold: true };
+        const int = tbar.interestRows(period, period.pn_rate == null ? tbar.DEFAULT_PN_RATE : Number(period.pn_rate));
+        if (int.rows.length) {
+          ws.addRow(['    ดอกเบี้ย P/N ที่ต้องจ่าย', 'ยอด P/N', 'วัน', 'ดอกเบี้ย']).font = { italic: true };
+          for (const it of int.rows) ws.addRow([`      ${it.label}`, it.amount, it.days, it.interest]);
+          ws.addRow(['      รวมที่ต้องจ่าย', '', '', int.total]).font = { bold: true };
+        }
+      } else if (period.period_type === 'deduction') {
+        ws.addRow(['    รับเงินค่างานสุทธิ', '', Number(period.income) || 0]);
+        for (const d of s.rows || []) ws.addRow([`    ${d.label}`, '', -Math.abs(d.amount)]);
+        ws.addRow(['    คงเหลือ', '', s.balance]).font = { bold: true };
+      } else if (period.period_type === 'aval') {
+        ws.addRow(['    ขอออก Aval จัดสรร', '', Number(period.aval_amount) || 0]);
+      }
+      for (const r of (Array.isArray(period.extra_rows) ? period.extra_rows : [])) {
+        ws.addRow([`    รายรับจากแหล่งอื่น · ${r.label || '—'}`, '', Number(r.amount) || 0]);
+      }
+      const paid = (period.paid_ids || []).map((id) => itemById.get(id)).filter(Boolean);
+      if (paid.length) {
+        ws.addRow(['', '', '', '', 'ครบ', 'ประเภท', 'เลขที่', 'รายละเอียด', 'จำนวน']).font = { italic: true };
+        for (const it of paid) {
+          ws.addRow(['', '', '', '', it.due, it.kind_short, it.ref || '—', it.desc || '—', it.amount]);
+        }
+      }
+      const sub = ws.addRow([`    รวมรับ ${s.cashIn} · รวมจ่าย ${s.cashOut} · สุทธิงวดนี้`, '', s.net]);
+      sub.font = { bold: true };
+      totalIn += s.cashIn; totalOut += s.cashOut;
+    }
+    const pr = ws.addRow([`  รวมโครงการ ${p.code || ''}`, 'รวมรับ', totalIn, '', 'รวมจ่าย', totalOut, 'คงเหลือ', totalIn - totalOut]);
+    pr.font = { bold: true };
+    ws.addRow([]);
+    grandIn += totalIn; grandOut += totalOut;
+  }
+  const gr = ws.addRow(['รวมทุก T-bar (Total all)', 'รวมรับ', grandIn, '', 'รวมจ่าย', grandOut, 'คงเหลือสุทธิ', grandIn - grandOut]);
+  gr.font = { bold: true };
+
+  const p2 = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}_${p2(now.getHours())}${p2(now.getMinutes())}`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="Tbar_${kind}_${month}_${stamp}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
 }));
 
 // ── หมวดค่าใช้จ่าย · งบประมาณ · สรุปค่าใช้จ่าย ──────────────────────────────

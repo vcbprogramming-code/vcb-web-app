@@ -9,6 +9,7 @@ import VersionsView from './VersionsView.jsx';
 import SopHeader from './SopHeader.jsx';
 import SopSidebar from './SopSidebar.jsx';
 import SopSettings from './SopSettings.jsx';
+import MetaModal from './MetaModal.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
@@ -45,6 +46,7 @@ export default function Sop() {
   const [module, setModule] = useState(() => (sharedCase || sharedFlow ? '' : readDefaultView()));
   const [q, setQ] = useState('');          // ช่องค้นหาเดียว ใช้กับทุกมุมมอง
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [metaOpen, setMetaOpen] = useState(false);   // หน้าต่าง "แก้ไขหัวเอกสาร" แบบของเขา
 
   // Switching view by hand drops the deep link — it belongs to the item that was
   // shared, and carrying it into another view would reopen it unasked.
@@ -87,7 +89,7 @@ export default function Sop() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)]">
         <SopSidebar modules={modules} counts={counts} meta={meta} tab={tab} module={module}
-          canEdit={canEdit} onPick={pick} />
+          canEdit={canEdit} onPick={pick} onEditMeta={() => setMetaOpen(true)} />
 
         <div className="min-w-0 space-y-4">
           {tab === 'cases' && (
@@ -133,6 +135,8 @@ export default function Sop() {
           )}
         </div>
       </div>
+
+      {metaOpen && <MetaModal meta={meta} onClose={() => setMetaOpen(false)} onSaved={load} />}
 
       {settingsOpen && (
         <SopSettings modules={modules} counts={counts.scenarios} onClose={() => setSettingsOpen(false)}

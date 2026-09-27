@@ -453,7 +453,7 @@ suite('§6 ยื่นลาครึ่งวันและแนบใบร
 {
   await as(A);
   await pickSite(); await settle(1500);
-  happy('เปิดแท็บการลาได้', await clickText('การลา'), '');
+  happy('เปิดแท็บคำขอ (การลา) ได้', await clickText('คำขอ'), '');
   await waitForText('ขอลาใหม่');
   const t = await body();
   happy('ฟอร์มมีช่องเลือกช่วงเวลาที่ลา', t.includes('ช่วงเวลาที่ลา'), '');

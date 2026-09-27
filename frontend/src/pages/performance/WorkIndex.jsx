@@ -141,7 +141,7 @@ export default function WorkIndex() {
             <Icon name="download" className="h-4 w-4" /> Excel
           </a>
           {tab === 'activities' && (
-            <label className="btn-outline !py-1.5 !text-sm cursor-pointer" title={t('นำเข้าทะเบียนงานจากไฟล์ Excel')}>
+            <label className="btn-outline !py-1.5 !text-sm cursor-pointer" title={t('นำเข้าดัชนีงานจากไฟล์ Excel')}>
               <input type="file" accept=".xlsx" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) checkImport(f); }} />
               <Icon name="upload" className="h-4 w-4" /> {t('นำเข้า')}

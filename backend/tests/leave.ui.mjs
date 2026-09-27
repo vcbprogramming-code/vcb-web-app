@@ -60,8 +60,8 @@ let reqId = null;
 suite('1. ยื่นคำขอลาจากหน้าจอ');
 {
   await as(A);
-  happy('มีแท็บ "การลา" ในโมดูล', (await body()).includes('การลา'), '');
-  await clickText('การลา');
+  happy('มีแท็บ "คำขอ" ในโมดูล', (await body()).includes('คำขอ'), '');
+  await clickText('คำขอ');
   await settle(3000);
   const t = await body();
   happy('เห็นฟอร์มขอลาใหม่', t.includes('ขอลาใหม่'), '');
@@ -111,7 +111,7 @@ suite('1. ยื่นคำขอลาจากหน้าจอ');
 suite('2. ผู้อนุมัติเห็นคิวและตัดสินได้');
 {
   await as(A);
-  await clickText('การลา');
+  await clickText('คำขอ');
   await settle(3000);
   const t = await body();
   happy('ผู้ดูแลเห็นแท็บรออนุมัติ', t.includes('รออนุมัติ'), '');
@@ -145,7 +145,7 @@ suite('3. อนุมัติแล้ววันลาเข้าตาร�
     logs.rows.map((x) => `${x.slot1}|${x.note}`).join(' · '));
 
   await as(A);
-  await clickText('การลา');
+  await clickText('คำขอ');
   await settle(2800);
   await clickText('ประวัติการพิจารณา');
   await settle(2000);
@@ -157,7 +157,7 @@ suite('3. อนุมัติแล้ววันลาเข้าตาร�
 suite('3b. ปุ่มใบลาอยู่บนทุกแถว');
 {
   await as(A);
-  await clickText('การลา');
+  await clickText('คำขอ');
   await settle(3000);
   const has = await page.evaluate(() =>
     [...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'ใบลา'));

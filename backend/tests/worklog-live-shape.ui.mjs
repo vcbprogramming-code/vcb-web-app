@@ -160,14 +160,15 @@ suite('หน้าจอเหลือห้าหน้าเท่าระ�
   const tabs = await page.evaluate(() => [...document.querySelectorAll('button')]
     // แท็บการลามีตัวเลขคำขอที่รออนุมัติต่อท้าย ("การลา 3") — ตัดตัวเลขก่อนเทียบชื่อ
     .map((b) => b.innerText.trim().replace(/\s*\d+\+?$/, ''))
-    .filter((x) => ['ภาพรวม', 'ลงบันทึกรายวัน', 'แรงงาน-วัน', 'รายงาน', 'การลา', 'ทะเบียนงาน', 'ตั้งค่า'].includes(x)));
-  happy(`เห็นแท็บ ${tabs.length} แท็บ`, tabs.length === 6, tabs.join(' · ')); // 5 + ทะเบียนงาน (admin)
+    .filter((x) => ['แดชบอร์ด', 'บันทึกงาน', 'แรงงาน-วัน', 'รายงาน', 'คำขอ', 'ดัชนีงาน', 'ตั้งค่า'].includes(x)));
+  happy(`เห็นแท็บ ${tabs.length} แท็บ`, tabs.length === 6, tabs.join(' · ')); // 5 + ดัชนีงาน (admin)
   bad('ไม่มีแท็บ "แรงงาน-วัน" แล้ว', !tabs.includes('แรงงาน-วัน'), tabs.join(' · '));
   await shot('01-แท็บ');
 
   await as(A, '/performance?tab=manday');
   const txt = await body();
-  bad('ลิงก์เก่า ?tab=manday ไม่พาไปหน้าว่าง', txt.includes('ภาพรวม') && !txt.includes('รวมวันนี้'), txt.slice(0, 120).replace(/\n/g, ' | '));
+  // แท็บหน้าแรกใช้ชื่อ "แดชบอร์ด" ตามระบบจริงแล้ว (คำว่า "ภาพรวม" ย้ายไปเป็นมุมมองย่อยในหน้าบันทึกงาน)
+  bad('ลิงก์เก่า ?tab=manday ไม่พาไปหน้าว่าง', txt.includes('แดชบอร์ด') && !txt.includes('รวมวันนี้'), txt.slice(0, 120).replace(/\n/g, ' | '));
 }
 
 suite('ตัวเลือกสองขั้นกรองตามหมวดงานที่อนุญาต');
@@ -181,16 +182,16 @@ suite('ตัวเลือกสองขั้นกรองตามหม�
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   }, `${MARK} ไซต์ตรวจ`);
   await settle(2000);
-  await clickText('ลงบันทึกรายวัน');
+  await clickText('บันทึกงาน');
   await settle(3000);
-  // สลับไปมุมมองรายสัปดาห์ที่มีช่องให้คลิก
-  await clickText('รายสัปดาห์');
+  // สลับไปมุมมองรายอาทิตย์ที่มีช่องให้คลิก
+  await clickText('รายอาทิตย์');
   await settle(2500);
   // ช่องงานที่สองมีข้อความ "+ งานที่ 2" กำกับไว้ ใช้เป็นจุดคลิกที่แน่นอนกว่า
   // การเดา div ตัวแรกในเซลล์ ซึ่งเคยไปโดนคอลัมน์ชื่อพนักงานแทน
   const slot = (await page.evaluateHandle(() => [...document.querySelectorAll('tbody td div')]
     .find((x) => x.innerText.trim() === '+ งานที่ 2'))).asElement();
-  happy('พบช่องลงงานในตารางรายสัปดาห์', Boolean(slot), '');
+  happy('พบช่องลงงานในตารางรายอาทิตย์', Boolean(slot), '');
   if (slot) await slot.click();
   await settle(1400);
   const pickerOpen = await page.evaluate(() => [...document.querySelectorAll('div')]

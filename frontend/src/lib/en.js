@@ -1716,4 +1716,11 @@ export const EN = {
   'ปกติหนึ่งวันเลือกงานเดียว ถ้าทำสองงานให้เพิ่มที่ช่อง “+ งานที่ 2” — หนึ่งวันเท่ากับหนึ่งวันทำงานเสมอ ถ้าทำสองงานจะนับงานละครึ่งวัน': 'One task per day is the norm; for a second task use “+ งานที่ 2”. A day is always one man-day — two tasks count half each.',
   'คำขอรออนุมัติ': 'requests awaiting approval',
   'ล็อก (อ่านอย่างเดียว · เกิน {n} วัน)': 'Locked (read-only · older than {n} days)',
+  // ── ชื่อเมนูตามระบบจริง (2026-09-27)
+  'แดชบอร์ด': 'Dashboard',
+  'บันทึกงาน': 'Work log',
+  'ดัชนีงาน': 'Work index',
+  'คำขอ': 'Requests',
+  'รายอาทิตย์': 'Weekly',
+  'นำเข้าดัชนีงานจากไฟล์ Excel': 'Import the work index from an Excel file',
 };

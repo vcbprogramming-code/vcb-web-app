@@ -93,17 +93,19 @@ export default function Performance() {
   // ลิงก์เก่าที่ชี้ไปแท็บที่ปิดแล้วต้องไม่พาไปหน้าว่าง
   const view = (rawView === 'manday' && !boot.features?.mandayEntry) ? 'dashboard' : rawView;
 
-  // หน้าจอชุดเดียวกับระบบที่ลูกค้าใช้จริง — ภาพรวม · ลงบันทึกรายวัน · ทะเบียนงาน
+  // หน้าจอชุดเดียวกับระบบที่ลูกค้าใช้จริง — แดชบอร์ด · บันทึกงาน · ดัชนีงาน
   // · การลา · ตั้งค่า ส่วนหน้าแรงงาน-วัน (กรอกตัวเลข) เป็นส่วนเสริมที่มาจาก
   // เอกสารตรวจรับ ไม่ใช่ระบบเดิม จึงขึ้นกับสวิตช์ features.mandayEntry
   const f = boot.features || {};
+  // ชื่อแท็บใช้คำเดียวกับหน้าจอที่ลูกค้าใช้อยู่ทุกวัน (แดชบอร์ด · บันทึกงาน · ดัชนีงาน · คำขอ)
+  // คนที่ย้ายมาจากระบบเดิมจะได้ไม่ต้องเรียนรู้ชื่อใหม่ คีย์ของแท็บใน URL ยังเหมือนเดิม
   const tabs = [
-    { key: 'dashboard', label: t('ภาพรวม'), show: true },
-    { key: 'entry', label: t('ลงบันทึกรายวัน'), show: boot.canEntry },
+    { key: 'dashboard', label: t('แดชบอร์ด'), show: true },
+    { key: 'entry', label: t('บันทึกงาน'), show: boot.canEntry },
     { key: 'manday', label: t('แรงงาน-วัน'), show: Boolean(f.mandayEntry) },
     { key: 'reports', label: t('รายงาน'), show: true },
-    { key: 'leave', label: t('การลา'), show: true, badge: pendingLeave },
-    { key: 'index', label: t('ทะเบียนงาน'), show: boot.isAdmin },
+    { key: 'leave', label: t('คำขอ'), show: true, badge: pendingLeave },
+    { key: 'index', label: t('ดัชนีงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },
   ].filter((x) => x.show);
 

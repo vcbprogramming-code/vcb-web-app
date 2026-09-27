@@ -1,5 +1,5 @@
 /**
- * หน้าลงบันทึกรายวัน — สิ่งที่คนกรอกต้องเห็นและกดได้จริงบนหน้าจอ
+ * หน้าบันทึกงาน — สิ่งที่คนกรอกต้องเห็นและกดได้จริงบนหน้าจอ
  *
  * ทุกข้อมาจากการเทียบกับหน้าจอจริงของลูกค้า (HR DAILY WORK LOG) ที่ผู้ใช้ชี้ว่า
  * ของเขาทำได้แต่ของเราไม่มี ข้อที่หนักที่สุดคือกล่องเลือกกิจกรรมเคยไปโผล่มุมซ้ายบน
@@ -49,11 +49,11 @@ const open = async () => {
   await page.evaluate((tk) => { localStorage.clear(); localStorage.setItem('hr_access_token', tk); }, tok(A));
   await page.goto(`${APP}/performance?tab=entry`, { waitUntil: 'networkidle2' });
   await new Promise((r) => setTimeout(r, 2500));
-  // เลือกไซต์ทดสอบ แล้วเข้ามุมมองรายสัปดาห์
+  // เลือกไซต์ทดสอบ แล้วเข้ามุมมองรายอาทิตย์
   await page.select('select[aria-label="เลือกไซต์งาน"]', site.key).catch(() => {});
   await new Promise((r) => setTimeout(r, 2500));
   await page.evaluate(() => {
-    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'รายสัปดาห์');
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'รายอาทิตย์');
     if (b) b.click();
   });
   await new Promise((r) => setTimeout(r, 2000));
@@ -139,9 +139,9 @@ suite('4. โหมดแก้ย้อนหลังของผู้ดู�
   const old = new Date(Y, M - 1, 1);
   const oldIso = `${Y}-${String(M).padStart(2, '0')}-01`;
   const lockedDate = oldIso < TODAY ? oldIso : TODAY;   // วันที่ 1 ของเดือนนี้ย่อมเลยกำหนดแล้ว
-  await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText.includes('ความครบถ้วน')); if (b) b.click(); });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'ภาพรวม'); if (b) b.click(); });
   await new Promise((r) => setTimeout(r, 600));
-  await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'รายสัปดาห์'); if (b) b.click(); });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'รายอาทิตย์'); if (b) b.click(); });
   await new Promise((r) => setTimeout(r, 900));
   // เลื่อนไปสัปดาห์แรกของเดือน
   for (let i = 0; i < 5; i++) {
@@ -161,7 +161,7 @@ suite('4. โหมดแก้ย้อนหลังของผู้ดู�
   await page.keyboard.press('Escape');
 }
 
-suite('5. ตัวเลขคำขอลาที่รออนุมัติขึ้นบนแท็บการลา');
+suite('5. ตัวเลขคำขอลาที่รออนุมัติขึ้นบนแท็บคำขอ');
 {
   const r = await call('/performance/leave', { method: 'POST', user: A,
     body: { employeeId: emp.eid, leaveType: 'sick', from: TODAY, to: TODAY, reason: `${MARK} ทดสอบ` } });
@@ -170,7 +170,7 @@ suite('5. ตัวเลขคำขอลาที่รออนุมัต�
   const apiCount = (pend.rows || pend.data || []).length;
   await open();
   const badge = await page.evaluate(() => {
-    const tab = [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith('การลา'));
+    const tab = [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith('คำขอ'));
     const m = tab && tab.innerText.match(/(\d+)/);
     return m ? Number(m[1]) : 0;
   });

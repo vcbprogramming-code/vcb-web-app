@@ -474,12 +474,11 @@ suite('6b. หน้ากระดาษ A4 — QR กันปลอมแป�
     name === `${MARK} ประชุมความก้าวหน้า ครั้งที่ 1 ${wantSuffix}.pdf`, name);
 
   // QR ต้องพาไปหน้าตรวจสอบสาธารณะ ไม่ใช่ลิงก์ที่ต้องล็อกอิน
-  const link = await page.evaluate(async () => {
-    const r = await fetch(`/api/meetings/${new URLSearchParams(location.search).get('meeting')}/print`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('hr_access_token')}` },
-    });
-    return (await r.json()).data?.verifyUrl || '';
-  });
+  //
+  // ถามผ่าน call() ของชุดทดสอบ ไม่ใช่ fetch('/api/...') ในหน้าเว็บ — บนเครื่อง
+  // พัฒนา พาธสัมพัทธ์วิ่งผ่าน proxy ของ vite ได้ แต่บน production หน้าเว็บอยู่
+  // คนละโดเมนกับ API (Vercel กับ Render) พาธนั้นจึงไม่มีอยู่จริงและชุดนี้ล้มทั้งชุด
+  const link = (await call(`/meetings/${mLong}/print`, { user: A })).data?.verifyUrl || '';
   happy('ลิงก์ตรวจสอบเป็นเส้นทางสาธารณะของโมดูลประชุม (/mtg/<กุญแจ>)',
     /\/mtg\/[0-9a-f-]{36}$/.test(link), link);
   bad('ลิงก์ตรวจสอบไม่ใช่ id ของแถว (id ไม่ใช่ความลับ)',

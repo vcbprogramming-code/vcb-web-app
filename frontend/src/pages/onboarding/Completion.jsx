@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import Icon from '../../components/Icon.jsx';
 import { pick } from '../../lib/onboardingProgram.js';
 import { useT } from '../../lib/i18n.jsx';
+import ContentPage from './ContentPage.jsx';
 
 /**
  * สำเร็จการปฐมนิเทศ — และใบประเมินสองหน้าที่พิมพ์ออกมาเซ็น
@@ -42,7 +43,7 @@ const ATTITUDE = [
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 
-export default function Completion({ dept, status, me, lang = 'th' }) {
+export default function Completion({ dept, status, me, lang = 'th', onNavigate }) {
   const t = useT();
 
   /**
@@ -165,6 +166,10 @@ ${letterhead}
     setTimeout(() => win.print(), 400);
   };
 
+  // ยังไม่ครบ — ของเขามีส่วน "Not finished yet" พร้อมทางกลับไปเช็กลิสต์ (เก็บไว้ใน
+  // ob_sections variant 'notdone') คำอธิบายของเราเป็นไทยเพราะเป็นข้อความของ
+  // หน้าจอเราเอง ไม่ใช่เนื้อหาของลูกค้า แต่ต้องมีปุ่มกลับเหมือนกัน — หน้าที่บอกว่า
+  // "ยังไม่ครบ" แล้วไม่บอกว่ากลับไปทำที่ไหนคือทางตัน
   if (!status.allComplete) {
     return (
       <div className="card space-y-2 py-10 text-center">
@@ -173,6 +178,12 @@ ${letterhead}
         <p className="text-sm text-slate-500">
           {t('หน้านี้จะปลดล็อกเมื่อทุกข้อในเช็กลิสต์ครบทั้งสามระยะของแผนกคุณเสร็จสมบูรณ์')}
         </p>
+        <div className="pt-1">
+          <button type="button" onClick={() => onNavigate?.(dept?.phases?.[0]?.id || 'home')}
+            className="btn-outline">
+            {t('กลับไปที่เช็กลิสต์ของคุณ')} <Icon name="arrowRight" className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     );
   }
@@ -193,6 +204,11 @@ ${letterhead}
         </p>
       </div>
 
+      {/*
+        ปุ่มพิมพ์ + กลับพอร์ทัล อยู่ในไฟล์นี้ ไม่ได้ฝากไว้กับ ContentPage ข้างล่าง
+        โดยตั้งใจ: สองปุ่มนี้คือทางออกของหน้า ถ้าเนื้อหาจากฐานข้อมูลโหลดไม่ได้
+        ปุ่มต้องยังอยู่ ไม่ใช่หายไปพร้อมกับการ์ดสองใบ
+      */}
       <div className="card flex flex-wrap items-center justify-center gap-3">
         <button onClick={openForm} className="btn-primary">
           <Icon name="document" className="h-4 w-4" /> {t('พิมพ์แบบประเมินการปฐมนิเทศ')}
@@ -201,6 +217,15 @@ ${letterhead}
           {t('กลับไปหน้าหลัก VCB Connect')} <Icon name="arrowRight" className="h-4 w-4" />
         </Link>
       </div>
+
+      {/*
+        การ์ดสองใบของเขา (รู้จักทีมของเรา / ชีวิตในไซต์งาน)
+        "Return to VCB Portal" ของเขาชี้ออกไปยัง Apps Script deployment เดิม ซึ่ง
+        เป็นระบบที่ของเรามาแทน — ลอกลิงก์นั้นมาคือพาพนักงานไปทางตัน จึงปิดไว้
+        (externalCta: false) และใช้ปุ่มกลับพอร์ทัลของเราเองข้างบนแทน
+      */}
+      <ContentPage pageKey="completion" lang={lang} header={false}
+        ctx={{ onNavigate, externalCta: false }} />
     </div>
   );
 }

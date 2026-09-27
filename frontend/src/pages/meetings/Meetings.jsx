@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   meetingsApi, meetingDateText, meetingTimeText, inRange, MTG_NAVY,
   summarySection, summaryBullets, sourceLabel,
+  readReadingSize, writeReadingSize,
 } from '../../lib/meetings.js';
 import { useToast } from '../../components/Toast.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
@@ -12,6 +13,8 @@ import Icon from '../../components/Icon.jsx';
 import AccessPanel from './AccessPanel.jsx';
 import MeetingDetail from './MeetingDetail.jsx';
 import MeetingForm from './MeetingForm.jsx';
+import Timeline from './Timeline.jsx';
+import SettingsPanel from './SettingsPanel.jsx';
 import { useLang, useT } from '../../lib/i18n.jsx';
 
 /**
@@ -46,8 +49,23 @@ export default function Meetings() {
   // ข้อมูลมาถึงแล้วเรนเดอร์รอบสองผ่านทางออกนั้นไป จำนวน hook จะเพิ่มขึ้นหนึ่ง
   // ตัว React จึงล้มทั้งหน้า ("Rendered more hooks than during the previous render")
   const [access, setAccess] = useState(false);
+  const [settings, setSettings] = useState(false);    // แผงตั้งค่าของโมดูล
+  // ขนาดตัวอักษรสำหรับอ่านบันทึก เก็บต่อเครื่องแบบของเขา อ่านค่าตอนติดตั้งครั้งเดียว
+  const [size, setSize] = useState(() => readReadingSize());
   const [groupForm, setGroupForm] = useState(null);   // null | 'new' | กลุ่มที่จะเปลี่ยนชื่อ
   const [summary, setSummary] = useState(null);       // บทสรุปของฉบับล่าสุดในโครงการที่เลือก
+  // มุมมองเส้นเวลา — แทนที่รายการกับเอกสาร ไม่ใช่แทนที่แถบข้าง (สารบัญยังต้องอยู่)
+  const [timeline, setTimeline] = useState(false);
+  /**
+   * สัญญาณว่า "เอกสารที่เปิดอยู่เปลี่ยนไปแล้ว ไปอ่านใหม่"
+   *
+   * MeetingDetail อ่านเอกสารเมื่อ id เปลี่ยน แต่การกดบันทึกในกล่องแก้ไขไม่ได้
+   * เปลี่ยน id — มันแก้ฉบับเดิม ผลคือหลังกดบันทึก รายการข้าง ๆ อัปเดตชื่อเรื่องใหม่
+   * ให้เห็น แต่ตัวเอกสารยังแสดงข้อความเก่าอยู่ คนที่เพิ่งแก้เองจึงเห็นงานของตัวเอง
+   * ไม่ขึ้น (เจอจาก meetings-flows.ui.mjs: ประวัติการทำงานไม่มีแถว "ย้ายโครงการ"
+   * ที่เพิ่งเกิด เพราะข้อมูลในหน้ายังเป็นชุดก่อนบันทึก)
+   */
+  const [docVersion, setDocVersion] = useState(0);
   // ?project= อย่างเดียวหมายถึง "เปิดฉบับล่าสุดของโครงการนี้" ครั้งเดียวตอนเข้า
   // ไม่ใช่ดึงผู้อ่านกลับไปฉบับล่าสุดทุกครั้งที่เขากดปิด
   const wantLatest = useRef(Boolean(sp.get('project')) && !sp.get('meeting') && !sp.get('id'));
@@ -168,7 +186,14 @@ export default function Meetings() {
     setGroup(gid === group ? '' : gid);
     setOpenId(null);
     setRange('all');
+    // เลือกโครงการคือการขอดูรายการของโครงการนั้น ไม่ใช่ขอดูเส้นเวลาที่กรองแล้ว —
+    // ถ้าค้างอยู่ในเส้นเวลา คนกดจะไม่เห็นอะไรเปลี่ยนเลยนอกจากสีของแถวในแถบข้าง
+    setTimeline(false);
   };
+
+  /** เปลี่ยนขนาดตัวอักษร — จำไว้ทันที ไม่ต้องมีปุ่มบันทึก การตั้งค่าที่ต้องกด
+   *  บันทึกอีกทีคือการตั้งค่าที่คนลืมกดแล้วคิดว่าระบบไม่จำ */
+  const pickSize = (v) => { setSize(v); writeReadingSize(v); };
 
   const rangeBtn = (r, label) => {
     const n = (rows || []).filter((x) => inRange(x, r)).length;
@@ -393,18 +418,25 @@ export default function Meetings() {
                 placeholder={t('ค้นหาการประชุม, มติ, บุคคล…')}
                 className="w-full rounded-lg border border-white/20 bg-white/10 py-2 pl-9 pr-3 text-sm text-white placeholder-white/50 outline-none transition focus:border-white/50 focus:bg-white/15" />
             </div>
-            {boot.canManage && (
-              <button onClick={() => setAccess(true)}
-                title={t('สิทธิ์การเข้าถึง')} aria-label={t('สิทธิ์การเข้าถึง')}
-                className="shrink-0 rounded-lg border border-white/20 p-2 text-white/80 transition hover:bg-white/10 hover:text-white">
-                <Icon name="settings" className="h-4 w-4" />
-              </button>
-            )}
+            {/* ปุ่มเฟืองเปิด "แผงตั้งค่า" ของโมดูลแบบของเขา ไม่ใช่กระโดดเข้าแผงสิทธิ์
+                โดยตรงอย่างเดิม — ข้างในมีภาษาและขนาดตัวอักษรที่ทุกคนใช้ได้ ส่วนสิทธิ์
+                โครงการเป็นหนึ่งรายการในนั้นและขึ้นเฉพาะผู้ที่จัดการได้ ปุ่มจึงต้อง
+                ไม่ถูกซ่อนจากคนอ่านทั่วไปอีก */}
+            <button onClick={() => setSettings(true)}
+              title={t('ตั้งค่า')} aria-label={t('ตั้งค่า')}
+              className="shrink-0 rounded-lg border border-white/20 p-2 text-white/80 transition hover:bg-white/10 hover:text-white">
+              <Icon name="settings" className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,15rem)_minmax(0,21rem)_minmax(0,1fr)] xl:items-start">
+      {/* เส้นเวลาต้องการความกว้าง: สิบสองเดือนหรือแปดเลนบนคอลัมน์ 1fr ของสามคอลัมน์
+          อ่านไม่ได้จริง ตอนเปิดเส้นเวลาจึงยุบคอลัมน์รายการ (เส้นเวลาเป็นตัวเลือก
+          รายการอยู่แล้ว กดจุดแล้วเปิดฉบับนั้น) แต่แถบข้างยังอยู่เพราะเป็นสารบัญ */}
+      <div className={`grid grid-cols-1 gap-4 xl:items-start ${timeline
+        ? 'xl:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]'
+        : 'xl:grid-cols-[minmax(0,15rem)_minmax(0,21rem)_minmax(0,1fr)]'}`}>
         {/* ── แถบข้าง: โครงการ ─────────────────────────────────────────── */}
         <aside className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">
           {canEdit && (
@@ -417,15 +449,16 @@ export default function Meetings() {
               <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มโครงการ')}
             </button>
           )}
-          {/* ปุ่ม Timeline ของเขาอยู่หัวแถบข้าง — หน้านั้นเป็นงานก้อนใหญ่ที่เจ้าของ
-              งานกันไว้ตัดสินใจเอง ปุ่มจึงบอกตรง ๆ ว่ายังไม่เปิด แทนที่จะกดแล้วเงียบ */}
-          <div className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 px-3 py-2 text-sm font-medium text-slate-400"
-            title={t('มุมมองเส้นเวลาของทุกโครงการ — ยังไม่เปิดใช้')}>
-            <Icon name="chart" className="h-4 w-4" /> Timeline
-            <span className="rounded bg-slate-100 px-1.5 py-px text-[10px] font-semibold text-slate-500">
-              {t('เร็ว ๆ นี้')}
-            </span>
-          </div>
+          {/* ปุ่มเส้นเวลาอยู่หัวแถบข้างเหมือนของเขา — มันเป็นมุมมองที่สามของข้อมูล
+              ชุดเดียวกัน ไม่ใช่โครงการหนึ่ง จึงไม่อยู่ในรายชื่อโครงการข้างล่าง */}
+          <button onClick={() => { setTimeline((v) => !v); setOpenId(null); }}
+            aria-pressed={timeline}
+            title={t('มุมมองเส้นเวลาของทุกโครงการ')}
+            style={timeline ? { background: MTG_NAVY, borderColor: MTG_NAVY } : undefined}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+              timeline ? 'text-white' : 'border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+            <Icon name="chart" className="h-4 w-4" /> {t('เส้นเวลา')}
+          </button>
           <p className="px-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{t('โครงการ')}</p>
           <div className="space-y-0.5">
             <SideRow id="" name={t('ทุกการประชุม')} nameEn="All meetings"
@@ -463,6 +496,7 @@ export default function Meetings() {
         </aside>
 
         {/* ── รายการ ────────────────────────────────────────────────────── */}
+        {!timeline && (
         <section className="space-y-2">
           <p className="text-sm font-bold text-slate-700">
             {headLabel} <span className="font-medium text-slate-400">· {shown.length} {t('รายการ')}</span>
@@ -481,12 +515,17 @@ export default function Meetings() {
           )}
           {shown.map((m) => <Card key={m.id} m={m} />)}
         </section>
+        )}
 
-        {/* ── เอกสาร ────────────────────────────────────────────────────── */}
+        {/* ── เอกสาร (หรือเส้นเวลา) ─────────────────────────────────────── */}
         <div className="min-w-0">
-          {openId ? (
+          {timeline ? (
+            <Timeline groups={groups}
+              onOpen={(id) => { setTimeline(false); setOpenId(id); }} />
+          ) : openId ? (
             <MeetingDetail
               id={openId} canEdit={canEdit} canManage={boot.canManage} groups={groups}
+              readingSize={size} refresh={docVersion}
               onClose={() => setOpenId(null)}
               onEdit={(row) => setEditing(row)}
               onDelete={removeRow}
@@ -502,7 +541,7 @@ export default function Meetings() {
           groups={groups}
           defaultGroupId={group || groups[0]?.id}
           onClose={() => setEditing(null)}
-          onSaved={(id) => { setEditing(null); setOpenId(id); load(); reload(); }}
+          onSaved={(id) => { setEditing(null); setOpenId(id); setDocVersion((v) => v + 1); load(); reload(); }}
         />
       )}
       {groupForm && (
@@ -510,6 +549,12 @@ export default function Meetings() {
           row={groupForm === 'new' ? null : groupForm}
           onClose={() => setGroupForm(null)}
           onSaved={(gid) => { setGroupForm(null); reload(); if (gid) setGroup(gid); }}
+        />
+      )}
+      {settings && (
+        <SettingsPanel
+          size={size} onSize={pickSize} canManage={boot.canManage}
+          onAccess={() => setAccess(true)} onClose={() => setSettings(false)}
         />
       )}
       {access && <AccessPanel onClose={() => { setAccess(false); load(); reload(); }} />}

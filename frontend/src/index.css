@@ -63,6 +63,47 @@
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
   }
+
+  /* ── แผนการเงิน (T-bar) ────────────────────────────────────────────────
+     สามคอลัมน์ รับ · จ่าย · สุทธิ ที่ทุกส่วนของการ์ดต้องเรียงตรงกัน
+     (สัดส่วนเดียวกับ PLAN_GRID ของระบบจริง) — บนจอโทรศัพท์ซ้อนเป็นคอลัมน์เดียว
+     ไม่บีบสามคอลัมน์ให้แคบจนอ่านไม่ได้ */
+  .tbar-grid {
+    @apply grid grid-cols-1;
+  }
+  .tbar-cell {
+    @apply min-w-0 overflow-x-auto;
+  }
+  /* ตารางในการ์ด T-bar — แถวเตี้ยกว่าตารางทะเบียน เพราะหนึ่งส่วนมีหลายแถว */
+  .tbar-tbl {
+    @apply w-full text-[12px];
+    table-layout: fixed;
+  }
+  .tbar-tbl th {
+    @apply px-1.5 py-1 text-left text-[11px] font-semibold text-slate-500;
+  }
+  .tbar-tbl td {
+    @apply px-1.5 py-[3px] align-middle text-slate-700 dark:text-slate-200;
+  }
+  .tbar-inp {
+    @apply w-full rounded border border-slate-300 bg-white px-1.5 py-[2px] text-right text-[12px]
+           tabular-nums text-slate-800 focus:border-brand focus:outline-none
+           dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+  }
+  .tbar-inp[readonly] {
+    @apply bg-slate-100 text-slate-500 dark:bg-slate-800;
+  }
+  .tbar-iconbtn {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200
+           text-slate-500 transition hover:border-brand hover:text-brand
+           dark:border-slate-700 dark:text-slate-400;
+  }
+}
+
+@media (min-width: 900px) {
+  .tbar-grid {
+    grid-template-columns: minmax(0, 0.84fr) minmax(0, 1.04fr) 116px;
+  }
 }
 
 /* =========================================================================
@@ -276,3 +317,17 @@
 }
 /* wide tables must scroll inside the body, never push the page sideways */
 .mtg-body { overflow-x: auto; }
+
+/* ── ขนาดตัวอักษรสำหรับอ่านบันทึกการประชุม ───────────────────────────────────
+   ของลูกค้ามีตัวเลือก เล็ก/ปกติ/ใหญ่ ในแผงตั้งค่า (readingSize) และให้มีผลกับ
+   "เนื้อหาที่อ่าน" เท่านั้น ไม่ใช่ทั้งแอป — ถ้าปุ่มกับแถบข้างขยายตามไปด้วย
+   สามคอลัมน์จะล้นจอทันที เราจึงผูกไว้กับ .mtg-body ที่เดียว
+
+   หัวข้อเป็น em ไม่ใช่ rem เฉพาะตอนที่มี data-size: rem อ้างขนาดของรากเอกสาร
+   จึงไม่ขยับตามกล่องนี้เลย แล้วเลือก "ใหญ่" ก็จะได้เนื้อความใหญ่แต่หัวข้อเท่าเดิม
+   ตัวเลือกที่กด "ปกติ" ไม่มีกฎของตัวเอง — มันคือค่าตั้งต้นที่หน้าใช้อยู่แล้ว */
+.mtg-body[data-size='small'] { font-size: 13.5px; }
+.mtg-body[data-size='large'] { font-size: 17.7px; }
+.mtg-body[data-size] h1 { font-size: 1.3em; }
+.mtg-body[data-size] h2 { font-size: 1.15em; }
+.mtg-body[data-size] h3 { font-size: 1.02em; }

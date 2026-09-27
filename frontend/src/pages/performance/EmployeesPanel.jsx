@@ -31,15 +31,38 @@ export default function EmployeesPanel({ siteKey, siteName, onClose, onChanged }
   const load = () => perfApi.employees(siteKey).then((r) => setList(r.data)).catch((e) => setError(e.message));
   useEffect(() => { load(); }, [siteKey]);
 
+  /**
+   * เพิ่มพนักงาน — รหัสซ้ำไม่ได้ปิดทาง แต่ต้องยืนยันว่าเป็นคนละคน
+   *
+   * ทะเบียนจริงของลูกค้ามีรหัสพนักงานซ้ำกันอยู่ 35 รหัส (ระบบเดิมของเขาไม่ห้าม)
+   * ถ้าเราปฏิเสธไปเลย ฝ่ายบุคคลจะเพิ่มคนตามทะเบียนจริงไม่ได้ ถ้ารับไปเงียบ ๆ
+   * ก็จะไม่มีใครรู้ว่าพิมพ์รหัสผิดหรือเป็นคนละคนจริง — จึงถามหนึ่งครั้งแล้วบอกด้วย
+   * ว่ารหัสนี้ตอนนี้เป็นของใครที่ไซต์ไหน ฝั่งเซิร์ฟเวอร์เก็บรหัสจริงไว้ครบ
+   * (live_emp_code) หน้าจอและไฟล์ Excel จึงยังแสดงรหัสจริง ไม่ใช่ตัวแยกภายใน
+   */
   const add = async (e) => {
     e.preventDefault();
     if (!form.fullName.trim()) { toast.error(t('กรุณากรอกชื่อพนักงาน')); return; }
     setBusy(true);
-    try {
-      await perfApi.createEmployee({ site: siteKey, fullName: form.fullName.trim(), employeeCode: form.employeeCode.trim() || null, kind: form.kind });
+    const body = { site: siteKey, fullName: form.fullName.trim(), employeeCode: form.employeeCode.trim() || null, kind: form.kind };
+    const send = async (confirmDuplicateCode) => {
+      await perfApi.createEmployee(confirmDuplicateCode ? { ...body, confirmDuplicateCode } : body);
       setForm({ fullName: '', employeeCode: '', kind: form.kind });
       setDirty(true); toast.success(t('เพิ่มพนักงานแล้ว')); await load();
-    } catch (e2) { toast.error(e2.message); } finally { setBusy(false); }
+    };
+    try {
+      await send(false);
+    } catch (e2) {
+      // จับที่รหัสของเหตุผล ไม่ใช่ข้อความไทย — ข้อความแก้คำหรือแปลได้ รหัสไม่
+      if (e2?.details?.code !== 'DUPLICATE_EMP_CODE') { toast.error(e2.message); setBusy(false); return; }
+      const ok = await confirm({
+        title: t('รหัสพนักงานซ้ำ'),
+        message: `${e2.message}\n${t('ถ้ายืนยัน ระบบจะบันทึกให้โดยยังแสดงรหัสนี้ตามเดิมทั้งบนหน้าจอและในไฟล์ Excel')}`,
+        confirmLabel: t('ยืนยัน เป็นคนละคน'),
+      });
+      if (!ok) { setBusy(false); return; }
+      try { await send(true); } catch (e3) { toast.error(e3.message); }
+    } finally { setBusy(false); }
   };
   const toggleKind = async (emp) => {
     setRowBusy(emp.eid);

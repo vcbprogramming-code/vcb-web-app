@@ -1,4 +1,4 @@
-import { api, apiBlobUrl } from './api.js';
+import { api, apiBlobUrl, apiUpload } from './api.js';
 
 const qs = (o) => {
   const s = new URLSearchParams(Object.entries(o).filter(([, v]) => v != null && v !== '')).toString();
@@ -28,12 +28,17 @@ export const meetingsApi = {
   togglePin: (id) => api(`/meetings/${id}/pin`, { method: 'POST' }),
   remove: (id) => api(`/meetings/${id}`, { method: 'DELETE' }),
 
-  attach: (id, file, kind = 'file') => {
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('kind', kind);
-    return api(`/meetings/${id}/attachments`, { method: 'POST', body: fd });
-  },
+  /**
+   * แนบไฟล์
+   *
+   * ต้องใช้ apiUpload ไม่ใช่ api: api() ตั้ง Content-Type เป็น application/json
+   * แล้ว JSON.stringify ตัว body ทิ้ง ฉะนั้น FormData ที่ส่งเข้าไปจะกลายเป็น "{}"
+   * multer มองไม่เห็น multipart เลยและเซิร์ฟเวอร์ตอบ 400 "ไม่พบไฟล์ที่แนบมา"
+   * ทุกครั้ง — การแนบไฟล์จากหน้าอ่านรายงานจึงไม่เคยทำงานเลยจนกว่าจะแก้ตรงนี้
+   * (พบจาก meetings-flows.ui.mjs ซึ่งขับหน้าจอจริง ชุดที่เรียก API ตรง ๆ ไม่เจอ)
+   */
+  attach: (id, file, kind = 'file') =>
+    apiUpload(`/meetings/${id}/attachments`, file, { extra: { kind } }),
   fileUrl: (id, attId) => apiBlobUrl(`/meetings/${id}/attachments/${attId}`),
   removeFile: (id, attId) => api(`/meetings/${id}/attachments/${attId}`, { method: 'DELETE' }),
 

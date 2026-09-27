@@ -12,6 +12,8 @@ import Phase from './Phase.jsx';
 import Completion from './Completion.jsx';
 import Cohort from './Cohort.jsx';
 import ChecklistAdmin from './ChecklistAdmin.jsx';
+import ContentPage from './ContentPage.jsx';
+import Section from './Sections.jsx';
 
 /**
  * ปฐมนิเทศพนักงานใหม่ 90 วัน
@@ -19,6 +21,12 @@ import ChecklistAdmin from './ChecklistAdmin.jsx';
  * ลำดับเดียวกับพอร์ทัลที่บริษัทใช้อยู่ — เจ็ดขั้นในชั้นวางด้านซ้าย:
  *   เตรียมความพร้อมก่อนเริ่มงาน → เอกสารที่จำเป็น → เลือกแผนก
  *   → วันที่ 1–30 → วันที่ 31–60 → วันที่ 61–90 → สำเร็จการปฐมนิเทศ
+ *
+ * ใต้ชั้นวางนั้นคือ "หน้าเนื้อหา" ของพอร์ทัลเขาที่ไม่ใช่เช็กลิสต์ — หน้าแนะนำแผนก
+ * ห้าหน้า รู้จักทีมของเรา และชีวิตในไซต์งาน (ob_pages/ob_sections, migration 0084)
+ * เมนูของเขาวางหน้าพวกนี้เป็นชั้นบนสุดคู่กับ Home ของเราวางเป็นกลุ่มที่สองใต้
+ * เจ็ดขั้น เพราะเจ็ดขั้นคือ *ลำดับที่ต้องเดิน* ส่วนหน้าเนื้อหาคือ *ที่ที่แวะอ่าน
+ * เมื่อไหร่ก็ได้* — ปนกันแล้วชั้นวางไม่บอกว่าต้องทำอะไรต่ออีกแล้ว
  *
  * สามขั้นแรกเปิดได้ก่อนเลือกแผนก และ **ต้องเปิดได้** — ประตูกั้นของเขาคือเอกสาร
  * ที่จำเป็นต้องครบก่อนจึงเลือกแผนกได้ ถ้าหน้าเอกสารเปิดได้เฉพาะคนที่เลือกแผนก
@@ -28,6 +36,15 @@ import ChecklistAdmin from './ChecklistAdmin.jsx';
  * ล่วงหน้าต้องอ่านได้ ไม่ใช่เจอหน้าว่าง
  */
 const DAY_LABEL = { '1-30': 'วันที่ 1–30', '31-60': 'วันที่ 31–60', '61-90': 'วันที่ 61–90' };
+/**
+ * คีย์หน้าของเขา → view ของเรา
+ *
+ * ลิงก์ในเนื้อหา (ปุ่มท้ายหน้า การ์ด "เรียนรู้เพิ่มเติม" การ์ดสามระยะ) อ้างถึง
+ * "คีย์หน้า" ของพอร์ทัลเขา สามคีย์นี้ตรงกับขั้นในชั้นวางของเราไม่ใช่หน้าเนื้อหา
+ * ที่เหลือเปิดเป็น view 'page:<คีย์>' และคีย์ของเฟส (accounting-day-1-30) ตรงกับ
+ * id ใน ob_phases อยู่แล้ว จึงเปิดเป็นหน้าเฟสได้ตรง ๆ
+ */
+const PAGE_TO_VIEW = { home: 'welcome', 'required-documents': 'docs', completion: 'done' };
 /** ชื่อย่อของสามบล็อกในชั้นวาง (ของเขาย่อเหลือ Reading/Knowledge/Outputs) */
 const BLOCK_SHORT = ['เอกสารที่ต้องศึกษา', 'ความรู้ที่จำเป็น', 'ผลงานที่ต้องส่งมอบ'];
 
@@ -42,6 +59,10 @@ export default function Program() {
   const [error, setError] = useState(null);
   const [reward, setReward] = useState(null);
   const [gate, setGate] = useState(null);      // แผนกที่กดไว้ตอนเอกสารยังไม่ครบ
+  // หน้า "เอกสารที่จำเป็น" ของเขามีอีกสองส่วนที่ไม่ใช่รายการเอกสาร: ลิงก์กำหนดการ
+  // ปฐมนิเทศวันแรก และคำบรรยายแต่ละแผนก (ใครเป็นหัวหน้า งานที่โฟกัส) — อยู่ใน
+  // ob_sections ของหน้า required-documents ดึงครั้งเดียวแล้วใช้ทั้งสองขั้น
+  const [preboard, setPreboard] = useState(null);
   const rewardTimer = useRef(null);
 
   const view = sp.get('v') || 'welcome';
@@ -52,6 +73,14 @@ export default function Program() {
     .catch((e) => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => clearTimeout(rewardTimer.current), []);
+  // โหลดไม่ได้ก็ไม่เป็นไร ทั้งสองขั้นทำงานได้ครบโดยไม่มีส่วนเสริมนี้
+  useEffect(() => {
+    let alive = true;
+    programApi.page('required-documents')
+      .then((r) => { if (alive) setPreboard(r.data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const flashReward = () => {
     setReward(randomReward());
@@ -63,6 +92,7 @@ export default function Program() {
   if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   const { departments, documents, status, isAdmin, me } = boot;
+  const contentPages = boot.pages || [];
   const dept = departments.find((d) => d.slug === status.department) || null;
   const deptName = dept ? (dept.name_th || dept.name) : null;
 
@@ -97,6 +127,43 @@ export default function Program() {
       { key: 'editor', label: t('แก้เช็กลิสต์') },
     ] : []),
   ];
+
+  // ── หน้าเนื้อหาที่ไม่ใช่เช็กลิสต์ ─────────────────────────────────────────
+  const readingPages = contentPages.filter((p) => p.kind === 'dept' || p.kind === 'feature');
+  const contentKeys = new Set(contentPages.map((p) => p.key));
+  const phaseIds = new Set(departments.flatMap((d) => d.phases.map((p) => p.id)));
+
+  /**
+   * ไปยัง "คีย์หน้า" ที่เนื้อหาอ้างถึง
+   *
+   * คีย์ที่ไม่รู้จักไม่ทำอะไรเลย ไม่ใช่พาไปหน้าว่าง — เนื้อหามาจากฐานข้อมูล
+   * ลิงก์ที่ชี้ไปหน้าที่ยังไม่ได้นำเข้าจึงเกิดขึ้นได้จริง และการพาไปหน้าว่างคือ
+   * ทางตันที่ไม่มีอะไรบอกว่าเกิดอะไรขึ้น
+   */
+  const navigate = (key) => {
+    if (!key) return;
+    if (PAGE_TO_VIEW[key]) { setView(PAGE_TO_VIEW[key]); return; }
+    if (phaseIds.has(key)) { setView(key); return; }
+    if (contentKeys.has(key)) setView(`page:${key}`);
+  };
+
+  /**
+   * คำบรรยายแต่ละแผนกจากเนื้อหาของเขา จับคู่ด้วย deptId
+   *
+   * ob_departments เก็บแค่ชื่อแผนก ส่วน "ใครเป็นหัวหน้า" กับ "งานที่โฟกัส" อยู่ใน
+   * deptgrid ของหน้า required-documents — ข้อมูลที่ช่วยคนเลือกแผนกได้จริง และเป็น
+   * ข้อมูลที่รอบก่อนหายไปทั้งก้อนเพราะตัวดึงเนื้อหาอ่านแต่ section ชนิด checklist
+   */
+  const deptInfo = Object.fromEntries(
+    ((preboard?.sections || []).find((s) => s.type === 'deptgrid')?.data.depts || [])
+      .map((d) => [d.deptId, d]));
+
+  /** สถานะของการ์ดสามระยะในหน้าแนะนำแผนก — เฟสของแผนกอื่นไม่มีสถานะให้แสดง */
+  const phaseState = (phaseId) => {
+    const idx = dept?.phases.findIndex((p) => p.id === phaseId) ?? -1;
+    if (idx < 0) return { foreign: true };
+    return { complete: status.phases[idx]?.complete, locked: !status.unlocked[phaseId] };
+  };
 
   /** เลือกแผนก — เอกสารยังไม่ครบก็ยังเลือกไม่ได้ ตามประตูกั้นของเขา */
   const chooseDept = async (slug) => {
@@ -168,7 +235,7 @@ export default function Program() {
                   </span>
                   <span className="min-w-0 flex-1">{s.label}</span>
                 </button>
-                {s.subs && (
+                {s.subs && s.subs.length > 0 && (
                   <ul className="mb-1 ml-8 space-y-0.5 border-l border-slate-200 pl-2.5">
                     {s.subs.map((sub) => (
                       <li key={sub.label} className="flex items-center gap-1.5 py-0.5 text-xs text-slate-500">
@@ -181,14 +248,51 @@ export default function Program() {
               </li>
             ))}
           </ol>
+
+          {/* หน้าเนื้อหาของพอร์ทัล — แวะอ่านได้ทุกเมื่อ ไม่ใช่ขั้นที่ต้องเดินผ่าน */}
+          {readingPages.length > 0 && (
+            <div className="mt-3 border-t border-slate-100 pt-2">
+              <div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {t('ทำความรู้จักบริษัท')}
+              </div>
+              <ul className="space-y-0.5">
+                {readingPages.map((p) => {
+                  const key = `page:${p.key}`;
+                  return (
+                    <li key={p.key}>
+                      <button onClick={() => setView(key)}
+                        aria-current={view === key ? 'page' : undefined}
+                        className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${
+                          view === key ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                        <Icon name={p.kind === 'dept' ? 'people' : 'card'}
+                          className={`h-3.5 w-3.5 shrink-0 ${view === key ? 'text-white' : 'text-slate-400'}`} />
+                        <span className="min-w-0 flex-1 truncate">{pick(lang, p.title, p.title_th)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </nav>
 
         <div className="min-w-0 space-y-4">
-          {view === 'welcome' && <Preboarding onStart={() => setView('docs')} />}
-          {view === 'docs' && <Documents documents={documents} status={status} onChanged={load}
-            onDone={() => setView('dept')} />}
+          {view === 'welcome' && <Preboarding onStart={() => setView('docs')} lang={lang} onNavigate={navigate} />}
+          {view === 'docs' && (
+            <>
+              <Documents documents={documents} status={status} onChanged={load}
+                onDone={() => setView('dept')} />
+              {/* กำหนดการปฐมนิเทศวันแรกของเขา — เป็น section ข้อความพร้อมลิงก์
+                  ไฟล์ ไม่ใช่เอกสารที่ต้องอัปกลับ จึงอยู่ใต้รายการ ไม่ใช่ในรายการ */}
+              {(preboard?.sections || []).filter((s) => s.type === 'text').map((s) => (
+                <Section key={s.sort_order} section={s} lang={lang} ctx={{ onNavigate: navigate }} />
+              ))}
+            </>
+          )}
           {view === 'dept' && (
             <DepartmentPicker departments={departments} status={status} lang={lang}
+              deptInfo={deptInfo}
+              onOpenDeptPage={navigate}
               onPick={chooseDept}
               onTrack={async (v) => {
                 try { await programApi.setMe({ track: v }); await load(); }
@@ -197,17 +301,35 @@ export default function Program() {
           )}
           {view === 'cohort' && isAdmin && <Cohort />}
           {view === 'editor' && isAdmin && <ChecklistAdmin departments={departments} onChanged={load} />}
-          {view === 'done' && <Completion dept={dept} status={status} me={me} lang={lang} />}
+          {view === 'done' && (
+            <Completion dept={dept} status={status} me={me} lang={lang} onNavigate={navigate} />
+          )}
+          {/* หน้าเนื้อหา: แนะนำแผนก 5 หน้า · รู้จักทีมของเรา · ชีวิตในไซต์งาน */}
+          {view.startsWith('page:') && (
+            <ContentPage pageKey={view.slice(5)} lang={lang}
+              ctx={{
+                onNavigate: navigate,
+                currentDept: status.department,
+                onPickDept: chooseDept,
+                phaseState,
+                onOpenPhase: navigate,
+              }} />
+          )}
           {dept && dept.phases.filter((p) => p.id === view).map((p) => (
             <Phase key={p.id} phase={p} status={status} lang={lang}
               onChanged={load} onReward={flashReward}
               onNext={() => setView(p.next_phase || (status.allComplete ? 'done' : p.id))} />
           ))}
-          {/* ขอ view ของเฟสมาแต่ยังไม่ได้เลือกแผนก (ลิงก์เก่า / พิมพ์ URL เอง) */}
-          {!dept && !['welcome', 'docs', 'dept', 'cohort', 'editor', 'done'].includes(view) && (
-            <div className="card py-12 text-center">
+          {/* ขอ view ของเฟสมาแต่ไม่ใช่เฟสของแผนกตัวเอง — ยังไม่ได้เลือกแผนก (ลิงก์
+              เก่า / พิมพ์ URL เอง) หรือกดการ์ดสามระยะจากหน้าแนะนำแผนกอื่น เช็กลิสต์
+              ของแผนกอื่นไม่ใช่ของคนนี้ จึงพาไปเลือกแผนกแทนหน้าว่าง */}
+          {!['welcome', 'docs', 'dept', 'cohort', 'editor', 'done'].includes(view)
+            && !view.startsWith('page:')
+            && !dept?.phases.some((p) => p.id === view) && (
+            <div className="card space-y-2 py-12 text-center">
               <h3 className="font-bold text-slate-700">{t('เลือกแผนกที่จะไปประจำก่อน')}</h3>
-              <p className="mt-1 text-sm text-slate-500">{t('รายการที่ต้องทำใน 90 วันแรกต่างกันไปตามแผนก')}</p>
+              <p className="text-sm text-slate-500">{t('รายการที่ต้องทำใน 90 วันแรกต่างกันไปตามแผนก')}</p>
+              <button onClick={() => setView('dept')} className="btn-primary">{t('ไปที่เลือกแผนก')}</button>
             </div>
           )}
         </div>
@@ -254,7 +376,7 @@ export default function Program() {
  * แล้ว **ลบ** ความคืบหน้าของแผนกเดิมทิ้ง ของเราเก็บไว้ กดผิดครั้งเดียวไม่ควร
  * ทำลายงานหลายสัปดาห์ คำโปรยท้ายการ์ดจึงเขียนตามพฤติกรรมจริงของเรา
  */
-function DepartmentPicker({ departments, status, lang, onPick, onTrack }) {
+function DepartmentPicker({ departments, status, lang, onPick, onTrack, deptInfo = {}, onOpenDeptPage }) {
   const t = useT();
   return (
     <div className="space-y-4">
@@ -271,21 +393,48 @@ function DepartmentPicker({ departments, status, lang, onPick, onTrack }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {departments.map((d, i) => {
           const on = status.department === d.slug;
+          // คำบรรยาย หัวหน้าฝ่าย และงานที่โฟกัส มาจากการ์ดแผนกของเขาเอง
+          // (deptgrid) — ไม่มีก็แสดงเท่าที่เคยมี ไม่ใช่การ์ดว่าง
+          const info = deptInfo[d.slug] || {};
           return (
-            <button key={d.slug} onClick={() => onPick(d.slug)}
-              className={`card flex items-start gap-3 text-left transition hover:border-brand/40 ${
-                on ? 'ring-2 ring-brand' : ''}`}>
-              <span className="text-lg font-bold tabular-nums text-slate-300">{String(i + 1).padStart(2, '0')}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-slate-800">{lang === 'en' ? d.name : (d.name_th || d.name)}</span>
-                <span className="mt-1 block text-sm text-slate-500">
-                  {t('ครบทั้งสามระยะของการปฐมนิเทศทำในแผนกนี้')}
+            <div key={d.slug}
+              className={`card space-y-2 ${on ? 'ring-2 ring-brand' : ''}`}>
+              <button onClick={() => onPick(d.slug)}
+                className="flex w-full items-start gap-3 text-left">
+                <span className="text-lg font-bold tabular-nums text-slate-300">{String(i + 1).padStart(2, '0')}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-slate-800">{lang === 'en' ? d.name : (d.name_th || d.name)}</span>
+                  <span className="mt-1 block text-sm text-slate-500">
+                    {pick(lang, info.desc, info.desc_th) || t('ครบทั้งสามระยะของการปฐมนิเทศทำในแผนกนี้')}
+                  </span>
                 </span>
-              </span>
-              {on
-                ? <Icon name="check" className="h-5 w-5 shrink-0 text-emerald-500" />
-                : <Icon name="arrowRight" className="h-4 w-4 shrink-0 text-slate-300" />}
-            </button>
+                {on
+                  ? <Icon name="check" className="h-5 w-5 shrink-0 text-emerald-500" />
+                  : <Icon name="arrowRight" className="h-4 w-4 shrink-0 text-slate-300" />}
+              </button>
+              {(info.lead || info.focus) && (
+                <dl className="space-y-1 border-t border-slate-100 pt-2 text-xs">
+                  {info.lead && (
+                    <div className="flex gap-1.5">
+                      <dt className="shrink-0 font-semibold uppercase tracking-wide text-slate-400">Led by</dt>
+                      <dd className="text-slate-600">{pick(lang, info.lead, info.lead_th)}</dd>
+                    </div>
+                  )}
+                  {info.focus && (
+                    <div className="flex gap-1.5">
+                      <dt className="shrink-0 font-semibold uppercase tracking-wide text-slate-400">Focus</dt>
+                      <dd className="text-slate-600">{pick(lang, info.focus, info.focus_th)}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+              {info.page && (
+                <button type="button" onClick={() => onOpenDeptPage?.(info.page)}
+                  className="text-xs font-semibold text-brand hover:underline">
+                  {t('ดูรายละเอียดแผนก')}
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

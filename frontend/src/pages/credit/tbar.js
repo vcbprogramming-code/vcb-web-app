@@ -204,6 +204,13 @@ export function prevMonthOf(month) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * โครงการที่ทำ T-bar ไม่ได้ — ส่วนกลาง (HO) และโครงการที่ใช้เงินนอกรูปแบบ
+ * ค่างาน + B/E + P/N (LPB) ตาม PLAN_EXCLUDE ของระบบจริง ถูกซ่อนจากทุกช่องเลือก
+ * ของแท็บแผนการเงิน ทั้งการ์ดเริ่มต้น ช่องเปลี่ยนโครงการ และปุ่มเพิ่มโครงการ
+ */
+export const PLAN_EXCLUDE = { HO: 1, LPB: 1 };
+
 /** ตัวเลือกประเภทส่วนของปุ่ม "＋ เพิ่มส่วน" — คำอธิบายตาม planPickType ของเขา */
 export const PERIOD_TYPE_CHOICES = [
   { value: 'income', label: 'ขอเบิก P/N', hint: 'เบิก P/N เข้าโครงการ จากค่างาน/เงินประกัน/ผลงานแล้วเสร็จ' },

@@ -48,6 +48,19 @@ export const creditApi = {
   cashPlan: (filters) => api(`/credit/cash-plan${qs(filters)}`),
   // แผนกับจริงอยู่เส้นทางเดียวกัน แยกด้วย kind — ผลต่างคำนวณให้ฝั่งเซิร์ฟเวอร์
   cashPlanVariance: (filters) => api(`/credit/cash-plan/variance${qs(filters)}`),
+  // ── แผนการเงิน (T-bar) · หักค่างานตามจริง ────────────────────────────────
+  // หนึ่งรอบได้ทุกอย่างที่จอต้องใช้: ส่วนของเดือนนี้ · ตั๋วที่ยังต้องจ่าย ·
+  // รวม P/N ของเดือนก่อน · ยอดรวมรายโครงการ
+  tbar: (filters) => api(`/credit/cash-plan/tbar${qs(filters)}`),
+  saveTbarPeriod: (body) => api('/credit/cash-plan/tbar/period', { method: 'POST', body }),
+  deleteTbarPeriod: (id) => api(`/credit/cash-plan/tbar/period/${id}`, { method: 'DELETE' }),
+  addTbarProject: (body) => api('/credit/cash-plan/tbar/project', { method: 'POST', body }),
+  deleteTbarProject: (filters) => api(`/credit/cash-plan/tbar/project${qs(filters)}`, { method: 'DELETE' }),
+  copyTbarMonth: (body) => api('/credit/cash-plan/tbar/copy', { method: 'POST', body }),
+  // ฉบับจริงตั้งต้นจากฉบับแผน — เรียกตอนเปิดแท็บหักค่างานตามจริง เหมือนระบบจริง
+  mirrorTbarActual: (body) => api('/credit/cash-plan/tbar/mirror', { method: 'POST', body }),
+  tbarVariance: (filters) => api(`/credit/cash-plan/tbar/variance${qs(filters)}`),
+  tbarExportUrl: (filters) => apiBlobUrl(`/credit/cash-plan/tbar/export${qs(filters)}`),
   costCategories: () => api('/credit/cost-categories'),
   addCostCategory: (name) => api('/credit/cost-categories', { method: 'POST', body: { name } }),
   // เขียนทะเบียนหมวดทั้งชุดครั้งเดียว (ชื่อ + ลำดับ) — จอตั้งค่าแก้ทั้งรายการแล้วกดบันทึก

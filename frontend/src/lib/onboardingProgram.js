@@ -13,6 +13,12 @@ export const programApi = {
   // ตัวเองแต่ขึ้นหน้าว่างบน production เพราะ X-Frame-Options)
   docFileUrl: (docId) => apiBlobUrl(`/onboarding-program/documents/${docId}/file`),
   cohort: () => api('/onboarding-program/cohort'),
+  // หน้าเนื้อหาของพอร์ทัล (สารจาก MD · ค่านิยม · ผลงาน · ผังองค์กร · แนะนำแผนก ·
+  // รู้จักทีมของเรา · ชีวิตในไซต์งาน · หน้าจบ) — ขอทีละหน้า ไม่ใช่มาพร้อม bootstrap
+  // เพราะผังองค์กรอันเดียวมีคน 184 คน ซึ่งไม่มีเหตุให้โหลดตอนเปิดเช็กลิสต์
+  page: (key) => api(`/onboarding-program/pages/${encodeURIComponent(key)}`),
+  // รูปอยู่หลังล็อกอิน <img src> ส่ง Bearer ไม่ได้ จึงดึงเป็น blob เหมือนไฟล์แนบ
+  imageUrl: (key) => apiBlobUrl(`/onboarding-program/images/${encodeURIComponent(key)}`),
   // ของผู้ดูแล: รวมข้อที่ปิดใช้งานแล้วด้วย bootstrap ส่งมาแต่ข้อที่เปิดอยู่
   blockItems: (blockId) => api(`/onboarding-program/items?blockId=${blockId}`),
   updateItem: (id, body) => api(`/onboarding-program/items/${id}`, { method: 'PATCH', body }),

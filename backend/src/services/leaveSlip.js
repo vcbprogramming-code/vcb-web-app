@@ -18,7 +18,7 @@ const thaiDate = (v) => {
 };
 const LEAVE_TH = {
   sick: 'ลาป่วย', personal: 'ลากิจ', vacation: 'ลาพักผ่อน',
-  maternity: 'ลาคลอด', ordination: 'ลาบวช', other: 'อื่น ๆ',
+  maternity: 'ลาคลอด', ordination: 'ลาบวช', other: 'อื่นๆ',
 };
 const STATUS_TH = { pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ', cancelled: 'ยกเลิกแล้ว' };
 

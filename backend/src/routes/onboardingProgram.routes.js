@@ -45,6 +45,19 @@ const BLOCK_TH = {
   'Required Outputs': 'ผลงานที่ต้องส่งมอบ',
 };
 
+/**
+ * สารบัญหน้าเนื้อหา — คีย์ ชื่อ และชนิด ไม่รวม section
+ *
+ * แยกจาก loadContent เพราะเนื้อ section ก้อนใหญ่ (ผังองค์กรอันเดียวมีคน 184 คน)
+ * bootstrap จึงได้แต่สารบัญไปทำเมนู แล้วค่อยขอเนื้อหน้าที่เปิดจริงทีละหน้า
+ */
+async function loadPageIndex() {
+  const { rows } = await query(
+    `select key, kind, dept_slug, title, title_th, eyebrow, eyebrow_th, sort_order
+       from ob_pages where is_active order by sort_order, key`);
+  return rows;
+}
+
 /** เนื้อหาทั้งโปรแกรม — แผนก เฟส บล็อก รายการ และเอกสารที่ต้องส่ง */
 async function loadContent() {
   const [depts, phases, blocks, items, docs] = await Promise.all([
@@ -147,17 +160,81 @@ async function statusFor(profileId, content) {
 /** GET /api/onboarding-program/bootstrap — เนื้อหาทั้งหมด + สถานะของผู้เรียก */
 router.get('/bootstrap', asyncHandler(async (req, res) => {
   const content = await loadContent();
-  const status = await statusFor(req.profile.id, content);
+  const [status, pages] = await Promise.all([
+    statusFor(req.profile.id, content),
+    // สารบัญ ไม่ใช่เนื้อ — ตารางอาจยังไม่มี (ฐานข้อมูลที่ยังไม่ได้รัน 0084) ซึ่ง
+    // ต้องไม่ทำให้ทั้งโมดูลล่ม โปรแกรมเดินได้ครบโดยไม่มีหน้าเนื้อหาพวกนี้
+    loadPageIndex().catch(() => []),
+  ]);
   res.json({
     data: {
       ...content,
       status,
+      pages,
       isAdmin: isAdmin(req.profile),
       // แถบความคืบหน้าของเขาเขียนชื่อคนไว้ในหัวข้อ ("ความคืบหน้าการปฐมนิเทศของ
       // คุณ — ชื่อ (แผนก)") ของเขาให้พนักงานพิมพ์ชื่อเอง ของเราอ่านจากบัญชี
       me: { name: req.profile.full_name || req.profile.email, email: req.profile.email },
     },
   });
+}));
+
+// ── หน้าเนื้อหา ─────────────────────────────────────────────────────────────
+// พอร์ทัลของลูกค้าไม่ได้มีแต่เช็กลิสต์: สารจากกรรมการผู้จัดการ ค่านิยม คารูเซล
+// ผลงาน ผังองค์กร โครงสร้างกลุ่มบริษัท หน้าแนะนำแผนก 5 หน้า รู้จักทีมของเรา
+// ชีวิตในไซต์งาน และหน้าจบ — เนื้อหาพวกนี้อยู่ใน ob_pages/ob_sections (0084)
+//
+// ส่งเป็น section เรียงตามลำดับ + ก้อน data ตามชนิด ไม่ใช่ HTML ที่ประกอบไว้แล้ว
+// อย่างต้นฉบับ: ต้นฉบับเป็น Apps Script ที่ต่อสตริง HTML แล้วยัดใส่ innerHTML
+// ฝั่งเราวาดด้วย React การส่ง HTML ดิบข้ามมาคือการเปิดช่อง XSS ให้เนื้อหาใน
+// ฐานข้อมูลโดยไม่จำเป็น
+
+/** GET /api/onboarding-program/pages — สารบัญหน้าเนื้อหา */
+router.get('/pages', asyncHandler(async (req, res) => {
+  res.json({ data: await loadPageIndex() });
+}));
+
+/**
+ * GET /api/onboarding-program/pages/:key — เนื้อหน้าหนึ่งหน้า
+ *
+ * variant 'notdone' คือ section สำรองของหน้าจบ สำหรับคนที่ยังทำเช็กลิสต์ไม่ครบ
+ * — ส่งมาทั้งคู่ แล้วให้หน้าจอเลือกตามสถานะจริงของคนที่เปิด (เหมือนที่ต้นฉบับ
+ * ตัดสินตอน render ไม่ใช่รอคำตอบอีกรอบจากเซิร์ฟเวอร์)
+ */
+router.get('/pages/:key', asyncHandler(async (req, res) => {
+  const page = await queryOne('select * from ob_pages where key = $1 and is_active', [req.params.key]);
+  if (!page) throw new ApiError(404, 'ไม่พบหน้านี้');
+  const { rows } = await query(
+    'select * from ob_sections where page_key = $1 order by variant, sort_order', [page.key]);
+  res.json({
+    data: {
+      ...page,
+      sections: rows.filter((r) => r.variant === 'main'),
+      notCompleteSections: rows.filter((r) => r.variant === 'notdone'),
+    },
+  });
+}));
+
+/**
+ * GET /api/onboarding-program/images/:key — รูปในเนื้อหา
+ *
+ * รูปของต้นฉบับเป็น data URI รวม 7.3 MB ในไฟล์เดียว เราอัปขึ้นที่เก็บไฟล์ของ
+ * โครงการแล้วเสิร์ฟทีละใบผ่านทางนี้ (scripts/upload-onboarding-images.mjs)
+ *
+ * อยู่หลังล็อกอินเหมือนโลโก้บริษัทของ E-Memo — หน้าจอจึงดึงเป็น blob (ObImage.jsx)
+ * ไม่ใช่ <img src> ตรง ๆ เพราะแท็ก img ส่ง Authorization ไม่ได้ ตั้ง Cache-Control
+ * ไว้ด้วยเพราะเนื้อหานี้ไม่เปลี่ยน: คีย์หนึ่งคี่ย์ = ไฟล์เดิมตลอดไป
+ */
+router.get('/images/:key', asyncHandler(async (req, res) => {
+  const row = await queryOne('select storage_key, content_type from ob_images where key = $1',
+    [req.params.key]);
+  if (!row?.storage_key) throw new ApiError(404, 'ไม่พบรูปนี้');
+  const obj = await openDownloadStream(row.storage_key);
+  if (!obj) throw new ApiError(404, 'ไม่พบไฟล์รูปในที่เก็บ');
+  res.setHeader('Content-Type', obj.contentType || row.content_type || 'image/jpeg');
+  res.setHeader('Cache-Control', 'private, max-age=604800');
+  obj.stream.on('error', () => res.destroy());
+  obj.stream.pipe(res);
 }));
 
 // ── ลงทะเบียนและระดับพนักงาน ────────────────────────────────────────────────

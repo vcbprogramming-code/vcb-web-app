@@ -72,12 +72,7 @@ export default function Timeline({ groups = [], onOpen }) {
   const byId = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
   const months = lang === 'en' ? EN_MONTHS_ABBR : TH_MONTHS_ABBR;
 
-  const empty = (msg) => (
-    <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">{msg}</p>
-  );
-
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!rows) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดเส้นเวลา…')} /></div>;
 
   const openOne = (id) => { setDayPick(null); onOpen?.(id); };
 
@@ -132,9 +127,14 @@ export default function Timeline({ groups = [], onOpen }) {
         })}
       </div>
 
-      {mode === 'horizontal'
-        ? <Horizontal items={plotted} projects={projects} months={months} onOpen={openOne} empty={empty} t={t} />
-        : <YearGrid items={plotted} byId={byId} year={year} onPick={setDayPick} onOpen={openOne} empty={empty} t={t} />}
+      {/* ระหว่างรอข้อมูล วาดกรอบและปุ่มไว้ก่อน แล้วหมุนรออยู่แค่ในตัวเนื้อ — เดิม
+          ทั้งหน้าคืน Spinner ก้อนเดียวตั้งแต่ต้น คนกดปุ่มเส้นเวลาจึงเห็นจอว่าง
+          ที่ไม่มีอะไรบอกว่านี่คือหน้าอะไร และสลับโหมดระหว่างรอก็ทำไม่ได้ */}
+      {!rows
+        ? <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดเส้นเวลา…')} /></div>
+        : mode === 'horizontal'
+          ? <Horizontal items={plotted} projects={projects} months={months} onOpen={openOne} />
+          : <YearGrid items={plotted} byId={byId} year={year} onPick={setDayPick} onOpen={openOne} />}
 
       {dayPick && (
         <Modal title={`${t('การประชุมวันที่')} ${dayPick.label}`} onClose={() => setDayPick(null)} size="md"
@@ -158,6 +158,15 @@ export default function Timeline({ groups = [], onOpen }) {
   );
 }
 
+/** ข้อความว่างชุดเดียวกับที่โมดูลใช้อยู่ (กรอบเส้นประ ตัวหนังสือเทา กลางกรอบ) */
+function Empty({ children }) {
+  return (
+    <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-500">
+      {children}
+    </p>
+  );
+}
+
 /**
  * แนวนอน — เลนละโครงการบนแกนเวลาร่วมอันเดียว
  *
@@ -165,8 +174,9 @@ export default function Timeline({ groups = [], onOpen }) {
  * แกนเดียวกันจริงและกว้างเท่าไรก็ยังตรงกัน เว้นขอบสองข้าง 3% ของช่วง ไม่อย่างนั้น
  * จุดแรกกับจุดสุดท้ายจะถูกขอบเลนตัดครึ่ง (ของเขาก็เว้น padMs เท่านี้)
  */
-function Horizontal({ items, projects, months, onOpen, empty, t }) {
-  if (!items.length) return empty(t('ไม่มีการประชุมที่มีวันที่ในโครงการที่เลือกไว้'));
+function Horizontal({ items, projects, months, onOpen }) {
+  const t = useT();
+  if (!items.length) return <Empty>{t('ไม่มีการประชุมที่มีวันที่ในโครงการที่เลือกไว้')}</Empty>;
 
   const dates = items.map((m) => m.iso).sort();
   const minD = new Date(`${dates[0]}T00:00:00`);
@@ -196,7 +206,7 @@ function Horizontal({ items, projects, months, onOpen, empty, t }) {
   }
 
   const lanes = projects.filter((g) => (byLane.get(g.id) || []).length);
-  if (!lanes.length) return empty(t('ไม่มีการประชุมที่มีวันที่ในโครงการที่เลือกไว้'));
+  if (!lanes.length) return <Empty>{t('ไม่มีการประชุมที่มีวันที่ในโครงการที่เลือกไว้')}</Empty>;
 
   return (
     <div className="overflow-x-auto">
@@ -214,7 +224,7 @@ function Horizontal({ items, projects, months, onOpen, empty, t }) {
             const pts = (byLane.get(g.id) || []).slice()
               .sort((a, b) => a.iso.localeCompare(b.iso));
             return (
-              <div key={g.id} className="flex items-center gap-2 py-1">
+              <div key={g.id} data-testid="tl-lane" className="flex items-center gap-2 py-1">
                 <div className="flex w-44 shrink-0 items-center gap-1.5 pr-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: g.color }} />
                   <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{g.name}</span>
@@ -223,7 +233,7 @@ function Horizontal({ items, projects, months, onOpen, empty, t }) {
                 <div className="relative h-8 flex-1 rounded-lg bg-slate-50">
                   <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
                   {pts.map((m) => (
-                    <button key={`${m.id}-${m.iso}`} onClick={() => onOpen(m.id)}
+                    <button key={`${m.id}-${m.iso}`} data-testid="tl-dot" onClick={() => onOpen(m.id)}
                       title={`${m.title} — ${meetingDateText(m)}`}
                       aria-label={`${m.title} ${meetingDateText(m)}`}
                       className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-white transition hover:h-4 hover:w-4"
@@ -239,7 +249,7 @@ function Horizontal({ items, projects, months, onOpen, empty, t }) {
           <div className="w-44 shrink-0" />
           <div className="relative h-5 flex-1 border-t border-slate-200">
             {ticks.map((k) => (
-              <span key={k.at} className="absolute top-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] text-slate-400"
+              <span key={k.at} data-testid="tl-tick" className="absolute top-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] text-slate-400"
                 style={{ left: `${k.at.toFixed(2)}%` }}>{k.label}</span>
             ))}
           </div>
@@ -257,7 +267,8 @@ const DOW_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
  * จุดต่อวันไม่เกินสามจุด เกินกว่านั้นขึ้น "+N": ช่องวันหนึ่งกว้างไม่ถึงสองเซนติเมตร
  * ยัดจุดที่สี่เข้าไปก็ได้แถวจุดที่นับไม่ได้อยู่ดี
  */
-function YearGrid({ items, byId, year, onPick, onOpen, empty, t }) {
+function YearGrid({ items, byId, year, onPick, onOpen }) {
+  const t = useT();
   const byDate = new Map();
   for (const m of items) {
     if (!m.iso.startsWith(String(year))) continue;
@@ -265,7 +276,7 @@ function YearGrid({ items, byId, year, onPick, onOpen, empty, t }) {
     byDate.get(m.iso).push(m);
   }
   if (!byDate.size) {
-    return empty(`${t('ไม่มีการประชุมในปี')} ${year + 543}`);
+    return <Empty>{`${t('ไม่มีการประชุมในปี')} ${year + 543}`}</Empty>;
   }
 
   const today = new Date();
@@ -293,7 +304,7 @@ function YearGrid({ items, byId, year, onPick, onOpen, empty, t }) {
           }
           const label = `${d} ${full[mo]} ${year + 543}`;
           cells.push(
-            <button key={iso}
+            <button key={iso} data-testid="tl-day"
               onClick={() => (list.length === 1 ? onOpen(list[0].id) : onPick({ iso, label, items: list }))}
               title={list.map((m) => m.title).join(', ')}
               className={`flex h-7 flex-col items-center justify-start rounded bg-slate-50 text-[10px] font-semibold leading-tight transition hover:bg-brand-tint ${
@@ -310,7 +321,7 @@ function YearGrid({ items, byId, year, onPick, onOpen, empty, t }) {
           );
         }
         return (
-          <div key={name} className="rounded-xl border border-slate-100 p-2">
+          <div key={name} data-testid="tl-month" className="rounded-xl border border-slate-100 p-2">
             <p className="mb-1 text-center text-xs font-bold text-slate-600">{name}</p>
             <div className="grid grid-cols-7 gap-px text-center">
               {DOW_TH.map((l, i) => (

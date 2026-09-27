@@ -45,9 +45,15 @@ const daysInMonthN = (y, m) => new Date(y, m, 0).getDate();
 /** Format a pg `date` (parsed to LOCAL midnight) by its local calendar parts. */
 // ประเภทการลา — declared up here because the roster loader labels a day off with
 // it, and the leave endpoints further down share the same list.
+//
+// ข้อความไทยชุดนี้เป็น "ค่า" ไม่ใช่แค่คำบนจอ: การอนุมัติเขียนมันลงโน้ตของช่อง
+// เป็น "[LV] <ประเภท> · <เลขที่>" แล้วหน้าจออ่านกลับมาขึ้นป้าย และเป็นค่าที่ต้อง
+// เทียบกับระบบจริงได้ตัวอักษรต่อตัวอักษร — จึงสะกด 'อื่นๆ' ไม่เว้นวรรค ตาม
+// LEAVE_TYPES ของเขา (Code.gs) ถ้าสะกดต่างกัน วันหลังจะกลายเป็นคนละค่า
+// ห้ามแก้คำเหล่านี้เพื่อความสวยงาม และห้ามแปลตอนส่งออก
 const LEAVE_TYPES_TH = {
   sick: 'ลาป่วย', personal: 'ลากิจ', vacation: 'ลาพักผ่อน',
-  maternity: 'ลาคลอด', ordination: 'ลาบวช', other: 'อื่น ๆ',
+  maternity: 'ลาคลอด', ordination: 'ลาบวช', other: 'อื่นๆ',
 };
 const LEAVE_TH = LEAVE_TYPES_TH;
 
@@ -59,24 +65,43 @@ const todayStr = () => { const t = new Date(); return ymd(t.getFullYear(), t.get
 const addDaysStr = (s, n) => { const [Y, M, D] = s.split('-').map(Number); const d = new Date(Y, M - 1, D + n); return ymd(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
 // reference: weekend = Sunday only (dow === 0)
 const isWeekend = (Y, M, d) => new Date(Y, M - 1, d).getDay() === 0;
-/** editable window = [today − lockDays, today + 1]; locked outside it. */
+/**
+ * ขอบบนของการบันทึก — พรุ่งนี้ ไม่มีใครข้ามได้ รวมถึงผู้ดูแลระบบ
+ * (ระบบจริงบังคับข้อนี้กับทุกคนเหมือนกัน: "the month can't be filled before it
+ * happens") แยกออกมาเป็นฟังก์ชันของตัวเอง เพราะการปลดล็อกย้อนหลังของผู้ดูแล
+ * ระบบต้องไม่พลอยปลดขอบบนนี้ไปด้วย
+ */
+const isFuture = (ds) => ds > addDaysStr(todayStr(), 1);
+
+/**
+ * ช่วงที่แก้ไขได้ = [วันนี้ − lockDays, พรุ่งนี้] นอกช่วงนี้ล็อก
+ *
+ * lockDays = 0 หมายถึง "ปิดทันทีเมื่อวันผ่านไป" ไม่ใช่ "ไม่ล็อกเลย" — ตามระบบจริง
+ * ที่คิดเส้นตายเป็น วันนี้ − lockDays ตรง ๆ (ตั้ง 0 = แก้ได้แค่วันนี้กับพรุ่งนี้)
+ * เดิมเราตีความกลับด้าน ผู้ดูแลระบบที่ตั้ง 0 เพราะอยากล็อกแน่นที่สุดจะได้ผลตรงข้าม
+ * คือเปิดให้แก้ย้อนหลังได้ไม่จำกัด
+ */
 function isLocked(ds, lockDays) {
-  const today = todayStr();
-  if (ds > addDaysStr(today, 1)) return true; // no logging beyond tomorrow (upper bound)
-  if (!lockDays || lockDays <= 0) return false;
-  return ds < addDaysStr(today, -lockDays);
+  if (isFuture(ds)) return true; // no logging beyond tomorrow (upper bound)
+  const n = Number(lockDays);
+  if (!Number.isFinite(n) || n < 0) return false;
+  return ds < addDaysStr(todayStr(), -n);
 }
 
 /**
  * §4 wants three states on screen, not two: a day that is still open, a day
  * about to close, and a day that has closed. "About to close" is what actually
  * changes behaviour — it is the last chance to fix something.
+ *
+ * "future" แยกจาก "locked" เพราะวันข้างหน้าไม่ได้ "เลยกำหนด" — มันยังไม่ถึงกำหนด
+ * ตารางของระบบจริงก็ระบายสีสองอย่างนี้ต่างกัน (เทา = ยังไม่ถึงกำหนด · จาง = ล็อก)
  */
 const DUE_SOON_DAYS = 1;
 function lockState(ds, lockDays, closedMonths = new Set()) {
   if (closedMonths.has(ds.slice(0, 7))) return 'closed';
+  if (isFuture(ds)) return 'future';
   if (isLocked(ds, lockDays)) return 'locked';
-  if (lockDays > 0 && ds <= addDaysStr(todayStr(), -(lockDays - DUE_SOON_DAYS))) return 'due-soon';
+  if (lockDays >= 0 && ds <= addDaysStr(todayStr(), -Math.max(0, lockDays - DUE_SOON_DAYS))) return 'due-soon';
   return 'editable';
 }
 
@@ -250,6 +275,9 @@ router.post('/activities', requireRole('admin'), asyncHandler(async (req, res) =
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
   const code = String(d.code || '').trim() || (await nextActivityCode(d.category));
+  // ค่าในช่องเก็บเป็นคู่ "A-1 / 5" แล้วแยกด้วย / รหัสที่มี / หรือช่องว่างอยู่ข้างใน
+  // จะถูกอ่านผิดทั้งรายงาน — กันที่ต้นทางเดียวกับที่การนำเข้าไฟล์กัน
+  if (/[\s/]/.test(code)) throw new ApiError(400, 'รหัสกิจกรรมห้ามมีช่องว่างหรือเครื่องหมาย /');
   const row = await queryOne(
     `insert into work_types (code, name, description, category, mapping, fixed_cost, sort_order)
      values ($1,$2,$3,$4,$5,$6,$7) returning *`,
@@ -298,9 +326,13 @@ router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async 
 /**
  * ลบรายการออกจากดัชนีงาน — แต่ไม่ลบทิ้งถ้ามีบันทึกงานอ้างอิงอยู่
  *
+ * ── ตั้งใจเข้มกว่าระบบจริง (5/5) ────────────────────────────────────────────
  * ค่าในช่องเก็บเป็นข้อความคู่ "A-1 / 5" ลบรหัสที่คนลงงานไว้แล้วจริง ๆ จะทำให้
  * บันทึกเก่าชี้ไปยังรหัสที่ไม่มีในทะเบียน แล้วหลุดจากกราฟและรายงานทันที
- * (ระบบจริงลบทิ้งได้เพราะชีตไม่มีใครตรวจ — เราปิดใช้งานแทนแล้วบอกผู้ใช้ตรง ๆ)
+ * ของเขา (api_masterDelete / api_costDelete) ลบแถวทิ้งทันทีไม่ตรวจอะไรเลย
+ * บันทึกที่ใช้รหัสนั้นจึงตกไปอยู่กอง "ไม่ตรงกับดัชนี" บนการ์ดแดชบอร์ดเงียบ ๆ
+ * เราปิดใช้งานแทนแล้วบอกจำนวนบันทึกที่อ้างอิงอยู่ — ผู้ใช้ยังได้ผลที่ต้องการคือ
+ * รหัสนั้นหายจากตัวเลือก และเปิดกลับได้ถ้าปิดผิด
  * split_part กันรหัสซ้อนกัน: 'A-1' ต้องไม่ไปจับ 'A-10'
  */
 const SLOT_HEAD = (n) => `split_part(coalesce(${n}, ''), ' / ', 1) = $1`;
@@ -516,20 +548,69 @@ const employeeSchema = z.object({
   // settable where a person is created, not only through the Excel import
   departmentId: z.string().uuid().optional().nullable(),
   positionId: z.string().uuid().optional().nullable(),
+  // ผู้ใช้ยืนยันแล้วว่ารหัสที่ซ้ำนี้เป็นคนละคนจริง — ดู empCodeFor() ว่าเก็บอย่างไร
+  confirmDuplicateCode: z.boolean().optional(),
 });
+
+/**
+ * รหัสพนักงานซ้ำ — เก็บรหัสจริงไว้ครบ แล้วเติมตัวแยกให้คอลัมน์ที่บังคับไม่ซ้ำ
+ *
+ * ทะเบียนจริงของลูกค้ามีรหัสซ้ำกันอยู่ 35 รหัส (70 แถว) เพราะระบบเดิมของเขาไม่ได้
+ * ห้ามเลย แต่ employees.employee_code ของเราบังคับไม่ซ้ำ ตัวนำเข้าจึงเก็บแถวที่สอง
+ * ขึ้นไปเป็น "<รหัส>#<เลขลำดับ>" และเก็บรหัสจริงล้วน ๆ ไว้ที่ live_emp_code
+ * (scripts/import-live-worklog.mjs) การเพิ่มคนด้วยมือต้องทำแบบเดียวกัน ไม่งั้น
+ * ฝ่ายบุคคลเพิ่มคนที่ใช้รหัสซ้ำตามของจริงไม่ได้เลย
+ *
+ * ทุกที่ที่แสดงรหัสอ่าน live_emp_code ก่อน (SQL_EMP_CODE) ทั้งหน้าจอและไฟล์ Excel
+ * จึงเห็นรหัสจริง ไม่เห็นตัวแยก — คนที่ถือทะเบียนของเขาอยู่ในมือหาแถวเดียวกันเจอ
+ */
+async function findEmpByRealCode(code, excludeId) {
+  return queryOne(
+    `select e.id, ${SQL_EMP_NAME('e')} as full_name, u.name as site_name
+       from employees e left join units u on u.id = e.unit_id
+      where ${SQL_EMP_CODE('e')} = $1 and ($2::uuid is null or e.id <> $2) limit 1`,
+    [String(code).trim(), excludeId || null]);
+}
+/** "<รหัส>#<เลขลำดับ>" ตัวแรกที่ยังไม่มีใครใช้ (แถวแรกของกลุ่มถือรหัสเปล่าไว้) */
+async function nextSuffixedCode(code) {
+  const base = String(code).trim();
+  for (let n = 2; n <= 200; n += 1) {
+    const cand = `${base}#${n}`;
+    if (!(await queryOne('select 1 from employees where employee_code = $1', [cand]))) return cand;
+  }
+  throw new ApiError(409, 'รหัสพนักงานนี้ถูกใช้ซ้ำมากเกินกว่าที่ระบบรองรับ');
+}
+/**
+ * คู่ค่าที่จะเก็บลงสองคอลัมน์ สำหรับรหัสที่ผู้ใช้กรอกมา
+ * ยังไม่ยืนยันว่าเป็นคนละคน → 409 พร้อมบอกว่าไปซ้ำกับใครที่ไซต์ไหน ให้หน้าจอถามก่อน
+ */
+async function empCodeFor(rawCode, { confirmed, excludeId } = {}) {
+  const code = String(rawCode || '').trim();
+  if (!code) return { employee_code: null, live_emp_code: null };
+  const dup = await findEmpByRealCode(code, excludeId);
+  if (!dup) return { employee_code: code, live_emp_code: null };
+  if (!confirmed) {
+    throw new ApiError(409,
+      `รหัสพนักงานนี้มีอยู่แล้วที่ ${dup.site_name || 'ไม่ระบุหน่วยงาน'} (${dup.full_name || 'ไม่มีชื่อ'}) — เป็นคนละคนใช่หรือไม่`,
+      { code: 'DUPLICATE_EMP_CODE', employeeCode: code, siteName: dup.site_name || '', fullName: dup.full_name || '' });
+  }
+  return { employee_code: await nextSuffixedCode(code), live_emp_code: code };
+}
 router.post('/employees', requirePermission('performance', 'edit'), asyncHandler(async (req, res) => {
   const p = employeeSchema.safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const unit = await loadUnitByKey(p.data.site);
   if (!unit) throw new ApiError(404, 'ไม่พบไซต์งาน');
   assertUnitInScope(scopedUnitIds(req.profile), unit.id);
+  // รหัสซ้ำไม่ได้ปิดทาง — ถามยืนยันว่าเป็นคนละคน แล้วเก็บรหัสจริงไว้ที่ live_emp_code
+  const codes = await empCodeFor(p.data.employeeCode, { confirmed: p.data.confirmDuplicateCode });
   const row = await queryOne(
-    `insert into employees (unit_id, full_name, employee_code, kind, is_active, department_id, position_id)
-     values ($1,$2,$3,$4,true,$5,$6) returning id`,
-    [unit.id, p.data.fullName, p.data.employeeCode || null, p.data.kind,
+    `insert into employees (unit_id, full_name, employee_code, live_emp_code, kind, is_active, department_id, position_id)
+     values ($1,$2,$3,$4,$5,true,$6,$7) returning id`,
+    [unit.id, p.data.fullName, codes.employee_code, codes.live_emp_code, p.data.kind,
      p.data.departmentId || null, p.data.positionId || null]
-  );
-  res.status(201).json({ data: { eid: row.id } });
+  ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสพนักงานนี้มีอยู่แล้ว'); throw e; });
+  res.status(201).json({ data: { eid: row.id, employeeCode: codes.live_emp_code || codes.employee_code } });
 }));
 // load an employee and confirm it belongs to a unit the caller may write to
 async function assertEmployeeScoped(profile, employeeId) {
@@ -544,16 +625,27 @@ router.patch('/employees/:id', requirePermission('performance', 'edit'), asyncHa
     kind: z.enum(['operation', 'support']).optional(), isActive: z.boolean().optional(),
     departmentId: z.string().uuid().optional().nullable(),
     positionId: z.string().uuid().optional().nullable(),
+    confirmDuplicateCode: z.boolean().optional(),
   }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   await assertEmployeeScoped(req.profile, req.params.id); // #B: no cross-unit writes
-  const map = { fullName: 'full_name', employeeCode: 'employee_code', kind: 'kind', isActive: 'is_active',
-    departmentId: 'department_id', positionId: 'position_id' };
+  // แก้รหัสให้ไปซ้ำกับคนอื่น ใช้กฎเดียวกับการเพิ่มคนใหม่ — ถามยืนยันก่อน แล้วเก็บ
+  // รหัสจริงไว้ที่ live_emp_code ไม่ใช่ปล่อยให้ 23505 หลุดขึ้นจอ
+  const patch = { ...p.data };
+  if (patch.employeeCode !== undefined) {
+    const codes = await empCodeFor(patch.employeeCode, {
+      confirmed: patch.confirmDuplicateCode, excludeId: req.params.id });
+    patch.employeeCode = codes.employee_code;
+    patch.liveEmpCode = codes.live_emp_code;
+  }
+  const map = { fullName: 'full_name', employeeCode: 'employee_code', liveEmpCode: 'live_emp_code',
+    kind: 'kind', isActive: 'is_active', departmentId: 'department_id', positionId: 'position_id' };
   const sets = []; const vals = [];
-  for (const [k, col] of Object.entries(map)) if (p.data[k] !== undefined) { vals.push(p.data[k]); sets.push(`${col} = $${vals.length}`); }
+  for (const [k, col] of Object.entries(map)) if (patch[k] !== undefined) { vals.push(patch[k]); sets.push(`${col} = $${vals.length}`); }
   if (!sets.length) throw new ApiError(400, 'No fields to update');
   vals.push(req.params.id);
-  const row = await queryOne(`update employees set ${sets.join(', ')} where id = $${vals.length} returning id`, vals);
+  const row = await queryOne(`update employees set ${sets.join(', ')} where id = $${vals.length} returning id`, vals)
+    .catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสพนักงานนี้มีอยู่แล้ว'); throw e; });
   if (!row) throw new ApiError(404, 'ไม่พบพนักงาน');
   res.json({ data: { eid: row.id } });
 }));
@@ -677,10 +769,17 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   if ((field === 'team' && emp.kind !== 'operation') || (field === 'detail' && emp.kind === 'operation')) {
     throw new ApiError(400, 'ช่องนี้ไม่ใช่ช่องงานหลักของพนักงานสายนี้');
   }
+  // ── ตั้งใจเข้มกว่าระบบจริง (2/5) ─────────────────────────────────────────
+  // ของเขาบังคับแค่ที่หน้าจอ (visibleSites() ซ่อนชื่อออกจากดรอปดาวน์) เซิร์ฟเวอร์
+  // ไม่เคยตรวจ active เลย ค่าที่มาทางอื่นจึงยังเขียนเข้าโครงการที่ปิดแล้วได้
+  // เราปิดที่เซิร์ฟเวอร์ตรงตามข้อความยืนยันของเขาเอง ("จะไม่สามารถบันทึกงานใหม่ได้
+  // แต่ประวัติเดิมยังอยู่") — การอ่านย้อนหลังยังเปิดไว้ทั้งหมด
   if (!unit.is_active) throw new ApiError(409, 'โครงการนี้ปิดแล้ว ไม่รับบันทึกใหม่');
 
   // §3 validation — a day in the future is a typo, not a record of work
-  if (date > addDaysStr(todayStr(), 1)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
+  // ข้อนี้บังคับกับทุกคนรวมถึงผู้ดูแลระบบ เหมือนระบบจริง: โหมดแก้ย้อนหลังปลดเฉพาะ
+  // ขอบล่าง (อดีต) ไม่ใช่ขอบบน — เดือนที่ยังไม่เกิดต้องกรอกล่วงหน้าไม่ได้
+  if (isFuture(date)) throw new ApiError(400, 'บันทึกล่วงหน้าเกินวันพรุ่งนี้ไม่ได้');
 
   const lockDays = unit.lock_days ?? 3;
   const closed = await closedMonthsFor(unit.id);
@@ -693,7 +792,7 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   if (isLocked(date, lockDays) && !canUnlock) throw new ApiError(409, 'วันที่นี้เลยกำหนดแก้ไขแล้ว (ผู้ดูแลระบบปลดล็อกได้)');
 
   const existing = await queryOne(
-    'select id, team, detail, pm, man_day, hours, work_status, verified_at, updated_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+    'select id, team, detail, pm, note, man_day, hours, work_status, verified_at, updated_at from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
     [eid, date]
   );
   // §12 two people on the same cell: the second one is told, not ignored
@@ -707,6 +806,16 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
   const next = { team: existing?.team || null, detail: existing?.detail || null, pm: existing?.pm || null };
   next[field] = value && value.trim() ? value.trim() : null;
 
+  // งานเดียวกันทั้งสองช่องของวันเดียวไม่ได้ — จะกลายเป็นครึ่งวันสองท่อนของงานเดิม
+  // ซึ่งไม่ได้บอกอะไรและทำให้การกระจายแรงงาน-วันลงหมวดงานเพี้ยน กล่องเลือกกิจกรรม
+  // กันไว้อยู่แล้ว (เหมือน oppPick ของระบบจริง) แต่ของเขากันแค่ที่หน้าจอ ค่าที่มา
+  // ทางอื่นจึงยังเข้าได้ — กันซ้ำที่นี่ด้วย เทียบเฉพาะรหัสงาน ไม่สนหมวดงานท้ายค่า
+  const headCode = (v) => String(v || '').split('/')[0].trim().toLowerCase();
+  const slot1Next = emp.kind === 'operation' ? next.team : next.detail;
+  if (slot1Next && next.pm && headCode(slot1Next) === headCode(next.pm)) {
+    throw new ApiError(400, 'งานทั้งสองช่องเหมือนกัน — เลือกงานคนละประเภทเพื่อบันทึก 2 งาน');
+  }
+
   if (!next.team && !next.detail && !next.pm) {
     // §9 a delete stays visible — the row is marked, never removed
     if (existing) {
@@ -716,16 +825,25 @@ router.post('/cell', requirePermission('performance', 'edit'), asyncHandler(asyn
     }
     return res.json({ data: { ok: true, cleared: true } });
   }
+  // ป้าย "✓ ลาป่วย" ใต้ช่องมาจากโน้ต "[LV] …" ที่การอนุมัติคำขอลาเขียนไว้ ถ้าคนมา
+  // แก้ช่องงานหลักให้เป็นงานอื่นที่ไม่ใช่ Z-2 แล้วโน้ตยังค้างอยู่ ป้ายจะกำกับงานที่
+  // ไม่ใช่วันลาว่าเป็นวันลา — ระบบจริงปล่อยค้างไว้จริง (writeWideCells_ เขียนเฉพาะ
+  // ช่องที่ส่งมา) แต่นั่นทำให้ป้ายโกหก จึงล้างโน้ตทิ้งพร้อมกับค่าที่เปลี่ยน
+  // ค่าเดิมยังตามอ่านได้จากประวัติการแก้ไข
+  const wasLeaveNote = String(existing?.note || '').startsWith('[LV]');
+  const stillLeave = String(slot1Next || '').trim().toUpperCase() === 'Z-2';
+  const clearNote = wasLeaveNote && !stillLeave;
   await query(
     `insert into work_logs (employee_id, unit_id, ymd, kind, team, detail, pm, status, updated_by)
      values ($1,$2,$3,$4,$5,$6,$7,'',$8)
      on conflict (employee_id, ymd) do update set
        unit_id=excluded.unit_id, kind=excluded.kind, team=excluded.team, detail=excluded.detail,
        pm=excluded.pm, updated_by=excluded.updated_by, updated_at=now(),
+       note = case when $9::boolean then null else work_logs.note end,
        -- ช่องที่เคยล้างแล้วพิมพ์ใหม่ต้องกลับมามีชีวิต ไม่งั้นค่าที่พิมพ์ใหม่
        -- จะหายจากตารางทันทีที่โหลดใหม่ (แถวยังติดสถานะลบอยู่)
        deleted_at=null, deleted_by=null`,
-    [eid, unit.id, date, emp.kind, next.team, next.detail, next.pm, req.profile.id]
+    [eid, unit.id, date, emp.kind, next.team, next.detail, next.pm, req.profile.id, clearNote]
   );
   const saved = await queryOne('select id, team, detail, pm, man_day, hours, work_status, updated_at from work_logs where employee_id = $1 and ymd = $2', [eid, date]);
   await logWork({ actor: req.profile, workLogId: saved?.id, employeeId: eid, unitId: unit.id, ymd: date,
@@ -820,6 +938,9 @@ router.get('/admin-summary', asyncHandler(async (req, res) => {
     const fillTotal = nEmp * workdaysPassed;
     rows.push({
       site_key: u.code, site_name: u.name, company: u.company, color: u.color, active: u.is_active !== false,
+      // ปฏิทินย่อในการ์ดระบายสี "ยังแก้ได้ / ล็อกแล้ว" จากระยะล็อก และระยะล็อกของเรา
+      // ตั้งรายไซต์ — ส่งค่าของไซต์นั้นมาด้วย ไม่ใช่ให้หน้าจอใช้ค่ากลางค่าเดียว
+      lockDays: u.lock_days ?? 3,
       n_emp: nEmp, n_support: nEmp - nOp, n_operation: nOp,
       support_started: startedSup.size, operation_started: startedOp.size,
       entries,
@@ -914,7 +1035,7 @@ const LEAVE_TYPES_DEF = [
   { code: 'vacation', th: 'ลาพักผ่อน' },
   { code: 'maternity', th: 'ลาคลอด' },
   { code: 'ordination', th: 'ลาบวช' },
-  { code: 'other', th: 'อื่น ๆ' },
+  { code: 'other', th: 'อื่นๆ' },
 ];
 
 
@@ -1005,6 +1126,10 @@ router.get('/leave/decided', asyncHandler(async (req, res) => {
 
 const leaveSchema = z.object({
   employeeId: z.string().uuid(),
+  // ── ตั้งใจเข้มกว่าระบบจริง (3/5) ─────────────────────────────────────────
+  // ประเภทที่ไม่รู้จัก: ของเขาเปลี่ยนเป็น 'other' เงียบ ๆ (`if(!leaveTypeTh_(t)) t='other'`)
+  // ค่าที่ระบบเดาให้เองจะไปโผล่บนใบลาที่ผู้ใช้พิมพ์ออกมาโดยไม่มีใครรู้ว่าถูกเปลี่ยน
+  // enum นี้ตอบ 400 แทน ให้ต้นทางแก้ให้ถูกก่อน — ไม่มีคำขอไหนหายไปจากการปฏิเสธนี้
   leaveType: z.enum(['sick', 'personal', 'vacation', 'maternity', 'ordination', 'other']).default('other'),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -1045,8 +1170,11 @@ router.post('/leave', requirePermission('performance', 'edit'), fileUpload.singl
   // leave for anybody in the company.
   assertUnitInScope(scopedUnitIds(req.profile), emp.unit_id);
 
-  // Two live requests over the same days say nothing extra and would each write
-  // the same days into the work log.
+  // ── ตั้งใจเข้มกว่าระบบจริง (1/5) ─────────────────────────────────────────
+  // ระบบจริงไม่ตรวจความซ้ำเลย (_api_requestLeave_ ไม่อ่านชีตก่อนเพิ่มแถว) สองใบ
+  // ที่ทับกันจึงอนุมัติได้ทั้งคู่ แล้วเขียนวันเดียวกันลงตารางงานซ้ำสองรอบ ใบที่
+  // อนุมัติทีหลังทับของเดิมโดยไม่มีอะไรฟ้อง เรากันที่ต้นทางเพราะใบที่ทับกันไม่ได้
+  // บอกอะไรเพิ่ม และผู้ใช้ไม่เสียงาน — ข้อความบอกช่วงวันที่ของใบที่ทับให้เลย
   const clash = await queryOne(
     `select id, from_date, to_date from leave_requests
       where employee_id = $1 and status in ('pending','approved')
@@ -1054,8 +1182,10 @@ router.post('/leave', requirePermission('performance', 'edit'), fileUpload.singl
     [employeeId, from, to]
   );
   if (clash) {
+    // from_date/to_date กลับมาจาก pg เป็นวัตถุ Date ไม่ใช่สตริง — String(...).slice(0,10)
+    // จึงได้ "Mon Mar 01" ขึ้นไปบนหน้าจอผู้ใช้ ต้องแปลงเป็นวันที่ตามปฏิทินก่อน
     throw new ApiError(409,
-      `ช่วงวันที่ทับกับคำขอที่มีอยู่แล้ว (${String(clash.from_date).slice(0, 10)} ถึง ${String(clash.to_date).slice(0, 10)})`);
+      `ช่วงวันที่ทับกับคำขอที่มีอยู่แล้ว (${dateStr(clash.from_date)} ถึง ${dateStr(clash.to_date)})`);
   }
 
   // §6 half a day only makes sense on a single day
@@ -1145,8 +1275,12 @@ router.post('/leave/:id/decide', asyncHandler(async (req, res) => {
       const before = await queryOne(
         'select id, team, detail, pm from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
         [row.employee_id, day]);
+      // ── ตั้งใจเข้มกว่าระบบจริง (4/5) ───────────────────────────────────────
       // วันลาไม่มีงานเสริม — ล้าง pm ทิ้ง ไม่งั้นแรงงาน-วันจะถูกแบ่งครึ่งให้งานที่
       // ไม่ได้เกิดขึ้น ค่าเดิมยังตามอ่านได้จากประวัติการแก้ไข
+      // ของเขาไม่แตะ pm เลย (writeWideCells_ เขียนเฉพาะช่องที่ส่งมา และ
+      // _api_decideLeaveRequest_ ไม่ส่ง pm) วันลาที่เคยลงงานที่สองไว้จึงเหลือ
+      // ครึ่งวันค้างอยู่ในรายงานทั้งที่คนนั้นไม่ได้มาทำงาน
       await query(
         `insert into work_logs (employee_id, unit_id, ymd, kind, ${slot1}, pm, note, status, updated_by)
          values ($1,$2,$3,$4,'Z-2',null,$5,'',$6)
@@ -1176,7 +1310,8 @@ router.post('/leave/:id/cancel', asyncHandler(async (req, res) => {
   if (row.requested_by !== req.profile.id && req.profile.role !== 'admin') {
     throw new ApiError(403, 'ยกเลิกได้เฉพาะคำขอที่ท่านเป็นผู้ยื่น');
   }
-  if (row.status !== 'pending') throw new ApiError(409, 'คำขอที่ถูกตัดสินแล้วยกเลิกไม่ได้');
+  // ถ้อยคำเดียวกับระบบจริง (ALREADY_DECIDED → 'คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้')
+  if (row.status !== 'pending') throw new ApiError(409, 'คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้');
   await query(`update leave_requests set status = 'cancelled', updated_at = now() where id = $1`, [row.id]);
   res.json({ ok: true });
 }));
@@ -1784,6 +1919,20 @@ function sheetRows(ws) {
 }
 const pick = (o, ...names) => { for (const n of names) if (o[n] !== undefined && o[n] !== '') return o[n]; return ''; };
 
+/**
+ * แถวตัวอย่างในเทมเพลตเปล่า — ต้องไม่ถูกนำเข้า
+ *
+ * เทมเพลตของเรา (และของระบบจริง) มีแถวตัวอย่างหนึ่งแถวไว้ให้ดูรูปแบบ ถ้าใครดาวน์
+ * โหลดเทมเพลตแล้วกรอกต่อท้ายโดยไม่ลบแถวตัวอย่าง แถวนั้นจะถูกนำเข้าเป็นของจริง —
+ * และเพราะตัวอย่างของเราใช้รหัส A-1 กับ 21 มันจะไปเขียนทับรายการจริงในทะเบียน
+ * ระบบจริงกันด้วยการทิ้งแถวที่ชื่อว่า 'งานตัวอย่าง' ของเราขึ้นต้นด้วย 'ตัวอย่าง'
+ * จึงรับทั้งสองแบบ
+ */
+const isTemplateSample = (name) => {
+  const s = String(name || '').trim();
+  return s === 'งานตัวอย่าง' || /^ตัวอย่าง(\s|$)/.test(s);
+};
+
 // ── ทะเบียนงาน: ส่งออก/นำเข้าเป็น Excel ─────────────────────────────────────
 // ระบบจริงของลูกค้ามีปุ่ม ⬇ Excel และ ⬆ นำเข้า อยู่บนหน้าดัชนีงาน เพราะทะเบียน
 // 44 รหัสนี้แก้กันทีละหลายแถว การพิมพ์ทีละช่องบนหน้าจอไม่ไหว
@@ -1859,15 +2008,26 @@ router.post('/import/activities', requirePermission('performance', 'edit'), impo
     for (const r of rows) {
       const code = pick(r, 'รหัสงาน', 'code', 'รหัส');
       const name = pick(r, 'ชื่องาน', 'name', 'ชื่อ');
-      if (!code) { bad.push({ row: r._row, reason: 'ไม่มีรหัสงาน' }); continue; }
       if (!name) { bad.push({ row: r._row, reason: 'ไม่มีชื่องาน' }); continue; }
-      if (!/^[A-Z]-\d+$/i.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ผิดรูปแบบ (ต้องเป็นแบบ A-1)` }); continue; }
+      if (isTemplateSample(name)) { bad.push({ row: r._row, reason: 'แถวตัวอย่างของเทมเพลต' }); continue; }
+      // ช่องรหัสเว้นว่างได้ = ให้ระบบออกเลขให้ ตามระบบจริงและตามเทมเพลตของเราเอง
+      // ที่วางรหัสไว้เป็นคอลัมน์สุดท้ายแล้วบอกว่าไม่ต้องกรอกก็ได้ เดิมเราปฏิเสธทุกแถว
+      // ที่ไม่มีรหัส คนที่กรอกตามเทมเพลตจึงนำเข้าไม่ได้เลยแม้แถวเดียว
+      // รหัสห้ามมีช่องว่างหรือเครื่องหมาย / เพราะค่าในช่องเก็บเป็นคู่ "A-1 / 5"
+      // แล้วแยกด้วย / — รหัสที่มี / อยู่ข้างในจะถูกอ่านผิดทั้งรายงาน
+      // เดิมบังคับรูปแบบ <อักษรตัวเดียว>-<เลข> ซึ่งเข้มกว่าปุ่ม "เพิ่มรายการใหม่"
+      // บนหน้าจอที่รับรหัสอะไรก็ได้ ไฟล์ที่กรอกรหัสอย่าง ZZ-1 จึงถูกปฏิเสธทั้งแถว
+      // แม้จะเพิ่มด้วยมือได้ปกติ (ระบบจริงไม่ตรวจรูปแบบรหัสเลย)
+      if (code && (/[\s/]/.test(code) || code.length > 20)) {
+        bad.push({ row: r._row, reason: `รหัส "${code}" ใช้ไม่ได้ (ห้ามมีช่องว่างหรือ / และยาวไม่เกิน 20 ตัว)` });
+        continue;
+      }
       const allowed = String(pick(r, 'หมวดงานที่อนุญาต', 'allowed_cost') || '')
         .split(/[,\s]+/).filter(Boolean);
       const unknown = allowed.filter((c) => !costCodes.has(c));
       if (unknown.length) { bad.push({ row: r._row, reason: `หมวดงานไม่มีในทะเบียน: ${unknown.join(', ')}` }); continue; }
       ok.push({
-        code: code.toUpperCase(), name,
+        code: code ? code.toUpperCase() : '', name,
         name_en: pick(r, 'ชื่อภาษาอังกฤษ', 'name_en') || null,
         description: pick(r, 'คำอธิบาย', 'description') || null,
         category: pick(r, 'หมวดหมู่', 'category') || null,
@@ -1884,11 +2044,17 @@ router.post('/import/activities', requirePermission('performance', 'edit'), impo
     const have = new Set((await query('select code from work_types')).rows.map((r) => String(r.code)));
     let added = 0; let updated = 0;
     for (const a of ok) {
-      if (have.has(a.code)) updated += 1; else added += 1;
+      // แถวที่ไม่ได้กรอกรหัสมา ออกเลขให้ตอนนี้ (ตัวเดียวกับปุ่ม "เพิ่มรายการใหม่")
+      if (!a.code) a.code = await nextActivityCode(a.category);
+      if (have.has(a.code)) updated += 1; else { added += 1; have.add(a.code); }
       await query(
+        // ดัชนีที่บังคับไม่ซ้ำของ work_types.code เป็นดัชนีแบบมีเงื่อนไข
+        // (unique … where code is not null — เพราะงานเก่าจากโมดูล OT ไม่มีรหัส)
+        // ON CONFLICT จึงต้องบอกเงื่อนไขเดียวกันเป๊ะ ไม่งั้น Postgres หาดัชนีไม่เจอ
+        // แล้วโยน 500 ทุกครั้ง — การนำเข้าทะเบียนงานจากไฟล์จึงใช้งานไม่ได้มาตลอด
         `insert into work_types (code, name, name_en, description, category, mapping, fixed_cost, allowed_cost, is_active)
          values ($1,$2,$3,$4,$5,$6,$7,$8,true)
-         on conflict (code) do update set
+         on conflict (code) where code is not null do update set
            name = excluded.name, name_en = excluded.name_en, description = excluded.description,
            category = excluded.category, mapping = excluded.mapping, fixed_cost = excluded.fixed_cost,
            allowed_cost = excluded.allowed_cost, is_active = true, updated_at = now()`,
@@ -1918,11 +2084,12 @@ router.post('/import/cost-categories', requireRole('admin'), importUpload.single
     for (const r of rows) {
       const code = String(pick(r, 'รหัส', 'code', 'รหัสหมวดงาน') || '').trim();
       const name = pick(r, 'ชื่อหมวดงาน', 'ชื่อ-ไทย', 'ชื่อ (ไทย)', 'หมวดงาน (ไทย)', 'ชื่อ', 'name');
-      if (!code) { bad.push({ row: r._row, reason: 'ไม่มีรหัสหมวดงาน' }); continue; }
-      if (!/^\d+$/.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ต้องเป็นตัวเลข` }); continue; }
       if (!name) { bad.push({ row: r._row, reason: 'ไม่มีชื่อหมวดงาน' }); continue; }
-      if (seen.has(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ซ้ำในไฟล์เดียวกัน` }); continue; }
-      seen.add(code);
+      if (isTemplateSample(name)) { bad.push({ row: r._row, reason: 'แถวตัวอย่างของเทมเพลต' }); continue; }
+      // รหัสเว้นว่างได้ = ออกเลขถัดไปให้ เหมือนปุ่ม "เพิ่มหมวดงาน" และเหมือนระบบจริง
+      if (code && !/^\d+$/.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ต้องเป็นตัวเลข` }); continue; }
+      if (code && seen.has(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ซ้ำในไฟล์เดียวกัน` }); continue; }
+      if (code) seen.add(code);
       ok.push({ code, name, name_en: pick(r, 'ชื่อภาษาอังกฤษ', 'ชื่อ-อังกฤษ', 'ชื่อ (อังกฤษ)', 'Work Category (English)', 'name_en') || null });
     }
     if (dryRun) return res.json({ data: { dryRun: true, willImport: ok.length, rejected: bad, imported: 0 } });
@@ -1930,7 +2097,8 @@ router.post('/import/cost-categories', requireRole('admin'), importUpload.single
     const have = new Set((await query('select code from cost_categories')).rows.map((r) => String(r.code)));
     let added = 0; let updated = 0;
     for (const c of ok) {
-      if (have.has(c.code)) updated += 1; else added += 1;
+      if (!c.code) c.code = await nextCategoryCode();
+      if (have.has(c.code)) updated += 1; else { added += 1; have.add(c.code); }
       await query(
         `insert into cost_categories (code, name, name_en, is_active) values ($1,$2,$3,true)
          on conflict (code) do update set

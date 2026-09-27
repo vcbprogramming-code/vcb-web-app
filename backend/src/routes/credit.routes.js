@@ -747,12 +747,17 @@ router.post('/cash-plan/tbar/period', asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
-    // สูงสุด 5 ส่วนต่อเดือน — นับเฉพาะตอนเพิ่มส่วนใหม่ (แก้ของเดิมไม่กระทบ)
     const existing = (await client.query(
       'select * from cash_plans where project_id = $1 and month = $2 and kind = $3 order by period_idx',
       [d.projectId, d.month, kind])).rows;
-    const mine = d.id ? existing.find((x) => x.id === d.id) : existing.find((x) => x.period_idx === d.periodIdx);
-    if (!mine && existing.length >= tbar.MAX_PERIODS) {
+    // หาแถวที่จะแก้ด้วย id ทั้งฐาน ไม่ใช่แค่ในกลุ่ม (โครงการ · เดือน · ฉบับ) นี้ —
+    // การ "เปลี่ยนโครงการ" ของการ์ดคือการย้ายแถวเดิมไปโครงการใหม่ ถ้าหาเฉพาะใน
+    // กลุ่มใหม่จะไม่เจอแล้วกลายเป็นแถวซ้ำสองแถว
+    const mine = d.id
+      ? (await client.query('select * from cash_plans where id = $1', [d.id])).rows[0] || null
+      : existing.find((x) => x.period_idx === d.periodIdx) || null;
+    // สูงสุด 5 ส่วนต่อเดือน — นับเฉพาะแถวอื่นที่อยู่ในกลุ่มเป้าหมายอยู่แล้ว
+    if (existing.filter((x) => x.id !== (mine ? mine.id : null)).length >= tbar.MAX_PERIODS) {
       await client.query('rollback');
       throw new ApiError(400, `ใส่ได้สูงสุด ${tbar.MAX_PERIODS} ส่วนต่อเดือน`);
     }
@@ -973,6 +978,63 @@ router.post('/cash-plan/tbar/copy', asyncHandler(async (req, res) => {
   const amountById = new Map(outstanding.map((o) => [o.id, o.amount]));
   const pnSold = tbar.pnSoldThisMonth(made);
   res.status(201).json({ data: made.map((r) => tbarOut(r, { amountById, pnSold })) });
+}));
+
+/**
+ * POST /credit/cash-plan/tbar/mirror — ฉบับ "จริง" ตั้งต้นจากฉบับ "แผน"
+ *
+ * ระบบจริงทำให้เองตอนเปิดแท็บหักค่างานตามจริง (planMirrorFromPlan): โครงการไหน
+ * มีแผนแล้วแต่ยังไม่มีฉบับจริง ให้ลอกโครงสร้างพร้อมยอดมาเป็นจุดตั้งต้น แล้วผู้ใช้
+ * ค่อยแก้ให้ตรงกับที่เกิดขึ้นจริง — โครงการที่มีฉบับจริงอยู่แล้วไม่ถูกแตะ
+ * เรียกซ้ำกี่ครั้งก็ได้ ไม่เกิดของซ้ำ
+ */
+router.post('/cash-plan/tbar/mirror', asyncHandler(async (req, res) => {
+  const body = z.object({
+    month: z.string().regex(MONTH_RX), projectId: z.string().uuid().optional(),
+  }).safeParse(req.body);
+  if (!body.success) throw new ApiError(400, 'Invalid input', body.error.flatten());
+  const { month, projectId } = body.data;
+  const planRows = await tbarPeriods(month, 'plan', projectId || null);
+  const actualRows = await tbarPeriods(month, 'actual', projectId || null);
+  const hasActual = new Set(actualRows.map((r) => r.project_id));
+  const todo = planRows.filter((r) => !hasActual.has(r.project_id));
+  if (!todo.length) { res.json({ data: { mirrored: 0, projects: [] } }); return; }
+  const client = await pool.connect();
+  const projectsDone = new Set();
+  try {
+    await client.query('begin');
+    for (const p of todo) {
+      const row = (await client.query(
+        `insert into cash_plans (project_id, month, period, kind, period_idx, period_label, period_date,
+           period_type, income, work_ref, new_pn, new_pn_note, note, deductions_json, income_break,
+           extra_rows, aval_amount, show_all_due, pn_rate, deductions, available, created_by)
+         values ($1,$2,$3,'actual',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,
+                 $16,$17,$18,$19,$20,$21)
+         on conflict (project_id, month, period, kind) do nothing
+         returning *`,
+        [p.project_id, month, String(p.period_idx), p.period_idx, p.period_label || '', p.period_date,
+          p.period_type, Number(p.income) || 0, p.work_ref, Number(p.new_pn) || 0, p.new_pn_note, p.note,
+          JSON.stringify(p.deductions_json || []), JSON.stringify(p.income_break || {}),
+          JSON.stringify(p.extra_rows || []), Number(p.aval_amount) || 0, Boolean(p.show_all_due),
+          p.pn_rate == null ? tbar.DEFAULT_PN_RATE : Number(p.pn_rate),
+          Number(p.deductions) || 0, Number(p.available) || 0, req.profile.id])).rows[0];
+      if (row) {
+        await writePaidIds(client, row.id, p.project_id, p.paid_ids || []);
+        projectsDone.add(p.project_id);
+      }
+    }
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  if (projectsDone.size) {
+    await writeAudit({ actor: req.profile, action: 'create', target: 'cashplan-tbar', targetId: month,
+      note: `${month} · ตั้งต้นฉบับจริงจากฉบับแผน ${projectsDone.size} โครงการ` });
+  }
+  res.json({ data: { mirrored: todo.length, projects: [...projectsDone] } });
 }));
 
 /**

@@ -17,6 +17,7 @@ import OnboardingProgram from './pages/onboarding/Program.jsx';
 import Sop from './pages/sop/Sop.jsx';
 import SystemMap from './pages/sysmap/SystemMap.jsx';
 import Meetings from './pages/meetings/Meetings.jsx';
+import VerifyMeeting from './pages/meetings/VerifyMeeting.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { disabledPaths } from './config/nav.js';
 
@@ -39,6 +40,10 @@ export default function App() {
       {/* read-only copy for a สำเนาเรียน (CC) recipient — link from their email,
           no login and no account needed. Opens that one document only. */}
       <Route path="/doc/:token" element={<SharedDocument />} />
+      {/* ตรวจสอบความแท้ของรายงานการประชุมที่พิมพ์ออกมา — สแกน QR บนกระดาษ ไม่ต้อง
+          ลงชื่อเข้าใช้ เส้นทางแยกจาก /verify/:token ของ E-Memo เพราะกุญแจอยู่ต่าง
+          ตารางและหน้านี้ไม่มีสายอนุมัติให้แสดง (ดูหัวไฟล์ meetingVerify.routes.js) */}
+      <Route path="/mtg/:token" element={<VerifyMeeting />} />
 
       <Route
         element={

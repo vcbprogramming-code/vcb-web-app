@@ -56,11 +56,14 @@ const SERVER_TH = {
 };
 
 /** Build an Error carrying the HTTP status + friendly Thai message. */
-function apiError(message, { status, network = false, timeout = false } = {}) {
+function apiError(message, { status, network = false, timeout = false, details } = {}) {
   const err = new Error(SERVER_TH[message] || message);
   if (status != null) err.status = status;
   if (network) err.network = true;
   if (timeout) err.timeout = true;
+  // เซิร์ฟเวอร์ส่ง details มาให้หน้าจอแยกแยะเหตุผลได้ด้วยรหัส ไม่ต้องเดาจากข้อความไทย
+  // (ข้อความแก้คำหรือแปลได้ รหัสไม่แก้) เพิ่มเท่านั้น ไม่เปลี่ยนพฤติกรรมเดิมของใคร
+  if (details !== undefined) err.details = details;
   return err;
 }
 
@@ -123,7 +126,7 @@ export async function api(path, { method = 'GET', body, auth = true, timeoutMs }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     handleUnauthorized(res, auth);
-    throw apiError(data.error || `เกิดข้อผิดพลาด (${res.status})`, { status: res.status });
+    throw apiError(data.error || `เกิดข้อผิดพลาด (${res.status})`, { status: res.status, details: data.details });
   }
   return data;
 }

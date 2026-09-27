@@ -379,12 +379,15 @@ function Coverage({ d, today, cutoff, ahead, lockDays, jump, ccodes, cellTitle }
  * ถูกคลิกหลุดออกจากหน้าจอก่อนที่กล่องเลือกกิจกรรมจะวัดตำแหน่งได้ กล่องเลยไป
  * เกาะมุมซ้ายบนแทนที่จะโผล่ตรงช่องที่คลิก
  */
-function Slot({ val, field, isSecond, weekend, locked, unlocked, canEdit, cellDisplay, cellTitle, onOpen }) {
+function Slot({ val, field, isSecond, weekend, locked, unlocked, future, canEdit, cellDisplay, cellTitle, onOpen }) {
   const t = useT();
   const ph = isSecond ? '+ งานที่ 2' : (weekend ? 'วันหยุด' : '+');
   // ผู้ดูแลระบบแก้ช่องที่ล็อกได้เมื่อเปิดโหมดแก้ย้อนหลังไว้เท่านั้น
   const clickable = (!locked || unlocked) && canEdit;
-  const hint = locked && !unlocked ? t('เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้') : undefined;
+  // วันข้างหน้ากับวันที่เลยกำหนดไม่ใช่เรื่องเดียวกัน ถ้าบอกเหมือนกันคนจะไปกดปลดล็อก
+  // แล้วก็ยังกรอกไม่ได้ (ขอบบน "ไม่เกินพรุ่งนี้" ไม่มีใครปลดได้ รวมผู้ดูแลระบบ)
+  const hint = future ? t('ยังไม่ถึงกำหนด — บันทึกล่วงหน้าได้ถึงพรุ่งนี้เท่านั้น')
+    : locked && !unlocked ? t('เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบเปิดโหมดแก้ย้อนหลังได้') : undefined;
   return (
     <div
       data-slot={field}
@@ -462,22 +465,29 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                     const v = (d.entries[e.eid] || {})[day.date] || {};
                     const amVal = (op ? v.team : v.detail) || '';
                     const lv = leaveNote(v.note);
-                    const locked = day.date < cutoff || day.date > ahead;
+                    // อดีตที่เลยกำหนด กับ อนาคตที่ยังไม่ถึงกำหนด ต้องแยกกัน — โหมดแก้
+                    // ย้อนหลังของผู้ดูแลระบบปลดได้แค่อดีต เซิร์ฟเวอร์ปฏิเสธอนาคตกับทุกคน
+                    // เดิมเปิดโหมดแล้วช่องของวันข้างหน้ากดได้ด้วย เลือกงานเสร็จก็เจอ
+                    // ข้อความผิดพลาดเด้งขึ้นมา — ให้กดไม่ได้ตั้งแต่ต้นแล้วบอกเหตุผล
+                    const future = day.date > ahead;
+                    const pastLocked = day.date < cutoff;
+                    const locked = pastLocked || future;
+                    const canUnlock = isAdmin && unlocked && pastLocked && !future;
                     const isFocus = focus && focus.eid === e.eid && focus.date === day.date;
                     // a locked cell opened by an admin is an unlock edit — flag it so the save bypasses the window
-                    const onOpen = (field, rect) => openPicker(e.eid, day.date, field, rect, locked && isAdmin && unlocked);
+                    const onOpen = (field, rect) => openPicker(e.eid, day.date, field, rect, canUnlock);
                     return (
-                      <td key={day.date} data-cell={day.date} className={`relative rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked && !(isAdmin && unlocked) ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
+                      <td key={day.date} data-cell={day.date} className={`relative rounded border align-top ${day.weekend ? 'bg-amber-50/40 dark:bg-amber-500/10' : 'bg-white'} ${locked && !canUnlock ? 'opacity-60' : ''} ${isFocus ? 'border-brand ring-1 ring-brand' : 'border-slate-100'}`}>
                         {/* กุญแจเล็ก ๆ มุมขวาบน บอกว่าช่องนี้ล็อกแล้ว ไม่ใช่แค่จางเพราะว่าง */}
                         {locked && (
-                          <Icon name="lock" className={`pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 ${isAdmin && unlocked ? 'text-amber-500' : 'text-slate-300'}`} />
+                          <Icon name={future ? 'clock' : 'lock'} className={`pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 ${canUnlock ? 'text-amber-500' : 'text-slate-300'}`} />
                         )}
                         <Slot val={amVal} field={primaryField} isSecond={false} weekend={day.weekend} locked={locked}
-                          unlocked={isAdmin && unlocked} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
+                          unlocked={canUnlock} future={future} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
                         <Slot val={v.pm || ''} field="pm" isSecond weekend={day.weekend} locked={locked}
-                          unlocked={isAdmin && unlocked} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
+                          unlocked={canUnlock} future={future} canEdit={canEdit} cellDisplay={cellDisplay} cellTitle={cellTitle} onOpen={onOpen} />
                         {lv && (
-                          <div title={lv.ref ? `${t('จากคำขอลาเลขที่')} ${lv.ref}` : undefined}
+                          <div title={`${t('บันทึกอัตโนมัติจากคำขอลาที่อนุมัติแล้ว')}${lv.ref ? ` · ${lv.ref}` : ''}`}
                             className="mt-0.5 truncate rounded bg-indigo-50 px-1 text-[9px] font-medium leading-4 text-indigo-700">
                             ✓ {t(lv.type, null, 'leave')}
                           </div>
@@ -487,10 +497,13 @@ function Weekly({ d, today, cutoff, ahead, lockDays, weekStart, setWeekStart, fo
                             title={`${t('ย้ายเข้าจาก')} ${e.moved_in_from}`}>→ {t('ย้ายเข้า')}</div>
                         )}
                         {/* ช่องที่ถูกแก้หลังจากล็อกแล้ว — ระบบจริงทำเครื่องหมายไว้ให้ตรวจย้อนได้ */}
+                        {/* ป้ายนี้ต้องบอกวันที่แก้บนตัวป้ายเลย ไม่ใช่ซ่อนใน tooltip —
+                            คนตรวจย้อนหลังไล่ดูทีละช่องด้วยตา ไม่ได้เอาเมาส์จี้ทุกช่อง
+                            (ระบบจริงพิมพ์ "แก้ไขย้อนหลัง <วันที่> · <ผู้แก้>" ใต้ช่อง) */}
                         {d.edits?.[`${e.eid}|${day.date}`] && (
                           <div className="mt-0.5 truncate rounded bg-amber-50 px-1 text-[9px] font-medium leading-4 text-amber-700"
-                            title={`${t('แก้ไขย้อนหลัง')} ${d.edits[`${e.eid}|${day.date}`].date}${d.edits[`${e.eid}|${day.date}`].by ? ` · ${d.edits[`${e.eid}|${day.date}`].by}` : ''}`}>
-                            {t('แก้ย้อนหลัง')}
+                            title={`${t('แก้ไขย้อนหลัง')} ${d.edits[`${e.eid}|${day.date}`].date}${d.edits[`${e.eid}|${day.date}`].by ? ` · ${t('โดย')} ${d.edits[`${e.eid}|${day.date}`].by}` : ''}`}>
+                            {t('แก้ย้อนหลัง')} {d.edits[`${e.eid}|${day.date}`].date.slice(5)}
                           </div>
                         )}
                       </td>

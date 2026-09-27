@@ -9,13 +9,17 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
+import MeetingPaper from './MeetingPaper.jsx';
 import { useLang, useT } from '../../lib/i18n.jsx';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** One meeting: the body, what was attached, what the team said, and what it
  *  used to say before somebody changed it. */
-export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdit, onDelete, onChanged }) {
+export default function MeetingDetail({
+  id, canEdit, groups = [], readingSize = 'normal', refresh = 0,
+  onClose, onEdit, onDelete, onChanged,
+}) {
   const t = useT();
   const { lang } = useLang();
   const toast = useToast();
@@ -29,6 +33,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
   const [preview, setPreview] = useState(null);      // an older version being read
   const [filing, setFiling] = useState(false);
   const [note, setNote] = useState('');              // ความเห็นที่เขียนในลิ้นชัก
+  const [paper, setPaper] = useState(false);         // ตัวอย่างหน้ากระดาษ A4 ก่อนพิมพ์
 
   // ลิ้นชักไม่ได้ใช้ Modal (มันเป็นแถบข้างขวา ไม่ใช่กล่องกลางจอ) จึงไม่ได้ปุ่ม
   // Escape มาฟรี ๆ — ต้องดักเอง ไม่อย่างนั้นเปิดแล้วปิดด้วยแป้นพิมพ์ไม่ได้เลย
@@ -39,8 +44,11 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
     return () => document.removeEventListener('keydown', onKey, true);
   }, [activity]);
 
+  // refresh อยู่ในรายการพึ่งพาโดยเจตนา: หน้าแม่เพิ่มค่านี้หลังกล่องแก้ไขบันทึกสำเร็จ
+  // ซึ่งเป็นกรณีเดียวที่เนื้อหาเปลี่ยนโดยที่ id ไม่เปลี่ยน — ถ้าไม่มี เอกสารบนจอจะ
+  // ค้างอยู่ที่ข้อความก่อนแก้จนกว่าผู้ใช้จะปิดแล้วเปิดใหม่
   const load = useCallback(() => { setM(null); setError(null);
-    return meetingsApi.get(id).then((r) => setM(r.data)).catch((e) => setError(e.message)); }, [id]);
+    return meetingsApi.get(id).then((r) => setM(r.data)).catch((e) => setError(e.message)); }, [id, refresh]);
   useEffect(() => { load(); }, [load]);
 
   /** สิ่งที่เกิดกับเอกสารโดยไม่ได้แก้เนื้อหา เล่าเป็นภาษาคน ไม่ใช่ชื่อ action ดิบ
@@ -58,6 +66,9 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
       case 'attach': return `${t('แนบไฟล์')}${f ? ` · ${f}` : ''}`;
       case 'detach': return `${t('ลบไฟล์แนบ')}${f ? ` · ${f}` : ''}`;
       case 'move': return `${t('ย้ายโครงการ')}${g ? ` · ${g}` : ''}`;
+      // การกู้คืนต้องบอกว่ากู้มาจากครั้งที่เท่าไร ไม่ใช่แค่ว่า "กู้คืน" — คนอ่าน
+      // ประวัติกำลังตามว่าข้อความชุดไหนกลับมา
+      case 'restore': return `${t('กู้คืนเนื้อหา')}${a.details?.seq ? ` · ${t('จากฉบับก่อนแก้ครั้งที่')} ${a.details.seq}` : ''}`;
       default: return a.action;
     }
   };
@@ -131,38 +142,29 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
   };
 
   /**
-   * พิมพ์ / PDF
+   * เผยแพร่ / เก็บเป็นฉบับร่าง
    *
-   * พิมพ์จาก iframe ที่ถือสำเนาของเนื้อหา ไม่ใช่ window.print() ของหน้าทั้งหน้า
-   * — ไม่อย่างนั้นได้แถบข้าง รายการ และปุ่มทุกปุ่มติดไปในกระดาษด้วย และ srcdoc
-   * ต้องเป็น HTML ที่ฝังมาตรง ๆ ไม่ใช่ URL ของ API (iframe ที่ชี้ API ใช้ได้ตอน
-   * ทดสอบเครื่องตัวเองแต่ว่างเปล่าบนโปรดักชันเพราะ X-Frame-Options)
+   * ของเขามีคำสั่งนี้แยกเป็นของตัวเอง (setVisibility) ส่วนของเราเคยมีแค่ช่องติ๊ก
+   * ในกล่องแก้ไข ซึ่งบังคับให้คนที่อยากเผยแพร่อย่างเดียวต้องเปิดฟอร์มแก้ไขทั้งฉบับ
+   * แล้วกดบันทึก — และการกดบันทึกฟอร์มแก้ไขเป็นเส้นทางที่เก็บเวอร์ชันได้ด้วย
+   * การเผยแพร่จึงไปปนกับประวัติการแก้เนื้อหาโดยไม่มีใครตั้งใจ
    */
-  const printDoc = () => {
-    const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const meta = [m.group_name, meetingDateText(m, lang, t('ภาพรวม')), meetingTimeText(m)].filter(Boolean).join(' · ');
-    const html = `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
-      <title>${esc(m.title)}</title>
-      <style>
-        @page { size: A4; margin: 18mm 16mm; }
-        body { font-family: Sarabun, "Noto Sans Thai", system-ui, sans-serif; color:#0f172a; font-size:12pt; line-height:1.65; }
-        h1 { font-size:16pt; margin:0 0 4px; }
-        .meta { color:#64748b; font-size:10pt; margin:0 0 14px; }
-        table { border-collapse:collapse; width:100%; }
-        th, td { border:1px solid #cbd5e1; padding:5px 7px; font-size:11pt; }
-        img { max-width:100%; }
-      </style></head><body>
-      <h1>${esc(m.title)}</h1><p class="meta">${esc(meta)}</p>
-      ${m.content || ''}
-      </body></html>`;
-    const old = document.getElementById('mtg-print-frame');
-    if (old) old.remove();
-    const f = document.createElement('iframe');
-    f.id = 'mtg-print-frame';
-    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;';
-    f.srcdoc = html;
-    f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch { window.print(); } };
-    document.body.appendChild(f);
+  const togglePublish = () => act(
+    () => meetingsApi.update(m.id, { visible: !m.visible }),
+    m.visible ? 'เก็บเป็นฉบับร่างแล้ว' : 'เผยแพร่แล้ว'
+  );
+
+  /** กู้คืนเนื้อหาจากเวอร์ชันเก่า — ถามก่อน เพราะมันเขียนทับสิ่งที่อยู่บนจอ
+   *  (แต่เขียนทับแบบที่กู้กลับได้ เนื้อหาปัจจุบันถูกเก็บเป็นเวอร์ชันก่อนเสมอ) */
+  const restoreVersion = async (seq) => {
+    const ok = await confirm({
+      title: t('กู้คืนเนื้อหา'),
+      message: `${t('นำเนื้อหาของฉบับก่อนแก้ครั้งที่')} ${seq} ${t('กลับมาเป็นเนื้อหาปัจจุบัน?')}\n${t('เนื้อหาปัจจุบันจะถูกเก็บเป็นเวอร์ชันไว้ก่อน จึงกู้คืนกลับได้อีก · ชื่อเรื่องและวันที่ไม่ถูกเปลี่ยน')}`,
+      confirmLabel: t('กู้คืน'),
+    });
+    if (!ok) return;
+    setPreview(null);
+    await act(() => meetingsApi.restore(m.id, seq), 'กู้คืนเนื้อหาแล้ว');
   };
 
   const attach = async (file) => {
@@ -248,9 +250,18 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
           <button onClick={copyLink} className={tool}>
             <Icon name="link" className="h-4 w-4" /> {t('คัดลอกลิงก์')}
           </button>
-          <button onClick={printDoc} className={tool}>
+          {/* เปิดตัวอย่างหน้ากระดาษ A4 จริงก่อน ไม่ยิงกล่องพิมพ์ของระบบทันที: เอกสาร
+              ที่ออกจากที่นี่ไปถึงคนนอกองค์กร คนกดควรเห็นว่าหน้าตกที่ไหน หัวจดหมาย
+              และ QR อยู่ตรงไหน ก่อนจะเสียกระดาษหรือส่งไฟล์ออกไป */}
+          <button onClick={() => setPaper(true)} className={tool}>
             <Icon name="document" className="h-4 w-4" /> {t('พิมพ์ / PDF')}
           </button>
+          {canEdit && (
+            <button onClick={togglePublish} disabled={busy} className={tool}
+              title={m.visible ? t('ซ่อนจากผู้อื่น เก็บไว้เป็นฉบับร่าง') : t('เผยแพร่ให้ผู้ที่เข้าถึงโครงการนี้อ่านได้')}>
+              <Icon name="eye" className="h-4 w-4" /> {m.visible ? t('เก็บเป็นฉบับร่าง') : t('เผยแพร่')}
+            </button>
+          )}
           {canEdit && (
             <button onClick={() => onDelete(m)} className="ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-rose-500 transition hover:bg-rose-50">
               <Icon name="trash" className="h-4 w-4" /> {t('ลบ')}
@@ -260,8 +271,14 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
       </header>
 
       {/* Where this recording has been filed. It stays in its inbox either way —
-          filing adds a place to find it, it does not move it out of the archive. */}
-      {(m.is_inbox || (m.tags || []).length > 0) && (
+          filing adds a place to find it, it does not move it out of the archive.
+          แสดงกับทุกฉบับที่ผู้ใช้แก้ไขได้ ไม่ใช่เฉพาะที่มาจากกล่องรอจัดเก็บ: เซิร์ฟเวอร์
+          ของเรารับการจัดเก็บฉบับใดก็ได้อยู่แล้ว แต่หน้าจอเคยซ่อนทางเข้าไว้ ฉบับที่
+          คนพิมพ์เองในโครงการหนึ่งจึงไม่มีวิธีจัดเก็บเข้าโครงการที่สองเลย ทั้งที่การ
+          ประชุมที่เกี่ยวกับสองโครงการเป็นเรื่องปกติ (ของเขาจำกัดไว้เพราะการจัดเก็บ
+          คือขั้นตอน "เผยแพร่" ออกจากกล่องส่วนตัว ซึ่งไม่ใช่กรณีของฉบับที่อยู่ใน
+          โครงการอยู่แล้ว) */}
+      {(canEdit || m.is_inbox || (m.tags || []).length > 0) && (
         <section className="rounded-xl bg-slate-50 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-medium text-slate-500">{t('จัดเก็บเข้าโครงการ:')}</span>
@@ -306,7 +323,7 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
 
       {/* ปุ่มจัดเก็บเป็นปุ่มหลักในแถบเครื่องมือ แต่ถ้ายังไม่มีกล่องด้านบนให้เลือก
           ก็ต้องมี select ให้กดตรงนี้ ไม่ใช่กดปุ่มแล้วไม่เกิดอะไรขึ้น */}
-      {filing && !(m.is_inbox || (m.tags || []).length > 0) && (
+      {filing && !(canEdit || m.is_inbox || (m.tags || []).length > 0) && (
         <select autoFocus defaultValue="" disabled={busy}
           onChange={(e) => { const v = e.target.value; setFiling(false);
             if (v) act(() => meetingsApi.tag(m.id, v), 'จัดเก็บเข้าโครงการแล้ว'); }}
@@ -360,8 +377,11 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
         </p>
       )}
 
+      {/* data-size = ขนาดตัวอักษรที่เลือกในแผงตั้งค่า มีผลเฉพาะกล่องเนื้อหานี้
+          (กฎอยู่ใน index.css) ไม่ใช่ทั้งหน้า — ถ้าขยายทั้งหน้า สามคอลัมน์จะล้นจอ */}
       {m.content
-        ? <div className="mtg-body border-t border-slate-100 pt-4 text-[15px] leading-relaxed text-slate-800"
+        ? <div data-size={readingSize} data-testid="mtg-content"
+            className="mtg-body border-t border-slate-100 pt-4 text-[15px] leading-relaxed text-slate-800"
             dangerouslySetInnerHTML={{ __html: m.content }} />
         : <p className="border-t border-slate-100 pt-4 text-sm text-slate-400">{t('ยังไม่มีเนื้อหา')}</p>}
 
@@ -462,10 +482,19 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                   </span>
                 </span>
                 {m.versions?.length > 0 && (
-                  <button onClick={() => viewVersion(m.versions[m.versions.length - 1].seq)}
-                    className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                    {t('ดูฉบับแรก')}
-                  </button>
+                  <span className="flex shrink-0 gap-1">
+                    <button onClick={() => viewVersion(m.versions[m.versions.length - 1].seq)}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                      {t('ดูฉบับแรก')}
+                    </button>
+                    {canEdit && (
+                      <button onClick={() => restoreVersion(m.versions[m.versions.length - 1].seq)}
+                        title={t('นำเนื้อหาของฉบับแรกกลับมา')}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                        {t('กู้คืน')}
+                      </button>
+                    )}
+                  </span>
                 )}
               </div>
 
@@ -483,11 +512,20 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
                       <span className="block text-[11px] text-slate-400">{thaiDateTime(e.when)}</span>
                     </span>
                     {e.kind === 'edit' && (
-                      <button onClick={() => viewVersion(e.seq)}
-                        title={t('ดูว่าก่อนแก้ครั้งนี้เขียนไว้ว่าอย่างไร')}
-                        className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                        {t('ดู')}
-                      </button>
+                      <span className="flex shrink-0 gap-1">
+                        <button onClick={() => viewVersion(e.seq)}
+                          title={t('ดูว่าก่อนแก้ครั้งนี้เขียนไว้ว่าอย่างไร')}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                          {t('ดู')}
+                        </button>
+                        {canEdit && (
+                          <button onClick={() => restoreVersion(e.seq)}
+                            title={t('นำเนื้อหาของฉบับนี้กลับมาเป็นเนื้อหาปัจจุบัน')}
+                            className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                            {t('กู้คืน')}
+                          </button>
+                        )}
+                      </span>
                     )}
                     {e.kind === 'comment' && (e.authorId === profile?.id || profile?.role === 'admin') && (
                       <button onClick={() => dropComment({ id: e.id })}
@@ -522,15 +560,30 @@ export default function MeetingDetail({ id, canEdit, groups = [], onClose, onEdi
 
       {preview && (
         <Modal title={`${t('ฉบับก่อนแก้ครั้งที่')} ${preview.seq}`} onClose={() => setPreview(null)} size="lg"
-          footer={<button onClick={() => setPreview(null)} className="btn-outline">{t('ปิด')}</button>}>
+          footer={(
+            <>
+              {/* ปุ่มกู้คืนอยู่ตรงนี้ด้วย เพราะนี่คือจุดที่คนตัดสินใจ: เขาเพิ่งอ่าน
+                  ข้อความเก่าจบและรู้ว่าต้องการมันกลับ ไม่ควรต้องปิดกล่องแล้วไปหา
+                  ปุ่มในลิ้นชักอีกรอบ */}
+              {canEdit && (
+                <button onClick={() => restoreVersion(preview.seq)} disabled={busy} className="btn-outline disabled:opacity-50">
+                  {t('กู้คืนเนื้อหานี้')}
+                </button>
+              )}
+              <button onClick={() => setPreview(null)} className="btn-outline">{t('ปิด')}</button>
+            </>
+          )}>
           <p className="mb-3 text-sm text-slate-600">
             <b className="text-slate-800">{preview.title}</b>
             <span className="text-slate-500"> · {meetingDateText(preview, lang)}{preview.time_label ? ` · ${preview.time_label}` : ''}</span>
           </p>
-          <div className="mtg-body rounded-xl border border-slate-200 p-4 text-[15px] leading-relaxed text-slate-800"
+          <div data-size={readingSize}
+            className="mtg-body rounded-xl border border-slate-200 p-4 text-[15px] leading-relaxed text-slate-800"
             dangerouslySetInnerHTML={{ __html: preview.content }} />
         </Modal>
       )}
+
+      {paper && <MeetingPaper meeting={m} onClose={() => setPaper(false)} />}
     </article>
   );
 

@@ -17,13 +17,17 @@ import { enqueue, flush, onReconnect, pendingCount } from '../../lib/offlineQueu
  * man-days into the same cell would have made both harder to key.
  */
 const STATUSES = ['ปกติ', 'ล่วงเวลา', 'Standby', 'ลา', 'ขาดงาน'];
+// "future" = วันข้างหน้าที่ยังไม่ถึงกำหนด แยกจาก "locked" ที่เลยกำหนดไปแล้ว
+// (เซิร์ฟเวอร์ปฏิเสธการบันทึกเกินพรุ่งนี้กับทุกคน รวมผู้ดูแลระบบ) ถ้าไม่มีในตารางนี้
+// ป้ายจะว่างเปล่าและหน้าจอจะคิดว่าวันนั้นแก้ได้
 const STATE_CHIP = {
   editable: 'bg-emerald-50 text-emerald-700',
   'due-soon': 'bg-amber-50 text-amber-700',
+  future: 'bg-slate-100 text-slate-400',
   locked: 'bg-slate-100 text-slate-500',
   closed: 'bg-rose-50 text-rose-700',
 };
-const STATE_TH = { editable: 'แก้ไขได้', 'due-soon': 'ใกล้ครบกำหนด', locked: 'ล็อกแล้ว', closed: 'ปิดงวดแล้ว' };
+const STATE_TH = { editable: 'แก้ไขได้', 'due-soon': 'ใกล้ครบกำหนด', future: 'ยังไม่ถึงกำหนด', locked: 'ล็อกแล้ว', closed: 'ปิดงวดแล้ว' };
 
 /**
  * The file column. A count with nothing behind it told a user a file existed and
@@ -127,7 +131,7 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
     const d = (data?.days || []).find((x) => x.date === date);
     return d?.state || 'editable';
   }, [data, date]);
-  const locked = dayState === 'locked' || dayState === 'closed';
+  const locked = dayState === 'locked' || dayState === 'closed' || dayState === 'future';
   const rows = data?.employees || [];
   // site-month returns rows shaped {eid, name, emp_id} — not the employees
   // table's own column names — so read them as they arrive
@@ -283,7 +287,9 @@ export default function MandayView({ site, month, canEdit, isAdmin }) {
         <div className="card-sm border-l-4 border-rose-400 text-sm text-slate-700">
           {dayState === 'closed'
             ? t('เดือนนี้ปิดงวดแล้ว — แก้ไขข้อมูลไม่ได้ ต้องเปิดงวดคืนก่อน')
-            : t('วันที่นี้เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบปลดล็อกได้โดยระบุเหตุผล')}
+            : dayState === 'future'
+              ? t('ยังไม่ถึงกำหนด — บันทึกล่วงหน้าได้ถึงพรุ่งนี้เท่านั้น')
+              : t('วันที่นี้เลยกำหนดแก้ไขแล้ว — ผู้ดูแลระบบปลดล็อกได้โดยระบุเหตุผล')}
         </div>
       )}
 

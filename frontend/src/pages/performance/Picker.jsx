@@ -15,8 +15,14 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
   const [warn, setWarn] = useState('');
   const [q, setQ] = useState('');
   const [pending, setPending] = useState(null);
+  // แถวที่ลูกศรขึ้น-ลงชี้อยู่ — ของเขาเลื่อนด้วยคีย์บอร์ดแล้ว Enter เลือกได้ (oppKey)
+  // คนกรอกทั้งวันไม่ได้ยกมือไปจับเมาส์ทุกช่อง
+  const [kbd, setKbd] = useState(0);
   const boxRef = useRef(null);
   const searchRef = useRef(null);
+  const listRef = useRef(null);
+  // pick() ถูกสร้างใหม่ทุกครั้งที่วาด ผูก listener ตรง ๆ จะถอด-ติดใหม่ไม่หยุด
+  const pickRef = useRef(null);
   const [pos, setPos] = useState({ left: 0, top: 0, width: 360, maxHeight: 460 });
 
   useLayoutEffect(() => {
@@ -80,10 +86,42 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
 
   const groups = {}; const order = [];
   filtered.forEach((it) => {
+    // 'อื่น ๆ' ตรงนี้เป็นหัวกลุ่มบนจอล้วน ๆ (กิจกรรมที่ไม่ได้ระบุหมวดหมู่) ไม่ได้ถูก
+    // เก็บลงฐานและไม่ได้อ่านกลับ จึงเว้นวรรคตามหลักภาษาไทยได้ — ต่างจากประเภทการลา
+    // 'อื่นๆ' ที่เป็นค่า ต้องสะกดตรงตัวอักษรกับระบบจริง (ดู LEAVE_TYPES_TH)
     const c = step === 1 ? (String(it.category || '').trim() || 'อื่น ๆ') : 'หมวดงาน';
     if (!groups[c]) { groups[c] = []; order.push(c); }
     groups[c].push(it);
   });
+  // ลำดับแบนตามที่ตาเห็นจริง (เรียงตามกลุ่ม) ลูกศรจึงเดินตามลำดับบนจอ
+  const flat = order.flatMap((c) => groups[c]);
+
+  // ลูกศรขึ้น-ลง เลื่อนแถวที่ชี้ · Enter เลือกแถวนั้น — เหมือน oppKey ของระบบจริง
+  // ผูกไว้หลังจากคำนวณ flat แล้ว เพราะต้องรู้ว่ามีกี่แถวจริง ๆ หลังกรองคำค้น
+  useEffect(() => {
+    const onNav = (e) => {
+      if (!flat.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setKbd((i) => {
+          const n = e.key === 'ArrowDown' ? i + 1 : i - 1;
+          return (n + flat.length) % flat.length;
+        });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        pickRef.current?.(flat[Math.min(kbd, flat.length - 1)]);
+      }
+    };
+    document.addEventListener('keydown', onNav);
+    return () => document.removeEventListener('keydown', onNav);
+  }, [flat, kbd]);
+  // พิมพ์คำค้นใหม่แล้วรายการเปลี่ยน ตัวชี้ต้องกลับไปแถวแรก ไม่ใช่ค้างเลยท้ายรายการ
+  useEffect(() => { setKbd(0); }, [q, step]);
+  // เลื่อนแถวที่ชี้ให้อยู่ในสายตา ไม่งั้นกดลูกศรลงไปเรื่อย ๆ แล้วไม่เห็นว่าอยู่ไหน
+  useEffect(() => {
+    const el = listRef.current?.querySelector('[data-kbd="1"]');
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [kbd]);
 
   const pick = (it) => {
     if (step === 1) {
@@ -98,17 +136,31 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
       const oneToOne = (it.mapping || 'one-to-many') === 'one-to-one';
       if (oneToOne) { onApply(it.fixed_cost ? `${it.code} / ${it.fixed_cost}` : it.code); return; }
       if (only.length === 1) { onApply(`${it.code} / ${only[0]}`); return; }
-      setPending(it); setStep(2); setQ('');
+      // ยังไม่มีทะเบียนหมวดงานเลย — ขั้นที่สองจะเป็นรายการเปล่าที่ไปต่อไม่ได้
+      // ระบบจริงลงรหัสงานเปล่าให้แล้วบอกทางไปเพิ่มหมวดงาน ทำเหมือนกัน ไม่ใช่
+      // ปล่อยให้คนกรอกค้างอยู่หน้ารายการว่างโดยไม่รู้ว่าต้องทำอะไร
+      if (!categories.length) {
+        onApply(it.code);
+        return;
+      }
+      setPending(it); setStep(2); setQ(''); setKbd(0);
     } else {
       onApply(`${pending ? pending.code : ''} / ${it.code}`);
     }
   };
+  pickRef.current = pick;
 
   return (
     <div ref={boxRef} className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
       style={{ left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxHeight }}>
       {warn && (
         <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{warn}</div>
+      )}
+      {/* ยังไม่มีทะเบียนหมวดงาน — บอกล่วงหน้าว่าจะได้แต่รหัสงาน และบอกทางไปเพิ่ม */}
+      {step === 1 && !categories.length && (
+        <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {t('ยังไม่มีรายการหมวดงาน — เพิ่มได้ที่ ดัชนีงาน › แท็บ หมวดงาน')}
+        </div>
       )}
       <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${step === 2 ? 'cursor-pointer text-brand' : 'text-slate-700'} bg-slate-50 border-b border-slate-200`}
         onMouseDown={(e) => { e.preventDefault(); if (step === 2) { setStep(1); setQ(''); } }}>
@@ -129,19 +181,22 @@ export default function Picker({ rect, activities, categories, siblingCode = '',
         <input ref={searchRef} type="text" placeholder={t('ค้นหา…')} autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)}
           className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
         <span className="shrink-0 text-[11px] text-slate-400">{filtered.length}/{items.length}</span>
-        <button onMouseDown={(e) => { e.preventDefault(); onApply(''); }} className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">{t('ล้าง')}</button>
+        <button onMouseDown={(e) => { e.preventDefault(); onApply(''); }} title={t('ล้างเซลล์')}
+          className="shrink-0 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 hover:bg-slate-50">{t('ล้าง')}</button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-1">
         {order.length === 0
-          ? <div className="px-3 py-6 text-center text-sm text-slate-400">{t('ไม่พบรายการ "')}{q}"</div>
+          ? <div className="px-3 py-6 text-center text-sm text-slate-400">{t('ไม่พบรายการที่ตรงกับ “{q}”', { q })}</div>
           : order.map((c) => (
             <div key={c}>
               <div className="sticky top-0 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{c}</div>
               {groups[c].map((it) => {
                 const oneToOne = step === 1 && (it.mapping || 'one-to-many') === 'one-to-one';
+                const onKbd = flat[Math.min(kbd, flat.length - 1)] === it;
                 return (
-                  <div key={it.code} data-pick-code={it.code} onMouseDown={(e) => { e.preventDefault(); pick(it); }}
-                    className="cursor-pointer px-3 py-1.5 hover:bg-brand-tint">
+                  <div key={it.code} data-pick-code={it.code} data-kbd={onKbd ? '1' : undefined}
+                    onMouseDown={(e) => { e.preventDefault(); pick(it); }}
+                    className={`cursor-pointer px-3 py-1.5 hover:bg-brand-tint ${onKbd ? 'bg-brand-tint' : ''}`}>
                     <div className="flex items-center gap-1.5 text-sm text-slate-800">
                       {it.code && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{it.code}</span>}
                       {step === 1 && it.code && (

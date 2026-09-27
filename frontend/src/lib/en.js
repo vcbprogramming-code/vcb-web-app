@@ -125,6 +125,8 @@ export const EN = {
   'ส่วนที่เกี่ยวข้อง': 'Related to',
   '— เลือกส่วนที่เกี่ยวข้อง —': '— Choose an area —',
   'อื่น ๆ': 'Other',
+  // ประเภทการลา สะกดตรงตัวอักษรกับระบบจริง (เป็นค่าที่เขียนลงโน้ต [LV] ไม่ใช่แค่คำบนจอ)
+  'อื่นๆ': 'Other',
   'รายละเอียด': 'Details',
   'อธิบายปัญหาหรือข้อสงสัย…': 'Describe the problem or question…',
   'เดือนก่อนหน้า': 'Previous month',
@@ -504,6 +506,75 @@ export const EN = {
   'พบ': 'Found',
   'ฉบับ': 'items',
   'เลือกรายงานทางซ้ายเพื่ออ่าน': 'Choose minutes on the left to read them',
+
+  // ── รายงานการประชุม: เส้นเวลา ─────────────────────────────────────────────
+  'เส้นเวลา': 'Timeline',
+  'มุมมองเส้นเวลาของทุกโครงการ': 'Timeline view across every project',
+  'กำลังโหลดเส้นเวลา…': 'Loading the timeline…',
+  'ปีก่อนหน้า': 'Previous year',
+  'ปีถัดไป': 'Next year',
+  'แสดงโครงการนี้': 'Show this project',
+  'ซ่อนโครงการนี้': 'Hide this project',
+  'การประชุมวันที่': 'Meetings on',
+  'ไม่มีการประชุมที่มีวันที่ในโครงการที่เลือกไว้':
+    'No dated meetings in the projects currently shown',
+  'ไม่มีการประชุมในปี': 'No meetings in',
+
+  // ── รายงานการประชุม: หน้ากระดาษ A4 และ QR ตรวจสอบความแท้ ──────────────────
+  'ตัวอย่างก่อนพิมพ์': 'Print preview',
+  'กำลังจัดหน้ากระดาษ…': 'Laying out the pages…',
+  'มี QR ตรวจสอบความแท้ทุกหน้า': 'Every page carries an authenticity QR code',
+  'ฉบับนี้ยังไม่เผยแพร่ — QR จะยังตรวจสอบไม่ได้จนกดเผยแพร่':
+    'These minutes are still a draft — the QR code will not verify until they are published',
+  'ยังไม่มี QR สำหรับฉบับนี้': 'No QR code for these minutes yet',
+  'QR ตรวจสอบความแท้': 'Authenticity QR code',
+  'คัดลอกลิงก์ตรวจสอบ': 'Copy the verification link',
+  'คัดลอกลิงก์ตรวจสอบแล้ว': 'Verification link copied',
+  'ขอบกระดาษ A4 · บน 2.7 ซม. · ซ้ายขวา 17 มม. · ล่าง 2 ซม.':
+    'A4 margins · top 2.7 cm · sides 17 mm · bottom 2 cm',
+
+  // ── รายงานการประชุม: หน้าตรวจสอบสาธารณะ (สแกน QR บนกระดาษ) ────────────────
+  'VCB รายงานการประชุม · ตรวจสอบเอกสาร': 'VCB Meeting Minutes · document check',
+  'QR หรือลิงก์อาจไม่ถูกต้อง หรือรายงานฉบับนี้ถูกลบออกจากระบบแล้ว':
+    'The QR code or link may be wrong, or these minutes have been removed from the system.',
+  'เอกสารนี้ออกจากระบบจริง': 'This document did come from our system',
+  'ข้อมูลด้านล่างอ่านจากฐานข้อมูลของบริษัทโดยตรง ณ เวลาที่เปิดหน้านี้':
+    'What follows is read straight from the company database, as of the moment this page opened.',
+  'วันประชุม': 'Meeting date',
+  'ปรับปรุงล่าสุด': 'Last updated',
+  'แก้ไขเนื้อหามาแล้ว': 'Body edited',
+  'ครั้ง': 'times',
+  'ยังไม่เคยแก้ไข': 'Never edited',
+  'เนื้อหาฉบับนี้ถูกแก้ไขหลังสร้าง หากกระดาษที่ท่านถืออยู่พิมพ์ไว้ก่อนวันที่ปรับปรุงล่าสุด โปรดขอฉบับปัจจุบันจากผู้บันทึก':
+    'The body has been edited since it was created. If the copy in your hand was printed before the date above, please ask the recorder for the current version.',
+  'หน้านี้แสดงเฉพาะข้อมูลที่ใช้ยืนยันความถูกต้องของเอกสาร ไม่แสดงเนื้อหาการประชุม':
+    'This page shows only what is needed to confirm the document is genuine. It never shows the minutes themselves.',
+
+  // ── รายงานการประชุม: เผยแพร่ / เก็บเป็นร่าง และการกู้คืนเวอร์ชัน ────────────
+  'ซ่อนจากผู้อื่น เก็บไว้เป็นฉบับร่าง': 'Hide from others and keep as a draft',
+  'เผยแพร่ให้ผู้ที่เข้าถึงโครงการนี้อ่านได้':
+    'Publish so everyone with access to this project can read it',
+  'กู้คืนเนื้อหา': 'Restore the body',
+  'กู้คืนเนื้อหานี้': 'Restore this body',
+  'จากฉบับก่อนแก้ครั้งที่': 'from the version before edit',
+  'นำเนื้อหาของฉบับก่อนแก้ครั้งที่': 'Bring back the body from before edit',
+  'กลับมาเป็นเนื้อหาปัจจุบัน?': 'as the current body?',
+  'เนื้อหาปัจจุบันจะถูกเก็บเป็นเวอร์ชันไว้ก่อน จึงกู้คืนกลับได้อีก · ชื่อเรื่องและวันที่ไม่ถูกเปลี่ยน':
+    'The current body is saved as a version first, so this can be undone · the title and date are left alone',
+  'นำเนื้อหาของฉบับแรกกลับมา': 'Bring back the body of the first version',
+  'นำเนื้อหาของฉบับนี้กลับมาเป็นเนื้อหาปัจจุบัน': 'Make this body the current one',
+
+  // ── รายงานการประชุม: แผงตั้งค่าของโมดูล ──────────────────────────────────
+  'เข้าสู่ระบบโดย': 'Signed in as',
+  'ภาษา': 'Language',
+  'ขนาดตัวอักษร': 'Reading size',
+  'มีผลกับเนื้อหาบันทึกการประชุมเท่านั้น และจำไว้เฉพาะเครื่องนี้':
+    'Applies to the body of the minutes only, and is remembered on this device',
+  'สิทธิ์โครงการ': 'Project access',
+  'ผู้ดูแล': 'Administrator',
+  'บัญชีนี้เป็นผู้ดูแลระบบ': 'This account is an administrator',
+  'ติดต่อผู้ดูแลระบบได้จากปุ่มช่วยเหลือบนหัวแอป':
+    'Reach an administrator from the help button in the app header',
 
   // ── ตั้งค่า: ประกาศ บริษัท รหัสเอกสาร ประเภทเอกสาร ───────────────────────
   'กรุณากรอกหัวข้อ': 'Please enter a title',
@@ -1717,6 +1788,22 @@ export const EN = {
   'ปกติหนึ่งวันเลือกงานเดียว ถ้าทำสองงานให้เพิ่มที่ช่อง “+ งานที่ 2” — หนึ่งวันเท่ากับหนึ่งวันทำงานเสมอ ถ้าทำสองงานจะนับงานละครึ่งวัน': 'One task per day is the norm; for a second task use “+ งานที่ 2”. A day is always one man-day — two tasks count half each.',
   'คำขอรออนุมัติ': 'requests awaiting approval',
   'ล็อก (อ่านอย่างเดียว · เกิน {n} วัน)': 'Locked (read-only · older than {n} days)',
+
+  // ── ไล่ทีละ user flow เทียบกับระบบจริง (2026-09-27) ──────────────────────
+  'ยังไม่ถึงกำหนด — บันทึกล่วงหน้าได้ถึงพรุ่งนี้เท่านั้น': 'Not due yet — you can log up to tomorrow only',
+  'ยังไม่มีรายการหมวดงาน — เพิ่มได้ที่ ดัชนีงาน › แท็บ หมวดงาน':
+    'No work categories yet — add them under Work Index › Work Category',
+  'บันทึกอัตโนมัติจากคำขอลาที่อนุมัติแล้ว': 'Filled automatically from an approved leave request',
+  'ไม่พบรายการที่ตรงกับ “{q}”': 'Nothing matches “{q}”',
+  'ล้างเซลล์': 'Clear this cell',
+  // รหัสพนักงานซ้ำ — ทะเบียนจริงของลูกค้ามีรหัสซ้ำอยู่ 35 รหัส จึงถามยืนยันไม่ใช่ปฏิเสธ
+  'รหัสพนักงานซ้ำ': 'Duplicate employee code',
+  'ถ้ายืนยัน ระบบจะบันทึกให้โดยยังแสดงรหัสนี้ตามเดิมทั้งบนหน้าจอและในไฟล์ Excel':
+    'If you confirm, the record is saved and this code still shows as-is on screen and in Excel.',
+  'ยืนยัน เป็นคนละคน': 'Confirm — a different person',
+  'ยังไม่ถึงกำหนด': 'Not due yet',
+  // ป้ายสถานะของใบลา — อ่านเป็นผลลัพธ์ ไม่ใช่คำสั่ง
+  'status::รอดำเนินการ': 'Pending',
   // ── ชื่อเมนูตามระบบจริง (2026-09-27)
   'แดชบอร์ด': 'Dashboard',
   'บันทึกงาน': 'Work log',
@@ -2287,9 +2374,25 @@ export const EN = {
   'คุณผ่านโปรแกรมปฐมนิเทศ 90 วันเต็มรูปแบบเรียบร้อยแล้ว': 'You\u2019ve completed the full 90-day onboarding program',
   'ไปหน้าสำเร็จการปฐมนิเทศ': 'Go to Completion',
 
+  // หน้าเนื้อหาของพอร์ทัล (แนะนำแผนก · รู้จักทีมของเรา · ชีวิตในไซต์งาน · ผังองค์กร)
+  //
+  // เนื้อหาของหน้าพวกนี้ไม่ได้อยู่ในพจนานุกรมนี้ — มันมาจากฐานข้อมูลเป็นคู่ภาษา
+  // (x / x_th) แล้วเลือกด้วย pick() ตรงจุดที่วาด และส่วนใหญ่ "ไม่มีคำแปลไทย" อยู่
+  // แล้วในระบบของลูกค้าเอง ที่อยู่ในนี้คือคำของหน้าจอ *เรา* ล้วน ๆ
+  'ทำความรู้จักบริษัท': 'About the company',
+  'มุมมองโครงสร้างบริษัท': 'Company structure view',
+  'กางทั้งหมด': 'Expand all',
+  'ย่อทั้งหมด': 'Collapse all',
+  '{n} โครงการ': '{n} projects',
+  'ภาพถัดไป': 'Next image',
+  'ดูรายละเอียดแผนก': 'View department',
+  'ยังล็อกอยู่': 'Still locked',
+  'เปิดหน้านี้ไม่สำเร็จ': 'This page could not be opened',
+
   // หน้าสำเร็จการปฐมนิเทศ และแบบประเมินที่พิมพ์ออกมาเซ็น
   'ยินดีต้อนรับสู่ทีมของเราอย่างเป็นทางการ!': 'Welcome, officially, to the team!',
   'ยังไม่เสร็จ': 'Not finished yet',
+  'กลับไปที่เช็กลิสต์ของคุณ': 'Return to your checklist',
   'หน้านี้จะปลดล็อกเมื่อทุกข้อในเช็กลิสต์ครบทั้งสามระยะของแผนกคุณเสร็จสมบูรณ์':
     'This page unlocks once every checklist item across all three phases of your department is complete.',
   'พิมพ์แบบประเมินการปฐมนิเทศ': 'Print Completion Form',
@@ -2502,4 +2605,144 @@ export const EN = {
   'เร็ว ๆ นี้': 'Soon',
   'ปิดเอกสาร': 'Close the record',
   'ติ๊ก': 'Tick list',
+  // ── credit T-bar — 2026-09-27 ─────────────────────────────────────────────
+  // แผนการเงิน (T-bar) · หักค่างานตามจริง · ผลต่าง — คำไทยทุกคำมาจากระบบจริงของ
+  // ลูกค้า ฝั่งอังกฤษจึงใช้คำที่ฝ่ายการเงินใช้คุยกับธนาคาร (P/N, T/L, Aval, งวด =
+  // installment) ชื่อรายการหักคงตัวย่อ TL/ML/PN ไว้ เพราะนั่นคือชื่อวงเงินจริง
+  'รับ · Cash in': 'Cash in',
+  'จ่าย · Cash out': 'Cash out',
+  'สุทธิ · Net': 'Net',
+  'สุทธิงวดนี้ / Net': 'Net this section',
+  'รวมรับ': 'Total in',
+  'รวมจ่าย': 'Total out',
+  // คงเหลือสุทธิ ที่อื่นแปลว่า Net available (วงเงินที่เบิกได้) ใน T-bar หมายถึง
+  // เงินที่เหลือหลังรับหักจ่าย จึงแยกด้วย ctx ไม่ให้ทับกัน
+  'tbar::คงเหลือสุทธิ': 'Net remaining',
+  'รวมทุก T-bar (Total all)': 'Total all T-bars',
+  'รวมทุกโครงการ': 'All projects',
+  'รับ': 'In',
+  'จ่าย': 'Out',
+  'Export T-bar': 'Export T-bar',
+  'ส่งออก T-bar เป็น Excel': 'Export the T-bar to Excel',
+  // การ์ดเริ่มต้นและช่องเลือกโครงการ
+  '① เริ่มต้น': '① Start here',
+  'เลือกโครงการ': 'Choose a project',
+  'เลือกโครงการเพื่อสร้างแผน 3 ส่วน พร้อม B/E + P/N ที่ครบกำหนดเดือนนี้':
+    'Pick a project to create the 3 sections, with the B/E + P/N falling due this month',
+  '— เลือกโครงการเพื่อโหลดรายการ —': '— Choose a project to load its items —',
+  'ทุกโครงการมีแผนในเดือนนี้แล้ว': 'Every project already has a plan this month',
+  'ทุกโครงการมีแผนแล้ว': 'Every project already has a plan',
+  'เพิ่มโครงการ {p} แล้ว': 'Project {p} added',
+  'กำลังเพิ่มโครงการ': 'Adding the project',
+  'เลือกโครงการแรกจากการ์ด “เริ่มต้น” ด้านล่างก่อน': 'Pick the first project from the “Start here” card below',
+  'โครงการนี้มีอยู่ในแผนเดือนนี้แล้ว': 'That project is already in this month’s plan',
+  'เปลี่ยนโครงการ — เก็บโครงสร้าง 3 ส่วน แต่เปลี่ยนชื่อโครงการ':
+    'Switch project — keeps the sections, changes which project they belong to',
+  // ปุ่มบนหัวการ์ดและการจัดการส่วน
+  'เพิ่มส่วน': 'Add section',
+  'เพิ่มส่วนแล้ว': 'Section added',
+  'เพิ่มไม่สำเร็จ': 'Could not add',
+  'ใส่ได้สูงสุด 5 ส่วนต่อเดือน': 'At most 5 sections per month',
+  'คัดลอกจากเดือนก่อน': 'Copy from last month',
+  'คัดลอกจากเดือนก่อนแล้ว': 'Copied from last month',
+  'ลบ T-bar ของโครงการนี้ทั้งหมด': 'Delete this project’s whole T-bar',
+  '{code} · {n} ส่วน': '{code} · {n} sections',
+  'ลบส่วนนี้': 'Delete this section',
+  'ลบส่วนนี้?': 'Delete this section?',
+  'ยังไม่มีส่วน — กด ＋ เพิ่มส่วน เพื่อเริ่ม': 'No sections yet — press ＋ Add section to start',
+  'เลือกประเภทงวดสำหรับ': 'Choose the section type for',
+  'งวดผสม': 'Mixed section',
+  'ขอเบิก P/N': 'Draw P/N',
+  'ขอเบิก P/N ค่างาน': 'Draw P/N · work value',
+  'ขอเบิก P/N Workdone': 'Draw P/N · Workdone',
+  'เบิก P/N เข้าโครงการ จากค่างาน/เงินประกัน/ผลงานแล้วเสร็จ':
+    'Draw P/N into the project against work value / retention / completed work',
+  'รับเงินค่างาน + หักหนี้': 'Work payment received + deductions',
+  'รับชำระค่างาน หักด้วย TL / ML / PN / Segment': 'Work payment received, less T/L · M/L · P/N · Segment',
+  'ขอออก Aval จัดสรร': 'Issue allocated Aval',
+  'ออก Aval (B/E) จ่ายผู้ขาย/วัสดุ': 'Issue an Aval (B/E) to pay a supplier or for materials',
+  'วันที่ส่งงาน': 'Work submitted on',
+  'งวดที่': 'Installment',
+  // ตารางซ้าย — ขอเบิก P/N
+  'คำนวณ': 'Calculated',
+  'tbar::จำนวน': 'Amount',
+  // ชื่อกำกับช่องกรอกแต่ละช่องของตารางซ้าย — ต้องบอกได้ว่าเป็นตัวเลขอะไร
+  'ค่างานที่ส่ง': 'Work value submitted',
+  'ค่า segment CVE': 'CVE segment charge',
+  'PN ที่ขายไว้': 'P/N already sold',
+  'เงินประกันผลงาน': 'Retention',
+  'ผลงานที่ทำได้': 'Work done',
+  'ส่งงานงวด {n} (ค่างานที่ส่ง)': 'Work submitted, installment {n} (value submitted)',
+  'หัก ค่า segment CVE': 'Less CVE segment charge',
+  'เหลือค่างวด {n}': 'Installment {n} balance',
+  '(ค่างาน − 60% seg)': '(work value − 60% segment)',
+  'หัก PN ที่ขายไว้ (เดือนก่อน)': 'Less P/N already sold (last month)',
+  'จะคงเหลือ P/N ที่ขายได้': 'P/N still sellable',
+  '(min − PN ขายไว้)': '(min − P/N already sold)',
+  'ขาย PN RT งวด {n} (เงินประกัน)': 'Sell retention P/N, installment {n}',
+  'รวม P/N ที่ขาย': 'Total P/N sold',
+  'ผลงานที่ทำได้ งวด {n} (Workdone)': 'Work done, installment {n} (Workdone)',
+  'ยังไม่ถึงงวดเบิกกับกรมทางหลวง · ธนาคารสนับสนุนล่วงหน้า · จากรายงานความก้าวหน้า/ใบวิทยุ':
+    'Not yet a claimable installment with the Highways Department · financed in advance by the bank · from the progress report',
+  // ตารางซ้าย — รับเงินค่างาน + หักหนี้
+  'รับเงินค่างานสุทธิ': 'Net work payment received',
+  'หัก TL': 'Less T/L',
+  'หัก ML': 'Less M/L',
+  'หัก PN': 'Less P/N',
+  'หัก PN ขอเบิกใหม่': 'Less newly drawn P/N',
+  'หัก Segment CVE': 'Less CVE Segment',
+  '(auto 15%)': '(auto 15%)',
+  '(auto 1.5%)': '(auto 1.5%)',
+  '(PN ต่อค่างานงวดนี้ · auto จาก P/N ที่ขาย)': '(P/N against this installment · auto from the P/N sold)',
+  '(PN Work Done ของงวดก่อน)': '(last installment’s Work Done P/N)',
+  // รายรับจากแหล่งอื่น
+  'เพิ่มรายรับจากแหล่งอื่น': 'Add income from another source',
+  'แหล่งที่มา…': 'Source…',
+  // ดอกเบี้ย P/N
+  'ดอกเบี้ย P/N ที่ต้องจ่าย': 'P/N interest payable',
+  'อัตรา': 'rate',
+  '%/ปี': '%/yr',
+  'อัตราดอกเบี้ยต่อปี (ตั้งได้ต่อโครงการ)': 'Annual interest rate (set per project)',
+  'ยอด P/N': 'P/N amount',
+  'ดอกเบี้ย': 'Interest',
+  'รวมที่ต้องจ่าย': 'Total payable',
+  'P/N ที่ขายได้': 'P/N sold',
+  'P/N RT (เงินประกัน)': 'Retention P/N',
+  // ตารางขวา — ตั๋วที่ส่วนนี้จ่าย
+  // ครบ ที่อื่นแปลว่า Complete — คอลัมน์นี้คือวันครบกำหนด
+  'tbar::ครบ': 'Due',
+  'บันทึกไม่สำเร็จ': 'Could not save',
+  'กำลังโหลด': 'Loading',
+  'กดเพื่อย่อ/ขยายรายการ': 'Click to collapse or expand the list',
+  'ย้ายไปส่วน {n}': 'Move to section {n}',
+  'ไม่ชำระงวดนี้': 'Do not pay this section',
+  'ตัดออกจากส่วนนี้': 'Remove from this section',
+  'ไม่มีรายการครบกำหนดในเดือนนี้': 'Nothing falls due this month',
+  'ไม่มีรายการในส่วนนี้': 'No items in this section',
+  'กด ＋ เพิ่ม': 'press ＋ Add',
+  'เลือกรายการที่จะเพิ่มเข้าส่วนนี้': 'Choose an item to add to this section',
+  'ล่วงหน้า (ยังไม่ครบ — ชำระก่อน)': 'Ahead of time (not yet due — paid early)',
+  'ไม่พบส่วนปลายทาง': 'Target section not found',
+  // แท็บผลต่าง
+  'ผลต่าง (แผน vs จริง)': 'Variance (plan vs actual)',
+  'ยังไม่มีข้อมูลแผน/จริงในเดือนนี้': 'No plan or actual figures for this month yet',
+  'รับเงิน (Received)': 'Received',
+  'หักจ่าย (Deducted)': 'Deducted',
+  'คงเหลือสุทธิ (Net)': 'Net',
+  'แผน': 'Plan',
+  'จริง': 'Actual',
+
+  // ── sop — หน้าต่างแก้ไขหัวเอกสาร (ตามระบบจริงของลูกค้า) ──────────────────
+  'แก้ไขหัวเอกสาร': 'Edit document header',
+  'แก้ไขหัวเอกสาร · Edit document header': 'Edit document header',
+  'ชื่อเอกสาร *': 'Document title *',
+  'คำบรรยายใต้ชื่อ': 'Subtitle',
+  'มีผล': 'Effective',
+  'เช่น เมษายน 2569': 'e.g. April 2026',
+  'คู่มืออ้างอิง': 'Reference manual',
+  'ขอบเขต': 'Scope',
+  'วัตถุประสงค์': 'Purpose',
+  'บรรทัดละหนึ่งข้อ': 'One note per line',
+  'กรุณากรอกชื่อเอกสาร': 'Enter the document title',
+  'บันทึกหัวเอกสารแล้ว': 'Document header saved',
 };

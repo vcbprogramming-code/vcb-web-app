@@ -4,6 +4,7 @@ import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import { useConfirm } from '../../components/Confirm.jsx';
 import { useT } from '../../lib/i18n.jsx';
+import { projectLabel } from './shared.jsx';
 
 function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved, kind = 'plan' }) {
   const t = useT();
@@ -66,8 +67,8 @@ function CashPlanModal({ row, projects, defaultMonth, onClose, onSaved, kind = '
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('โครงการ')} <span className="text-red-500">*</span></label>
-            <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field">
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
+            <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field" title={t('โครงการ')}>
+              {projects.map((p) => <option key={p.id} value={p.id}>{projectLabel(p)}</option>)}
             </select>
           </div>
           <div>
@@ -138,11 +139,12 @@ export default function CashPlanTab({ projects, onChanged, kind = 'plan' }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="field !w-auto">
+        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="field !w-auto" title={t('โครงการ')}>
           <option value="">{t('ทุกโครงการ')}</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
+          {/* ป้ายชื่อโครงการรูปแบบเดียวกันทุกแท็บ */}
+          {projects.map((p) => <option key={p.id} value={p.id}>{projectLabel(p)}</option>)}
         </select>
-        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="field !w-auto" />
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="field !w-auto" title={t('เดือน')} />
         <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มงวด')}</button>
       </div>
 

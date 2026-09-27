@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { programApi } from '../../lib/onboardingProgram.js';
+import { programApi, pick } from '../../lib/onboardingProgram.js';
 import { useToast } from '../../components/Toast.jsx';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
@@ -8,6 +8,11 @@ import { useT } from '../../lib/i18n.jsx';
 /**
  * หน้าเฟสหนึ่งช่วง — หัวใจของโปรแกรม
  *
+ * ข้อความของหัวเฟส หัวบล็อก และข้อเช็กลิสต์ทุกข้อมาจากฐานข้อมูลเป็นคู่ภาษา
+ * (text / text_th) แล้วเลือกตรงจุดที่วาด ไม่ได้ห่อด้วย t() — เนื้อหาเช็กลิสต์
+ * เป็น *ข้อมูล* ไม่ใช่ข้อความบนหน้าจอ ถ้าห่อ t() พจนานุกรมจะไม่มีคีย์ให้เจอ
+ * และหน้าไทยจะกลับไปเป็นอังกฤษล้วนเหมือนก่อนรอบนี้
+ *
  * เฟสที่ยังไม่ปลดล็อก **ไม่ได้ซ่อนเนื้อหา** ช่องติ๊กเท่านั้นที่กดไม่ได้ พร้อม
  * แถบอธิบายว่าติดอะไร เพราะสองสาเหตุ (เอกสารไม่ครบ / เฟสก่อนยังไม่จบ) ต้องทำ
  * คนละอย่างเพื่อปลดล็อก บอกรวม ๆ ว่า "ยังล็อกอยู่" ไม่ช่วยใครเลย
@@ -15,7 +20,7 @@ import { useT } from '../../lib/i18n.jsx';
  * การติ๊กอัปเดตหน้าจอก่อนรอเซิร์ฟเวอร์ ล้มเหลวครั้งแรกลองซ้ำอัตโนมัติหนึ่งครั้ง
  * ล้มซ้ำจึงย้อนเครื่องหมายกลับ — ไม่ปล่อยให้เข้าใจผิดว่าบันทึกแล้วทั้งที่ไม่
  */
-export default function Phase({ phase, status, isAdmin, onChanged, onReward, onNext }) {
+export default function Phase({ phase, status, lang, onChanged, onReward, onNext }) {
   const t = useT();
   const toast = useToast();
   const unlocked = status.unlocked[phase.id];
@@ -54,42 +59,57 @@ export default function Phase({ phase, status, isAdmin, onChanged, onReward, onN
     }
   };
 
+  const eyebrow = pick(lang, phase.eyebrow, phase.eyebrow_th);
+  const title = pick(lang, phase.title, phase.title_th);
+  const closing = pick(lang, phase.closing, phase.closing_th);
+
   return (
     <div className="space-y-4">
       <div className="card-sm">
-        {phase.eyebrow && <div className="text-xs font-semibold uppercase tracking-wide text-brand">{phase.eyebrow}</div>}
-        <h2 className="mt-0.5 text-lg font-bold text-slate-900">{phase.title}</h2>
+        {eyebrow && <div className="text-xs font-semibold uppercase tracking-wide text-brand">{eyebrow}</div>}
+        <h2 className="mt-0.5 text-lg font-bold text-slate-900">{title}</h2>
         <div className="mt-1 text-sm text-slate-500">{doneCount}/{all.length} {t('รายการ')}</div>
       </div>
 
       {!unlocked && (
         <div className="card-sm border-l-4 border-amber-400 text-sm text-slate-700">
           {reason === 'documents'
-            ? t('ส่งเอกสารให้ครบก่อน จึงจะเริ่มติ๊กรายการในเฟสนี้ได้ — เนื้อหาด้านล่างอ่านล่วงหน้าได้เลย')
-            : t('ทำเฟสก่อนหน้าให้ครบก่อน จึงจะเริ่มติ๊กรายการในเฟสนี้ได้ — เนื้อหาด้านล่างอ่านล่วงหน้าได้เลย')}
+            ? t('กรอกเอกสารที่จำเป็นทั้งหมดให้ครบเพื่อปลดล็อกระยะนี้ คุณยังสามารถอ่านเนื้อหาด้านล่างได้ตามปกติ')
+            : t('ทำเฟสก่อนหน้าให้เสร็จเพื่อปลดล็อกงานเหล่านี้ คุณยังสามารถอ่านเนื้อหาด้านล่างได้ตามปกติ')}
         </div>
       )}
 
       {phase.blocks.map((b) => {
         const items = visible(b.items);
         if (!items.length) return null;
+        const bDone = items.filter((i) => local.has(i.id)).length;
+        const bPct = Math.round((bDone / items.length) * 100);
         return (
           <div key={b.id} className="card">
-            <h3 className="mb-2 font-bold text-slate-800">{b.heading}</h3>
+            <h3 className="mb-2 font-bold text-slate-800">{pick(lang, b.heading, b.heading_th)}</h3>
+            {/* แถบความคืบหน้าต่อบล็อก — ของเขามีแถบนี้เหนือทุกกลุ่มเช็กลิสต์ */}
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className={`h-full rounded-full transition-all ${bPct === 100 ? 'bg-emerald-500' : 'bg-brand'}`}
+                  style={{ width: `${bPct}%` }} />
+              </div>
+              <span className="shrink-0 text-xs tabular-nums text-slate-500">{bPct}% {t('เสร็จสมบูรณ์')}</span>
+            </div>
             <div className="divide-y divide-slate-100">
               {items.map((it) => {
                 const on = local.has(it.id);
                 return (
                   <label key={it.id}
-                    className={`flex items-start gap-3 py-2.5 ${unlocked ? 'cursor-pointer' : 'cursor-default'}`}>
+                    className={`flex items-start gap-3 py-2.5 ${unlocked ? 'cursor-pointer' : 'cursor-default'} ${
+                      it.level === 'senior' ? '-ml-3 border-l-2 border-amber-400 pl-3' : ''}`}>
                     <input type="checkbox" checked={on} disabled={!unlocked}
                       onChange={() => toggle(it)}
                       className="mt-1 h-4 w-4 accent-emerald-600 disabled:opacity-40" />
                     <span className={`text-sm ${on ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                      {it.text}
+                      {pick(lang, it.text, it.text_th)}
                       {it.level === 'senior' && (
-                        <span className="ml-2 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
-                          {t('ระดับอาวุโส')}
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                          {t('ซีเนียร์')}
                         </span>
                       )}
                     </span>
@@ -101,18 +121,20 @@ export default function Phase({ phase, status, isAdmin, onChanged, onReward, onN
         );
       })}
 
-      {phase.closing && complete && (
-        <div className="card-sm text-sm text-slate-600">{phase.closing}</div>
+      {closing && complete && (
+        <div className="card-sm text-sm text-slate-600">{closing}</div>
       )}
 
+      {/* 'จบเฟสนี้แล้ว' ไม่ใช่ 'ทำสำเร็จหนึ่งหมวดแล้ว' ของเขา — ป๊อปอัปนั้นของเขา
+          ขึ้นตอนจบ *บล็อก* หนึ่ง ของเราขึ้นตอนจบทั้งเฟส คำเดียวกันจึงผิดความหมาย */}
       {celebrate && (
         <Modal title={celebrate === 'all' ? t('ครบ 90 วันแล้ว') : t('จบเฟสนี้แล้ว')}
-          onClose={() => setCelebrate(null)} size="sm"
+          onClose={() => setCelebrate(null)} size="md"
           footer={(
             <>
               <button onClick={() => setCelebrate(null)} className="btn-outline">{t('อยู่หน้านี้ต่อ')}</button>
               <button onClick={() => { setCelebrate(null); onNext?.(); }} className="btn-primary">
-                {celebrate === 'all' ? t('ไปหน้าจบโปรแกรม') : t('ไปเฟสถัดไป')}
+                {celebrate === 'all' ? t('ไปหน้าสำเร็จการปฐมนิเทศ') : t('ไปเฟสถัดไป')}
               </button>
             </>
           )}>
@@ -120,7 +142,7 @@ export default function Phase({ phase, status, isAdmin, onChanged, onReward, onN
             <Icon name="check" className="mx-auto h-10 w-10 text-emerald-500" />
             <p className="mt-2 text-slate-700">
               {celebrate === 'all'
-                ? t('ยินดีต้อนรับเข้าสู่ทีมอย่างเป็นทางการ')
+                ? t('คุณผ่านโปรแกรมปฐมนิเทศ 90 วันเต็มรูปแบบเรียบร้อยแล้ว')
                 : t('ทำครบทุกรายการของเฟสนี้แล้ว')}
             </p>
           </div>

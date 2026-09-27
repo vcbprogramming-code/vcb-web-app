@@ -13,11 +13,8 @@ import WorkIndex from './WorkIndex.jsx';
 import SettingsView from './SettingsView.jsx';
 import LeaveView from './LeaveView.jsx';
 import LeaveApprovers from './LeaveApprovers.jsx';
+import MonthPicker from './MonthPicker.jsx';
 import { useT } from '../../lib/i18n.jsx';
-
-const THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-const monthLabel = ({ y, m }) => `${THAI_MONTHS[m - 1]} ${y + 543}`;
-const shift = ({ y, m }, delta) => { const d = new Date(y, m - 1 + delta, 1); return { y: d.getFullYear(), m: d.getMonth() + 1 }; };
 
 /** A dead end with no way out reads as a broken page; say who can open it. */
 function NoSites() {
@@ -45,6 +42,8 @@ export default function Performance() {
   const setView = (v) => setSp((prev) => { const n = new URLSearchParams(prev); n.set('tab', v); return n; }, { replace: true });
   const [cur, setCur] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
   const [siteKey, setSiteKey] = useState('');
+  // นับการเปลี่ยนค่าที่เก็บในเครื่อง (รูปแบบปี ฯลฯ) เพื่อให้หัวหน้าวาดใหม่ทันที
+  const [prefsKey, setPrefsKey] = useState(0);
   const [roster, setRoster] = useState([]);
   const [rosterKey, setRosterKey] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -79,9 +78,9 @@ export default function Performance() {
     perfApi.bootstrap()
       .then((r) => {
         setBoot(r);
-        // โครงการที่ปิดแล้วไม่รับบันทึกใหม่ — เริ่มที่โครงการแรกที่ยังเปิดอยู่
-        const open = (r.sites || []).filter((x) => x.active !== false);
-        if (open.length) setSiteKey(open[0].key);
+        // ไม่เลือกหน่วยงานให้อัตโนมัติ — ตามระบบจริง ("do NOT auto-pick a site")
+        // การเดาหน่วยงานให้เสียการโหลดหนึ่งรอบกับหน่วยงานที่เขาไม่ได้อยากดู และ
+        // แย่กว่านั้นคือทำให้คนเผลอลงข้อมูลผิดหน่วยงานเพราะไม่ได้สังเกตว่าเลือกอะไรไว้
         if (!r.canEntry && !sp.get('tab')) setView('dashboard');
       })
       .catch((e) => setError(e.message));
@@ -120,11 +119,10 @@ export default function Performance() {
         title={t('บันทึกงานฝ่ายบุคคล')}
         subtitle={t('บันทึกงานที่พนักงานแต่ละคนทำในแต่ละวัน แยกตามไซต์งาน')}
         right={
-          <div className="flex items-center gap-2">
-            {/* icon-only: the month they move to has to be readable, not guessable */}
-            <button onClick={() => setCur(shift(cur, -1))} aria-label={t('เดือนก่อนหน้า')} title={t('เดือนก่อนหน้า')} className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"><Icon name="arrowLeft" className="h-4 w-4" /></button>
-            <span className="chip bg-brand/10 text-brand min-w-[130px] justify-center">{monthLabel(cur)}</span>
-            <button onClick={() => setCur(shift(cur, 1))} aria-label={t('เดือนถัดไป')} title={t('เดือนถัดไป')} className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"><Icon name="arrowRight" className="h-4 w-4" /></button>
+          // ตัวเลือกเดือนแบบระบบจริง: ลูกศรเดินทีละเดือน + ปุ่มกลางเปิดปฏิทินเลือกปี/เดือน
+          <div>
+            <div className="mb-0.5 text-[11px] font-medium text-slate-400">{t('เดือน')}</div>
+            <MonthPicker key={prefsKey} cur={cur} onChange={setCur} />
           </div>
         }
       />
@@ -147,28 +145,37 @@ export default function Performance() {
             month, and a leave request is filed for one of its people. Only the
             grid has anything to export. */}
         {(view === 'entry' || view === 'leave' || view === 'manday' || view === 'reports') && boot.sites.length > 0 && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-end gap-2">
+            {/* ปุ่มส่งออกมีปุ่มเดียว — เดิมหน้าบันทึกงานมีสองปุ่มที่ทำงานคนละเส้นทาง
+                (แถบนี้กับในตัวหน้า) คนกดสลับกันแล้วได้ไฟล์หน้าตาไม่เหมือนกัน
+                ปุ่มที่เหลือคือตัวที่คงรูปแบบไฟล์เดิมของระบบจริงไว้ */}
             {view === 'entry' && (
-              <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50" title={t('ส่งออกเป็น Excel')}>
+              <button onClick={downloadExcel} disabled={exporting || !siteKey} className="btn-outline !py-1.5 !text-sm disabled:opacity-50"
+                title={t('ส่งออกบันทึกทั้งหมดของหน่วยงานนี้เป็นไฟล์ Excel (.xlsx) โดยคงรูปแบบเดิมไว้')}>
                 <BusyLabel busy={exporting} busyText="กำลังส่งออก…"><Icon name="download" className="h-4 w-4" /> {t('ส่งออก Excel')}</BusyLabel>
               </button>
             )}
-            {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
-                with no bg class the control kept the browser's white default while
-                its text was lifted to near-white (unreadable). */}
-            <select aria-label={t('เลือกไซต์งาน')} value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
-              {/* โครงการที่ปิดแล้วไม่อยู่ในรายการ ยกเว้นตัวที่กำลังเปิดดูจากหน้าภาพรวม */}
-              {boot.sites.filter((s) => s.active !== false || s.key === siteKey).map((s) => (
-                <option key={s.key} value={s.key}>{s.name}{s.active === false ? ` (${t('ปิดแล้ว')})` : ''}</option>
-              ))}
-            </select>
+            <div>
+              <div className="mb-0.5 text-[11px] font-medium text-slate-400">{t('หน่วยงาน')}</div>
+              {/* bg-white/text-slate-800 so the dark-mode remap can recolour BOTH —
+                  with no bg class the control kept the browser's white default while
+                  its text was lifted to near-white (unreadable). */}
+              <select aria-label={t('เลือกไซต์งาน')} value={siteKey} onChange={(e) => setSiteKey(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+                {/* ไม่มีตัวไหนถูกเลือกไว้ล่วงหน้า — ต้องเลือกเองเสมอ */}
+                <option value="">{t('— เลือกหน่วยงาน —')}</option>
+                {/* โครงการที่ปิดแล้วไม่อยู่ในรายการ ยกเว้นตัวที่กำลังเปิดดูจากหน้าภาพรวม */}
+                {boot.sites.filter((s) => s.active !== false || s.key === siteKey).map((s) => (
+                  <option key={s.key} value={s.key}>{s.name}{s.active === false ? ` (${t('ปิดแล้ว')})` : ''}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
       </div>
 
       {view === 'dashboard' && (
-        <Dashboard cur={cur} onOpenSite={(key) => { setSiteKey(key); setView('entry'); }} />
+        <Dashboard cur={cur} canEntry={boot.canEntry} onOpenSite={(key) => { setSiteKey(key); setView('entry'); }} />
       )}
 
       {view === 'entry' && (
@@ -196,6 +203,8 @@ export default function Performance() {
       {view === 'settings' && (
         <SettingsView
           features={f}
+          boot={boot}
+          onPrefsChanged={() => setPrefsKey((k) => k + 1)}
           sites={boot.sites}
           onOpenSite={(key) => { setSiteKey(key); setRosterKey((k) => k + 1); setView('entry'); }}
           onSitesChange={(key, patch) => setBoot((b) => ({ ...b, sites: b.sites.map((s) => (s.key === key ? { ...s, ...(typeof patch === 'object' ? patch : { lockDays: patch }) } : s)) }))}

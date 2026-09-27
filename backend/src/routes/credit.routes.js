@@ -5,7 +5,7 @@ import { pool, query, queryOne } from '../config/db.js';
 import { requireAuth, requirePermission } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { facilityView, authorizedUsedMap, dueBucket, overdueInterest, writeAudit, diff, AUTHORIZED_STATUSES, isOutstanding, isDueWithin7 } from '../services/credit.js';
+import { facilityView, authorizedUsedMap, dueBucket, overdueInterestInfo, ratePct, writeAudit, diff, AUTHORIZED_STATUSES, isOutstanding, isDueWithin7 } from '../services/credit.js';
 
 /**
  * การพับรวมวงเงินบนหน้าจอ — ธนาคารไม่ได้แยกวงเงินเหล่านี้ออกจากกัน
@@ -53,6 +53,9 @@ const ledgerOut = (l) => ({
   doc_from: l.doc_from, doc_to: l.doc_to, interest_rate: num(l.interest_rate), note: l.note, request_id: l.request_id,
   beneficiary: l.beneficiary, counterparty: l.counterparty, purpose: l.purpose,
   cost_category: l.cost_category, ref_doc_from: l.ref_doc_from, ref_doc_to: l.ref_doc_to, term_days: l.term_days,
+  // วันที่บันทึกรายการ — คอลัมน์ "วันที่" ของตารางรายการสินเชื่อ คนละอย่างกับ
+  // วันเริ่มของตราสาร (start_date) ซึ่งอาจเป็นวันในอนาคต
+  created_at: l.created_at, updated_at: l.updated_at,
 });
 const requestOut = (r) => ({
   id: r.id, facility_id: r.facility_id, project_id: r.project_id, amount: Number(r.amount),
@@ -68,15 +71,26 @@ const cashPlanOut = (c) => ({
   available: Number(c.available), note: c.note, kind: c.kind || 'plan', paid_ids: c.paid_ids || [],
 });
 
+/**
+ * ตัวกรองประเภทวงเงินแบบ "กลุ่ม" — kinds=LG หรือ kinds=AVAL,LGM,DLC,PNPOST
+ *
+ * การ์ด BG กับ B/E บนหน้าภาพรวมเป็นก้อนเงินเดียวที่มาจากหลายประเภท กดการ์ดแล้ว
+ * ต้องได้ทุกประเภทในก้อนนั้น ไม่ใช่ประเภทเดียว (jumpBG/jumpBE ของระบบจริง)
+ * กรองที่ตระกูล (kind) ไม่ใช่ป้ายบนเอกสาร (doc_kind) เพราะ L/G วัสดุ กับ BG
+ * ใช้ป้ายคนละตัวแต่ต้องอยู่คนละก้อน
+ */
+const kindList = (v) => String(v || '').split(',').map((s) => s.trim()).filter(Boolean);
+
 // ── facilities ──────────────────────────────────────────────────────────
 router.get('/facilities', asyncHandler(async (req, res) => {
-  const { projectId, type, search, company, facilityNo } = req.query;
+  const { projectId, type, search, company, facilityNo, kinds } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (projectId) add('project_id = $$', projectId);
   if (type) add('type = $$', type);
   if (company) add('company = $$', company);
   if (facilityNo) add('facility_no = $$', Number(facilityNo));
+  if (kindList(kinds).length) add('facility_no in (select no from facility_types where kind = any($$))', kindList(kinds));
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
   const { rows } = await query(`select * from facilities ${whereSql} order by created_at`, params);
   const usedMap = await authorizedUsedMap(rows.map((r) => r.id));
@@ -98,6 +112,8 @@ const facilitySchema = z.object({
   // ประเภทวงเงินอ้างทะเบียนจริง 10 ประเภท ไม่ใช่ข้อความอิสระอีกต่อไป
   facilityNo: z.number().int().min(1).max(10), limit: z.number().nonnegative(),
   usedBaseline: z.number().optional(), interestRate: z.number().optional().nullable(), feeRate: z.number().optional().nullable(),
+  // อัตราดอกเบี้ยตามหนังสือธนาคาร เป็นประโยค ไม่ใช่ตัวเลข ("MLR ต่อปี")
+  interestNote: z.string().max(200).optional().nullable(),
   approvedDate: z.string().optional().nullable(), dueDate: z.string().optional().nullable(), notes: z.string().optional().nullable(),
   // ปักยอดใช้ไปเอง — null คือกลับไปคำนวณจากรายการ (setUsedOverride ของระบบจริง)
   usedOverride: z.number().nonnegative().nullable().optional(),
@@ -111,10 +127,11 @@ router.post('/facilities', asyncHandler(async (req, res) => {
   if (!ft) throw new ApiError(400, 'ไม่พบประเภทวงเงินนี้ในทะเบียน');
   // type เก็บป้ายสั้นไว้ให้รายงานเดิมอ่านได้ แต่ความจริงอยู่ที่ facility_no
   const row = await queryOne(
-    `insert into facilities (project_id, company, bank, facility_no, type, "limit", used_baseline, interest_rate, fee_rate, approved_date, due_date, notes)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+    `insert into facilities (project_id, company, bank, facility_no, type, "limit", used_baseline, interest_rate, fee_rate, approved_date, due_date, notes, interest_note)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
     [d.projectId, d.company || null, d.bank || null, d.facilityNo, ft.doc_kind, d.limit, d.usedBaseline || 0,
-     d.interestRate ?? null, d.feeRate ?? null, d.approvedDate || null, d.dueDate || null, d.notes || null]
+     d.interestRate ?? null, d.feeRate ?? null, d.approvedDate || null, d.dueDate || null, d.notes || null,
+     d.interestNote || null]
   );
   await writeAudit({ actor: req.profile, action: 'create', target: 'facility', targetId: row.id, note: ft.name_th });
   res.status(201).json({ data: facilityView(row, 0) });
@@ -126,7 +143,8 @@ router.patch('/facilities/:id', asyncHandler(async (req, res) => {
   if (!before) throw new ApiError(404, 'Facility not found');
   const d = parsed.data;
   const map = { company: 'company', bank: 'bank', facilityNo: 'facility_no', limit: '"limit"',
-    interestRate: 'interest_rate', feeRate: 'fee_rate', approvedDate: 'approved_date', dueDate: 'due_date', notes: 'notes' };
+    interestRate: 'interest_rate', feeRate: 'fee_rate', approvedDate: 'approved_date', dueDate: 'due_date', notes: 'notes',
+    interestNote: 'interest_note' };
   const sets = []; const vals = [];
   for (const [k, col] of Object.entries(map)) if (d[k] !== undefined) { vals.push(d[k] || null); sets.push(`${col} = $${vals.length}`); }
   // ศูนย์เป็นค่าที่ปักได้จริง (ธนาคารแจ้งว่าไม่มียอดใช้) จึงแยกออกจาก `|| null` ด้านบน
@@ -134,7 +152,7 @@ router.patch('/facilities/:id', asyncHandler(async (req, res) => {
   if (!sets.length) throw new ApiError(400, 'No fields to update');
   vals.push(req.params.id);
   const after = await queryOne(`update facilities set ${sets.join(', ')} where id = $${vals.length} returning *`, vals);
-  const changes = diff(before, after, ['limit', 'interest_rate', 'due_date', 'type', 'bank', 'facility_no', 'company', 'notes']);
+  const changes = diff(before, after, ['limit', 'interest_rate', 'interest_note', 'due_date', 'type', 'bank', 'facility_no', 'company', 'notes']);
   if (changes) await writeAudit({ actor: req.profile, action: 'update', target: 'facility', targetId: req.params.id, changes });
   if (d.usedOverride !== undefined && String(before.used_override ?? '') !== String(after.used_override ?? '')) {
     await writeAudit({ actor: req.profile, action: after.used_override == null ? 'usedclear' : 'usedoverride',
@@ -159,13 +177,22 @@ router.put('/facilities/:id/limit', asyncHandler(async (req, res) => {
 
 // ── ledger ────────────────────────────────────────────────────────────────
 router.get('/ledger', asyncHandler(async (req, res) => {
-  const { facilityId, projectId, status, costCategory, company, due } = req.query;
+  const { facilityId, projectId, status, costCategory, company, due, kinds, search } = req.query;
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (facilityId) add('facility_id = $$', facilityId);
   if (projectId) add('project_id = $$', projectId);
-  if (status) add('status = $$', status);
+  // สถานะรับได้หลายค่าคั่นด้วยจุลภาค — ตัวกรอง "รออนุมัติ (ใหม่/เสนอ)" ของระบบ
+  // จริงส่งสองสถานะมาพร้อมกัน ("คำขอใหม่,อยู่ระหว่างเสนออนุมัติ")
+  if (status) {
+    const list = String(status).split(',').map((s) => s.trim()).filter(Boolean);
+    if (list.length > 1) add('status = any($$)', list);
+    else add('status = $$', list[0] ?? status);
+  }
   if (costCategory) add('cost_category = $$', costCategory);
+  if (kindList(kinds).length) add('facility_id in (select id from facilities where facility_no in (select no from facility_types where kind = any($$)))', kindList(kinds));
+  // ค้นหาเดียวกับช่องบนหน้าจอ: เลขที่เอกสาร · รายละเอียด · ผู้รับผลประโยชน์
+  if (search) add(`(coalesce(ref,'') || ' ' || coalesce(counterparty,'') || ' ' || coalesce(beneficiary,'') || ' ' || coalesce(note,'')) ilike '%' || $$ || '%'`, String(search));
   // บริษัทอยู่ที่ตัววงเงิน ไม่ได้อยู่ที่รายการ — กรองผ่านวงเงินที่สังกัด
   if (company) add('facility_id in (select id from facilities where company = $$)', company);
   // "ครบใน 7 วัน" นับแยกอิสระจากกลุ่มเดือนนี้/เดือนหน้าตามข้อกำหนด §5
@@ -371,7 +398,8 @@ router.get('/overview', asyncHandler(async (req, res) => {
     query('select * from credit_ledger'),
     query(`select * from credit_requests where status = 'อยู่ระหว่างเสนออนุมัติ'`),
   ]);
-  const rateBy = Object.fromEntries(facilities.rows.map((f) => [f.id, f.interest_rate]));
+  // อัตราต่อปีอ่านจากข้อความอิสระก่อน แล้วค่อยถอยไปคอลัมน์ตัวเลขเดิม
+  const rateBy = Object.fromEntries(facilities.rows.map((f) => [f.id, ratePct(f.interest_note, f.interest_rate)]));
   const authorized = ledger.rows.filter((i) => AUTHORIZED_STATUSES.includes(i.status));
   const usedBy = new Map();
   for (const i of authorized) usedBy.set(i.facility_id, (usedBy.get(i.facility_id) || 0) + Number(i.amount));
@@ -384,12 +412,19 @@ router.get('/overview', asyncHandler(async (req, res) => {
     const boxNo = foldNo(f.facility_no);
     const box = types[boxNo];
     const key = box?.doc_kind || f.type || '(ไม่ระบุ)';
-    const t = byType[key] || { type: key, no: boxNo, name: box?.name_th || key, limit: 0, used: 0, parts: [] };
+    const t = byType[key] || { type: key, no: boxNo, name: box?.name_th || key, limit: 0, used: 0, partsBy: new Map() };
     t.limit += v.limit; t.used += v.used;
-    if (v.limit > 0 || v.used > 0) {
-      const part = types[Number(f.facility_no)];
-      t.parts.push({ no: Number(f.facility_no) || null, name: part?.name_th || f.type, limit: v.limit, used: v.used });
-    }
+    // รายละเอียดใต้การ์ดรวมตาม "เลขประเภทวงเงิน" ไม่ใช่ตามแถววงเงิน
+    //
+    // ธนาคารออกวงเงินแยกตามโครงการ กลุ่มนี้มีเจ็ดโครงการ ถ้าไล่ทีละแถว การ์ด BG
+    // จะขึ้น "หนังสือค้ำประกันสัญญา 5%" ซ้ำสามบรรทัด (โครงการละหนึ่ง) โดยไม่มี
+    // อะไรบอกว่าบรรทัดไหนของโครงการไหน — อ่านแล้วเข้าใจผิดว่าวงเงินซ้ำ และกระทบ
+    // ยอดกับเอกสารธนาคารไม่ได้ ระบบจริงรวมที่ agg[facilityNo] ข้ามโครงการก่อน
+    // แล้วจึงทำบรรทัดย่อยประเภทละบรรทัด (computeStats ใน Dashboard.jsx) — ทำตาม
+    const no = Number(f.facility_no) || null;
+    const p = t.partsBy.get(no) || { no, name: types[no]?.name_th || f.type, limit: 0, used: 0 };
+    p.limit += v.limit; p.used += v.used;
+    t.partsBy.set(no, p);
     byType[key] = t;
   }
   // การ์ดครบกำหนด: ทุกรายการที่ยังต้องจ่าย (ไม่ใช่เฉพาะที่อนุมัติแล้ว) ยอดบวกเท่านั้น
@@ -400,27 +435,41 @@ router.get('/overview', asyncHandler(async (req, res) => {
     const b = dueBucket(i.due_date); buckets[b].count++; buckets[b].amount += Number(i.amount);
     if (isDueWithin7(i.due_date)) { buckets.due7.count++; buckets.due7.amount += Number(i.amount); }
   }
-  let overdueInt = 0;
-  for (const i of authorized) overdueInt += overdueInterest(i, rateBy[i.facility_id]);
+  // ดอกเบี้ยเกินกำหนด: บอกด้วยว่ามีกี่รายการที่ระบุอัตราไม่ได้ (เช่นวงเงินที่
+  // หนังสือธนาคารเขียนว่า MLR) ไม่งั้นยอดรวมจะอ่านเหมือนครบแล้วทั้งที่ยังขาด
+  let overdueInt = 0; let rateUnknown = 0;
+  for (const i of authorized) {
+    const info = overdueInterestInfo(i, rateBy[i.facility_id]);
+    overdueInt += info.amount;
+    if (info.rateUnavailable) rateUnknown += 1;
+  }
   // การ์ดสถานะนับรายการ (จำนวน + ยอดเงิน) ตามสถานะของรายการ เหมือนระบบจริง
   const tally = (rows) => ({ count: rows.length, amount: rows.reduce((a, r) => a + Number(r.amount || 0), 0) });
   const newItems = tally(ledger.rows.filter((i) => i.status === 'คำขอใหม่'));
   const pending = tally([...ledger.rows.filter((i) => i.status === 'อยู่ระหว่างเสนออนุมัติ'), ...pendingReqs.rows]);
   const approved = tally(authorized);
   res.json({ data: {
-    byType: Object.values(byType).map((t) => ({ ...t, available: t.limit - t.used,
-      pct: t.limit > 0 ? Math.min(100, Math.round((t.used / t.limit) * 100)) : (t.used > 0 ? 100 : 0) })),
-    buckets, overdueInterest: Math.round(overdueInt),
+    byType: Object.values(byType).map(({ partsBy, ...t }) => ({ ...t, available: t.limit - t.used,
+      pct: t.limit > 0 ? Math.min(100, Math.round((t.used / t.limit) * 100)) : (t.used > 0 ? 100 : 0),
+      // ประเภทที่ไม่มีทั้งวงเงินและยอดใช้ ไม่ต้องขึ้นเป็นบรรทัดว่าง (เหมือน .filter ของเขา)
+      parts: [...partsBy.values()].filter((p) => p.limit > 0 || p.used > 0)
+        .sort((a, b) => (a.no || 0) - (b.no || 0)) })),
+    buckets, overdueInterest: Math.round(overdueInt), overdueRateUnknown: rateUnknown,
     newCount: newItems.count, newAmount: newItems.amount,
     pendingCount: pending.count, pendingAmount: pending.amount,
     approvedCount: approved.count, approvedAmount: approved.amount,
   } });
 }));
 router.get('/overdue', asyncHandler(async (req, res) => {
-  const facilities = (await query('select id, interest_rate from facilities')).rows;
-  const rateBy = Object.fromEntries(facilities.map((f) => [f.id, f.interest_rate]));
+  const facilities = (await query('select id, interest_rate, interest_note from facilities')).rows;
+  const rateBy = Object.fromEntries(facilities.map((f) => [f.id, ratePct(f.interest_note, f.interest_rate)]));
   const { rows } = await query(`select * from credit_ledger where status='อนุมัติแล้ว' and due_date < current_date`);
-  res.json({ data: rows.map((i) => ({ ...ledgerOut(i), bucket: dueBucket(i.due_date), overdue_interest: Math.round(overdueInterest(i, rateBy[i.facility_id])) })) });
+  res.json({ data: rows.map((i) => {
+    const info = overdueInterestInfo(i, rateBy[i.facility_id]);
+    return { ...ledgerOut(i), bucket: dueBucket(i.due_date), overdue_interest: Math.round(info.amount),
+      // ระบุอัตราไม่ได้ ≠ ดอกเบี้ยศูนย์ — หน้าจอต้องเขียนต่างกัน
+      overdue_rate_unavailable: info.rateUnavailable, overdue_days: info.days };
+  }) });
 }));
 
 // ── cash plan ───────────────────────────────────────────────────────────
@@ -504,6 +553,71 @@ router.post('/cost-categories', requirePermission('credit', 'edit'), asyncHandle
      on conflict (name) do update set is_active = true`, [p.data.name, next.n]);
   await writeAudit({ actor: req.profile, action: 'create', target: 'costCategory', targetId: p.data.name });
   res.status(201).json({ data: { name: p.data.name } });
+}));
+
+/**
+ * PUT /api/credit/cost-categories — เขียนทะเบียนหมวดค่าใช้จ่ายทั้งชุด
+ *
+ * จอตั้งค่าของระบบจริงให้แก้ทั้งรายการทีเดียว (เพิ่ม · ย้ายลำดับ · ลบ) แล้วกด
+ * บันทึกครั้งเดียว — setCostCategories ของเขาลบแถวเดิมทิ้งทั้งหมดแล้วเขียนใหม่
+ *
+ * ของเราลบทิ้งแบบนั้นไม่ได้: หมวดถูกอ้างด้วย "ชื่อ" จากรายการสินเชื่อ คำขอ และ
+ * ตารางงบประมาณ — ลบชื่อออกจากทะเบียนแล้วเงินที่เบิกไปแล้วจะกลายเป็นหมวดที่
+ * ไม่มีอยู่ หน้าสรุปค่าใช้จ่ายจะขึ้นงบที่ตั้งไม่ได้อีก ฉะนั้นหมวดที่ยังถูกใช้อยู่
+ * จะถูก "ปิด" (is_active = false) ไม่ใช่ลบ — หายจากเมนู แต่ข้อมูลเก่ายังอ่านได้
+ *
+ * ลำดับที่ผู้ใช้จัด = ลำดับที่แสดงในเมนู จึงเขียน sort_order ตามตำแหน่งในอาเรย์
+ */
+router.put('/cost-categories', requirePermission('credit', 'edit'), asyncHandler(async (req, res) => {
+  const p = z.object({ list: z.array(z.string().trim().min(1).max(80)).max(200) }).safeParse(req.body);
+  if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
+  // ตัดซ้ำแต่คงลำดับที่ผู้ใช้จัดไว้
+  const seen = new Set(); const list = [];
+  for (const raw of p.data.list) {
+    const s = String(raw).trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s); list.push(s);
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    // ชุดที่จอนี้แทนที่ = หมวดที่ "เปิดใช้งานอยู่" เท่านั้น
+    //
+    // จอตั้งค่าโหลดมาแต่หมวดที่เปิดอยู่ (GET ส่งเฉพาะ is_active) หมวดที่เคยปิดไป
+    // แล้วจึงไม่เคยปรากฏในรายการที่ผู้ใช้กดบันทึก — ถ้านับรวมเป็น "ของที่ถูกเอาออก"
+    // การกดบันทึกโดยไม่แตะอะไรเลยจะลบประวัติหมวดเก่าทิ้งทั้งชุด (ข้อมูลที่นำเข้า
+    // มาจากระบบเดิมของลูกค้ามีหมวดปิดอยู่จริงสองหมวด) หมวดที่ปิดแล้วจึงไม่ถูกแตะ
+    const before = (await client.query('select name, sort_order, is_active from credit_cost_categories where is_active')).rows;
+    // ชื่อที่ยังถูกอ้างถึงจากข้อมูลจริง — ห้ามลบ ปิดแทน
+    const inUse = new Set((await client.query(
+      `select distinct btrim(cost_category) name from (
+         select cost_category from credit_ledger
+         union all select cost_category from credit_requests
+         union all select cost_category from credit_category_caps) x
+        where nullif(btrim(cost_category), '') is not null`)).rows.map((r) => r.name));
+    let i = 0; const kept = [];
+    for (const name of list) {
+      i += 1;
+      await client.query(
+        `insert into credit_cost_categories (name, sort_order, is_active) values ($1, $2, true)
+         on conflict (name) do update set sort_order = excluded.sort_order, is_active = true`, [name, i]);
+      kept.push(name);
+    }
+    const drop = before.map((r) => r.name).filter((n) => !seen.has(n));
+    const closed = drop.filter((n) => inUse.has(n));
+    const deleted = drop.filter((n) => !inUse.has(n));
+    if (closed.length) await client.query('update credit_cost_categories set is_active = false where name = any($1)', [closed]);
+    if (deleted.length) await client.query('delete from credit_cost_categories where name = any($1)', [deleted]);
+    await client.query('commit');
+    await writeAudit({ actor: req.profile, action: 'update', target: 'costCategory', targetId: '*',
+      changes: { count: { before: before.length, after: kept.length } },
+      note: closed.length ? `ปิดหมวดที่ยังถูกใช้อยู่ ${closed.length} หมวด` : null });
+    res.json({ data: { list: kept, count: kept.length, deactivated: closed, removed: deleted } });
+  } catch (err) {
+    await client.query('rollback'); throw err;
+  } finally {
+    client.release();
+  }
 }));
 
 router.get('/category-caps', asyncHandler(async (req, res) => {
@@ -648,38 +762,90 @@ router.get('/audit', asyncHandler(async (req, res) => {
   const { rows } = await query(`select * from credit_audit ${whereSql} order by created_at desc limit 200`, params);
   res.json({ data: rows.map((a) => ({ id: a.id, actor_label: a.actor_label, action: a.action, target: a.target, target_id: a.target_id, changes: a.changes, note: a.note, created_at: a.created_at })) });
 }));
+/**
+ * GET /api/credit/export — ไฟล์ Excel ตามตัวกรองที่เห็นบนหน้าจอ
+ *
+ * ลำดับคอลัมน์เรียงตาม exportXlsx ของระบบจริง คนที่เปิดไฟล์นี้อยู่ทุกเดือนอ่าน
+ * จากตำแหน่งคอลัมน์ ไม่ได้อ่านหัวตาราง — สลับที่แล้วสูตรใน sheet ปลายทางของเขา
+ * เพี้ยนทั้งแฟ้ม คอลัมน์ที่ของเรามีเกิน (ธนาคาร · เลขที่วงเงิน · อัตราดอกเบี้ย)
+ * ต่อท้ายไว้ ไม่แทรกกลาง
+ *
+ * ตัวกรองครบห้าตัวเหมือนบนหน้าจอ (โครงการ · ประเภท · สถานะ · ระยะเวลา · คำค้น)
+ * — ไฟล์ที่ได้ต้องเป็นสิ่งเดียวกับที่คนกดส่งออกเห็นอยู่ ไม่ใช่ข้อมูลทั้งฐาน
+ */
 router.get('/export', asyncHandler(async (req, res) => {
   const where = []; const params = [];
   const add = (c, v) => { params.push(v); where.push(c.replace('$$', `$${params.length}`)); };
   if (req.query.projectId) add('f.project_id = $$', req.query.projectId);
-  // กรองด้วยกล่องที่พับรวมแล้ว: เลือก "B/E" ต้องได้ทั้งอาวัล L/G วัสดุ DLC และ PN Post
-  if (req.query.type) {
+  if (req.query.facilityNo) add('f.facility_no = $$', Number(req.query.facilityNo));
+  if (kindList(req.query.kinds).length) {
+    add('f.facility_no in (select no from facility_types where kind = any($$))', kindList(req.query.kinds));
+  } else if (req.query.type) {
+    // กรองด้วยกล่องที่พับรวมแล้ว: เลือก "B/E" ต้องได้ทั้งอาวัล L/G วัสดุ DLC และ PN Post
     const nos = (await query('select no from facility_types where doc_kind = $1', [req.query.type])).rows
       .map((r) => r.no)
       .flatMap((n) => (n === BE_FOLD_INTO ? [n, ...BE_FOLDED] : n === 1 ? BG_PARTS : [n]));
     if (nos.length) add('f.facility_no = any($$)', nos);
     else add('f.type = $$', req.query.type);
   }
+  if (req.query.company) add('f.company = $$', req.query.company);
   const whereSql = where.length ? `where ${where.join(' and ')}` : '';
-  const facilities = (await query(`select f.*, p.name as project_name, p.code as project_code from facilities f join projects p on p.id=f.project_id ${whereSql} order by f.created_at`, params)).rows;
+  const facilities = (await query(`select f.*, p.name as project_name, p.code as project_code from facilities f join projects p on p.id=f.project_id ${whereSql} order by p.code, f.facility_no, f.created_at`, params)).rows;
   const usedMap = await authorizedUsedMap(facilities.map((f) => f.id));
+  const kinds = Object.fromEntries((await query('select no, doc_kind, name_th from facility_types')).rows.map((r) => [r.no, r]));
 
   const wb = new ExcelJS.Workbook();
   const fs = wb.addWorksheet('วงเงินสินเชื่อ');
-  fs.addRow(['โครงการ', 'บริษัท', 'ธนาคาร', 'เลขที่วงเงิน', 'ประเภท', 'วงเงิน', 'ใช้ไป', 'คงเหลือ', 'ดอกเบี้ย%', 'ครบกำหนด']);
+  fs.addRow(['โครงการ', 'บริษัท', 'ประเภท', 'วงเงิน', 'ใช้ไป', 'คงเหลือ', '% ใช้ไป',
+    'ธนาคาร', 'เลขที่วงเงิน', 'อัตราดอกเบี้ย', 'ครบกำหนด', 'หมายเหตุ']);
   for (const f of facilities) {
     const v = facilityView(f, usedMap.get(f.id) || 0);
-    fs.addRow([f.project_name || f.project_code, f.company || '', f.bank || '', f.facility_no || '', f.type, v.limit, v.used, v.available, f.interest_rate ?? '', dateStr(f.due_date)]);
+    fs.addRow([f.project_name || f.project_code, f.company || '', kinds[f.facility_no]?.doc_kind || f.type,
+      v.limit, v.used, v.available, `${v.pct}%`,
+      f.bank || '', f.facility_no || '', f.interest_note || (f.interest_rate != null ? `${Number(f.interest_rate)} % ต่อปี` : ''),
+      dateStr(f.due_date), f.notes || '']);
   }
   fs.getRow(1).font = { bold: true };
+
   const facIds = facilities.map((f) => f.id);
-  const ledger = facIds.length ? (await query('select l.*, p.name as project_name from credit_ledger l join projects p on p.id=l.project_id where l.facility_id = any($1) order by l.start_date desc nulls last', [facIds])).rows : [];
+  const lw = ['l.facility_id = any($1)']; const lp = [facIds];
+  const ladd = (c, v) => { lp.push(v); lw.push(c.replace('$$', `$${lp.length}`)); };
+  if (req.query.status) {
+    const list = String(req.query.status).split(',').map((s) => s.trim()).filter(Boolean);
+    if (list.length > 1) ladd('l.status = any($$)', list); else ladd('l.status = $$', list[0]);
+  }
+  const due = req.query.due;
+  if (due === 'due7') lw.push('l.due_date between current_date and current_date + 7');
+  else if (due === 'overdue') lw.push('l.due_date < current_date');
+  else if (due === 'thisMonth') lw.push("date_trunc('month', l.due_date) = date_trunc('month', current_date)");
+  else if (due === 'nextMonth') lw.push("date_trunc('month', l.due_date) = date_trunc('month', current_date + interval '1 month')");
+  if (req.query.search) {
+    ladd(`(coalesce(l.ref,'') || ' ' || coalesce(l.counterparty,'') || ' ' || coalesce(l.beneficiary,'') || ' ' || coalesce(l.note,'')) ilike '%' || $$ || '%'`, String(req.query.search));
+  }
+  const ledger = facIds.length ? (await query(
+    `select l.*, p.name as project_name, p.code as project_code, f.company, f.facility_no, f.interest_rate, f.interest_note
+       from credit_ledger l join projects p on p.id=l.project_id join facilities f on f.id=l.facility_id
+      where ${lw.join(' and ')} order by l.start_date desc nulls last, l.created_at desc`, lp)).rows : [];
+
   const ts = wb.addWorksheet('รายการสินเชื่อ');
-  ts.addRow(['โครงการ', 'จำนวนเงิน', 'สถานะ', 'วันเริ่ม', 'ครบกำหนด', 'อ้างอิง', 'หมายเหตุ']);
-  for (const l of ledger) ts.addRow([l.project_name, Number(l.amount), l.status, dateStr(l.start_date), dateStr(l.due_date), l.ref || '', l.note || '']);
+  ts.addRow(['วันที่', 'บริษัท', 'โครงการ', 'ประเภท', 'รายละเอียด', 'จำนวนเงิน', 'เริ่ม', 'ครบ',
+    'ดอกเบี้ยเกินกำหนด', 'สถานะ', 'เอกสารแนบ', 'หมวดค่าใช้จ่าย', 'อ้างอิง', 'หมายเหตุ']);
+  for (const l of ledger) {
+    const info = overdueInterestInfo(l, ratePct(l.interest_note, l.interest_rate));
+    const detail = [l.counterparty, l.beneficiary].filter(Boolean).join(' | ');
+    ts.addRow([dateStr(l.start_date || l.created_at), l.company || '', l.project_name || l.project_code,
+      kinds[l.facility_no]?.doc_kind || '', detail, Number(l.amount),
+      dateStr(l.start_date), dateStr(l.due_date),
+      info.rateUnavailable ? 'ระบุอัตราไม่ได้' : (info.amount ? Math.round(info.amount) : '—'),
+      l.status, l.source || '—', l.cost_category || '', l.ref || '', l.note || '']);
+  }
   ts.getRow(1).font = { bold: true };
+
+  const p2 = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}_${p2(now.getHours())}${p2(now.getMinutes())}`;
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename="credit-facilities.xlsx"');
+  res.setHeader('Content-Disposition', `attachment; filename="CreditFacility_${stamp}.xlsx"`);
   await wb.xlsx.write(res);
   res.end();
 }));

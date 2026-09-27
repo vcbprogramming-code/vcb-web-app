@@ -2,40 +2,44 @@ import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
- * ก่อนเริ่มงาน — หน้าแรกสุดของโปรแกรม 90 วัน
+ * เตรียมความพร้อมก่อนเริ่มงาน — หน้าแรกสุดของโปรแกรม 90 วัน
  *
- * เนื้อหาตรงตามพอร์ทัลปฐมนิเทศที่บริษัทใช้อยู่: สารต้อนรับจากประธานเจ้าหน้าที่
- * บริหาร แล้วตามด้วยค่านิยมสี่ข้อ ไม่ใช่ถ้อยคำที่เราแต่งขึ้นเอง — พนักงานใหม่
- * ที่เคยเห็นพอร์ทัลเดิมมาแล้วต้องอ่านเจอข้อความเดียวกัน
+ * ทุกประโยคในหน้านี้เป็นคำแปลไทยจาก TH_DICT ของพอร์ทัลที่บริษัทใช้อยู่ตรงตัว
+ * ไม่ใช่ถ้อยคำที่เราแต่งขึ้นเอง — พนักงานใหม่ที่เคยเห็นพอร์ทัลเดิมต้องอ่านเจอ
+ * ข้อความเดียวกัน รวมทั้งชื่อค่านิยมที่แปลไว้แล้ว ("ความซื่อสัตย์" ไม่ใช่
+ * "ความซื่อตรง", "ความประณีต" ไม่ใช่ "ความเป็นเลิศ") ซึ่งเราเคยแปลเองผิดไป
+ *
+ * ข้อความอังกฤษอยู่ใน frontend/src/lib/en.js ตามกลไก i18n ของระบบ (พจนานุกรม
+ * คีย์ด้วยข้อความไทย) ไม่ได้ฝังสองภาษาไว้ในไฟล์นี้
  */
 const VALUES = [
   {
     name: 'Discipline',
     th: 'วินัย',
-    body: 'We follow structured systems, documented processes, and approval hierarchies.',
-    bullets: ['No shortcuts', 'No undocumented commitments', 'No uncontrolled decisions'],
-    footer: 'Discipline protects our liquidity, reputation, and long-term stability.',
+    body: 'เราปฏิบัติตามระบบที่มีโครงสร้าง กระบวนการที่มีการบันทึกเป็นเอกสาร และลำดับขั้นการอนุมัติ',
+    bullets: ['ไม่มีทางลัด', 'ไม่มีข้อผูกพันที่ไม่มีเอกสารรองรับ', 'ไม่มีการตัดสินใจที่ไม่มีการควบคุม'],
+    footer: 'วินัยช่วยปกป้องสภาพคล่อง ชื่อเสียง และความมั่นคงในระยะยาวของเรา',
   },
   {
     name: 'Responsibility',
     th: 'ความรับผิดชอบ',
-    body: 'Every action has operational and financial impact. We take ownership of:',
-    bullets: ['Our decisions', 'Our documentation', 'Our deadlines', 'Our results'],
-    footer: 'Responsibility is not transferred — it is upheld.',
+    body: 'ทุกการกระทำส่งผลกระทบต่อการดำเนินงานและการเงิน เรารับผิดชอบต่อ:',
+    bullets: ['การตัดสินใจของเรา', 'เอกสารของเรา', 'กำหนดเวลาของเรา', 'ผลลัพธ์ของเรา'],
+    footer: 'ความรับผิดชอบไม่ใช่สิ่งที่โอนต่อได้ — แต่ต้องยึดมั่นไว้',
   },
   {
     name: 'Integrity',
-    th: 'ความซื่อตรง',
-    body: 'We operate with transparency, honesty, and regulatory compliance.',
-    bullets: ['Accurate reporting', 'Honest measurement', 'Proper documentation', 'Respect for public trust'],
-    footer: 'Integrity ensures sustainability.',
+    th: 'ความซื่อสัตย์',
+    body: 'เราดำเนินงานด้วยความโปร่งใส ความซื่อสัตย์ และการปฏิบัติตามกฎระเบียบ',
+    bullets: ['การรายงานที่ถูกต้อง', 'การวัดผลอย่างตรงไปตรงมา', 'เอกสารที่ถูกต้องครบถ้วน', 'การเคารพความไว้วางใจของสาธารณะ'],
+    footer: 'ความซื่อสัตย์คือหลักประกันความยั่งยืน',
   },
   {
     name: 'Excellence',
-    th: 'ความเป็นเลิศ',
-    body: 'We execute with precision, coordination, and continuous improvement.',
-    bullets: ['Accurate quantities', 'Controlled costs', 'Timely delivery', 'Risk awareness'],
-    footer: 'Excellence is achieved through consistency, not chance.',
+    th: 'ความประณีต',
+    body: 'เราทำงานด้วยความแม่นยำ การประสานงาน และการพัฒนาอย่างต่อเนื่อง',
+    bullets: ['ปริมาณงานที่ถูกต้อง', 'ต้นทุนที่ควบคุมได้', 'ส่งมอบงานตรงเวลา', 'ความตระหนักถึงความเสี่ยง'],
+    footer: 'ความเป็นเลิศเกิดจากความสม่ำเสมอ ไม่ใช่ความบังเอิญ',
   },
 ];
 
@@ -44,53 +48,49 @@ export default function Preboarding({ onStart }) {
   return (
     <div className="space-y-5">
       <div className="card space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-brand">{t('ก่อนเริ่มงาน')}</p>
-        <h2 className="text-xl font-bold text-slate-800">VCB 90-Day Onboarding Portal</h2>
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand">{t('เตรียมความพร้อมก่อนเริ่มงาน')}</p>
+        <h2 className="text-xl font-bold text-slate-800">{t('พอร์ทัลปฐมนิเทศพนักงานใหม่ 90 วัน VCB')}</h2>
         <p className="text-sm text-slate-600">
-          This portal defines the required knowledge, system mastery, execution standards,
-          and governance expectations for all new employees during their first 90 days.
+          {t('พอร์ทัลนี้กำหนดความรู้ที่จำเป็น ความเชี่ยวชาญในระบบ มาตรฐานการปฏิบัติงาน และข้อกำหนดด้านธรรมาภิบาลสำหรับพนักงานใหม่ทุกคนในช่วง 90 วันแรก')}
         </p>
         <p className="text-sm text-slate-500">
-          Confirmation of employment is based on competency, documentation accuracy,
-          system discipline, and risk awareness.
+          {t('การยืนยันการจ้างงานพิจารณาจากความสามารถ ความถูกต้องของเอกสาร วินัยในการใช้ระบบ และความตระหนักถึงความเสี่ยง')}
         </p>
       </div>
 
       <div className="card">
         <h3 className="mb-3 flex items-center gap-2 font-bold text-slate-800">
-          <Icon name="chat" className="h-4 w-4 text-brand" /> {t('สารต้อนรับจากประธานเจ้าหน้าที่บริหาร')}
+          <Icon name="chat" className="h-4 w-4 text-brand" /> {t('สารต้อนรับจากท่านกรรมการผู้จัดการ')}
         </h3>
         <blockquote className="border-l-4 border-brand/30 pl-4 text-slate-700">
           <p className="italic">
-            “We’re thrilled to have you onboard. We believe that every person here contributes
-            to our success, and we’re committed to helping you thrive.
-            Let’s build something great together.”
+            {t('เรารู้สึกยินดีเป็นอย่างยิ่งที่คุณมาร่วมงานกับเรา เราเชื่อว่าทุกคนที่นี่มีส่วนร่วมต่อความสำเร็จของเรา และเรามุ่งมั่นที่จะช่วยให้คุณเติบโตก้าวหน้า มาร่วมกันสร้างสิ่งที่ยิ่งใหญ่ไปด้วยกัน')}
           </p>
-          <footer className="mt-2 text-sm font-medium text-slate-500">— Mr. Voravith Chavananand</footer>
+          <footer className="mt-2 text-sm font-medium text-slate-500">— {t('นาย วรวิทย์ ชวนะนันท์')}</footer>
         </blockquote>
       </div>
 
       <div className="space-y-3">
         <div>
-          <h3 className="font-bold text-slate-800">{t('ค่านิยมองค์กร')} · VCB Culture &amp; Values</h3>
-          <p className="text-sm text-slate-500">{t('สิ่งที่เรายึดถือ — ทำความเข้าใจตั้งแต่วันแรก')}</p>
+          <h3 className="font-bold text-slate-800">{t('วัฒนธรรมและค่านิยมของ VCB')}</h3>
+          <p className="text-sm text-slate-500">{t('สิ่งที่เรายึดถือ — โปรดซึมซับตั้งแต่วันแรก')}</p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {VALUES.map((v) => (
             <div key={v.name} className="card space-y-2">
               <div className="flex items-baseline gap-2">
-                <h4 className="font-bold text-slate-800">{v.name}</h4>
-                <span className="text-sm text-slate-500">{v.th}</span>
+                <h4 className="font-bold text-slate-800">{t(v.th)}</h4>
+                <span className="text-sm text-slate-400">{v.name}</span>
               </div>
-              <p className="text-sm text-slate-600">{v.body}</p>
+              <p className="text-sm text-slate-600">{t(v.body)}</p>
               <ul className="space-y-1">
                 {v.bullets.map((b) => (
                   <li key={b} className="flex items-start gap-2 text-sm text-slate-600">
-                    <Icon name="check" className="mt-1 h-3 w-3 shrink-0 text-brand" /> {b}
+                    <Icon name="check" className="mt-1 h-3 w-3 shrink-0 text-brand" /> {t(b)}
                   </li>
                 ))}
               </ul>
-              <p className="border-t border-slate-100 pt-2 text-xs text-slate-500">{v.footer}</p>
+              <p className="border-t border-slate-100 pt-2 text-xs text-slate-500">{t(v.footer)}</p>
             </div>
           ))}
         </div>
@@ -98,7 +98,7 @@ export default function Preboarding({ onStart }) {
 
       <div className="flex justify-end">
         <button onClick={onStart} className="btn-primary">
-          {t('เริ่มจากเอกสารที่ต้องส่ง')} <Icon name="arrowRight" className="h-4 w-4" />
+          {t('ไปที่เอกสารที่จำเป็น')} <Icon name="arrowRight" className="h-4 w-4" />
         </button>
       </div>
     </div>

@@ -12,12 +12,16 @@ import { useT } from '../../lib/i18n.jsx';
  * Three views of the same queue, because three different people come here: the
  * person who filed it wants to know where it got to, the supervisor wants the
  * ones still waiting on them, and both want to look back at what was decided.
+ *
+ * แถวหนึ่งคือหนึ่งคำขอ วางเป็นกริดคอลัมน์เดียวกับหัวตาราง (แบบ .lv-ticket ของเขา)
+ * บนจอกว้าง และยุบเป็นกองซ้อนบนจอแคบ — หัวตารางจึงซ่อนบนจอแคบด้วย เพราะหัว
+ * คอลัมน์ที่ไม่ตรงกับคอลัมน์ไหนเลยอ่านไม่รู้เรื่อง
  */
 const STATUS = {
-  pending:   { label: 'รออนุมัติ',  chip: 'bg-amber-50 text-amber-700' },
-  approved:  { label: 'อนุมัติแล้ว', chip: 'bg-emerald-50 text-emerald-700' },
-  rejected:  { label: 'ไม่อนุมัติ',  chip: 'bg-rose-50 text-rose-700' },
-  cancelled: { label: 'ยกเลิกแล้ว',  chip: 'bg-slate-100 text-slate-500' },
+  pending:   { label: 'รออนุมัติ',  chip: 'bg-amber-50 text-amber-700',     bar: '#e8b500' },
+  approved:  { label: 'อนุมัติแล้ว', chip: 'bg-emerald-50 text-emerald-700', bar: '#1f9d55' },
+  rejected:  { label: 'ไม่อนุมัติ',  chip: 'bg-rose-50 text-rose-700',       bar: '#e0533a' },
+  cancelled: { label: 'ยกเลิกแล้ว',  chip: 'bg-slate-100 text-slate-500',    bar: '#cbd5e1' },
 };
 const DAY_PART_TH = { first_half: 'ครึ่งวันเช้า', second_half: 'ครึ่งวันบ่าย' };
 const thDate = (v) => {
@@ -26,21 +30,43 @@ const thDate = (v) => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear() + 543}`;
 };
 
+/** คอลัมน์ชุดเดียวกันทั้งหัวตารางและแถว จะได้ตรงกันแน่นอน */
+const GRID = 'md:grid md:grid-cols-[minmax(8rem,1.1fr)_minmax(5.5rem,.8fr)_minmax(8.5rem,1fr)_3.5rem_minmax(5rem,.7fr)_minmax(7rem,1.1fr)_auto] md:items-start md:gap-x-3';
+
+function HeadRow() {
+  const t = useT();
+  return (
+    <div className={`hidden border-b border-slate-200 bg-slate-50/60 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${GRID}`}>
+      <div>{t('ชื่อพนักงาน')}</div>
+      <div>{t('หน่วยงาน')}</div>
+      <div>{t('ช่วงวันที่ลา')}</div>
+      <div>{t('วัน')}</div>
+      <div>{t('ประเภทการลา')}</div>
+      <div>{t('เหตุผล')}</div>
+      <div className="text-right">{t('สถานะ')}</div>
+    </div>
+  );
+}
+
 function Row({ r, children, onOpenFile, onDownloadFile }) {
   const t = useT();
   const st = STATUS[r.status] || STATUS.pending;
   return (
-    <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-b border-slate-100 px-4 py-3 last:border-0">
-      <div className="min-w-[180px] flex-1">
-        <div className="font-medium text-slate-800">{r.employee_name}</div>
-        <div className="text-xs text-slate-500">{r.site_name || '—'}{r.employee_code ? ` · ${r.employee_code}` : ''}</div>
+    <div className={`border-b border-slate-100 px-4 py-3 last:border-0 ${GRID}`}
+      style={{ borderLeft: `4px solid ${st.bar}` }}>
+      {/* ชื่อพนักงานขึ้นทุกแท็บ รวมแท็บ "คำขอของฉัน" — ของเขาซ่อนได้เพราะแท็บนั้น
+          คือคำขอของตัวเองจริง ๆ ส่วนของเราฝ่ายบุคคลยื่นแทนคนอื่น ไม่มีชื่อแล้ว
+          อ่านไม่ออกว่าแถวนี้ของใคร */}
+      <div className="min-w-0">
+        <div className="truncate font-medium text-slate-800">{r.employee_name}</div>
+        {r.employee_code && <div className="truncate text-[11px] text-slate-400 md:hidden">{r.employee_code}</div>}
       </div>
-      <div className="min-w-[150px]">
-        <div className="text-sm text-slate-800">{thDate(r.from_date)} – {thDate(r.to_date)}</div>
-        <div className="text-xs text-slate-500">
-          {r.days} {t('วัน ·')} {r.leave_type_th}
-          {DAY_PART_TH[r.day_part] ? ` · ${t(DAY_PART_TH[r.day_part])}` : ''}
-        </div>
+      <div className="min-w-0 text-xs text-slate-500">
+        <span className="truncate">{r.site_name || '—'}</span>
+      </div>
+
+      <div className="min-w-0 text-sm text-slate-800">
+        {thDate(r.from_date)} – {thDate(r.to_date)}
         {/* A certificate that can be attached and never opened again is a filing
             cabinet with no handle — the name is the button. */}
         {r.has_attachment && (
@@ -57,21 +83,26 @@ function Row({ r, children, onOpenFile, onDownloadFile }) {
           </div>
         )}
       </div>
-      <div className="min-w-[160px] flex-1">
+      <div className="text-sm tabular-nums text-slate-600">{r.days} {t('วัน')}</div>
+      <div className="min-w-0 text-xs text-slate-600">
+        {r.leave_type_th}
+        {DAY_PART_TH[r.day_part] ? <div className="text-slate-400">{t(DAY_PART_TH[r.day_part])}</div> : null}
+      </div>
+      <div className="min-w-0">
         {r.reason
-          ? <div className="text-sm text-slate-600">{r.reason}</div>
+          ? <div className="truncate text-sm text-slate-600" title={r.reason}>{r.reason}</div>
           : <div className="text-sm text-slate-400">{t('— ไม่ได้ระบุเหตุผล')}</div>}
         {r.decided_by_name ? (
-          <div className="mt-0.5 text-xs text-slate-500">
+          <div className="mt-0.5 text-[11px] text-slate-500">
             {t(st.label, null, 'status')}{t('โดย')} {r.decided_by_name} · {thDate(r.decided_at)}
             {r.decide_note ? ` — ${r.decide_note}` : ''}
           </div>
         ) : r.status === 'pending' && r.approver_names ? (
           // Waiting is easier to accept when you know who you are waiting for.
-          <div className="mt-0.5 text-xs text-slate-500">{t('รอ')} {r.approver_names} {t('อนุมัติ')}</div>
+          <div className="mt-0.5 text-[11px] text-slate-500">{t('รอ')} {r.approver_names} {t('อนุมัติ')}</div>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-2 md:mt-0">
         <span className={`chip ${st.chip}`}>{t(st.label, null, 'status')}</span>
         {children}
       </div>
@@ -87,20 +118,24 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
   const [mine, setMine] = useState(null);
   const [pending, setPending] = useState(null);
   const [decided, setDecided] = useState(null);
+  const [decidedTotal, setDecidedTotal] = useState(0);
   const [canDecide, setCanDecide] = useState(false);
   const [tab, setTab] = useState('mine');
+  const [histFilter, setHistFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ employeeId: '', leaveType: 'sick', from: '', to: '', reason: '', dayPart: 'full', file: null });
   const [error, setError] = useState(null);
 
   const load = useCallback(() => Promise.all([
     perfApi.leaveTypes(), perfApi.myLeave(), perfApi.pendingLeave(), perfApi.decidedLeave(),
-  ]).then(([t, m, p, d]) => {
-    setTypes(t.types || []);
+  // ห้ามตั้งชื่อตัวแปรว่า t นอกจากฟังก์ชันแปล — ตัวแรกคือรายการประเภทการลา
+  ]).then(([lt, m, p, d]) => {
+    setTypes(lt.types || []);
     setMine(m.rows || []);
     setPending(p.rows || []);
     setCanDecide(Boolean(p.canDecide));
     setDecided(d.rows || []);
+    setDecidedTotal(d.total ?? (d.rows || []).length);
   }).catch((e) => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
 
@@ -132,29 +167,39 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
   };
 
   const decide = async (r, approve) => {
+    // ถ้อยคำเดียวกับระบบจริง — ข้อความอนุมัติบอกด้วยว่ามันจะเขียนลงตารางงานให้
     const ok = await confirm({
-      title: approve ? t('อนุมัติการลา') : t('ไม่อนุมัติการลา'),
-      message: `${r.employee_name} · ${thDate(r.from_date)} – ${thDate(r.to_date)} (${r.days} ${t('วัน')})`
-        + (approve ? '\n' + t('วันเหล่านี้จะถูกบันทึกเป็นวันลาในตารางงานให้อัตโนมัติ') : ''),
+      title: approve ? t('อนุมัติ') : t('ไม่อนุมัติ'),
+      message: `${r.employee_name} · ${thDate(r.from_date)} – ${thDate(r.to_date)} (${r.days} ${t('วัน')})\n`
+        + (approve ? t('อนุมัติคำขอลานี้และบันทึกลงตารางงานหรือไม่?') : t('ไม่อนุมัติคำขอลานี้หรือไม่?')),
       confirmLabel: approve ? t('อนุมัติ') : t('ไม่อนุมัติ'), danger: !approve,
     });
     if (!ok) return;
     setBusy(true);
     try {
       await perfApi.decideLeave(r.id, approve);
-      toast.success(approve ? t('อนุมัติแล้ว') : t('บันทึกว่าไม่อนุมัติแล้ว'));
+      toast.success(approve ? t('อนุมัติแล้ว') : t('ไม่อนุมัติแล้ว'));
       await load();
       onChanged?.();
-    } catch (err) { toast.error(err.message); }
+    } catch (err) { toast.error(err.message || t('ดำเนินการไม่สำเร็จ')); }
     finally { setBusy(false); }
   };
 
   const cancel = async (r) => {
-    const ok = await confirm({ title: t('ยกเลิกคำขอลา'), message: t('ยกเลิกคำขอนี้?'), confirmLabel: t('ยกเลิกคำขอ'), danger: true });
+    const ok = await confirm({
+      title: t('ยกเลิกคำขอ'),
+      message: t('ยกเลิกคำขอลานี้หรือไม่? การกระทำนี้ย้อนกลับไม่ได้'),
+      confirmLabel: t('ยกเลิกคำขอ'), danger: true,
+    });
     if (!ok) return;
     setBusy(true);
     try { await perfApi.cancelLeave(r.id); toast.success(t('ยกเลิกคำขอแล้ว')); await load(); }
-    catch (err) { toast.error(err.message); }
+    catch (err) {
+      // 409 = มีคนพิจารณาไปแล้ว แถวไม่ได้เสีย แต่ไม่ใช่ของเราให้ยกเลิกอีกต่อไป
+      toast.error(/ALREADY_DECIDED|พิจารณา/.test(err.message || '')
+        ? t('คำขอนี้ถูกพิจารณาแล้ว ยกเลิกไม่ได้') : (err.message || t('ยกเลิกไม่สำเร็จ')));
+      await load();
+    }
     finally { setBusy(false); }
   };
 
@@ -193,10 +238,19 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
     ...(canDecide ? [{ key: 'pending', label: t('รออนุมัติ'), n: pending.length, hot: pending.length > 0 }] : []),
     ...(canDecide ? [{ key: 'decided', label: t('ประวัติการพิจารณา'), n: decided.length }] : []),
   ];
-  const list = tab === 'mine' ? mine : tab === 'pending' ? pending : decided;
+  const histRows = histFilter === 'all' ? decided : decided.filter((r) => r.status === histFilter);
+  const list = tab === 'mine' ? mine : tab === 'pending' ? pending : histRows;
+
+  // นับสรุปบนหัวรายการ — เห็นภาพรวมก่อนไล่อ่านทีละแถว (ตามระบบจริง)
+  const n = (rows, s) => rows.filter((r) => r.status === s).length;
 
   return (
     <div className="space-y-4">
+      <div className="card">
+        <h2 className="text-lg font-bold text-slate-800">{t('คำขอ')}</h2>
+        <p className="mt-0.5 text-sm text-slate-500">{t('ขอลาและติดตามสถานะคำขอของคุณ')}</p>
+      </div>
+
       {canEntry && (
         <form onSubmit={submit} className="card space-y-3">
           <h3 className="text-sm font-bold text-slate-800">{t('ขอลาใหม่')}</h3>
@@ -204,7 +258,7 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อพนักงาน')} <span className="text-red-500">*</span></label>
               <select value={form.employeeId} onChange={(e) => setForm((f) => ({ ...f, employeeId: e.target.value }))} className="field">
-                <option value="">{t('— เลือกพนักงาน —')}</option>
+                <option value="">{t('— เลือกชื่อ —')}</option>
                 {employees.map((e) => <option key={e.eid} value={e.eid}>{e.name}</option>)}
               </select>
             </div>
@@ -247,7 +301,7 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('เหตุผล (ถ้ามี)')}</label>
             <input value={form.reason} onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-              placeholder={t('เช่น ไปโรงพยาบาล')} className="field" />
+              maxLength={300} placeholder={t('เช่น ลาป่วย ลากิจ ลาพักผ่อน')} className="field" />
           </div>
           {error && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
           <div className="flex items-center gap-3">
@@ -268,32 +322,62 @@ export default function LeaveView({ employees, canEntry, onChanged, features = {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white">
+      {/* สรุปจำนวนและคำอธิบายขอบเขตของแต่ละแท็บ */}
+      {tab === 'mine' && mine.length > 0 && (
+        <p className="text-xs text-slate-500">
+          {t('รอดำเนินการ')} {n(mine, 'pending')} · {t('อนุมัติแล้ว')} {n(mine, 'approved')} · {t('ไม่อนุมัติ')} {n(mine, 'rejected')}
+        </p>
+      )}
+      {tab === 'pending' && <p className="text-xs text-slate-500">{t('ทุกหน่วยงานในสิทธิ์ของคุณ')}</p>}
+      {tab === 'decided' && (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {[['all', 'ทั้งหมด'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ']].map(([k, label]) => (
+              <button key={k} onClick={() => setHistFilter(k)}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition ${histFilter === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {t(label, null, 'status')}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">
+            {t('อนุมัติแล้ว')} {n(decided, 'approved')} · {t('ไม่อนุมัติ')} {n(decided, 'rejected')}
+            {/* บอกตรง ๆ เมื่อเซิร์ฟเวอร์ตัดรายการ ไม่ให้ประวัติบางส่วนอ่านเหมือนทั้งหมด */}
+            {decidedTotal > decided.length && <b> · {t('แสดง')} {decided.length}/{decidedTotal}</b>}
+          </p>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {list.length === 0 ? (
           <p className="py-12 text-center text-sm text-slate-500">
-            {tab === 'mine' ? t('ยังไม่มีคำขอลาของท่าน')
-              : tab === 'pending' ? t('ไม่มีคำขอรออนุมัติ') : t('ยังไม่มีประวัติการพิจารณา')}
+            {tab === 'mine' ? t('ยังไม่มีคำขอลา')
+              : tab === 'pending' ? t('ไม่มีคำขอลาที่รอดำเนินการ') : t('ยังไม่มีประวัติการพิจารณา')}
           </p>
-        ) : list.map((r) => (
-          <Row key={r.id} r={r} onOpenFile={openAttachment} onDownloadFile={downloadAttachment}>
-            {tab === 'pending' && (
-              <>
-                <button onClick={() => decide(r, true)} disabled={busy}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">{t('อนุมัติ')}</button>
-                <button onClick={() => decide(r, false)} disabled={busy}
-                  className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50">{t('ไม่อนุมัติ')}</button>
-              </>
-            )}
-            <button onClick={() => openSlip(r)} title={t('เปิดใบลาเพื่อพิมพ์')}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
-              <Icon name="file" className="h-4 w-4" /> {t('ใบลา')}
-            </button>
-            {tab === 'mine' && r.status === 'pending' && (
-              <button onClick={() => cancel(r)} disabled={busy}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">{t('ยกเลิกคำขอ')}</button>
-            )}
-          </Row>
-        ))}
+        ) : (
+          <>
+            <HeadRow />
+            {list.map((r) => (
+              <Row key={r.id} r={r} onOpenFile={openAttachment} onDownloadFile={downloadAttachment}>
+                {tab === 'pending' && (
+                  <>
+                    <button onClick={() => decide(r, true)} disabled={busy}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">{t('อนุมัติ')}</button>
+                    <button onClick={() => decide(r, false)} disabled={busy}
+                      className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50">{t('ไม่อนุมัติ')}</button>
+                  </>
+                )}
+                <button onClick={() => openSlip(r)} title={t('เปิดใบลาเพื่อพิมพ์')}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                  <Icon name="file" className="h-4 w-4" /> {t('ใบลา')}
+                </button>
+                {tab === 'mine' && r.status === 'pending' && (
+                  <button onClick={() => cancel(r)} disabled={busy}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">{t('ยกเลิกคำขอ')}</button>
+                )}
+              </Row>
+            ))}
+          </>
+        )}
       </div>
 
       {!canDecide && (

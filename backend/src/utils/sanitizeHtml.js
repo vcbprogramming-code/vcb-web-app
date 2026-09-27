@@ -35,22 +35,62 @@ const ATTRS = {
 
 const VOID = new Set(['br', 'hr', 'img', 'col']);
 
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/** หนีอักขระในค่าของแอตทริบิวต์ — เข้มที่สุด & ทุกตัวถูกหนี */
+const escAttr = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/** A link or image target we are willing to put in front of a reader. */
+/**
+ * หนีอักขระในเนื้อข้อความ โดยไม่หนีสิ่งที่ถูกหนีไว้แล้ว
+ *
+ * ของเดิมหนี & ทุกตัวรวมทั้งตัวที่เป็นส่วนหนึ่งของอักขระอ้างอิงที่ถูกต้องอยู่แล้ว
+ * "SG&amp;A" ที่วางมาจาก Google Docs จึงกลายเป็น "SG&amp;amp;A" แล้วขึ้นบนจอว่า
+ * "SG&amp;A" ตรง ๆ — พบตอนนำเข้าบันทึกการประชุมจริง 27 จาก 82 ฉบับมีอาการนี้ และ
+ * ใครพิมพ์ "A & B" ในตัวแก้ไขของเราเองก็เจอเหมือนกัน เพราะเบราว์เซอร์ส่ง &amp; มา
+ *
+ * ปล่อยอักขระอ้างอิงผ่านได้อย่างปลอดภัย: ในตำแหน่งข้อความ &lt;script&gt; คือ
+ * ตัวอักษรที่อ่านว่า <script> ไม่ใช่แท็ก เบราว์เซอร์ไม่เคยตีความมันเป็นแท็ก
+ * (ต่างจากในค่าแอตทริบิวต์ ซึ่งยังใช้ escAttr เข้ม ๆ ตามเดิม)
+ */
+const escText = (s) => String(s)
+  .replace(/&(?!#\d{1,7};|#[xX][0-9a-fA-F]{1,6};|[a-zA-Z][a-zA-Z0-9]{1,31};)/g, '&amp;')
+  .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * ถอดอักขระอ้างอิงในค่าที่เป็น URL ก่อนตรวจว่าปลอดภัยไหม
+ *
+ * ต้องถอดก่อนตรวจ ไม่ใช่หลัง: เบราว์เซอร์ถอดให้เองตอนผู้ใช้กดลิงก์ ถ้าตรวจจาก
+ * ข้อความดิบ "&#106;avascript:alert(1)" จะผ่านทุกด่าน แล้วค่อยกลายเป็น
+ * javascript: ตอนที่มีคนกด — ซึ่งก็คือช่องที่เรากำลังปิดอยู่นี่เอง
+ */
+const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', tab: '\t', newline: '\n', semi: ';' };
+function decodeRefs(raw) {
+  return String(raw)
+    // ตัวเลขถอดได้แม้ไม่มีอัฒภาค เบราว์เซอร์ก็ถอด ("&#106avascript:")
+    .replace(/&#(\d{1,7});?/g, (m, d) => { try { return String.fromCodePoint(+d); } catch { return m; } })
+    .replace(/&#[xX]([0-9a-fA-F]{1,6});?/g, (m, h) => { try { return String.fromCodePoint(parseInt(h, 16)); } catch { return m; } })
+    // ชื่อที่เบราว์เซอร์ยอมให้ไม่มีอัฒภาคมีแค่ชุดเก่าสี่ตัวนี้
+    .replace(/&(amp|lt|gt|quot);?/gi, (m, n) => NAMED[n.toLowerCase()])
+    // ที่เหลือต้องมีอัฒภาค — ถ้าถอดโดยไม่บังคับ URL จริงอย่าง "?a=1&tab=t.0"
+    // จะถูกแปลงเป็นแท็บแล้วลิงก์ของลูกค้าก็พัง
+    .replace(/&(apos|colon|tab|newline|semi);/gi, (m, n) => NAMED[n.toLowerCase()]);
+}
+
+/** A link or image target we are willing to put in front of a reader.
+ *  ตรวจจาก "สิ่งที่เบราว์เซอร์จะได้จริง" — ถอดอักขระอ้างอิงและช่องว่างที่เบราว์เซอร์
+ *  ไม่สนใจออกก่อน ("&#106;avascript:", "java\tscript:") แล้วคืนค่าดิบไปเขียนต่อ */
 function safeUrl(raw, { image = false } = {}) {
-  const v = String(raw || '').trim();
+  const v = decodeRefs(String(raw || '')).trim();
   if (!v) return null;
+  const probe = v.replace(/[\s\u0000-\u001f]/g, '');
   // javascript:, vbscript:, and data: URIs that can carry script. An image may
   // be a data: URI only when it is a real raster image — an SVG data URI is a
   // document that can run script.
-  if (/^\s*(javascript|vbscript|file):/i.test(v)) return null;
-  if (/^data:/i.test(v)) {
+  if (/^(javascript|vbscript|file):/i.test(probe)) return null;
+  if (/^data:/i.test(probe)) {
     if (!image) return null;
-    return /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(v) ? v : null;
+    return /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(probe) ? v : null;
   }
-  if (/^(https?:)?\/\//i.test(v) || v.startsWith('/') || v.startsWith('#')) return v;
-  if (/^mailto:|^tel:/i.test(v)) return v;
+  if (/^(https?:)?\/\//i.test(probe) || probe.startsWith('/') || probe.startsWith('#')) return v;
+  if (/^mailto:|^tel:/i.test(probe)) return v;
   return null;
 }
 
@@ -69,8 +109,8 @@ export function sanitizeHtml(html, { maxLength = 400000 } = {}) {
 
   while (i < src.length) {
     const lt = src.indexOf('<', i);
-    if (lt < 0) { out += esc(src.slice(i)); break; }
-    out += esc(src.slice(i, lt));
+    if (lt < 0) { out += escText(src.slice(i)); break; }
+    out += escText(src.slice(i, lt));
 
     // comments and CDATA go entirely, including anything hiding inside them
     if (src.startsWith('<!--', lt)) {
@@ -78,8 +118,15 @@ export function sanitizeHtml(html, { maxLength = 400000 } = {}) {
       i = end < 0 ? src.length : end + 3;
       continue;
     }
+
+    // "<" ที่ไม่ได้ตามด้วยตัวอักษร / "/" / "!" / "?" ไม่ใช่การเปิดแท็ก มันคือ
+    // เครื่องหมายน้อยกว่าที่คนพิมพ์ ("งบ 5 < 10 ล้าน") เบราว์เซอร์ก็อ่านเป็น
+    // ข้อความแบบนั้น แต่ของเดิมกระโดดไปหา ">" ตัวถัดไปแล้วกลืนทุกอย่างระหว่าง
+    // ทางทิ้ง — ประโยคขาดหายไปกลางบรรทัดโดยไม่มีอะไรบอก
+    if (!/[a-zA-Z/!?]/.test(src[lt + 1] || '')) { out += '&lt;'; i = lt + 1; continue; }
+
     const gt = src.indexOf('>', lt);
-    if (gt < 0) { out += esc(src.slice(lt)); break; }
+    if (gt < 0) { out += escText(src.slice(lt)); break; }
 
     const raw = src.slice(lt + 1, gt).trim();
     i = gt + 1;
@@ -124,7 +171,7 @@ export function sanitizeHtml(html, { maxLength = 400000 } = {}) {
       }
       if ((key === 'width' || key === 'height' || key === 'colspan' || key === 'rowspan' || key === 'span')
         && !/^\d{1,4}$/.test(val)) continue;
-      attrs += ` ${key}="${esc(val)}"`;
+      attrs += ` ${key}="${escAttr(val)}"`;
     }
     // a link that opens elsewhere must not hand the opener to the target page
     if (name === 'a' && /target="_blank"/.test(attrs) && !/rel=/.test(attrs)) {

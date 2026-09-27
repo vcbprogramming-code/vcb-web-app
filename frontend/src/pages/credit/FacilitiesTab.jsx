@@ -1,20 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { creditApi, formatMoney } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
+import { useToast } from '../../components/Toast.jsx';
 import { useT } from '../../lib/i18n.jsx';
-
-// ป้ายสีตามป้ายสั้นบนเอกสาร (doc_kind) ของทะเบียนประเภทวงเงิน
-const TYPE_CHIP = {
-  BG: 'bg-pink-50 text-pink-700',
-  'L/G': 'bg-fuchsia-50 text-fuchsia-700',
-  'T/L': 'bg-amber-50 text-amber-700',
-  'B/E': 'bg-blue-50 text-blue-700',
-  'P/N': 'bg-violet-50 text-violet-700',
-  'M/L': 'bg-teal-50 text-teal-700',
-  DLC: 'bg-sky-50 text-sky-700',
-  'PN-post': 'bg-indigo-50 text-indigo-700',
-};
+import DrawdownModal from './DrawdownModal.jsx';
+import { TYPE_CHIP, SortTh, useSort, projectLabel, typeParams } from './shared.jsx';
 
 function FacilityModal({ facility, projects, types, onClose, onSaved }) {
   const t = useT();
@@ -27,10 +18,11 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
     // วงเงินก้อนนี้ไปรวมอยู่กล่องไหนบนหน้าภาพรวม
     facilityNo: facility?.facility_no ?? (types[0]?.no ?? 1),
     limit: facility?.limit ?? '',
-    usedBaseline: facility ? '' : '',
+    usedBaseline: '',
     // ยอดใช้ไปที่ปักเอง — ว่างไว้ = คำนวณจากรายการ (setUsedOverride ของระบบจริง)
     usedOverride: facility?.used_overridden ? String(facility.used) : '',
-    interestRate: facility?.interest_rate ?? '',
+    // อัตราดอกเบี้ยตามหนังสือธนาคาร เป็นประโยค ไม่ใช่ตัวเลข
+    interestNote: facility?.interest_note ?? (facility?.interest_rate != null ? `${facility.interest_rate} % ต่อปี` : ''),
     dueDate: facility?.due_date ? String(facility.due_date).slice(0, 10) : '',
     notes: facility?.notes || '',
   });
@@ -49,7 +41,7 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
         bank: form.bank || null,
         facilityNo: Number(form.facilityNo),
         limit: Number(form.limit) || 0,
-        interestRate: form.interestRate === '' ? null : Number(form.interestRate),
+        interestNote: form.interestNote.trim() || null,
         dueDate: form.dueDate || null,
         notes: form.notes || null,
       };
@@ -71,6 +63,14 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
     }
   };
 
+  // ตัวเลขที่ระบบจะใช้คำนวณดอกเบี้ยเกินกำหนดจากข้อความที่กรอก — กฎเดียวกับฝั่ง
+  // เซิร์ฟเวอร์ ให้คนกรอกเห็นทันทีว่าประโยคที่พิมพ์คำนวณได้หรือไม่ได้
+  const ratePreview = useMemo(() => {
+    const m = String(form.interestNote || '').match(/(\d+(\.\d+)?)\s*%/);
+    if (m) return `${t('คำนวณดอกเบี้ยที่')} ${m[1]}% ${t('ต่อปี')}`;
+    return String(form.interestNote || '').trim() ? t('ระบุอัตราไม่ได้') : '';
+  }, [form.interestNote, t]);
+
   return (
     <Modal
       title={editing ? t('แก้ไขวงเงินสินเชื่อ') : t('เพิ่มวงเงินสินเชื่อ')}
@@ -79,7 +79,7 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
       footer={
         <>
           <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
-          <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+          <button onClick={submit} disabled={busy} className="btn-primary">{busy ? t('กำลังบันทึก…') : t('บันทึก')}</button>
         </>
       }
     >
@@ -87,13 +87,13 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('โครงการ')} <span className="text-red-500">*</span></label>
-            <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field">
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
+            <select value={form.projectId} onChange={(e) => set('projectId', e.target.value)} className="field" title={t('โครงการ')}>
+              {projects.map((p) => <option key={p.id} value={p.id}>{projectLabel(p)}</option>)}
             </select>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('ประเภทวงเงิน')} <span className="text-red-500">*</span></label>
-            <select value={form.facilityNo} onChange={(e) => set('facilityNo', e.target.value)} className="field">
+            <select value={form.facilityNo} onChange={(e) => set('facilityNo', e.target.value)} className="field" title={t('ประเภทวงเงิน')}>
               {types.map((ty) => (
                 <option key={ty.no} value={ty.no}>{ty.no}. {ty.name_th}</option>
               ))}
@@ -125,8 +125,16 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
               placeholder={t('เช่น เลขที่วงเงินตามหนังสือธนาคาร')} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อัตราดอกเบี้ย (%/ปี)')}</label>
-            <input type="number" step="0.01" value={form.interestRate} onChange={(e) => set('interestRate', e.target.value)} className="field" />
+            {/* หนังสือวงเงินของธนาคารเขียนเงื่อนไขเป็นประโยค ไม่ใช่ตัวเลขเดียว —
+                ช่องตัวเลขบังคับให้คนกรอกตัดความจริงทิ้ง ("เรียกเก็บทุก 3 เดือน") */}
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อัตราดอกเบี้ย')}</label>
+            <input value={form.interestNote} onChange={(e) => set('interestNote', e.target.value)} className="field"
+              placeholder={t('เช่น MLR ต่อปี / 1.25 % ต่อปีเรียกเก็บทุก 3 เดือน')} />
+            {ratePreview && (
+              <p className={`mt-1 text-xs ${ratePreview === t('ระบุอัตราไม่ได้') ? 'text-amber-700' : 'text-slate-500'}`}>
+                {ratePreview}
+              </p>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -159,137 +167,89 @@ function FacilityModal({ facility, projects, types, onClose, onSaved }) {
   );
 }
 
-function DrawdownModal({ facility, costCategories = [], onClose, onSaved }) {
+/**
+ * ปรับวงเงิน / ใช้ไป — จอสั้นจอเดียวที่คนใช้ทุกเดือน
+ *
+ * ทุกต้นเดือนธนาคารส่งยอดมาให้กระทบ งานที่ทำคือแก้สองช่องนี้ ไม่ใช่แก้ทะเบียน
+ * วงเงินทั้งใบ ระบบจริงจึงแยกจอนี้ออกมา (openLimit) และยิงเฉพาะช่องที่เปลี่ยน
+ * — ช่องที่ไม่ได้แตะไม่ถูกเขียน ประวัติการแก้ไขจึงไม่มีรายการเปล่า ๆ ปนอยู่
+ *
+ * ช่อง "ใช้ไป" เว้นว่าง = กลับไปให้ระบบคำนวณจากรายการ ไม่ใช่ตั้งเป็นศูนย์ —
+ * ศูนย์เป็นค่าที่ธนาคารแจ้งได้จริง จึงต้องแยกจากการไม่กรอก
+ */
+function AdjustLimitModal({ facility, label, onClose, onSaved }) {
   const t = useT();
-  const [form, setForm] = useState({
-    amount: '', startDate: '', dueDate: '', termDays: '', ref: '', note: '',
-    counterparty: '', beneficiary: '', costCategory: '',
-  });
+  const toast = useToast();
+  const auto = Number(facility.used_auto ?? facility.used ?? 0);
+  const [limit, setLimit] = useState(String(Number(facility.limit || 0)));
+  const [used, setUsed] = useState(facility.used_overridden ? String(Number(facility.used)) : '');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const save = async () => {
+    const lim = Number(String(limit).replace(/,/g, ''));
+    if (String(limit).trim() === '' || Number.isNaN(lim) || lim < 0) { toast.error(t('กรอกวงเงินให้ถูกต้อง')); return; }
+    const raw = String(used).trim();
+    const nextUsed = raw === '' ? null : Number(raw.replace(/,/g, ''));
+    if (nextUsed != null && (Number.isNaN(nextUsed) || nextUsed < 0)) { toast.error(t('กรอกยอดใช้ไปให้ถูกต้อง')); return; }
+    const prevUsed = facility.used_overridden ? Number(facility.used) : null;
+    const limitChanged = lim !== Number(facility.limit || 0);
+    const usedChanged = nextUsed !== prevUsed;
+    if (!limitChanged && !usedChanged) { onClose(); return; }
     setBusy(true);
-    setError(null);
     try {
-      await creditApi.addLedger({
-        facilityId: facility.id,
-        amount: Number(form.amount),
-        status: 'อนุมัติแล้ว',
-        startDate: form.startDate || null,
-        dueDate: form.dueDate || null,
-        termDays: form.termDays === '' ? null : Number(form.termDays),
-        ref: form.ref || null,
-        note: form.note || null,
-        counterparty: form.counterparty || null,
-        beneficiary: form.beneficiary || null,
-        costCategory: form.costCategory || null,
-      });
+      if (limitChanged) await creditApi.setLimit(facility.id, lim);
+      if (usedChanged) await creditApi.updateFacility(facility.id, { usedOverride: nextUsed });
+      toast.success(t('ปรับเรียบร้อย'));
       onSaved();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); }
   };
 
   return (
     <Modal
-      title={`บันทึกการใช้วงเงิน · ${facility.type}`}
+      title={t('ปรับวงเงิน / ใช้ไป')}
       onClose={onClose}
+      size="md"
       footer={
         <>
           <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
-          <button onClick={submit} disabled={busy} className="btn-primary">{busy ? 'กำลังบันทึก…' : 'บันทึก'}</button>
+          <button onClick={save} disabled={busy} className="btn-primary">{busy ? t('กำลังบันทึก…') : t('บันทึก')}</button>
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">
-            {t('จำนวนเงิน (บาท) — ใส่ค่าลบเมื่อปลด/คืนวงเงิน')} <span className="text-red-500">*</span>
-          </label>
-          <input type="number" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="field" />
-          {Number(form.amount) < 0 && (
-            <p className="mt-1 text-xs text-amber-700">
-              {t('ยอดติดลบคือการปลดวงเงินคืน — ยอดใช้ไปของวงเงินก้อนนี้จะลดลงเท่าที่ใส่')}
-            </p>
-          )}
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันเริ่ม')}</label>
-            <input type="date" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} className="field" />
-          </div>
-          <div>
-            {/* กรอกจำนวนวันแล้วได้วันครบกำหนดเลย แบบเดียวกับที่เขาทำกันอยู่ */}
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('จำนวนวัน')}</label>
-            <input type="number" value={form.termDays} onChange={(e) => set('termDays', e.target.value)} className="field" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ครบกำหนด')}</label>
-            <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="field" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('รายละเอียด / คู่ค้า')}</label>
-            <input value={form.counterparty} onChange={(e) => set('counterparty', e.target.value)} className="field" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ผู้รับผลประโยชน์')}</label>
-            <input value={form.beneficiary} onChange={(e) => set('beneficiary', e.target.value)} className="field" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            {/* หมวดนี้เป็นตัวป้อนหน้าสรุปค่าใช้จ่าย ไม่ใส่ก็ยังบันทึกได้
-                แต่รายการจะไปรวมอยู่กลุ่ม "ไม่ระบุหมวด" */}
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('หมวดค่าใช้จ่าย')}</label>
-            <select value={form.costCategory} onChange={(e) => set('costCategory', e.target.value)} className="field">
-              <option value="">{t('— ไม่ระบุ —')}</option>
-              {costCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('อ้างอิง / หมายเหตุ')}</label>
-            <input value={form.ref} onChange={(e) => set('ref', e.target.value)} className="field" placeholder={t('เลขที่เอกสาร / อ้างอิง')} />
-          </div>
-        </div>
-        {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
-      </form>
+      <p className="text-sm text-slate-500">{label}</p>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-600">
+          {t('วงเงิน (บาท)')} <span className="text-red-500">*</span>
+        </label>
+        <input type="number" value={limit} onChange={(e) => setLimit(e.target.value)} className="field" />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-600">
+          {t('ใช้ไป (บาท)')}{' '}
+          <span className="text-xs font-normal text-slate-400">{t('— เว้นว่างเพื่อใช้ค่าที่คำนวณอัตโนมัติจากรายการ')}</span>
+        </label>
+        <input type="number" value={used} onChange={(e) => setUsed(e.target.value)} className="field"
+          placeholder={`${t('คำนวณอัตโนมัติ')}: ${auto.toLocaleString('en-US')}`} />
+      </div>
     </Modal>
   );
 }
 
-export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
-  // ทะเบียนประเภทวงเงินโหลดครั้งเดียว — ใช้ทั้งช่องเลือก ตัวกรอง และป้ายกำกับ
-  const [types, setTypes] = useState([]);
-  const [company, setCompany] = useState('');
-  const [costCategories, setCostCategories] = useState([]);
-  // รายชื่อบริษัทอ่านจากวงเงินที่มีอยู่จริง — ไม่ต้องมีทะเบียนแยกให้ดูแลอีกชุด
-  const [companies, setCompanies] = useState([]);
-  useEffect(() => { creditApi.facilityTypes().then((r) => setTypes(r.data || [])).catch(() => setTypes([])); }, []);
-  useEffect(() => { creditApi.costCategories().then((r) => setCostCategories(r.data || [])).catch(() => setCostCategories([])); }, []);
-  useEffect(() => {
-    creditApi.facilities({}).then((r) => setCompanies(
-      [...new Set((r.data || []).map((f) => f.company).filter(Boolean))].sort(),
-    )).catch(() => setCompanies([]));
-  }, []);
+export default function FacilitiesTab({ projects, filters, types = [], costCategories = [], onChanged, openNew = 0 }) {
   const t = useT();
   const [facilities, setFacilities] = useState([]);
   const [error, setError] = useState(null);
-  const [projectId, setProjectId] = useState('');
-  const [type, setType] = useState('');
-  const [search, setSearch] = useState('');
-  useEffect(() => { if (openNew) setEdit(null); }, [openNew]);
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
+  const [adjust, setAdjust] = useState(null);
   const [drawdown, setDrawdown] = useState(null);
+  const sort = useSort();
+  useEffect(() => { if (openNew) setEdit(null); }, [openNew]);
 
+  // ตัวกรองมาจากแถบชุดเดียวบนหน้าหลัก แท็บนี้แค่ใช้ค่าที่ได้มา
+  const { projectId = '', company = '', search = '', type = '' } = filters || {};
   const load = useCallback(() => {
-    creditApi.facilities({ projectId, type, search, company })
+    creditApi.facilities({ projectId, search, company, ...typeParams(type) })
       .then((r) => setFacilities(r.data)).catch((e) => setError(e.message));
   }, [projectId, type, search, company]);
   useEffect(() => {
@@ -297,34 +257,34 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
     return () => clearTimeout(timer);
   }, [load, search]);
 
-  const projName = Object.fromEntries(projects.map((p) => [p.id, p.name || p.code]));
-  const refresh = () => { load(); onChanged?.(); setEdit(undefined); setDrawdown(null); };
+  const projById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
+  const projName = (id) => (projById[id] ? (projById[id].name || projById[id].code) : '—');
+  const projCode = (id) => projById[id]?.code || '';
+  const refresh = () => { load(); onChanged?.(); setEdit(undefined); setDrawdown(null); setAdjust(null); };
+
+  const rows = useMemo(() => {
+    // ลำดับตั้งต้น: รหัสโครงการ แล้วเลขประเภท — ตรงกับ facTable() ของระบบจริง
+    // ซึ่งเรียงด้วย x.project (รหัสโครงการ) ไม่ใช่ชื่อไทย การเรียงด้วยชื่อไทยดัน
+    // โครงการที่ชื่อเป็นอักษรโรมัน (LPB) ขึ้นเป็นแถวแรกทั้งที่ยังไม่มีวงเงินสักบาท
+    const base = facilities.slice().sort((a, b) => {
+      const pa = projCode(a.project_id); const pb = projCode(b.project_id);
+      if (pa !== pb) return pa < pb ? -1 : 1;
+      return Number(a.facility_no || 0) - Number(b.facility_no || 0);
+    });
+    return sort.apply(base, {
+      project: (f) => projCode(f.project_id),
+      company: (f) => f.company || '',
+      type: (f) => f.type || '',
+      limit: (f) => Number(f.limit) || 0,
+      used: (f) => Number(f.used) || 0,
+      available: (f) => Number(f.available) || 0,
+      pct: (f) => (Number(f.limit) > 0 ? Number(f.used) / Number(f.limit) : 0),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facilities, sort, projById]);
 
   return (
     <div className="space-y-4">
-      {/* filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="field !w-auto">
-          <option value="">{t('ทุกโครงการ')}</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name || p.code}</option>)}
-        </select>
-        <select value={type} onChange={(e) => setType(e.target.value)} className="field !w-auto">
-          <option value="">{t('ทุกประเภท')}</option>
-          {/* กรองด้วยกล่องที่พับรวมแล้ว — เลือก B/E ต้องได้ทุกวงเงินที่ใช้ก้อนนั้นร่วมกัน */}
-          {[...new Set(types.map((x) => x.doc_kind))].map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-        {/* บริษัทผู้ถือวงเงิน — กลุ่มนี้มีหลายนิติบุคคลและกิจการร่วมค้า */}
-        <select value={company} onChange={(e) => setCompany(e.target.value)} className="field !w-auto">
-          <option value="">{t('ทุกบริษัท')}</option>
-          {companies.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <div className="relative min-w-[200px] flex-1">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('ค้นหา ธนาคาร / เลขที่วงเงิน')} className="field pl-9" />
-        </div>
-        <button onClick={() => setEdit(null)} className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มวงเงิน')}</button>
-      </div>
-
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       <div className="card !p-0 overflow-x-auto">
@@ -332,23 +292,25 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
           <thead>
             <tr className="tbl-head">
               <th className="tbl-th w-10">#</th>
-              <th className="tbl-th">{t('โครงการ')}</th>
-              <th className="tbl-th">{t('ประเภท')}</th>
-              <th className="tbl-th text-right">{t('วงเงิน')}</th>
-              <th className="tbl-th text-right">{t('ใช้ไป')}</th>
-              <th className="tbl-th text-right">{t('คงเหลือ')}</th>
-              <th className="tbl-th w-40">{t('การใช้')}</th>
-              <th className="tbl-th text-right">{t('จัดการ')}</th>
+              <SortTh sort={sort} colKey="project">{t('โครงการ')}</SortTh>
+              <SortTh sort={sort} colKey="company">{t('บริษัท')}</SortTh>
+              <SortTh sort={sort} colKey="type">{t('ประเภท')}</SortTh>
+              <SortTh sort={sort} colKey="limit" className="text-right">{t('วงเงิน')}</SortTh>
+              <SortTh sort={sort} colKey="used" className="text-right">{t('ใช้ไป')}</SortTh>
+              <SortTh sort={sort} colKey="available" className="text-right">{t('คงเหลือ')}</SortTh>
+              <SortTh sort={sort} colKey="pct" className="w-40">{t('การใช้')}</SortTh>
+              {/* หัวคอลัมน์ปุ่มเว้นว่างไว้ — "จัดการ" ไม่ได้บอกอะไรที่ไอคอนยังไม่บอก */}
+              <th className="tbl-th text-right" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {facilities.length === 0 ? (
-              <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">{t('ยังไม่มีวงเงินสินเชื่อ')}</td></tr>
-            ) : facilities.map((f, i) => (
+            {rows.length === 0 ? (
+              <tr><td colSpan={9} className="px-5 py-10 text-center text-slate-400">{t('ไม่มีข้อมูลวงเงินตามเงื่อนไข')}</td></tr>
+            ) : rows.map((f, i) => (
               <tr key={f.id} className="tbl-row">
                 <td className="tbl-td text-slate-400">{i + 1}</td>
                 <td className="tbl-td">
-                  <div className="font-medium text-slate-800">{projName[f.project_id] || '—'}</div>
+                  <div className="font-medium text-slate-800">{projName(f.project_id)}</div>
                   {/* the bank's own facility number is how finance and the bank
                       refer to the same line — it has to be readable here, not
                       only inside the edit form. */}
@@ -357,27 +319,39 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
                       {[f.bank, f.facility_no].filter(Boolean).join(' · ')}
                     </div>
                   )}
-                  {f.company && <div className="text-xs text-slate-400">{f.company}</div>}
                 </td>
+                <td className="tbl-td text-slate-600">{f.company || '—'}</td>
                 <td className="tbl-td"><span className={`chip ${TYPE_CHIP[f.type] || 'bg-slate-100 text-slate-600'}`}>{f.type}</span></td>
                 <td className="tbl-td text-right tabular-nums">{formatMoney(f.limit)}</td>
                 <td className="tbl-td text-right tabular-nums">
                   {formatMoney(f.used)}
                   {/* ยอดที่ปักเอง ไม่ได้มาจากรายการ — ต้องมองออกทันทีว่าตัวเลขนี้ไม่ได้คำนวณ */}
                   {f.used_overridden && (
-                    <span className="ml-1 font-bold text-amber-600" title={t('ตั้งเอง — ไม่ได้คำนวณจากรายการ')}>*</span>
+                    <span className="ml-1 font-bold text-amber-600" title={t('ตั้งเอง (override) — ไม่ได้คำนวณจากรายการ')}>✱</span>
                   )}
                 </td>
-                <td className={`tbl-td text-right tabular-nums font-medium ${f.available <= 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMoney(f.available)}</td>
+                <td className={`tbl-td text-right tabular-nums font-medium ${f.available < 0 ? 'text-red-600' : f.available === 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatMoney(f.available)}</td>
                 <td className="tbl-td">
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div className={`h-full rounded-full ${f.pct >= 90 ? 'bg-red-500' : f.pct >= 70 ? 'bg-amber-400' : 'bg-brand'}`} style={{ width: `${Math.min(100, f.pct)}%` }} />
+                    <div className={`h-full rounded-full ${f.pct >= 100 ? 'bg-red-500' : f.pct >= 80 ? 'bg-amber-400' : 'bg-brand'}`} style={{ width: `${Math.min(100, f.pct)}%` }} />
                   </div>
-                  <div className="mt-0.5 text-[11px] text-slate-400">{f.pct}%</div>
+                  <div className="mt-0.5 text-[11px] text-slate-400">
+                    {f.pct}%
+                    {f.available < 0 && (
+                      <span className="ml-1 inline-flex items-center gap-0.5 font-semibold text-red-600">
+                        <Icon name="warning" className="h-3 w-3" /> {t('เกินวงเงิน')}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
                   <button onClick={() => setDrawdown(f)} className="mr-2 text-sm text-brand hover:underline">{t('เบิกใช้')}</button>
-                  <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700" title={t('แก้ไขวงเงิน')} aria-label={t('แก้ไขวงเงิน')}><Icon name="edit" className="inline h-4 w-4" /></button>
+                  <button onClick={() => setAdjust(f)} className="mr-1 text-slate-400 hover:text-slate-700"
+                    title={t('ปรับวงเงิน / ใช้ไป')} aria-label={t('ปรับวงเงิน / ใช้ไป')}><Icon name="edit" className="inline h-4 w-4" /></button>
+                  {/* ทะเบียนวงเงินทั้งใบ (ธนาคาร · เลขที่สัญญา · ดอกเบี้ย) แก้ไม่บ่อย
+                      แต่ต้องแก้ได้ — แยกปุ่มไว้ ไม่ปนกับงานกระทบยอดรายเดือน */}
+                  <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700"
+                    title={t('แก้ไขวงเงิน')} aria-label={t('แก้ไขวงเงิน')}><Icon name="card" className="inline h-4 w-4" /></button>
                 </td>
               </tr>
             ))}
@@ -388,8 +362,13 @@ export default function FacilitiesTab({ projects, onChanged, openNew = 0 }) {
       {edit !== undefined && (
         <FacilityModal facility={edit} projects={projects} types={types} onClose={() => setEdit(undefined)} onSaved={refresh} />
       )}
+      {adjust && (
+        <AdjustLimitModal facility={adjust} label={`${projName(adjust.project_id)} · ${adjust.type}`}
+          onClose={() => setAdjust(null)} onSaved={refresh} />
+      )}
       {drawdown && (
-        <DrawdownModal facility={drawdown} costCategories={costCategories} onClose={() => setDrawdown(null)} onSaved={refresh} />
+        <DrawdownModal facility={drawdown} costCategories={costCategories} types={types}
+          onClose={() => setDrawdown(null)} onSaved={refresh} />
       )}
     </div>
   );

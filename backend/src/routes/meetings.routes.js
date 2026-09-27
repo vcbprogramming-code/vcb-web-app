@@ -50,6 +50,113 @@ function decodeFilename(name) {
  *  kept in the row. */
 const slug = (name) => (String(name).replace(/[^\w.\-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'file');
 
+// ── วันที่ที่คนพิมพ์เอง ──────────────────────────────────────────────────────
+// ระบบจริงของลูกค้าไม่มีช่อง type="date" เลย ช่องวันที่เป็นข้อความอิสระ และ
+// เซิร์ฟเวอร์แปลงให้ (parseDateLabel_ ใน Code.js) เพราะคนกรอกเขียน "21/05/2569"
+// บ้าง "21 พ.ค. 69" บ้าง "21 May 2569" บ้าง — ถ้าบังคับรูปแบบเดียวคนก็เลี่ยงไป
+// พิมพ์ลงชื่อเรื่องแทน แล้ววันที่ก็หายไปจากที่ที่เรียงลำดับได้
+const THAI_MONTHS = {
+  'ม.ค': 1, 'มกรา': 1, 'มกราคม': 1,
+  'ก.พ': 2, 'กุมภา': 2, 'กุมภาพันธ์': 2,
+  'มี.ค': 3, 'มีนา': 3, 'มีนาคม': 3,
+  'เม.ย': 4, 'เมษา': 4, 'เมษายน': 4,
+  'พ.ค': 5, 'พฤษภา': 5, 'พฤษภาคม': 5,
+  'มิ.ย': 6, 'มิถุนา': 6, 'มิถุนายน': 6,
+  'ก.ค': 7, 'กรกฎา': 7, 'กรกฎาคม': 7,
+  'ส.ค': 8, 'สิงหา': 8, 'สิงหาคม': 8,
+  'ก.ย': 9, 'กันยา': 9, 'กันยายน': 9,
+  'ต.ค': 10, 'ตุลา': 10, 'ตุลาคม': 10,
+  'พ.ย': 11, 'พฤศจิกา': 11, 'พฤศจิกายน': 11,
+  'ธ.ค': 12, 'ธันวา': 12, 'ธันวาคม': 12,
+};
+const EN_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+/** ปีที่กรอกอาจเป็น 69 / 2569 / 2026 — ทำให้เป็นคริสต์ศักราชเสมอ */
+function normYear(y) {
+  let n = parseInt(y, 10);
+  if (Number.isNaN(n)) return NaN;
+  if (n < 100) n += 2500;        // "69" หมายถึง 2569 ไม่ใช่ ค.ศ. 1969
+  if (n > 2400) n -= 543;
+  return n;
+}
+const p2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * ข้อความวันที่อิสระ → 'yyyy-mm-dd' (หรือ '' ถ้าอ่านไม่ออก)
+ *
+ * เรียงลำดับการเดาตาม parseDateLabel_ ของเขาเป๊ะ ๆ รวมทั้งเหตุผล: ตัดโทเค็นเวลา
+ * ออกก่อน ("10.00น" ไม่ใช่วันที่) แล้วลอง ISO ที่ขึ้นต้นด้วยปีสี่หลักก่อน
+ * dd/mm/yyyy เพื่อไม่ให้ 2569-12-03 ถูกอ่านเป็นวันที่ 2569
+ */
+export function parseDateLabel(label) {
+  if (!label) return '';
+  const s = String(label).replace(/\d{1,2}\s*[:.]\s*\d{2}\s*(?:AM|PM|am|pm|น\.?)?/g, ' ');
+
+  const iso = s.match(/(\d{4})\s*-\s*(\d{1,2})\s*-\s*(\d{1,2})/);
+  if (iso) return ok(normYear(iso[1]), +iso[2], +iso[3]);
+
+  // วัน-เดือน-ปี ตามลำดับที่คนไทยเขียน ไม่ใช่ ISO ที่เอาปีขึ้นก่อน
+  const dmy = s.match(/(\d{1,2})\s*[/.\-]\s*(\d{1,2})\s*[/.\-]\s*(\d{2,4})/);
+  if (dmy) return ok(normYear(dmy[3]), +dmy[2], +dmy[1]);
+
+  const en1 = s.match(/(\d{1,2})\s*([A-Za-z]{3,9})\.?\s*,?\s*(\d{2,4})/);
+  if (en1 && EN_MONTHS[en1[2].slice(0, 3).toLowerCase()]) {
+    return ok(normYear(en1[3]), EN_MONTHS[en1[2].slice(0, 3).toLowerCase()], +en1[1]);
+  }
+  const en2 = s.match(/([A-Za-z]{3,9})\s+(\d{1,2})\s*,?\s*(\d{2,4})/);
+  if (en2 && EN_MONTHS[en2[1].slice(0, 3).toLowerCase()]) {
+    return ok(normYear(en2[3]), EN_MONTHS[en2[1].slice(0, 3).toLowerCase()], +en2[2]);
+  }
+  // เดือนไทย — ต้องมีอักษรไทยจริง ไม่ใช่แค่จุดลอย ๆ
+  const th = s.match(/(\d{1,2})\s*([ก-๙]+\.?[ก-๙]*\.?)\s*(\d{2,4})/);
+  if (th) {
+    const key = th[2].replace(/\.+$/, '').trim();
+    for (const k of Object.keys(THAI_MONTHS)) {
+      if (key && (key === k || key.startsWith(k) || k.startsWith(key))) {
+        return ok(normYear(th[3]), THAI_MONTHS[k], +th[1]);
+      }
+    }
+  }
+  return '';
+
+  function ok(y, mo, d) {
+    if (!y || Number.isNaN(y) || !(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return '';
+    return `${y}-${p2(mo)}-${p2(d)}`;
+  }
+}
+
+/**
+ * วันประชุมที่ส่งออกไป ต้องเป็น 'yyyy-mm-dd' เท่านั้น
+ *
+ * meeting_date เป็นชนิด date ซึ่งไม่มีเขตเวลา แต่ไดรเวอร์ pg คืนมาเป็น Date ของ
+ * จาวาสคริปต์ที่เที่ยงคืนตามเวลาเครื่อง พอ JSON.stringify มันก็กลายเป็น UTC —
+ * ที่กรุงเทพ (UTC+7) วันที่ 21 จึงเดินทางออกไปเป็น "2026-05-20T17:00:00Z" และ
+ * ทุกที่ที่ตัดสิบตัวแรกมาใช้ก็ได้วันก่อนหน้าหนึ่งวัน ข้อผิดพลาดชนิดเดียวกับที่
+ * ทำให้ "วันนี้" ในโมดูลอื่นเคยเป็นเมื่อวานก่อนเจ็ดโมงเช้า
+ *
+ * และการเทียบว่าวันที่เปลี่ยนไหมใน PATCH ก็เคยใช้ String(Date).slice(0,10) ซึ่ง
+ * ได้ "Thu May 2" — เทียบกับ "2026-05-21" ไม่ตรงตลอด จึงเก็บเวอร์ชันเปล่าเพิ่ม
+ * ทุกครั้งที่กดบันทึกโดยไม่ได้แก้วันที่เลย
+ */
+function isoDate(v) {
+  if (!v) return null;
+  if (typeof v === 'string') return v.slice(0, 10);
+  if (v instanceof Date) return `${v.getFullYear()}-${p2(v.getMonth() + 1)}-${p2(v.getDate())}`;
+  return String(v).slice(0, 10);
+}
+
+/** ผู้ใช้พิมพ์ 'yyyy-mm-dd' มาตรง ๆ ไม่ต้องเก็บเป็น date_label — ฟอร์มจะได้
+ *  แสดงวันที่แบบไทยสวย ๆ กลับมา ไม่ใช่คืนตัวเลข ISO ที่เครื่องเป็นคนเขียน */
+const isPlainIso = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '').trim());
+
+/** ใส่แถวประวัติการทำงานหนึ่งแถว ล้มเหลวก็ไม่ควรทำให้การกระทำหลักพัง */
+async function logAudit(meetingId, action, actorId, details = {}) {
+  try {
+    await query('insert into mtg_audit (meeting_id, action, actor_id, details) values ($1,$2,$3,$4::jsonb)',
+      [meetingId, action, actorId, JSON.stringify(details)]);
+  } catch { /* ประวัติขาดหนึ่งแถว ดีกว่าปักหมุดไม่สำเร็จ */ }
+}
+
 /** Groups this user may see. Admin sees all; otherwise a group tied to a project
  *  follows the project visibility the client already configures per user. */
 async function visibleGroupIds(profile) {
@@ -86,6 +193,7 @@ const inGroups = (ids, col = 'm.group_id') => (ids === null ? '' : ` and ${col} 
 const LIST_SELECT = `
   select m.id, m.group_id, m.title, m.meeting_date, m.time_label, m.excerpt,
          m.attendees, m.pinned, m.visible, m.source, m.recording_url,
+         m.kind, m.date_label, m.meeting_key,
          m.created_at, m.updated_at,
          g.name as group_name, g.code as group_code, g.color as group_color, g.is_inbox,
          (select coalesce(json_agg(json_build_object('id', tg.id, 'name', tg.name, 'color', tg.color)
@@ -124,6 +232,15 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
       // the headline total counts each meeting once, wherever it is filed
       total: groups.rows.reduce((a, g) => a + g.count, 0),
       inboxTotal: groups.rows.filter((g) => g.is_inbox).reduce((a, g) => a + g.count, 0),
+      // จำนวนที่แถว "ทุกการประชุม" ต้องแสดง นับด้วยกฎเดียวกับรายการเป๊ะ ๆ —
+      // เลขข้าง ๆ ที่ไม่เท่ากับจำนวนแถวที่โผล่มาอ่านเป็นข้อมูลหาย
+      allTotal: groups.rows.filter((g) => !g.is_inbox).reduce((a, g) => a + g.count, 0)
+        + (await queryOne(
+          `select count(distinct t.meeting_id)::int as n
+             from mtg_meeting_tags t
+             join mtg_groups home on home.id = (select group_id from mtg_meetings where id = t.meeting_id)
+             join mtg_groups dest on dest.id = t.group_id
+            where home.is_inbox and not dest.is_inbox`)).n,
     },
   });
 }));
@@ -143,6 +260,15 @@ router.get('/', canView, asyncHandler(async (req, res) => {
     where.push(`(m.group_id = $${params.length}
                  or exists (select 1 from mtg_meeting_tags t
                              where t.meeting_id = m.id and t.group_id = $${params.length}))`);
+  } else {
+    // "ทุกการประชุม" ไม่รวมบันทึกเสียงที่ยังไม่ได้จัดเก็บ — กล่องรอจัดเก็บเป็นคิว
+    // ที่ต้องไล่ฟัง ไม่ใช่ที่ที่บันทึกการประชุมอยู่ (isInboxProject_ ของเขาตัด
+    // ออกจาก ALL เหมือนกัน) แต่เราไม่ตัดแถวที่ "จัดเก็บแล้ว" ทิ้งไปด้วย —
+    // การจัดเก็บคือการเพิ่มที่ให้หาเจอ ตัดออกจากรายการรวมก็เท่ากับทำให้หาไม่เจอ
+    where.push(`(not g.is_inbox
+                 or exists (select 1 from mtg_meeting_tags t2
+                              join mtg_groups g2 on g2.id = t2.group_id
+                             where t2.meeting_id = m.id and not g2.is_inbox))`);
   }
   if (ids !== null) { params.push(ids); where.push(`m.group_id = any($${params.length})`); }
   // A hidden meeting is a draft: its author still needs to find it.
@@ -157,11 +283,15 @@ router.get('/', canView, asyncHandler(async (req, res) => {
     where.push(`(m.title ilike ${p} or m.excerpt ilike ${p} or m.content ilike ${p}
                  or m.attendees::text ilike ${p})`);
   }
+  // แถว overview ไม่มีวันประชุม มันคือหน้าภาพรวมของโครงการ จึงต้องอยู่ท้าย
+  // รายการเสมอ ไม่ใช่ลอยขึ้นมาปนกับการประชุมที่ไม่มีวันที่ — เรียงแบบเดียวกับ
+  // visibleMeetings ของเขา: ปักหมุด → ไม่ใช่ overview → วันที่ใหม่สุด
   const sql = `${LIST_SELECT}${where.length ? ` where ${where.join(' and ')}` : ''}
-     order by m.pinned desc, m.meeting_date desc nulls last, m.created_at desc
+     order by m.pinned desc, (m.kind = 'overview'),
+              m.meeting_date desc nulls last, m.created_at desc
      limit 300`;
   const { rows } = await query(sql, params);
-  res.json({ data: rows });
+  res.json({ data: rows.map((r) => ({ ...r, meeting_date: isoDate(r.meeting_date) })) });
 }));
 
 /**
@@ -198,8 +328,10 @@ router.get('/:id', canView, asyncHandler(async (req, res) => {
     throw new ApiError(403, 'รายงานฉบับนี้ยังไม่เผยแพร่');
   }
 
-  const [atts, comments, versions, tags] = await Promise.all([
-    query(`select id, kind, file_name, content_type, size_bytes, created_at
+  const [atts, comments, versions, tags, audit] = await Promise.all([
+    // external_url ต้องมาด้วย: ไฟล์แนบที่นำเข้ามาจากระบบเดิมอยู่บน Google Drive
+    // ไม่ใช่ไบต์ที่เราถือไว้ หน้าจอต้องรู้ว่าจะเปิดลิงก์ ไม่ใช่ขอไฟล์จากเรา
+    query(`select id, kind, file_name, content_type, size_bytes, external_url, created_at
              from mtg_attachments where meeting_id = $1 and kind = 'file' order by created_at`, [m.id]),
     query(`select c.id, c.body, c.created_at, c.author_id, p.full_name as author_name
              from mtg_comments c left join profiles p on p.id = c.author_id
@@ -210,9 +342,16 @@ router.get('/:id', canView, asyncHandler(async (req, res) => {
     query(`select g.id, g.name, g.color from mtg_meeting_tags t
              join mtg_groups g on g.id = t.group_id
             where t.meeting_id = $1 order by g.sort_order`, [m.id]),
+    // ประวัติการทำงาน: สิ่งที่เกิดกับเอกสารโดยไม่ได้แก้เนื้อหา ส่งมาพร้อมกันใน
+    // คำขอเดียว เพราะแผงนี้เปิดจากหน้าที่โหลดข้อมูลนี้อยู่แล้ว
+    query(`select a.id, a.action, a.details, a.created_at, p.full_name as actor_name
+             from mtg_audit a left join profiles p on p.id = a.actor_id
+            where a.meeting_id = $1 order by a.created_at`, [m.id]),
   ]);
-  res.json({ data: { ...m, attachments: atts.rows, comments: comments.rows,
-    versions: versions.rows, tags: tags.rows } });
+  res.json({ data: { ...m, meeting_date: isoDate(m.meeting_date),
+    attachments: atts.rows, comments: comments.rows,
+    versions: versions.rows.map((v) => ({ ...v, meeting_date: isoDate(v.meeting_date) })),
+    tags: tags.rows, audit: audit.rows } });
 }));
 
 /** GET /api/meetings/:id/versions/:seq — one earlier version, as it was.
@@ -223,7 +362,7 @@ router.get('/:id/versions/:seq', canView, asyncHandler(async (req, res) => {
     `select seq, content, title, meeting_date, time_label, saved_at from mtg_versions
       where meeting_id = $1 and seq = $2`, [req.params.id, Number(req.params.seq) || -1]);
   if (!v) throw new ApiError(404, 'ไม่พบเวอร์ชันนี้');
-  res.json({ data: v });
+  res.json({ data: { ...v, meeting_date: isoDate(v.meeting_date) } });
 }));
 
 // ── write ───────────────────────────────────────────────────────────────────
@@ -231,7 +370,12 @@ router.get('/:id/versions/:seq', canView, asyncHandler(async (req, res) => {
 const meetingSchema = z.object({
   groupId: z.string().uuid(),
   title: z.string().trim().min(1).max(300),
-  meetingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  // ข้อความอิสระ ไม่ใช่ ISO เท่านั้น — "21/05/2569", "21 พ.ค. 69", "21 May 2569"
+  // และ "2026-05-21" ที่เคยส่งมาอยู่แล้วต้องรับได้ทั้งหมด (ดู parseDateLabel)
+  meetingDate: z.string().trim().max(60).optional().nullable(),
+  // ถ้าผู้เรียกอยากกำหนดข้อความวันที่เองแยกจากวันที่จริง ก็ส่งมาได้
+  dateLabel: z.string().trim().max(60).optional(),
+  kind: z.enum(['meeting', 'overview']).optional(),
   timeLabel: z.string().trim().max(60).optional().default(''),
   content: z.string().max(400000).optional().default(''),
   attendees: z.array(z.string().trim().max(120)).max(100).optional().default([]),
@@ -255,23 +399,59 @@ router.post('/', canEdit, asyncHandler(async (req, res) => {
   // A recording arrives before anyone has decided what it is about, so it starts
   // unpublished — visible once it has been listened to and filed.
   const visible = p.data.visible !== undefined ? p.data.visible : !g.is_inbox;
-  const row = await queryOne(
-    `insert into mtg_meetings (group_id, title, meeting_date, time_label, content, excerpt,
-                               attendees, visible, recording_url, source, created_by, updated_by)
-     values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$11) returning id`,
-    [p.data.groupId, p.data.title, p.data.meetingDate || null, p.data.timeLabel, html,
-     htmlToText(html).slice(0, 200), JSON.stringify(p.data.attendees), visible,
-     safeLink(p.data.recordingUrl), p.data.source || (g.is_inbox ? 'manual' : 'manual'), req.profile.id]
-  );
+  const raw = String(p.data.meetingDate || '').trim();
+  const iso = raw ? parseDateLabel(raw) : '';
+  const label = p.data.dateLabel !== undefined ? p.data.dateLabel
+    : (raw && !isPlainIso(raw) ? raw : '');
+  // คีย์กันนำเข้าซ้ำ ชนได้เมื่อสองคำขอมาถึงในมิลลิวินาทีเดียวกัน — คำนวณใหม่แล้ว
+  // ลองอีกครั้ง ไม่ใช่ปล่อย 500 ออกไป (แบบเดียวกับ seq ของ mtg_versions)
+  let row = null;
+  for (let attempt = 0; ; attempt += 1) {
+    const key = `manual-${Date.now()}${attempt ? `-${attempt}` : ''}`;
+    try {
+      row = await queryOne(
+        `insert into mtg_meetings (group_id, title, meeting_date, date_label, kind, time_label,
+                                   content, excerpt, attendees, visible, recording_url,
+                                   source, meeting_key, created_by, updated_by)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$14) returning id`,
+        [p.data.groupId, p.data.title, iso || null, label, p.data.kind || 'meeting',
+         p.data.timeLabel, html, htmlToText(html).slice(0, 200),
+         JSON.stringify(p.data.attendees), visible, safeLink(p.data.recordingUrl),
+         p.data.source || 'manual', key, req.profile.id]
+      );
+      break;
+    } catch (e) {
+      if (e?.code !== '23505' || attempt >= 4) throw e;   // 23505 = กุญแจซ้ำ
+    }
+  }
   res.status(201).json({ data: { id: row.id } });
 }));
 
 /** PATCH /api/meetings/:id — save an edit, keeping what was there before. */
 router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
-  const p = meetingSchema.partial().omit({ groupId: true }).safeParse(req.body);
+  const p = meetingSchema.partial().safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const cur = await queryOne('select * from mtg_meetings where id = $1', [req.params.id]);
   if (!cur) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
+
+  // ── ย้ายโครงการได้ตอนแก้ไข ────────────────────────────────────────────────
+  // ของเขาย้ายได้ (ช่อง Project ในกล่องแก้ไขไม่เคยถูกล็อก) และคนกรอกผิดโครงการ
+  // เป็นเรื่องปกติ — เดิมเราล็อกไว้ ทางออกเดียวคือลบแล้วพิมพ์ใหม่ทั้งฉบับ
+  let moveTo = null;
+  if (p.data.groupId !== undefined && p.data.groupId !== cur.group_id) {
+    const g = await queryOne(
+      'select id, name, is_inbox from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
+    if (!g) throw new ApiError(400, 'ไม่พบกลุ่มที่ระบุ');
+    moveTo = g;
+  }
+
+  // วันที่ที่ส่งมาเป็นข้อความอิสระ แปลงก่อนเทียบ ไม่ใช่เทียบข้อความดิบกับ date
+  // ในฐานข้อมูล — ไม่อย่างนั้น "21/05/2569" จะนับเป็นการเปลี่ยนแปลงทุกครั้งที่
+  // กดบันทึก แล้วก็เก็บเวอร์ชันเปล่าเพิ่มขึ้นทุกครั้งไปเรื่อย ๆ
+  const rawDate = p.data.meetingDate === undefined ? undefined : String(p.data.meetingDate || '').trim();
+  const nextIso = rawDate === undefined ? undefined : (rawDate ? parseDateLabel(rawDate) : '');
+  const nextLabel = p.data.dateLabel !== undefined ? p.data.dateLabel
+    : (rawDate === undefined ? undefined : (rawDate && !isPlainIso(rawDate) ? rawDate : ''));
 
   // Snapshot BEFORE overwriting, and snapshot the title/date as they stand right
   // now — capturing them afterwards would file the new name against the old body.
@@ -281,11 +461,12 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
   // edit the text tomorrow, and that version pairs yesterday's words with
   // today's name — which is exactly what a reader would be misled by.
   const changed = ['content', 'title', 'meetingDate', 'timeLabel'].some((k) => {
-    if (p.data[k] === undefined) return false;
+    const given = k === 'meetingDate' ? nextIso : p.data[k];
+    if (given === undefined) return false;
     const before = { content: cur.content, title: cur.title,
-      meetingDate: cur.meeting_date ? String(cur.meeting_date).slice(0, 10) : null,
+      meetingDate: isoDate(cur.meeting_date),
       timeLabel: cur.time_label }[k];
-    return String(p.data[k] ?? '') !== String(before ?? '');
+    return String(given ?? '') !== String(before ?? '');
   });
   if (changed && cur.content) {
     // (meeting_id, seq) มีดัชนีไม่ซ้ำ ถ้าสองคนแก้รายงานฉบับเดียวกันพร้อมกัน
@@ -308,10 +489,16 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
   }
 
   const html = p.data.content !== undefined ? sanitizeHtml(p.data.content) : null;
+  // ล้างวันที่ต้องทำได้จริง coalesce เพียว ๆ ทำให้ค่าว่างกลายเป็น "ไม่เปลี่ยน"
+  // คนที่ลบวันที่ผิดออกจึงลบไม่ออกและไม่มีอะไรบอกว่าทำไม
+  const dateGiven = rawDate !== undefined || p.data.dateLabel !== undefined;
   const row = await queryOne(
     `update mtg_meetings set
        title = coalesce($2, title),
-       meeting_date = coalesce($3, meeting_date),
+       meeting_date = case when $11 then $3 else meeting_date end,
+       date_label = case when $12 then $13 else date_label end,
+       kind = coalesce($14, kind),
+       group_id = coalesce($15, group_id),
        time_label = coalesce($4, time_label),
        content = coalesce($5, content),
        excerpt = coalesce($6, excerpt),
@@ -319,13 +506,26 @@ router.patch('/:id', canEdit, asyncHandler(async (req, res) => {
        visible = coalesce($8, visible),
        recording_url = coalesce($10, recording_url),
        updated_by = $9, updated_at = now()
-     where id = $1 returning id, title, updated_at`,
-    [cur.id, p.data.title ?? null, p.data.meetingDate ?? null, p.data.timeLabel ?? null,
+     where id = $1 returning id, title, group_id, updated_at`,
+    [cur.id, p.data.title ?? null, nextIso || null, p.data.timeLabel ?? null,
      html, html === null ? null : htmlToText(html).slice(0, 200),
      p.data.attendees ? JSON.stringify(p.data.attendees) : null,
      p.data.visible ?? null, req.profile.id,
-     p.data.recordingUrl === undefined ? null : safeLink(p.data.recordingUrl)]
+     p.data.recordingUrl === undefined ? null : safeLink(p.data.recordingUrl),
+     rawDate !== undefined, nextLabel !== undefined, nextLabel ?? '',
+     p.data.kind ?? null, moveTo ? moveTo.id : null]
   );
+
+  if (moveTo) {
+    await logAudit(cur.id, 'move', req.profile.id, { to: moveTo.name });
+    // ย้ายเข้าโครงการที่ปักป้ายไว้แล้ว ป้ายนั้นก็ซ้ำซ้อน — ของเราห้ามป้ายชี้กลุ่ม
+    // ของตัวเองอยู่แล้ว (POST /tags คืน 409) ถ้าไม่เก็บก็จะเหลือแถวที่สร้างใหม่ไม่ได้
+    await query('delete from mtg_meeting_tags where meeting_id = $1 and group_id = $2',
+      [cur.id, moveTo.id]);
+  }
+  if (p.data.visible !== undefined && p.data.visible !== cur.visible) {
+    await logAudit(cur.id, p.data.visible ? 'publish' : 'unpublish', req.profile.id);
+  }
   res.json({ data: row });
 }));
 
@@ -334,6 +534,7 @@ router.post('/:id/pin', canEdit, asyncHandler(async (req, res) => {
     'update mtg_meetings set pinned = not pinned, updated_at = now() where id = $1 returning pinned',
     [req.params.id]);
   if (!row) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
+  await logAudit(req.params.id, row.pinned ? 'pin' : 'unpin', req.profile.id);
   res.json({ data: row });
 }));
 
@@ -368,6 +569,7 @@ router.post('/:id/attachments', canEdit, upload.single('file'), asyncHandler(asy
      values ($1,$2,$3,$4,$5,$6,$7) returning id, kind, file_name, content_type, size_bytes, created_at`,
     [m.id, kind, fileName, req.file.mimetype || '', req.file.size || 0, key, req.profile.id]
   );
+  if (kind === 'file') await logAudit(m.id, 'attach', req.profile.id, { file: fileName });
   res.status(201).json({ data: row });
 }));
 
@@ -375,6 +577,9 @@ router.get('/:id/attachments/:attId', canView, asyncHandler(async (req, res) => 
   const a = await queryOne(
     'select * from mtg_attachments where id = $1 and meeting_id = $2', [req.params.attId, req.params.id]);
   if (!a) throw new ApiError(404, 'ไม่พบไฟล์นี้');
+  // ไฟล์แนบที่อยู่ภายนอก (ลิงก์ Drive ที่นำเข้ามา) ไม่มีไบต์ให้ส่ง — ส่งทางไป
+  // ที่ไฟล์กลับไปแทน ดีกว่าไปขอ storage แล้วได้ 404 ที่อธิบายอะไรไม่ได้เลย
+  if (a.external_url) return res.redirect(302, a.external_url);
   const buf = await getObjectBuffer(a.storage_key);
   res.setHeader('Content-Type', a.content_type || 'application/octet-stream');
   res.setHeader('Content-Disposition',
@@ -384,10 +589,12 @@ router.get('/:id/attachments/:attId', canView, asyncHandler(async (req, res) => 
 
 router.delete('/:id/attachments/:attId', canEdit, asyncHandler(async (req, res) => {
   const a = await queryOne(
-    'delete from mtg_attachments where id = $1 and meeting_id = $2 returning storage_key',
+    `delete from mtg_attachments where id = $1 and meeting_id = $2
+      returning storage_key, kind, file_name`,
     [req.params.attId, req.params.id]);
   if (!a) throw new ApiError(404, 'ไม่พบไฟล์นี้');
   await deleteObject(a.storage_key).catch(() => {});
+  if (a.kind === 'file') await logAudit(req.params.id, 'detach', req.profile.id, { file: a.file_name });
   res.json({ data: { ok: true } });
 }));
 
@@ -429,7 +636,8 @@ router.post('/:id/tags', canEdit, asyncHandler(async (req, res) => {
   if (!p.success) throw new ApiError(400, 'ข้อมูลไม่ถูกต้อง', p.error.flatten());
   const m = await queryOne('select id, group_id from mtg_meetings where id = $1', [req.params.id]);
   if (!m) throw new ApiError(404, 'ไม่พบรายงานการประชุมนี้');
-  const g = await queryOne('select id, is_inbox from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
+  const g = await queryOne(
+    'select id, name, is_inbox from mtg_groups where id = $1 and is_active = true', [p.data.groupId]);
   if (!g) throw new ApiError(400, 'ไม่พบกลุ่มที่ระบุ');
   if (g.is_inbox) throw new ApiError(400, 'จัดเก็บเข้ากล่องรอจัดเก็บไม่ได้ — เลือกกลุ่มปลายทาง');
   if (g.id === m.group_id) throw new ApiError(409, 'รายงานนี้อยู่ในกลุ่มนี้อยู่แล้ว');
@@ -437,6 +645,7 @@ router.post('/:id/tags', canEdit, asyncHandler(async (req, res) => {
   await query(
     `insert into mtg_meeting_tags (meeting_id, group_id, tagged_by) values ($1,$2,$3)
      on conflict do nothing`, [m.id, g.id, req.profile.id]);
+  await logAudit(m.id, 'tag', req.profile.id, { group: g.name });
   const tags = await query(
     `select g.id, g.name, g.color from mtg_meeting_tags t join mtg_groups g on g.id = t.group_id
       where t.meeting_id = $1 order by g.sort_order`, [m.id]);
@@ -448,9 +657,11 @@ router.post('/:id/tags', canEdit, asyncHandler(async (req, res) => {
 router.delete('/:id/tags/:groupId', canEdit, asyncHandler(async (req, res) => {
   if (!UUID.test(req.params.groupId)) throw new ApiError(404, 'ไม่พบกลุ่มที่ระบุ');
   const row = await queryOne(
-    'delete from mtg_meeting_tags where meeting_id = $1 and group_id = $2 returning meeting_id',
+    `delete from mtg_meeting_tags where meeting_id = $1 and group_id = $2
+      returning meeting_id, (select name from mtg_groups where id = $2) as group_name`,
     [req.params.id, req.params.groupId]);
   if (!row) throw new ApiError(404, 'รายงานนี้ไม่ได้ถูกจัดเก็บไว้ในกลุ่มนั้น');
+  await logAudit(req.params.id, 'untag', req.profile.id, { group: row.group_name || '' });
   const tags = await query(
     `select g.id, g.name, g.color from mtg_meeting_tags t join mtg_groups g on g.id = t.group_id
       where t.meeting_id = $1 order by g.sort_order`, [req.params.id]);

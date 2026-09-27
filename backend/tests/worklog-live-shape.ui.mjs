@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import { suite, happy, bad, report, U, warm, APP, tok, query, call } from './harness.mjs';
+import { suite, happy, bad, report, U, warm, APP, tok, query, call, upload } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 const SHOTS = `${ROOT}/worklog-live-shape`;
@@ -122,6 +122,103 @@ suite('เส้นทางของส่วนเสริมปิดอย�
   bad('ยื่นลาครึ่งวันไม่ได้', half.status === 400, `${half.status}`);
 }
 
+// ── ดัชนีงาน: เพิ่ม/ลบ/นำเข้า ตามระบบจริง (รอบเทียบ 2026-09-27) ────────────
+suite('ดัชนีงาน: ออกรหัสให้เอง · ลบจริงเมื่อไม่มีใครใช้ · ปิดใช้งานเมื่อมีคนใช้');
+{
+  // รหัสเว้นว่างได้ = เซิร์ฟเวอร์ออกเลขให้ (กันสองคนกดพร้อมกันได้รหัสซ้ำ)
+  const newAct = await call('/performance/activities', { method: 'POST', user: A,
+    body: { name: `${MARK} กิจกรรมทดสอบ`, category: `${MARK} หมวดทดสอบ`, description: 'คำอธิบายทดสอบ' } });
+  const actCode = newAct.data?.code;
+  happy('เพิ่มกิจกรรมโดยเว้นรหัสว่างได้ ระบบออกเลขให้',
+    newAct.status === 201 && /^[A-Z]-\d+$/.test(actCode || ''), `${newAct.status} ${actCode}`);
+  happy('คำอธิบายถูกเก็บและส่งกลับมา', newAct.data?.desc === 'คำอธิบายทดสอบ', newAct.data?.desc || '—');
+
+  const newCat = await call('/performance/cost-categories', { method: 'POST', user: A,
+    body: { name: `${MARK} หมวดงานทดสอบ` } });
+  const catCode = newCat.data?.code;
+  happy('เพิ่มหมวดงานโดยเว้นรหัสว่างได้ ระบบออกเลขถัดไปให้',
+    newCat.status === 201 && /^\d+$/.test(catCode || ''), `${newCat.status} ${catCode}`);
+
+  // ลงงานด้วยรหัสคู่นี้ก่อน แล้วสั่งลบ — ต้องถูกปิดใช้งานแทนการลบ
+  await call('/performance/cell', { method: 'POST', user: A,
+    body: { site: site.code, eid: emp.id, date: TODAY, field: 'team', value: `${actCode} / ${catCode}` } });
+  const delUsedAct = await call(`/performance/activities/${encodeURIComponent(actCode)}`, { method: 'DELETE', user: A });
+  happy('ลบกิจกรรมที่มีบันทึกอ้างอิง = ปิดใช้งานแทน ไม่ลบทิ้ง',
+    delUsedAct.status === 200 && delUsedAct.data?.deactivated === true && delUsedAct.data?.deleted === false,
+    JSON.stringify(delUsedAct.data));
+  happy('บอกผู้ใช้ตรง ๆ ว่าทำไมไม่ลบ', /บันทึกงาน/.test(delUsedAct.data?.message || ''), delUsedAct.data?.message || '—');
+  bad('บันทึกเดิมไม่ถูกลบตามไปด้วย',
+    (await query('select count(*)::int n from work_logs where employee_id = $1 and ymd = $2 and deleted_at is null',
+      [emp.id, TODAY])).rows[0].n === 1, '');
+  const delUsedCat = await call(`/performance/cost-categories/${encodeURIComponent(catCode)}`, { method: 'DELETE', user: A });
+  happy('ลบหมวดงานที่มีบันทึกอ้างอิง = ปิดใช้งานแทน',
+    delUsedCat.status === 200 && delUsedCat.data?.deactivated === true, JSON.stringify(delUsedCat.data));
+
+  // ล้างบันทึกแล้วลบซ้ำ — ไม่มีใครอ้างอิงอีก จึงลบจริงได้
+  await call('/performance/cell', { method: 'POST', user: A,
+    body: { site: site.code, eid: emp.id, date: TODAY, field: 'team', value: '' } });
+  const delAct = await call(`/performance/activities/${encodeURIComponent(actCode)}`, { method: 'DELETE', user: A });
+  happy('ไม่มีใครใช้แล้วลบจริงได้', delAct.data?.deleted === true, JSON.stringify(delAct.data));
+  const delCat = await call(`/performance/cost-categories/${encodeURIComponent(catCode)}`, { method: 'DELETE', user: A });
+  happy('หมวดงานที่ไม่มีใครใช้ลบจริงได้', delCat.data?.deleted === true, JSON.stringify(delCat.data));
+  bad('ลบรหัสที่ไม่มีอยู่ตอบ 404',
+    (await call('/performance/activities/ZZ-999', { method: 'DELETE', user: A })).status === 404, '');
+  bad('ผู้ที่ไม่ใช่ผู้ดูแลระบบลบไม่ได้',
+    (await call('/performance/activities/A-1', { method: 'DELETE', user: U.hr })).status === 403, '');
+}
+
+suite('ดัชนีงาน: เทมเพลตเปล่าและการนำเข้าทั้งสองชนิด');
+{
+  const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  for (const [kind, p] of [['กิจกรรม', '/performance/import/activities/template.xlsx'],
+    ['หมวดงาน', '/performance/import/cost-categories/template.xlsx']]) {
+    const res = await call(p, { user: A, raw: true });
+    happy(`ดาวน์โหลดเทมเพลตเปล่าของ${kind}ได้`,
+      res.status === 200 && (res.headers.get('content-type') || '').includes(XLSX),
+      `${res.status} ${res.headers.get('content-type')}`);
+  }
+
+  // นำเข้าหมวดงานจากไฟล์จริง — ของเราเคยนำเข้าได้แต่แท็บกิจกรรม
+  const ExcelJS = (await import('exceljs')).default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('หมวดงาน');
+  ws.columns = [{ header: 'รหัส', key: 'code' }, { header: 'ชื่อหมวดงาน', key: 'name' },
+    { header: 'ชื่อภาษาอังกฤษ', key: 'name_en' }];
+  ws.addRow({ code: '991', name: `${MARK} หมวดนำเข้า หนึ่ง`, name_en: 'Imported one' });
+  ws.addRow({ code: '992', name: `${MARK} หมวดนำเข้า สอง`, name_en: 'Imported two' });
+  ws.addRow({ code: 'ไม่ใช่เลข', name: `${MARK} แถวเสีย` });   // ต้องถูกข้าม ไม่ล้มทั้งไฟล์
+  const buf = Buffer.from(await wb.xlsx.writeBuffer());
+  const imp = await upload('/performance/import/cost-categories', A, 'หมวดงาน.xlsx', buf, XLSX);
+  happy('นำเข้าหมวดงานได้ และรายงานเป็น เพิ่ม/อัปเดต/ข้าม',
+    imp.status === 200 && imp.data?.added === 2 && imp.data?.skipped === 1, JSON.stringify(imp.data));
+  const again = await upload('/performance/import/cost-categories', A, 'หมวดงาน.xlsx', buf, XLSX);
+  happy('นำเข้าไฟล์เดิมซ้ำนับเป็น "อัปเดต" ไม่ใช่เพิ่มใหม่',
+    again.data?.added === 0 && again.data?.updated === 2, JSON.stringify(again.data));
+  await query("delete from cost_categories where code in ('991','992')");
+
+  // ทะเบียนกลับมาเท่าระบบจริงครบ 44 / 20 หลังทดสอบ
+  const acts = (await call('/performance/activities', { user: A })).data || [];
+  const cats = (await call('/performance/cost-categories', { user: A })).data || [];
+  happy('ทะเบียนกลับมาเป็น 44 / 20 หลังทดสอบลบและนำเข้า',
+    acts.length === 44 && cats.length === 20, `${acts.length} / ${cats.length}`);
+}
+
+suite('ประวัติการแก้ไขอ่านออกได้เอง (ชื่อหน่วยงาน/พนักงาน ไม่ใช่ uuid)');
+{
+  await call('/performance/cell', { method: 'POST', user: A,
+    body: { site: site.code, eid: emp.id, date: TODAY, field: 'team', value: 'A-1 / 5' } });
+  const au = await call(`/performance/audit?site=${site.code}&limit=50`, { user: A });
+  const row = (au.data || []).find((r) => r.employee_id === emp.id);
+  happy('มีแถวประวัติของการบันทึกที่เพิ่งทำ', Boolean(row), `${(au.data || []).length} แถว`);
+  happy('แถวบอกชื่อหน่วยงานและชื่อพนักงานมาด้วย',
+    row?.site_name === site.name && row?.emp_name === emp.full_name,
+    `${row?.site_name} / ${row?.emp_name}`);
+  happy('แถวบอกผู้แก้ไขและค่าใหม่', Boolean(row?.actor_label) && Boolean(row?.after_val),
+    `${row?.actor_label} · ${JSON.stringify(row?.after_val)}`);
+  await call('/performance/cell', { method: 'POST', user: A,
+    body: { site: site.code, eid: emp.id, date: TODAY, field: 'team', value: '' } });
+}
+
 // แต่ละชุดใช้โปรไฟล์ Chrome ของตัวเอง ไม่ใช้ร่วมกัน — ชุดที่ล้มกลางคันจะทิ้ง
 // Chrome ที่ยังถือ lock ของโปรไฟล์ไว้ ชุดถัดไปที่ใช้โปรไฟล์เดียวกันจะค้างตามไป
 // ทั้งที่ตัวเองไม่มีอะไรผิด (เกิดขึ้นจริงตอนรันรวมทั้งชุดบนเครื่องที่งานหนัก)
@@ -155,6 +252,13 @@ const clickText = (label, sel = 'button, a, [role="tab"]') => page.evaluate((l, 
   const el = [...document.querySelectorAll(s)].find((x) => x.innerText.trim() === l);
   if (el) { el.click(); return true; } return false;
 }, label, sel);
+// แท็บที่มีตัวนับต่อท้ายชิดกับชื่อ ("รออนุมัติ3") เทียบตรงตัวไม่ได้ — ตัดตัวเลข
+// ท้ายออกก่อน แล้วยอมให้ชื่อขึ้นต้นตรงกันพอ
+const clickTab = (label) => page.evaluate((l) => {
+  const el = [...document.querySelectorAll('button')]
+    .find((x) => x.innerText.trim().replace(/\s*\d+\+?$/, '').trim() === l);
+  if (el) { el.click(); return true; } return false;
+}, label);
 
 suite('หน้าจอเหลือห้าหน้าเท่าระบบจริง');
 {
@@ -278,6 +382,282 @@ suite('บทบาทเหลือสามระดับ');
   bad('ไม่มีบทบาทที่ไม่มีในระบบจริงหลงเหลือ',
     !roles.includes('recorder') && !roles.includes('verifier'), roles.join(', '));
   await shot('06-บทบาท');
+}
+
+// ── สิ่งที่ระบบจริงมีแต่ของเรายังไม่มี (รอบเทียบ 2026-09-27) ────────────────
+suite('หน้าตั้งค่า: หัวข้อ · วิธีใช้งาน · ทางเข้าประวัติการแก้ไข');
+{
+  await as(A, '/performance?tab=settings');
+  await settle(3000);
+  const st = await body();
+  happy('หัวข้อหน้าเป็น "การตั้งค่า · Settings"', st.includes('การตั้งค่า · Settings'), '');
+  happy('บอกว่าค่าที่ตั้งเก็บไว้ในเครื่อง',
+    st.includes('การตั้งค่าจะถูกเก็บไว้ในเครื่อง (แต่ละเครื่องอาจไม่เหมือนกัน)'), '');
+  for (const h of ['การแสดงในตารางสัปดาห์', 'รูปแบบปี', 'มุมมองเริ่มต้นของแดชบอร์ด',
+    'โครงการ / หน่วยงาน', 'หน่วยงานที่แสดง', 'ประวัติการแก้ไข', 'เกี่ยวกับระบบ']) {
+    happy(`มีหัวข้อ "${h}"`, st.includes(h), '');
+  }
+  happy('ตัวเลือกรูปแบบปีมีทั้ง พ.ศ. และ ค.ศ.',
+    st.includes('พุทธศักราช (2569)') && st.includes('คริสต์ศักราช (2026)'), '');
+  happy('ตัวเลือกการแสดงในตารางใช้คำของเขา',
+    st.includes('รหัส (A-1 / 5)') && st.includes('ชื่อกิจกรรม (เต็ม) / 5'), '');
+  happy('ส่วนเกี่ยวกับระบบบอกอีเมลและบทบาท',
+    st.includes(A.email) && /บทบาท/.test(st), '');
+  await shot('07-ตั้งค่า-หัวข้อ');
+
+  // กดตัวเลือกแรกในเครื่องที่ยังไม่มีค่าอะไรเก็บไว้ เคยทำให้หน้าพังทั้งหน้า
+  // (perfPrefs.set คืนค่าที่ไม่มี hiddenSites หน้าตั้งค่าอ่าน .includes() ต่อแล้วระเบิด)
+  const monthOnHead = () => page.evaluate(() => (document.body.innerText
+    .match(/(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4}/) || [])[0] || '');
+  const beLabel = await monthOnHead();
+  happy('เลือก "คริสต์ศักราช" ได้', await clickText('คริสต์ศักราช (2026)'), '');
+  await settle(1200);
+  const ceLabel = await monthOnHead();
+  bad('เปลี่ยนค่าที่เก็บในเครื่องแล้วหน้าไม่พัง',
+    !(await body()).includes('เกิดข้อผิดพลาดบางอย่าง'), '');
+  happy('ป้ายเดือนบนหัวหน้าเปลี่ยนเป็น ค.ศ. ทันที',
+    Boolean(ceLabel) && ceLabel !== beLabel && /\s20\d\d$/.test(ceLabel), `${beLabel} → ${ceLabel}`);
+  happy('ค่าที่เก็บยังมีคีย์อื่นครบ ไม่ถูกเขียนทับทิ้ง',
+    await page.evaluate(() => {
+      const p = JSON.parse(localStorage.getItem('hr_perf_prefs') || '{}');
+      return Array.isArray(p.hiddenSites) && typeof p.cellNames === 'string' && typeof p.dashView === 'string';
+    }), await page.evaluate(() => localStorage.getItem('hr_perf_prefs')));
+  await clickText('พุทธศักราช (2569)');
+  await settle(1000);
+  happy('สลับกลับเป็น พ.ศ. ได้', (await monthOnHead()) === beLabel, `${await monthOnHead()} vs ${beLabel}`);
+
+  // วิธีใช้งานหน้าบันทึกงาน — ห้าขั้นของเขา
+  happy('มีปุ่มวิธีใช้งานหน้านี้', await clickText('วิธีใช้งานหน้านี้ (อ่านก่อนเริ่ม)'), '');
+  await settle(1200);
+  const how = await body();
+  happy('เปิดคู่มือ "วิธีใช้งานหน้าบันทึกงาน"', how.includes('วิธีใช้งานหน้าบันทึกงาน'), '');
+  for (const s of ['เลือกหน่วยงานและสัปดาห์', 'คลิกช่องว่างของพนักงาน', 'ไม่ต้องกดบันทึก',
+    'ทำ 2 งานในวันเดียว', 'แก้ไข & ดูภาพรวม']) {
+    happy(`คู่มือมีขั้น "${s}"`, how.includes(s), '');
+  }
+  happy('อธิบายการถ่วงน้ำหนักครึ่ง-ครึ่งไว้ในคู่มือ', how.includes('0.5 วันทำงาน'), '');
+  await shot('08-วิธีใช้งาน');
+  await page.keyboard.press('Escape');
+  await settle(800);
+
+  // ประวัติการแก้ไขต้องเข้าได้จากหน้าตั้งค่า โดยไม่ต้องเปิดธงฟีเจอร์ใด ๆ
+  happy('มีปุ่มเปิดประวัติการแก้ไข', await clickText('เปิดประวัติการแก้ไข →'), '');
+  // ประวัติ 1000 แถวใช้เวลาโหลดไม่แน่นอน — รอให้ตารางหรือข้อความว่างขึ้นจริง
+  // ไม่ใช่รอเวลาคงที่ แล้วไปเจอสปินเนอร์แทนหัวตาราง
+  await page.waitForFunction(() => document.querySelectorAll('th').length > 0
+    || /ยังไม่มีประวัติการแก้ไข|โหลดไม่สำเร็จ/.test(document.body.innerText), { timeout: 60000 });
+  await settle(600);
+  const au = await body();
+  happy('ช่องค้นหาใช้คำของเขา', await page.evaluate(() => [...document.querySelectorAll('input')]
+    .some((i) => (i.placeholder || '') === 'ค้นหา อีเมล / ชื่อ / ค่า')), '');
+  happy('มีตัวกรองหน่วยงานและช่อง', au.includes('ทุกหน่วยงาน') && au.includes('ทุกช่อง'), '');
+  const cols = ['เวลา', 'ผู้แก้ไข', 'หน่วยงาน', 'พนักงาน', 'วันที่', 'ช่อง', 'เดิม', 'ใหม่'];
+  const heads = await page.evaluate(() => [...document.querySelectorAll('th')].map((x) => x.innerText.trim()));
+  happy(`หัวตารางครบแปดคอลัมน์ (พบ ${heads.length})`, cols.every((c) => heads.includes(c)), heads.join(' · '));
+  // ตัวนับ N / M อยู่ข้างตัวกรอง
+  happy('มีตัวนับจำนวนแถวที่กรองได้', /\d+\s*\/\s*\d+/.test(au), '');
+  await shot('09-ประวัติการแก้ไข');
+  // ค้นหาคำที่ไม่มีทางเจอ ต้องขึ้น "ไม่พบรายการ" ไม่ใช่ตารางเปล่า
+  await page.evaluate(() => {
+    const i = [...document.querySelectorAll('input')].find((x) => (x.placeholder || '').startsWith('ค้นหา อีเมล'));
+    if (!i) return;
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(i, 'ZZZไม่มีทางเจอZZZ');
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await settle(900);
+  happy('ค้นไม่เจอแล้วบอกว่า "ไม่พบรายการ"', (await body()).includes('ไม่พบรายการ'), '');
+  await page.keyboard.press('Escape');
+}
+
+suite('ดัชนีงาน: ลบ · คำอธิบาย · เรียงคอลัมน์ · นำเข้าได้ทั้งสองแท็บ');
+{
+  await as(A, '/performance?tab=index');
+  await settle(3200);
+  const ix = await body();
+  for (const h of ['รหัสงาน', 'ชื่อ', 'คำอธิบาย', 'หมวดหมู่']) {
+    happy(`หัวคอลัมน์กิจกรรมมี "${h}"`, ix.includes(h), '');
+  }
+  happy('ปุ่มเพิ่มใช้คำของเขา', ix.includes('+ เพิ่มกิจกรรม'), '');
+  happy('บอกว่าหัวคอลัมน์กดเรียงได้', ix.includes('คลิกหัวคอลัมน์เพื่อจัดเรียง'), '');
+  const nDel = await page.evaluate(() => [...document.querySelectorAll('button')]
+    .filter((b) => b.innerText.trim() === 'ลบ').length);
+  happy(`ทุกแถวมีปุ่มลบ (พบ ${nDel} ปุ่ม)`, nDel >= 44, `${nDel}`);
+
+  // เรียงสามจังหวะ: กดหัวคอลัมน์รหัสแล้วลำดับต้องเปลี่ยน และกดครบสามครั้งกลับเดิม
+  const codes = () => page.evaluate(() => [...document.querySelectorAll('tbody tr td:first-child')]
+    .map((td) => td.innerText.trim()).slice(0, 5).join(','));
+  const original = await codes();
+  const clickHead = (label) => page.evaluate((l) => {
+    const th = [...document.querySelectorAll('th')].find((x) => x.innerText.trim() === l);
+    if (th) th.click();
+  }, label);
+  await clickHead('รหัสงาน'); await settle(600);
+  const desc = await codes();
+  happy('กดหัวคอลัมน์ครั้งแรกเรียงกลับทาง', desc !== original, `${original} → ${desc}`);
+  await clickHead('รหัสงาน'); await settle(600);
+  await clickHead('รหัสงาน'); await settle(600);
+  happy('กดครบสามจังหวะกลับเป็นลำดับเดิม', (await codes()) === original, await codes());
+
+  // นำเข้า: ต้องมีโมดัลแบบเขา และต้องมีทั้งสองแท็บ
+  happy('มีปุ่มนำเข้าในแท็บกิจกรรม', await clickText('นำเข้า'), '');
+  await settle(1400);
+  const im = await body();
+  happy('โมดัลชื่อ "นำเข้ารายการดัชนีงาน"', im.includes('นำเข้ารายการดัชนีงาน'), '');
+  happy('มีหัวข้อวิธีนำเข้าและลำดับคอลัมน์', im.includes('วิธีนำเข้า') && im.includes('ลำดับคอลัมน์:'), '');
+  happy('มีปุ่มเทมเพลตเปล่าและปุ่มเลือกไฟล์',
+    im.includes('ดาวน์โหลดเทมเพลตเปล่า') && im.includes('เลือกไฟล์ที่กรอกแล้ว'), '');
+  await shot('10-นำเข้าดัชนีงาน');
+  await page.keyboard.press('Escape');
+  await settle(800);
+
+  await clickTab('หมวดงาน (Work Category)');
+  await settle(1600);
+  const cx = await body();
+  // หัวตารางถูก CSS ทำเป็นตัวพิมพ์ใหญ่ (tbl-th uppercase) — เทียบแบบไม่สนตัวพิมพ์
+  const cxHeads = await page.evaluate(() => [...document.querySelectorAll('th')].map((x) => x.innerText.trim().toLowerCase()));
+  happy('แท็บหมวดงานใช้หัวคอลัมน์ของเขา',
+    cxHeads.includes('รหัส') && cxHeads.includes('หมวดงาน (ไทย)')
+      && cxHeads.includes('work category (english)'), cxHeads.join(' · '));
+  happy('แท็บหมวดงานมีปุ่ม "+ เพิ่มหมวดงาน"', cx.includes('+ เพิ่มหมวดงาน'), '');
+  happy('นำเข้าได้จากแท็บหมวดงานด้วย', await clickText('นำเข้า'), '');
+  await settle(1400);
+  happy('โมดัลชื่อ "นำเข้าหมวดงาน"', (await body()).includes('นำเข้าหมวดงาน'), '');
+  await shot('11-นำเข้าหมวดงาน');
+  await page.keyboard.press('Escape');
+}
+
+suite('คำขอ: หัวคอลัมน์ · ตัวกรองประวัติ · สรุปจำนวน');
+{
+  // แถวหัวคอลัมน์และบรรทัดสรุปของ "คำขอของฉัน" ขึ้นเฉพาะเมื่อมีคำขออยู่จริง
+  // และ /leave/mine กรองด้วย requested_by = ตัวเอง ชุดนี้จึงต้องยื่นคำขอของ
+  // ตัวเองก่อน ไม่ใช่พึ่งคำขอที่ค้างอยู่ในฐานข้อมูลจากที่อื่น — พึ่งของเดิมคือ
+  // สาเหตุที่แปดข้อนี้ล้มทันทีที่ข้อมูลทดสอบเก่าถูกล้างออก (2026-09-27)
+  const own = await call('/performance/leave', { method: 'POST', user: A,
+    body: { employeeId: emp.id, leaveType: 'sick', from: '2027-03-01', to: '2027-03-02', reason: `${MARK} ตรวจหัวคอลัมน์` } });
+  happy('ยื่นคำขอของตัวเองไว้ตรวจหัวคอลัมน์ได้', own.status === 201, `${own.status} ${own.error || ''}`);
+  await as(A, '/performance?tab=leave');
+  await settle(3500);
+  const lv = await body();
+  happy('หัวข้อหน้าเป็น "คำขอ" พร้อมคำบรรยายของเขา',
+    lv.includes('ขอลาและติดตามสถานะคำขอของคุณ'), '');
+  const heads = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('div')].find((d) => (d.className || '').includes('uppercase'));
+    return row ? row.innerText.split('\n').map((x) => x.trim()).filter(Boolean) : [];
+  });
+  for (const c of ['ชื่อพนักงาน', 'หน่วยงาน', 'ช่วงวันที่ลา', 'วัน', 'ประเภทการลา', 'เหตุผล', 'สถานะ']) {
+    happy(`แถวหัวคอลัมน์มี "${c}"`, heads.includes(c), heads.join(' · '));
+  }
+  happy('สรุปจำนวนบนรายการของฉัน', /รอดำเนินการ\s*\d+\s*·\s*อนุมัติแล้ว\s*\d+\s*·\s*ไม่อนุมัติ\s*\d+/.test(lv), '');
+  happy('ช่องเหตุผลใช้ตัวอย่างของเขา', await page.evaluate(() => [...document.querySelectorAll('input')]
+    .some((i) => (i.placeholder || '') === 'เช่น ลาป่วย ลากิจ ลาพักผ่อน')), '');
+  happy('ช่องเลือกชื่อใช้คำว่า "— เลือกชื่อ —"', lv.includes('— เลือกชื่อ —'), '');
+
+  await clickTab('รออนุมัติ');
+  await settle(1500);
+  happy('แท็บรออนุมัติบอกขอบเขตว่าทุกหน่วยงานในสิทธิ์',
+    (await body()).includes('ทุกหน่วยงานในสิทธิ์ของคุณ'), '');
+  await clickTab('ประวัติการพิจารณา');
+  await settle(1500);
+  const hist = await body();
+  happy('ประวัติการพิจารณามีตัวกรองสามปุ่ม',
+    hist.includes('ทั้งหมด') && hist.includes('อนุมัติแล้ว') && hist.includes('ไม่อนุมัติ'), '');
+  happy('สรุปจำนวนบนประวัติการพิจารณา', /อนุมัติแล้ว\s*\d+\s*·\s*ไม่อนุมัติ\s*\d+/.test(hist), '');
+  await shot('12-คำขอ');
+}
+
+suite('แดชบอร์ด: ป้ายวงแหวน · หน่วยวันทำงาน · หัวข้อหน้า');
+{
+  await as(A, '/performance?tab=dashboard');
+  await settle(4000);
+  const db = await body();
+  happy('หัวข้อหน้าและคำบรรยายตามเขา',
+    db.includes('ภาพรวมการบันทึกการทำงานรายหน่วยงาน'), '');
+  happy('ป้ายข้างวงแหวนบอก "บันทึกครบ N / M ช่อง"',
+    /บันทึกครบ\s*\d+\s*\/\s*\d+\s*ช่อง/.test(db.replace(/\n/g, ' ')), '');
+  happy('ป้ายสถิติใช้คำของเขา',
+    db.includes('พนักงาน') && db.includes('รายการใน') && db.includes('เริ่มบันทึกแล้ว'), '');
+  happy('บอกความหมายของ "เริ่มบันทึกแล้ว"', db.includes('พนักงานที่ลงอย่างน้อย 1 วัน'), '');
+  happy('บอกสัดส่วนสนับสนุน/ปฏิบัติการใต้จำนวนพนักงาน',
+    /\d+\s*สนับสนุน\s*·\s*\d+\s*ปฏิบัติการ/.test(db.replace(/\n/g, ' ')), '');
+  await shot('13-แดชบอร์ด');
+
+  await clickText('กิจกรรมหลัก');
+  await settle(2500);
+  const top = await body();
+  happy('มุมมองกิจกรรมหลักเปลี่ยนมุมขวาเป็นจำนวนรายการ',
+    /\d+\s*รายการ/.test(top.replace(/\n/g, ' ')) && !/บันทึกครบ/.test(top), '');
+  happy('แถวอันดับบอกหน่วยเป็น "วันทำงาน"',
+    top.includes('วันทำงาน') || top.includes('ยังไม่มีบันทึกในเดือนนี้')
+      || top.includes('ไม่ตรงกับดัชนี'), '');
+  await shot('14-กิจกรรมหลัก');
+}
+
+suite('ตัวเลือกเดือนเป็นป็อปโอเวอร์แบบเขา (แท็บปี + ตารางเดือน)');
+{
+  await as(A, '/performance?tab=dashboard');
+  await settle(3000);
+  // ปุ่มกลางของตัวเลือกเดือนคือปุ่มที่มีชื่อเดือนไทยอยู่ข้างใน
+  const opened = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')]
+      .find((x) => /^(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s/.test(x.innerText.trim()));
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  happy('กดปุ่มเดือนเปิดป็อปโอเวอร์ได้', opened, '');
+  await settle(1000);
+  const months = await page.evaluate(() => [...document.querySelectorAll('button')]
+    .map((b) => b.innerText.trim())
+    .filter((x) => /^(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)$/.test(x)));
+  happy(`ป็อปโอเวอร์มีตารางเดือนครบ 12 ช่อง (พบ ${months.length})`, months.length === 12, months.join(','));
+  const years = await page.evaluate(() => [...document.querySelectorAll('button')]
+    .map((b) => b.innerText.trim()).filter((x) => /^25\d\d$/.test(x)));
+  happy(`มีแท็บปีให้เลือก (พบ ${years.length})`, years.length >= 1, years.join(','));
+  // เดือนอนาคตกดไม่ได้ — บันทึกล่วงหน้าเกินพรุ่งนี้ไม่ได้อยู่แล้ว
+  const disabled = await page.evaluate(() => [...document.querySelectorAll('button[disabled]')]
+    .filter((b) => /^(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)$/.test(b.innerText.trim())).length);
+  bad('เดือนที่ยังไม่มาถึงกดไม่ได้', disabled > 0, `${disabled} เดือน`);
+  await shot('15-ตัวเลือกเดือน');
+  // ลูกศรเดินทีละเดือนยังต้องใช้ได้
+  const label = () => page.evaluate(() => (document.body.innerText.match(/(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+25\d\d/) || [])[0] || '');
+  await page.keyboard.press('Escape');
+  await settle(500);
+  const before = await label();
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.getAttribute('aria-label') === 'เดือนก่อนหน้า');
+    if (b) b.click();
+  });
+  await settle(2500);
+  happy('ลูกศรถอยเดือนยังใช้ได้', (await label()) !== before, `${before} → ${await label()}`);
+}
+
+suite('หน้าบันทึกงาน: ป้ายกำกับช่อง · ไม่เลือกหน่วยงานให้เอง · ปุ่มส่งออกปุ่มเดียว');
+{
+  await as(A, '/performance?tab=entry');
+  await settle(3200);
+  const en = await body();
+  happy('ไม่เลือกหน่วยงานให้อัตโนมัติ', en.includes('— เลือกหน่วยงาน —'), '');
+  happy('หน้าว่างบอกวิธีเลือกหน่วยงาน',
+    en.includes('เลือกหน่วยงานเพื่อเริ่มบันทึก') && en.includes('เปิดบันทึก'), '');
+  happy('ช่องในแถบเครื่องมือมีป้ายกำกับ',
+    en.includes('หน่วยงาน') && en.includes('เดือน'), '');
+  // เลือกหน่วยงานแล้วป้าย "มุมมอง"/"สัปดาห์" ต้องขึ้น และปุ่มส่งออกต้องมีปุ่มเดียว
+  await page.evaluate((n) => {
+    const sel = document.querySelector('select[aria-label="เลือกไซต์งาน"]');
+    const opt = [...sel.options].find((o) => o.text.includes(n));
+    if (!opt) return;
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, opt.value);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }, `${MARK} ไซต์ตรวจรูปร่าง`);
+  await settle(3500);
+  const en2 = await body();
+  happy('มีป้าย "มุมมอง"', en2.includes('มุมมอง'), '');
+  const xls = await page.evaluate(() => [...document.querySelectorAll('a, button')]
+    .filter((b) => /Excel/.test(b.innerText)).map((b) => b.getAttribute('title') || b.innerText.trim()));
+  happy(`ปุ่มส่งออก Excel เหลือปุ่มเดียว (พบ ${xls.length})`, xls.length === 1, xls.join(' | '));
+  happy('คำอธิบายปุ่มส่งออกตรงกับของเขา',
+    (xls[0] || '').includes('โดยคงรูปแบบเดิมไว้'), xls[0] || '');
+  await shot('16-บันทึกงาน');
 }
 
 suite('ไม่มีข้อผิดพลาดซ่อนอยู่');

@@ -8,6 +8,7 @@
  * reproduce or trace is worse than no screen.
  */
 import { fileURLToPath } from 'node:url';
+import ExcelJS from 'exceljs';
 import { call, suite, happy, bad, report, U, warm, query, tok, API } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
@@ -203,6 +204,144 @@ suite('8. ส่งออก Excel');
   happy('ดาวน์โหลดไฟล์ได้', res.status === 200, `${res.status}`);
   happy('เป็นไฟล์ Excel จริง', buf.subarray(0, 2).toString() === 'PK', buf.subarray(0, 4).toString('hex'));
   happy('มีเนื้อหา ไม่ใช่ไฟล์เปล่า', buf.length > 3000, `${Math.round(buf.length / 1024)} KB`);
+  // ชื่อไฟล์ต้องบอกได้เองว่าส่งออกเมื่อไร — ไฟล์ชื่อซ้ำทุกครั้งทับกันในโฟลเดอร์ดาวน์โหลด
+  const cd = res.headers.get('content-disposition') || '';
+  happy('ชื่อไฟล์เป็น CreditFacility_YYYYMMDD_HHmm.xlsx', /CreditFacility_\d{8}_\d{4}\.xlsx/.test(cd), cd);
+
+  // ลำดับคอลัมน์คือสิ่งที่คนปลายทางอ่าน ไม่ใช่หัวตาราง — สลับที่แล้วสูตรในแฟ้ม
+  // ของเขาเพี้ยนทั้งไฟล์ จึงตรึงลำดับเจ็ดคอลัมน์แรกตาม exportXlsx ของระบบจริง
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  const s1 = wb.getWorksheet('วงเงินสินเชื่อ');
+  const s2 = wb.getWorksheet('รายการสินเชื่อ');
+  const head = (ws) => (ws ? (ws.getRow(1).values || []).slice(1).map((v) => String(v)) : []);
+  const h1 = head(s1); const h2 = head(s2);
+  happy('ชีตวงเงิน: เจ็ดคอลัมน์แรกตามลำดับของเขา',
+    h1.slice(0, 7).join('|') === 'โครงการ|บริษัท|ประเภท|วงเงิน|ใช้ไป|คงเหลือ|% ใช้ไป', h1.slice(0, 7).join('|'));
+  happy('ชีตรายการ: สิบเอ็ดคอลัมน์แรกตามลำดับของเขา',
+    h2.slice(0, 11).join('|') === 'วันที่|บริษัท|โครงการ|ประเภท|รายละเอียด|จำนวนเงิน|เริ่ม|ครบ|ดอกเบี้ยเกินกำหนด|สถานะ|เอกสารแนบ',
+    h2.slice(0, 11).join('|'));
+
+  // ตัวกรองต้องมีผลกับไฟล์ ไม่ใช่ส่งออกทั้งฐานทุกครั้ง
+  const one = await fetch(`${API}/credit/export?projectId=${project.id}&kinds=AVAL,LGM,DLC,PNPOST`,
+    { headers: { Authorization: `Bearer ${tok(A)}` } });
+  const wb2 = new ExcelJS.Workbook();
+  await wb2.xlsx.load(Buffer.from(await one.arrayBuffer()));
+  const kinds = new Set();
+  wb2.getWorksheet('วงเงินสินเชื่อ').eachRow((row, i) => { if (i > 1) kinds.add(String(row.getCell(3).value)); });
+  bad('กรองประเภทแบบกลุ่มแล้วไฟล์มีแต่ประเภทในกลุ่มนั้น',
+    [...kinds].every((k) => ['B/E', 'L/G', 'DLC', 'PN-post'].includes(k)), [...kinds].join(', '));
+}
+
+// ── 8ข. อัตราดอกเบี้ยเป็นข้อความอิสระ ─────────────────────────────────────
+// หนังสือวงเงินของธนาคารเขียนเงื่อนไขเป็นประโยค ("MLR ต่อปี") ไม่ใช่ตัวเลขเดียว
+// การคำนวณต้องดึงตัวเลขออกมาเอง และเมื่อไม่มีตัวเลขต้องบอกว่า "ระบุอัตราไม่ได้"
+// ไม่ใช่เงียบ ๆ ปัดเป็น ฿0 ซึ่งอ่านเหมือนไม่มีดอกเบี้ยค้าง
+suite('8ข. อัตราดอกเบี้ยเป็นข้อความ คำนวณได้เท่าที่มีตัวเลข');
+{
+  const iso = (days) => {
+    const d = new Date(Date.now() + days * 86400000);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const f = (await call('/credit/facilities', { method: 'POST', user: A, body: {
+    projectId: project.id, facilityNo: 7, limit: 5000000,
+    interestNote: 'MLR ต่อปี', notes: `${MARK} ดอกเบี้ยข้อความ` } })).data;
+  made.fac.push(f.id);
+  happy('เก็บข้อความอัตราดอกเบี้ยไว้ตรงตัว', f.interest_note === 'MLR ต่อปี', String(f.interest_note));
+  happy('ไม่มีตัวเลข % → คำนวณอัตราไม่ได้ (null ไม่ใช่ 0)', f.interest_pct === null, String(f.interest_pct));
+
+  const l = (await call('/credit/ledger', { method: 'POST', user: A, body: {
+    facilityId: f.id, amount: 1000000, status: 'อนุมัติแล้ว',
+    startDate: iso(-120), dueDate: iso(-60), ref: `${MARK}-MLR` } })).data;
+  made.led.push(l.id);
+  const od1 = ((await call('/credit/overdue', { user: A })).data || []).find((x) => x.id === l.id);
+  happy('รายการเกินกำหนดบอกว่าระบุอัตราไม่ได้', od1?.overdue_rate_unavailable === true, JSON.stringify(od1?.overdue_rate_unavailable));
+  happy('ยอดดอกเบี้ยไม่ถูกเดาเป็นตัวเลข', Number(od1?.overdue_interest) === 0, String(od1?.overdue_interest));
+  const ov1 = (await call('/credit/overview', { user: A })).data;
+  happy('ภาพรวมนับรายการที่ระบุอัตราไม่ได้ไว้ด้วย', Number(ov1.overdueRateUnknown) >= 1, String(ov1.overdueRateUnknown));
+
+  const f2 = (await call(`/credit/facilities/${f.id}`, { method: 'PATCH', user: A,
+    body: { interestNote: '1.25 % ต่อปีเรียกเก็บทุก 3 เดือน' } })).data;
+  happy('ประโยคที่มีตัวเลข % ดึงอัตราออกมาได้', f2.interest_pct === 1.25, String(f2.interest_pct));
+  const od2 = ((await call('/credit/overdue', { user: A })).data || []).find((x) => x.id === l.id);
+  happy('คำนวณดอกเบี้ยเกินกำหนดจากตัวเลขที่ดึงได้', Number(od2?.overdue_interest) > 0, String(od2?.overdue_interest));
+  bad('ไม่ขึ้นว่าระบุอัตราไม่ได้อีก', od2?.overdue_rate_unavailable === false, String(od2?.overdue_rate_unavailable));
+}
+
+// ── 8ค. ตัวกรองรายการสินเชื่อ ─────────────────────────────────────────────
+suite('8ค. ตัวกรองรายการสินเชื่อตรงกับช่องบนหน้าจอ');
+{
+  const f = (await call('/credit/facilities', { method: 'POST', user: A, body: {
+    projectId: project.id, facilityNo: 5, limit: 3000000, notes: `${MARK} LGM` } })).data;  // 5 = L/G วัสดุ (กล่อง B/E)
+  made.fac.push(f.id);
+  const mk = async (amount, status, ref) => {
+    const r = (await call('/credit/ledger', { method: 'POST', user: A,
+      body: { facilityId: f.id, amount, status, ref } })).data;
+    made.led.push(r.id);
+    return r;
+  };
+  const a = await mk(100000, 'คำขอใหม่', `${MARK}-ใหม่`);
+  const b = await mk(200000, 'อยู่ระหว่างเสนออนุมัติ', `${MARK}-เสนอ`);
+  await mk(300000, 'อนุมัติแล้ว', `${MARK}-อนุมัติ`);
+
+  const two = (await call('/credit/ledger?status=คำขอใหม่,อยู่ระหว่างเสนออนุมัติ', { user: A })).data || [];
+  const ids = two.map((x) => x.id);
+  happy('"รออนุมัติ (ใหม่/เสนอ)" ได้ทั้งสองสถานะพร้อมกัน', ids.includes(a.id) && ids.includes(b.id), `${two.length} รายการ`);
+  bad('ไม่ติดรายการที่อนุมัติแล้วมาด้วย', two.every((x) => x.status !== 'อนุมัติแล้ว'), '');
+
+  // L/G วัสดุ (#5) ใช้วงเงินก้อนเดียวกับ B/E — กดการ์ด B/E ต้องเห็นรายการของมัน
+  const grouped = (await call('/credit/ledger?kinds=AVAL,LGM,DLC,PNPOST', { user: A })).data || [];
+  happy('กรองแบบกลุ่ม B/E เห็นรายการของ L/G วัสดุ', grouped.some((x) => x.id === a.id), `${grouped.length} รายการ`);
+  const lg = (await call('/credit/ledger?kinds=LG', { user: A })).data || [];
+  bad('กรองกลุ่ม BG ไม่เห็นรายการของ L/G วัสดุ', !lg.some((x) => x.id === a.id), `${lg.length} รายการ`);
+
+  const found = (await call(`/credit/ledger?search=${encodeURIComponent(`${MARK}-เสนอ`)}`, { user: A })).data || [];
+  happy('ค้นหาด้วยเลขที่เอกสารเจอรายการนั้น', found.length === 1 && found[0].id === b.id, `${found.length} รายการ`);
+}
+
+// ── 8ง. ทะเบียนหมวดค่าใช้จ่าย — เขียนทั้งชุด ─────────────────────────────
+// จอตั้งค่าแก้ทั้งรายการแล้วกดบันทึกครั้งเดียว ลำดับที่จัด = ลำดับในเมนู
+// สิ่งที่ห้ามเกิดคือหมวดที่ยังถูกอ้างจากเงินที่เบิกไปแล้วหายจากทะเบียน
+suite('8ง. ทะเบียนหมวดค่าใช้จ่าย เขียนทั้งชุดได้ และไม่ทำข้อมูลเก่าพัง');
+{
+  const original = (await call('/credit/cost-categories', { user: A })).data || [];
+  const NEWCAT = `${MARK}หมวดใหม่`;
+  const USED = `${MARK}หมวดที่ถูกใช้`;
+
+  const r1 = await call('/credit/cost-categories', { method: 'PUT', user: A,
+    body: { list: [NEWCAT, USED, ...original] } });
+  happy('เขียนทะเบียนทั้งชุดได้', r1.status === 200, `${r1.status} ${r1.error || ''}`);
+  const after1 = (await call('/credit/cost-categories', { user: A })).data || [];
+  happy('ลำดับที่จัดไว้คือลำดับที่ได้กลับมา',
+    after1[0] === NEWCAT && after1[1] === USED, `${after1[0]} / ${after1[1]}`);
+  happy('หมวดเดิมยังอยู่ครบ', original.every((c) => after1.includes(c)), `${after1.length} หมวด`);
+
+  // ผูกหมวดหนึ่งไว้กับรายการที่เบิกจริง แล้วสั่งลบทั้งคู่
+  const f = (await call('/credit/facilities', { method: 'POST', user: A, body: {
+    projectId: project.id, facilityNo: 6, limit: 1000000, notes: `${MARK} หมวด` } })).data;
+  made.fac.push(f.id);
+  const l = (await call('/credit/ledger', { method: 'POST', user: A, body: {
+    facilityId: f.id, amount: 50000, status: 'อนุมัติแล้ว', costCategory: USED, ref: `${MARK}-หมวด` } })).data;
+  made.led.push(l.id);
+
+  const r2 = await call('/credit/cost-categories', { method: 'PUT', user: A, body: { list: original } });
+  const after2 = (await call('/credit/cost-categories', { user: A })).data || [];
+  bad('หมวดที่ไม่มีใครใช้ ลบออกจากทะเบียนได้', !after2.includes(NEWCAT), '');
+  bad('หมวดที่ยังถูกใช้อยู่ ไม่โผล่ในเมนูอีก', !after2.includes(USED), '');
+  const row = await query('select is_active from credit_cost_categories where name = $1', [USED]);
+  happy('แต่แถวยังอยู่ในฐาน ปิดไว้ ไม่ได้ลบ', row.rows.length === 1 && row.rows[0].is_active === false, JSON.stringify(row.rows));
+  happy('บอกกลับมาว่าปิดหมวดไหนไว้', (r2.data?.deactivated || []).includes(USED), JSON.stringify(r2.data?.deactivated));
+  // เงินที่เบิกไปแล้วยังกระทบยอดได้ตามปกติ
+  const cs = (await call(`/credit/cost-summary?projectId=${project.id}`, { user: A })).data;
+  happy('เงินที่เบิกด้วยหมวดที่ปิดแล้วยังขึ้นในหน้าสรุป',
+    (cs.projects[0]?.lines || []).some((x) => x.cost_category === USED), '');
+
+  // คืนทะเบียนให้เหมือนเดิม
+  await call('/credit/cost-categories', { method: 'PUT', user: A, body: { list: original } });
+  await query('delete from credit_cost_categories where name like $1', [`${MARK}%`]);
+  const back = (await call('/credit/cost-categories', { user: A })).data || [];
+  happy('คืนทะเบียนกลับเป็นชุดเดิมครบ', back.join('|') === original.join('|'), `${back.length} / ${original.length} หมวด`);
 }
 
 // ── เก็บกวาด ───────────────────────────────────────────────────────────────

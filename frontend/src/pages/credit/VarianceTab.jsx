@@ -3,6 +3,7 @@ import { creditApi, formatMoney } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useT } from '../../lib/i18n.jsx';
+import { projectLabel } from './shared.jsx';
 
 /**
  * ผลต่าง (แผน vs จริง)
@@ -49,9 +50,10 @@ export default function VarianceTab({ projects = [] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select value={project} onChange={(e) => setProject(e.target.value)} className="field !w-auto">
+        <select value={project} onChange={(e) => setProject(e.target.value)} className="field !w-auto" title={t('โครงการ')}>
           <option value="">{t('ทุกโครงการ')}</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}
+          {/* ป้ายชื่อโครงการรูปแบบเดียวกันทุกแท็บ — คนละรูปแบบทำให้คนคิดว่าเป็นคนละโครงการ */}
+          {projects.map((p) => <option key={p.id} value={p.id}>{projectLabel(p)}</option>)}
         </select>
         <p className="text-xs text-slate-500">
           {t('แต่ละช่องอ่านจากบนลงล่าง: ยอดจริง · ยอดตามแผน · ผลต่าง')}

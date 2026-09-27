@@ -29,22 +29,29 @@ export default function ProjectsAdmin({ onChanged, onAdded }) {
 
   const add = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    const name = form.name.trim();
+    if (!name) { toast.error(t('กรุณาระบุชื่อโครงการ')); return; }
+    // ชื่อซ้ำกันคือกับดักของรายงาน ต่อให้รหัสต่างกัน — บอกก่อนยิงไปเซิร์ฟเวอร์
+    if ((rows || []).some((r) => String(r.name || '').trim() === name)) {
+      toast.error(t('มีโครงการชื่อนี้อยู่แล้ว')); return;
+    }
     setBusy(true);
     try {
-      const r = await perfApi.addSite({ name: form.name.trim(), company: form.company.trim() || null });
+      const r = await perfApi.addSite({ name, company: form.company.trim() || null });
       toast.success(t('เพิ่มโครงการแล้ว'));
       setForm({ name: '', company: '' });
       onAdded?.(r.data);
       load();
-    } catch (err) { toast.error(err.message); } finally { setBusy(false); }
+    } catch (err) { toast.error(err.message || t('เพิ่มโครงการไม่สำเร็จ')); } finally { setBusy(false); }
   };
 
   const toggle = async (s) => {
-    if (s.active && s.emps > 0) {
+    if (s.active) {
       const ok = await confirm({
         title: t('ปิดโครงการ'),
-        message: t('ยังมีพนักงาน {n} คนสังกัด "{name}" — ปิดแล้วจะบันทึกงานใหม่ในโครงการนี้ไม่ได้ ประวัติเดิมยังอยู่ครบ', { n: s.emps, name: s.name }),
+        message: [t('ปิดโครงการนี้หรือไม่?'),
+          s.emps > 0 ? `${s.emps} ${t('คนยังอยู่ในโครงการนี้')}` : '',
+          t('จะไม่สามารถบันทึกงานใหม่ได้ แต่ประวัติเดิมยังอยู่')].filter(Boolean).join('\n'),
         confirmLabel: t('ปิดโครงการ'), danger: true,
       });
       if (!ok) return;
@@ -61,14 +68,14 @@ export default function ProjectsAdmin({ onChanged, onAdded }) {
   return (
     <section className="card space-y-3">
       <div>
-        <h3 className="font-bold text-slate-800">{t('จัดการโครงการ')}</h3>
-        <p className="text-xs text-slate-400">{t('ปิดโครงการ = หยุดรับบันทึกใหม่ ประวัติยังอยู่และยังแสดงในภาพรวม')}</p>
+        <h3 className="font-bold text-slate-800">{t('โครงการ / หน่วยงาน')}</h3>
+        <p className="text-xs text-slate-400">{t('เพิ่มโครงการใหม่ หรือปิดโครงการที่จบแล้ว · โครงการที่ปิดจะไม่ให้บันทึกงานใหม่ แต่ประวัติเดิมยังอยู่ในแดชบอร์ด')}</p>
       </div>
       <form onSubmit={add} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          placeholder={t('ชื่อโครงการ')} aria-label={t('ชื่อโครงการ')} className="field" />
-        <input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-          placeholder={t('บริษัท (ถ้ามี)')} aria-label={t('บริษัท')} className="field" />
+        <input value={form.name} maxLength={120} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder={t('ชื่อโครงการใหม่')} aria-label={t('ชื่อโครงการใหม่')} className="field" />
+        <input value={form.company} maxLength={160} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+          placeholder={t('บริษัท (ถ้ามี)')} aria-label={t('บริษัท (ถ้ามี)')} className="field" />
         <button type="submit" disabled={busy || !form.name.trim()} className="btn-primary disabled:opacity-50">
           <BusyLabel busy={busy} busyText="กำลังเพิ่ม…"><Icon name="plus" className="h-4 w-4" /> {t('เพิ่มโครงการ')}</BusyLabel>
         </button>

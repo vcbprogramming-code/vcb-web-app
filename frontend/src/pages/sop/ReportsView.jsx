@@ -8,16 +8,15 @@ import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
- * "อยากได้รายงานแบบนี้ ต้องไปเมนูไหน" — the report-menu register.
+ * วิธีเรียก Report — "อยากได้รายงานแบบนี้ ต้องไปเมนูไหน"
  * Each row is a question plus the ERP menu path that answers it.
  */
-export default function ReportsView({ canEdit, onChanged }) {
+export default function ReportsView({ canEdit, q = '', onChanged }) {
   const t = useT();
   const toast = useToast();
   const confirm = useConfirm();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState(null);
-  const [q, setQ] = useState('');
   const [edit, setEdit] = useState(undefined); // undefined=closed, null=new, obj=edit
 
   const load = () => {
@@ -45,13 +44,14 @@ export default function ReportsView({ canEdit, onChanged }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[240px] flex-1">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('ค้นหารายงาน')}
-            placeholder={t('ค้นหาจากสิ่งที่อยากรู้ หรือชื่อรายงาน…')}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-        </div>
+      {/* ช่องค้นหาอยู่บนแถบหัวโมดูลอันเดียว เหมือนระบบจริง — ที่นี่แสดงผลอย่างเดียว */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="flex flex-wrap items-center gap-1.5 text-lg font-bold text-slate-800">
+          <Icon name="chart" className="h-5 w-5 text-slate-400" /> {t('วิธีเรียก Report')}
+          <span className="text-sm font-normal text-slate-500">
+            · {t('เมนูเรียกรายงานสำคัญ')} · {t('แสดง {n} จาก {total} รายงาน', { n: shown?.length ?? 0, total: rows?.length ?? 0 })}
+          </span>
+        </h3>
         {/* คลังความรู้ที่บริษัทผูกไว้กับคู่มือฉบับนี้ — ลิงก์เดียวกับที่ระบบเดิมมี */}
         <a href="https://notebooklm.google.com/notebook/17c8699a-9e2d-4d3b-8a74-51a3cf8ba64c"
           target="_blank" rel="noreferrer" className="btn-outline !py-2 !text-sm">
@@ -59,7 +59,7 @@ export default function ReportsView({ canEdit, onChanged }) {
         </a>
         {canEdit && (
           <button onClick={() => setEdit(null)} className="btn-primary !py-2 !text-sm">
-            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายการ')}
+            <Icon name="plus" className="h-4 w-4" /> {t('เพิ่มรายงานใหม่')}
           </button>
         )}
       </div>
@@ -69,19 +69,19 @@ export default function ReportsView({ canEdit, onChanged }) {
           {err}<button onClick={load} className="ml-2 font-semibold underline">{t('ลองใหม่')}</button>
         </div>
       ) : !shown ? (
-        <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดเมนูรายงาน…')} /></div>
+        <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดวิธีเรียก Report…')} /></div>
       ) : shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
-          {q ? `ไม่พบรายการที่ตรงกับ “${q}”` : 'ยังไม่มีรายการ'}
+          {t('ไม่พบรายงานที่ค้นหา')}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="tbl min-w-[720px]">
             <thead>
-              <tr className="tbl-head">
-                <th className="tbl-th w-14">{t('ลำดับ')}</th>
-                <th className="tbl-th">{t('ต้องการทราบ')}</th>
-                <th className="tbl-th">{t('เมนูรายงานในระบบ')}</th>
+              <tr className="tbl-head normal-case">
+                <th className="tbl-th w-14">#</th>
+                <th className="tbl-th">{t('ต้องการตรวจสอบอะไร')}</th>
+                <th className="tbl-th">{t('เมนูที่ใช้ · Menu Path')}</th>
                 {canEdit && <th className="tbl-th w-28 text-right">{t('จัดการ')}</th>}
               </tr>
             </thead>
@@ -123,7 +123,7 @@ function ReportModal({ item, onClose, onSaved }) {
 
   const save = async (e) => {
     e?.preventDefault();
-    if (!scenarioText.trim() || !reportPath.trim()) { toast.error(t('กรุณากรอกให้ครบ')); return; }
+    if (!scenarioText.trim() || !reportPath.trim()) { toast.error(t('กรุณากรอกข้อมูลให้ครบ / Please fill in all fields')); return; }
     setBusy(true);
     try {
       const body = {
@@ -141,19 +141,19 @@ function ReportModal({ item, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={editing ? 'แก้ไขรายการ' : 'เพิ่มรายการ'} onClose={onClose} size="lg"
+    <Modal title={editing ? t('แก้ไขรายการ Report') : t('เพิ่มรายการ Report ใหม่')} onClose={onClose} size="lg"
       footer={<>
         <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
         <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button>
       </>}>
       <form onSubmit={save} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ต้องการทราบอะไร *')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('ต้องการตรวจสอบอะไร')} *</label>
           <textarea value={scenarioText} onChange={(e) => setScenarioText(e.target.value)} rows={2}
             placeholder={t('เช่น ตรวจสอบยอดหนี้คงค้างในระบบ')} className="field resize-y" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">{t('เมนูรายงานในระบบ *')}</label>
+          <label className="mb-1 block text-sm font-medium text-slate-600">{t('เมนูที่ใช้ · Menu Path')} *</label>
           <input value={reportPath} onChange={(e) => setReportPath(e.target.value)}
             placeholder={t('เช่น AP -&gt; Report -&gt; 10.2.1 (AP Aging Report)')} className="field font-mono text-[13px]" />
         </div>

@@ -16,9 +16,11 @@ export const perfApi = {
   activities: () => api('/performance/activities'),
   createActivity: (body) => api('/performance/activities', { method: 'POST', body }),
   updateActivity: (code, body) => api(`/performance/activities/${encodeURIComponent(code)}`, { method: 'PATCH', body }),
+  deleteActivity: (code) => api(`/performance/activities/${encodeURIComponent(code)}`, { method: 'DELETE' }),
   costCategories: () => api('/performance/cost-categories'),
   createCostCategory: (body) => api('/performance/cost-categories', { method: 'POST', body }),
   updateCostCategory: (code, body) => api(`/performance/cost-categories/${encodeURIComponent(code)}`, { method: 'PATCH', body }),
+  deleteCostCategory: (code) => api(`/performance/cost-categories/${encodeURIComponent(code)}`, { method: 'DELETE' }),
 
   // employees for a site
   employees: (site, month) => api(`/performance/employees${qs({ site, month })}`),
@@ -51,6 +53,11 @@ export const perfApi = {
   entriesXlsxUrl: (params) => apiBlobUrl(`/performance/export/entries.xlsx${qs(params)}`),
   importActivities: (file, dryRun) =>
     apiUpload(`/performance/import/activities${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  // นำเข้าได้ทั้งสองแท็บเหมือนระบบจริง — หมวดงาน 20 แถวก็แก้กันทีละหลายแถว
+  importCostCategories: (file, dryRun) =>
+    apiUpload(`/performance/import/cost-categories${qs({ dryRun: dryRun ? 'true' : undefined })}`, file),
+  indexTemplateUrl: (kind) => apiBlobUrl(
+    kind === 'cost' ? '/performance/import/cost-categories/template.xlsx' : '/performance/import/activities/template.xlsx'),
   moveEmployee: (id, site, date, note) =>
     api(`/performance/employees/${id}/move`, { method: 'POST', body: { site, date, note } }),
   // ทะเบียนแผนกและตำแหน่ง
@@ -136,7 +143,24 @@ export const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.d
 // ── client-side display prefs (localStorage) ─────────────────────────────────
 const PREFS_KEY = 'hr_perf_prefs';
 const readPrefs = () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; } };
+/**
+ * ค่าที่เก็บไว้ในเครื่อง (แต่ละเครื่องอาจไม่เหมือนกัน) — ชุดเดียวกับระบบจริง
+ *   cellNames  แสดงกิจกรรมในตารางสัปดาห์เป็นรหัสหรือชื่อเต็ม
+ *   hiddenSites  หน่วยงานที่ซ่อนจากแดชบอร์ดและรายการเลือก
+ *   yearFmt    'be' = พุทธศักราช (ค่าเริ่มต้น) · 'ce' = คริสต์ศักราช
+ *              เปลี่ยนเฉพาะ "การแสดง" ปีในตัวเลือกเดือน ไม่แตะค่าที่ส่งไปเซิร์ฟเวอร์
+ *   dashView   มุมมองที่แดชบอร์ดเปิดขึ้นมาเป็นค่าเริ่มต้น
+ *
+ * set() คืนค่าที่ "เติมค่าเริ่มต้นแล้ว" เหมือน get() เสมอ — เดิมคืนเฉพาะสิ่งที่
+ * เคยบันทึกไว้ ผู้ใช้ใหม่ที่ยังไม่มีค่าอะไรในเครื่องกดตัวเลือกแรกครั้งเดียวแล้ว
+ * hiddenSites หายไปจากอ็อบเจกต์ หน้าตั้งค่าที่เอาไปอ่าน .includes() ต่อจึงพังทั้งหน้า
+ */
+const PREF_DEFAULTS = { cellNames: 'code', hiddenSites: [], yearFmt: 'be', dashView: 'progress' };
 export const perfPrefs = {
-  get: () => ({ cellNames: 'code', hiddenSites: [], ...readPrefs() }),
-  set: (patch) => { const next = { ...readPrefs(), ...patch }; localStorage.setItem(PREFS_KEY, JSON.stringify(next)); return next; },
+  get: () => ({ ...PREF_DEFAULTS, ...readPrefs() }),
+  set: (patch) => {
+    const next = { ...PREF_DEFAULTS, ...readPrefs(), ...patch };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    return next;
+  },
 };

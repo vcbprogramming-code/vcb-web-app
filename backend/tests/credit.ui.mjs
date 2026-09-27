@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import { suite, happy, bad, report, U, warm, APP, tok, query, call } from './harness.mjs';
+import { suite, happy, bad, report, U, warm, APP, tok, query, call, TEST_PROJECT } from './harness.mjs';
 
 const ROOT = fileURLToPath(new URL('./.out', import.meta.url));
 const SHOTS = `${ROOT}/credit-ui`;
@@ -19,7 +19,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 await warm();
 const { admin: A, exec: C, hr: H } = U;
 const MARK = 'ZZUI';
-const project = (await query("select id, name from projects where code = 'kda' limit 1")).rows[0];
+const project = (await query('select id, name from projects where code = $1', [TEST_PROJECT])).rows[0];
 const made = { fac: [], led: [] };
 
 // real figures to read off the screen: a 5,000,000 facility with 2,000,000 drawn
@@ -58,6 +58,15 @@ const as = async (user, path) => {
   await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('hr_access_token', t); }, tok(user));
   await page.goto(`${APP}${path}`, { waitUntil: 'networkidle2' }).catch(() => {});
   await settle(3500);
+};
+/** รอจนกว่าข้อความจะโผล่บนหน้า (หรือหมดเวลา) แล้วคืนว่าเจอหรือไม่ */
+const waitForText = async (needle, ms = 12000) => {
+  const until = Date.now() + ms;
+  for (;;) {
+    if ((await body()).includes(needle)) return true;
+    if (Date.now() > until) return false;
+    await settle(500);
+  }
 };
 const clickText = async (label) => page.evaluate((l) => {
   const el = [...document.querySelectorAll('button, a, [role="tab"]')].find((x) => x.innerText.trim().includes(l));
@@ -103,14 +112,19 @@ suite('2. ตัวเลขบนหน้าจอต้องตรงกั�
 
 // ── 3. ครบทั้งสี่แท็บ ──────────────────────────────────────────────────────
 suite('3. ทุกแท็บเปิดได้ ไม่มีจอขาว');
-// ชื่อแท็บเปลี่ยนให้ตรงกับระบบจริงของลูกค้าแล้ว และเพิ่มมาอีกสามแท็บ
-for (const tab of ['วงเงินสินเชื่อ', 'รายการสินเชื่อ', 'สรุปค่าใช้จ่าย',
-  'แผนการเงิน', 'หักค่างานตามจริง', 'ผลต่าง', 'คำขอใช้วงเงิน']) {
+// ชื่อแท็บเปลี่ยนให้ตรงกับระบบจริงของลูกค้าแล้ว รวมวงเล็บอังกฤษที่เขาพ่วงไว้
+// (ฝ่ายการเงินเรียกแท็บพวกนี้ด้วยคำอังกฤษเวลาคุยกับธนาคาร) และเพิ่มมาอีกสามแท็บ
+for (const tab of ['วงเงินสินเชื่อ (Facilities)', 'รายการสินเชื่อ (Credit Ledger)', 'สรุปค่าใช้จ่าย (Cost summary)',
+  'แผนการเงิน (T-bar)', 'หักค่างานตามจริง', 'ผลต่าง (Variance)']) {
+  // ทางเข้าคำขอสินเชื่อไม่ได้เป็นแท็บอีกแล้ว — ย้ายไปเป็นปุ่มใต้แถบตัวกรอง ซึ่ง
+  // ซ่อนไปพร้อมแถบบนแท็บวางแผน ชุด 3ง จึงพิสูจน์ทางเข้านั้นแยกต่างหากตั้งแต่กด
+  // จนบันทึกสำเร็จ แทนที่จะเช็กแค่ว่าปุ่มโผล่อยู่ตอนไหนก็ได้
   // กดที่แถบแท็บโดยตรง — ชื่อแท็บบางชื่อไปตรงกับหัวข้อในหน้าด้วย
   const found = await page.evaluate((label) => {
     const tabs = [...document.querySelectorAll('button')].filter((b) => b.className.includes('border-b-2'));
     const el = tabs.find((b) => b.innerText.trim() === label)
-      || [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === label);
+      || [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === label)
+      || [...document.querySelectorAll('button')].find((b) => b.innerText.trim().startsWith(label));
     if (el) { el.click(); return true; } return false;
   }, tab);
   await settle(2200);
@@ -120,6 +134,236 @@ for (const tab of ['วงเงินสินเชื่อ', 'รายก�
   const err = t.match(/(เกิดข้อผิดพลาด|Something went wrong|Internal Server Error|Failed to fetch|ไม่มีสิทธิ์)/);
   bad(`แท็บ "${tab}" ไม่ขึ้นข้อความผิดพลาด`, !err, err ? err[0] : '');
   await shot(`03-แท็บ-${tab}`);
+  // ปุ่มคำขอเปิดเป็นจอซ้อน ต้องปิดก่อน ไม่งั้นบังแท็บถัดไป
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('[role="dialog"] button')].find((x) => x.innerText.trim() === 'ปิด');
+    if (b) b.click();
+  });
+  await settle(900);
+}
+
+// ── 3ข. แท็บรายการสินเชื่อ เขียนคำและคอลัมน์แบบระบบจริง ───────────────────
+// เทียบกับ txnTable() ของเขา: สิบสองคอลัมน์ · บรรทัดนับรายการ · ยอดรวมท้ายตาราง
+// · ปุ่มดู/แก้ไข/ลบ · จอรายละเอียดสิบสามแถว
+suite('3ข. แท็บรายการสินเชื่อตรงกับระบบจริง');
+{
+  const openTab = (label) => page.evaluate((l) => {
+    const el = [...document.querySelectorAll('button')].filter((b) => b.className.includes('border-b-2'))
+      .find((b) => b.innerText.trim() === l);
+    if (el) { el.click(); return true; } return false;
+  }, label);
+  await as(A, '/credit');
+  happy('เปิดแท็บรายการสินเชื่อได้', await openTab('รายการสินเชื่อ (Credit Ledger)'), '');
+  await settle(3000);
+
+  const head = await page.evaluate(() => [...document.querySelectorAll('table thead th')].map((x) => x.innerText.trim()));
+  happy('คอลัมน์ครบสิบสองตามลำดับของเขา',
+    head.join('|') === '#|วันที่|บริษัท|โครงการ|ประเภท|เลขที่เอกสาร|รายละเอียด / ผู้รับผลประโยชน์|จำนวนเงิน|เริ่ม|ครบ|สถานะ|',
+    head.join('|'));
+
+  const t = await body();
+  happy('มีบรรทัดบอกว่าแสดงกี่รายการจากทั้งหมด', /แสดง \d+ \/ \d+ รายการ/.test(t), (t.match(/แสดง \d+ \/ \d+ รายการ/) || ['ไม่พบ'])[0]);
+  happy('ท้ายตารางรวมยอดค้างชำระ', t.includes('รวมยอดค้างชำระ'), '');
+  happy('เห็นรายการที่เพิ่งสร้าง (2,000,000)', t.includes('2,000,000'), '');
+
+  // ช่องกรองสถานะ: มี "รออนุมัติ (ใหม่/เสนอ)" และต้องไม่มีคำในฐานข้อมูลอย่าง void
+  const statusOpts = await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => (x.title || '') === 'สถานะ');
+    return s ? [...s.options].map((o) => o.text) : [];
+  });
+  happy('ช่องสถานะมีตัวเลือกรออนุมัติ (ใหม่/เสนอ)', statusOpts.includes('รออนุมัติ (ใหม่/เสนอ)'), statusOpts.join(', '));
+  bad('ช่องสถานะไม่มีคำ void ให้ผู้ใช้เห็น', !statusOpts.some((o) => /void/i.test(o)), statusOpts.join(', '));
+
+  // กรองด้วยระยะเวลาแล้วต้องขึ้นป้ายว่ากำลังแสดงเฉพาะอะไร
+  await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => (x.title || '') === 'ระยะเวลา');
+    if (s) { s.value = 'thisMonth'; s.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  await settle(2200);
+  happy('กรองระยะเวลาแล้วขึ้นป้าย "แสดงเฉพาะ:"', (await body()).includes('แสดงเฉพาะ:'), '');
+  await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => (x.title || '') === 'ระยะเวลา');
+    if (s) { s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  await settle(2200);
+
+  // จอรายละเอียด: สิบสามแถว พร้อมปุ่มลบ/แก้ไข
+  const viewed = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('tbody button')].find((x) => (x.title || '') === 'ดู');
+    if (b) { b.click(); return true; } return false;
+  });
+  happy('ปุ่มดูเปิดจอรายละเอียดรายการสินเชื่อ', viewed, '');
+  await settle(1600);
+  const det = await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    return { title: dlg?.querySelector('h3')?.innerText.trim() || '',
+      rows: dlg ? [...dlg.querySelectorAll('dt')].map((x) => x.innerText.trim()) : [],
+      btns: dlg ? [...dlg.querySelectorAll('button')].map((x) => x.innerText.trim()).filter(Boolean) : [] };
+  });
+  happy('หัวจอคือ "รายละเอียดรายการสินเชื่อ"', det.title === 'รายละเอียดรายการสินเชื่อ', det.title);
+  happy('มีสิบสามแถวตามของเขา', det.rows.length === 13, `${det.rows.length} แถว: ${det.rows.join(', ')}`);
+  happy('ลำดับแถวเริ่มที่วันที่ขอ จบที่หมายเหตุ',
+    det.rows[0] === 'วันที่ขอ' && det.rows[12] === 'หมายเหตุ', `${det.rows[0]} … ${det.rows[12]}`);
+  happy('มีปุ่มลบและแก้ไขอยู่ในจอรายละเอียด',
+    det.btns.includes('ลบ') && det.btns.includes('แก้ไข'), det.btns.join(' / '));
+  await shot('03ข-รายละเอียดรายการ');
+
+  // ฟอร์มแก้ไขคำขอ: ช่องสถานะสี่ค่า
+  await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const b = dlg && [...dlg.querySelectorAll('button')].find((x) => x.innerText.trim() === 'แก้ไข');
+    if (b) b.click();
+  });
+  await settle(1800);
+  const ed = await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const s = dlg && [...dlg.querySelectorAll('select')].find((x) => (x.title || '') === 'สถานะ');
+    return { title: dlg?.querySelector('h3')?.innerText.trim() || '', opts: s ? [...s.options].map((o) => o.text) : [] };
+  });
+  happy('หัวฟอร์มคือ "แก้ไขคำขอ"', ed.title === 'แก้ไขคำขอ', ed.title);
+  happy('ช่องสถานะมีสี่ค่าตามของเขา',
+    ed.opts.join('|') === 'คำขอใหม่|อยู่ระหว่างเสนออนุมัติ|อนุมัติแล้ว|ชำระแล้ว (ปิดรายการ)', ed.opts.join('|'));
+  await shot('03ค-แก้ไขคำขอ');
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'ยกเลิก');
+    if (b) b.click();
+  });
+  await settle(1200);
+
+  // แท็บสรุปค่าใช้จ่าย: หัวแผงตามชื่อของเขา
+  happy('เปิดแท็บสรุปค่าใช้จ่ายได้', await openTab('สรุปค่าใช้จ่าย (Cost summary)'), '');
+  await settle(2600);
+  happy('หัวแผงคือ "สรุปหมวดค่าใช้จ่าย"', (await body()).includes('สรุปหมวดค่าใช้จ่าย'), '');
+  await shot('03ง-สรุปค่าใช้จ่าย');
+}
+
+// ── 3ค. โครงหน้าจอแบบเดียวกับระบบที่ลูกค้าใช้อยู่ ────────────────────────
+// แถบหัวน้ำเงิน · แถบตัวกรองชุดเดียวใต้แท็บ · ปุ่มสามปุ่มชิดขวาใต้ตัวกรอง
+suite('3ค. โครงหน้าจอตรงกับระบบจริง');
+{
+  await as(A, '/credit');
+  const hdr = await page.evaluate(() => {
+    const h = [...document.querySelectorAll('header')].find((x) => x.innerText.includes('VCB Group')
+      && /CREDIT FACILITY MANAGER/i.test(x.innerText));
+    if (!h) return null;
+    const bg = getComputedStyle(h).backgroundColor;
+    return { text: h.innerText.replace(/\n/g, ' | '), bg, gear: Boolean(h.querySelector('button[title]')) };
+  });
+  happy('มีแถบหัวโมดูลชื่อ VCB Group · CREDIT FACILITY MANAGER', Boolean(hdr), hdr?.text || 'ไม่พบ');
+  happy('แถบหัวเป็นพื้นน้ำเงินเข้ม', hdr?.bg === 'rgb(31, 56, 100)', hdr?.bg || '');
+  happy('บรรทัดล่างบอกชื่อกลุ่มบริษัทและงานของโมดูล',
+    (hdr?.text || '').includes('กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ติดตามวงเงินสินเชื่อทุกโครงการ'), '');
+  happy('ปุ่มตั้งค่าอยู่บนแถบหัว', hdr?.gear === true, '');
+
+  // แถบตัวกรอง: ห้าช่องบนแท็บวงเงิน (ช่องสถานะโผล่เฉพาะแท็บรายการ เหมือนของเขา)
+  const barOf = () => page.evaluate(() => {
+    const titles = ['บริษัท', 'ประเภทวงเงิน', 'โครงการ', 'สถานะ', 'ระยะเวลา'];
+    const sels = [...document.querySelectorAll('select')].filter((x) => titles.includes(x.title || ''));
+    return { fields: sels.map((x) => x.title),
+      search: Boolean([...document.querySelectorAll('input')].find((x) => (x.title || '').startsWith('ค้นหา'))) };
+  });
+  const fac = await barOf();
+  happy('แท็บวงเงินมีตัวกรองห้าช่อง (บริษัท · ประเภท · โครงการ · ระยะเวลา · ค้นหา)',
+    fac.fields.join('|') === 'บริษัท|ประเภทวงเงิน|โครงการ|ระยะเวลา' && fac.search, fac.fields.join('|'));
+
+  const btns = await page.evaluate(() => [...document.querySelectorAll('button')]
+    .map((b) => b.innerText.trim().replace(/\s+\d+$/, '')).filter(Boolean));
+  for (const label of ['เพิ่มคำขอสินเชื่อ', 'บันทึกการใช้วงเงิน', 'ส่งออก Excel']) {
+    happy(`มีปุ่ม "${label}" ใต้แถบตัวกรอง`, btns.includes(label), '');
+  }
+  await shot('03ค-โครงหน้าจอ');
+
+  // ตัวกรองเป็นชุดเดียว: ตั้งที่แท็บวงเงินแล้วสลับแท็บต้องยังอยู่
+  await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => (x.title || '') === 'ประเภทวงเงิน');
+    if (s) { s.value = '7'; s.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  await settle(2000);
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('button')].filter((b) => b.className.includes('border-b-2'))
+      .find((b) => b.innerText.trim() === 'รายการสินเชื่อ (Credit Ledger)');
+    if (el) el.click();
+  });
+  await settle(2400);
+  const kept = await page.evaluate(() => {
+    const s = [...document.querySelectorAll('select')].find((x) => (x.title || '') === 'ประเภทวงเงิน');
+    return s ? s.value : '';
+  });
+  happy('ตัวกรองเป็นชุดเดียว สลับแท็บแล้วยังอยู่', kept === '7', kept);
+  const led = await barOf();
+  happy('แท็บรายการเพิ่มช่องสถานะขึ้นมา', led.fields.includes('สถานะ'), led.fields.join('|'));
+
+  // แท็บวางแผนไม่มีอะไรให้กรอง แถบต้องหายทั้งแถบ เหมือน showBar ของเขา
+  await page.evaluate(() => {
+    const el = [...document.querySelectorAll('button')].filter((b) => b.className.includes('border-b-2'))
+      .find((b) => b.innerText.trim() === 'ผลต่าง (Variance)');
+    if (el) el.click();
+  });
+  await settle(2400);
+  const gone = await barOf();
+  // แท็บผลต่างมีช่องเลือกโครงการของตัวเองอยู่แล้ว (เทียบทีละโครงการ) สิ่งที่ต้อง
+  // หายไปคือแถบร่วม ซึ่งมีช่องบริษัทกับระยะเวลาที่แท็บนั้นไม่มีวันมีเอง
+  bad('แท็บผลต่างไม่มีแถบตัวกรองร่วม',
+    !gone.fields.includes('บริษัท') && !gone.fields.includes('ระยะเวลา') && !gone.search, gone.fields.join('|'));
+}
+
+// ── 3ง. เปิดคำขอสินเชื่อจากปุ่มใต้ตัวกรอง แล้วบันทึกได้จริง ──────────────
+// ปุ่มนี้แทนปุ่ม "คำขอใช้วงเงิน" เดิมบนหัวโมดูล — ต้องพิสูจน์ว่าทางเข้ายังครบ
+// ตั้งแต่กดจนบันทึกสำเร็จ ไม่ใช่แค่ว่าปุ่มมีอยู่
+suite('3ง. ทางเข้าคำขอสินเชื่อใช้งานได้ตั้งแต่กดจนบันทึก');
+{
+  await as(A, '/credit');
+  const opened = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim().startsWith('เพิ่มคำขอสินเชื่อ'));
+    if (b) { b.click(); return true; } return false;
+  });
+  happy('กดปุ่มเพิ่มคำขอสินเชื่อแล้วจอเปิด', opened, '');
+  await settle(2200);
+  const formOpen = await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    return Boolean(dlg && [...dlg.querySelectorAll('button')].some((b) => b.innerText.trim() === 'ยื่นคำขอ'));
+  });
+  happy('ฟอร์มกางให้เลย ไม่ต้องกดเพิ่มอีกชั้น', formOpen, '');
+
+  // เลือกวงเงินของโครงการทดสอบ แล้วกรอกจำนวนเงิน
+  const picked = await page.evaluate((facId) => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const sel = dlg && dlg.querySelector('select');
+    if (!sel) return false;
+    const set = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+    set.call(sel, facId);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return sel.value === facId;
+  }, fac.data.id);
+  happy('เลือกวงเงินในฟอร์มได้', picked, '');
+  await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const inp = dlg && [...dlg.querySelectorAll('input[type="number"]')][0];
+    if (!inp) return;
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(inp, '125000');
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await settle(800);
+  happy('ขึ้นบรรทัดบอกวงเงินคงเหลือใต้ช่องจำนวนเงิน',
+    (await body()).includes('คงเหลือใช้ได้'), '');
+  await shot('03ง-ฟอร์มคำขอ');
+  await page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]');
+    const b = dlg && [...dlg.querySelectorAll('button')].find((x) => x.innerText.trim() === 'ยื่นคำขอ');
+    if (b) b.click();
+  });
+  await settle(3200);
+  const saved = (await query(
+    'select amount, status from credit_requests where facility_id = $1 order by created_at desc limit 1',
+    [fac.data.id])).rows[0];
+  happy('คำขอถูกบันทึกลงฐานจริง', Number(saved?.amount) === 125000, `${saved?.amount} · ${saved?.status}`);
+  happy('บอกผู้ใช้ว่าบันทึกแล้ว', (await body()).includes('บันทึกคำขอแล้ว'), '');
+  await query('delete from credit_requests where facility_id = $1', [fac.data.id]);
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('[role="dialog"] button')].find((x) => x.innerText.trim() === 'ปิด');
+    if (b) b.click();
+  });
+  await settle(1200);
 }
 
 // ── 4. คนที่ไม่ควรเห็นเงิน ต้องไม่เห็น ─────────────────────────────────────
@@ -146,7 +390,7 @@ suite('4. ฝ่ายบุคคลที่ไม่มีสิทธิ์�
   await shot('04-ไม่มีสิทธิ์');
 
   await as(C, '/credit');
-  happy('ผู้บริหารเปิดดูได้ตามสิทธิ์', (await body()).includes(`${MARK} ทดสอบหน้าจอ`), '');
+  happy('ผู้บริหารเปิดดูได้ตามสิทธิ์', await waitForText(`${MARK} ทดสอบหน้าจอ`), '');
   await shot('05-ผู้บริหาร');
 }
 
@@ -157,8 +401,9 @@ suite('4ข. เปิดสิทธิ์ให้รายบุคคลไ�
 {
   await setHrCredit(true);
   await as(H, '/credit');
+  const seen = await waitForText(`${MARK} ทดสอบหน้าจอ`);
   const t = await body();
-  happy('ผู้ที่ได้รับสิทธิ์เพิ่มเปิดดูได้ แม้ไม่ได้เป็นผู้บริหาร', t.includes(`${MARK} ทดสอบหน้าจอ`), '');
+  happy('ผู้ที่ได้รับสิทธิ์เพิ่มเปิดดูได้ แม้ไม่ได้เป็นผู้บริหาร', seen, '');
   bad('ไม่มีข้อความสิทธิ์ไม่พอค้างอยู่บนหน้า', !/Insufficient permissions|ไม่มีสิทธิ์/.test(t), '');
   await as(H, '/');
   happy('การ์ดขึ้นในหน้าแรกให้คนที่ได้รับสิทธิ์', (await body()).includes('วงเงินสินเชื่อ'), '');

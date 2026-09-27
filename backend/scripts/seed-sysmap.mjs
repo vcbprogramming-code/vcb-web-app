@@ -32,6 +32,11 @@ function readLiteral(file) {
   return eval(`(${src.slice(eq + 2, end)})`);
 }
 
+/** Same, for a file the upstream may not carry yet. */
+function readOptional(file, fallback) {
+  try { return readLiteral(file); } catch { return fallback; }
+}
+
 const LANES = readLiteral('lanes.ts');
 const CONNS = readLiteral('crossConns.ts');
 const DEPTS = readLiteral('depts.ts');
@@ -42,6 +47,10 @@ const AI_OPPS = readLiteral('aiOpps.ts');
 const TH = readLiteral('langTh.ts');
 const FN_LOC = readLiteral('functionLoc.ts');
 const FN_DEPT2 = readLiteral('functionDept2.ts');
+const FUNCTION_AI = readOptional('functionAi.ts', {});
+const AI_REG_FNS = readOptional('aiRegistryFns.ts', new Set());
+const DOC_NODES = readOptional('docNodes.ts', []);
+const NODE_FN = readOptional('nodeFn.ts', {});
 
 const S = (v) => (v == null ? '' : String(v));
 let counts = {};
@@ -177,6 +186,72 @@ for (const [dept, rows] of Object.entries(REGISTRY)) {
     );
     bump('ai');
   }
+  // AI_OPPS ใช้ node id เป็นคีย์อยู่แล้ว — ผูกกลับให้แผงกล่องงานมีแท็บโอกาส AI
+  // (เขียนแยกจาก insert ข้างบนเพื่อไม่แตะคอลัมน์เดิม ถ้าคีย์ไหนไม่ใช่ node ก็ปล่อยว่าง)
+  const bound = await query(
+    `update sysmap_ai_opps a set node_id = a.key
+       where a.key = any($1) and exists (select 1 from sysmap_nodes n where n.id = a.key)`,
+    [Object.keys(AI_OPPS)]
+  );
+  bump('ai_node_id', bound.rowCount || 0);
+}
+
+// ── AI ระดับฟังก์ชัน ───────────────────────────────────────────────────────
+{
+  const reg = AI_REG_FNS instanceof Set ? AI_REG_FNS : new Set(AI_REG_FNS || []);
+  for (const code of new Set([...Object.keys(FUNCTION_AI), ...reg])) {
+    const a = FUNCTION_AI[code] || {};
+    await query(
+      `insert into sysmap_function_ai (code, desc_en, desc_th, tool, in_registry)
+       values ($1,$2,$3,$4,$5)
+       on conflict (code) do update set
+         desc_en = excluded.desc_en, desc_th = excluded.desc_th,
+         tool = excluded.tool, in_registry = excluded.in_registry`,
+      [code, S(a.en), S(a.th), S(a.tool), reg.has(code)]
+    );
+    bump('function_ai');
+  }
+}
+
+// ── หน้าที่ที่เกี่ยวข้องกับแต่ละกล่องงาน ───────────────────────────────────
+{
+  const { rows } = await query('select id from sysmap_nodes');
+  const known = new Set(rows.map((r) => r.id));
+  for (const [nodeId, codes] of Object.entries(NODE_FN || {})) {
+    if (!known.has(nodeId)) continue;   // กล่องที่ไม่มีบนผังก็ไม่มีชิปให้ติด
+    for (const [i, code] of (codes || []).entries()) {
+      await query(
+        `insert into sysmap_node_fns (node_id, code, sort_order) values ($1,$2,$3)
+         on conflict (node_id, code) do update set sort_order = excluded.sort_order`,
+        [nodeId, code, i]
+      );
+      bump('node_fns');
+    }
+  }
+}
+
+// ── เอกสารหน้างาน (Document Control) ───────────────────────────────────────
+for (const [i, n] of (DOC_NODES || []).entries()) {
+  const th = TH.docs?.[n.id] || {};
+  await query(
+    `insert into sysmap_doc_nodes
+       (id, code, dept, label_en, label_th, sub_en, sub_th, desc_en, desc_th,
+        erp_style, erp_label_en, erp_label_th, items_en, items_th, sort_order)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)
+     on conflict (id) do update set
+       code = excluded.code, dept = excluded.dept,
+       label_en = excluded.label_en, label_th = excluded.label_th,
+       sub_en = excluded.sub_en, sub_th = excluded.sub_th,
+       desc_en = excluded.desc_en, desc_th = excluded.desc_th,
+       erp_style = excluded.erp_style,
+       erp_label_en = excluded.erp_label_en, erp_label_th = excluded.erp_label_th,
+       items_en = excluded.items_en, items_th = excluded.items_th,
+       sort_order = excluded.sort_order`,
+    [n.id, S(n.code), S(n.dept), S(n.label), S(th.label), S(n.sub), S(th.sub),
+     S(n.desc), S(th.desc), S(n.erp_style) || 'manual', S(n.erp_label), S(th.erp_label),
+     JSON.stringify(n.items || []), JSON.stringify(th.items || []), i]
+  );
+  bump('doc_nodes');
 }
 
 console.log('\nนำเข้าข้อมูลแผนผังระบบเรียบร้อย');

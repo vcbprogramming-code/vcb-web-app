@@ -1,33 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { sopApi } from '../../lib/sop.js';
-import { PageHeader } from '../../components/ui/index.js';
+import { sopApi, readDefaultView, writeDefaultView } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
-import Icon from '../../components/Icon.jsx';
 import ScenariosView from './ScenariosView.jsx';
 import FlowsView from './FlowsView.jsx';
 import ReportsView from './ReportsView.jsx';
 import VersionsView from './VersionsView.jsx';
+import SopHeader from './SopHeader.jsx';
+import SopSidebar from './SopSidebar.jsx';
+import SopSettings from './SopSettings.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
 /**
- * Module 5 — SOP (คู่มือปฏิบัติงาน). Three views over the same manual:
- * case studies ("when X, do Y"), swimlane process flows, and the report-menu
- * register. Editors (sop.edit) can maintain all of it in place.
+ * Module 5 — ระเบียบปฏิบัติงานมาตรฐาน (SOP)
+ *
+ * โครงหน้าจอสามคอลัมน์แบบเดียวกับหน้าเว็บที่ลูกค้าใช้อยู่จริง: ซ้ายเป็นเมนูหมวด
+ * กลางเป็นรายการ ขวาเป็นรายละเอียด และมีแถบหัวสีน้ำเงินเข้มที่รวมช่องค้นหาไว้
+ * ที่เดียวสำหรับทุกมุมมอง คำที่ใช้ก็เป็นคำของเขา — คนของเขาเรียก "กรณีเฉพาะ"
+ * ไม่ใช่ "กรณีศึกษา" และเรียกตารางรายงานว่า "วิธีเรียก Report"
+ *
+ * ประวัติเวอร์ชันและการแก้ไขเนื้อหาในระบบเป็นส่วนที่ระบบเรามีเพิ่ม คงไว้ตามเดิม
  */
-const TABS = [
-  { key: 'cases', label: 'กรณีศึกษา', icon: 'document' },
-  { key: 'flows', label: 'ผังกระบวนการ', icon: 'flow' },
-  { key: 'reports', label: 'เมนูรายงาน', icon: 'chart' },
-  // ประวัติเวอร์ชันเปิดให้เฉพาะผู้แก้ไข — เอกสารข้อกำหนดฟังก์ชัน §2.7
-  { key: 'versions', label: 'ประวัติเวอร์ชัน', icon: 'clock', editorOnly: true },
+
+/** วิธีใช้สามขั้นบนหน้าแรก — ข้อความชุดเดียวกับที่ระบบจริงขึ้นให้ผู้ใช้ใหม่อ่าน */
+const HOW_TO = [
+  { n: 1, title: 'เลือกหมวด (ซ้าย)', desc: 'คลิกหมวดในแถบซ้าย เช่น PO, IC, AP หรือ "ทั้งหมด" เพื่อดูรายการกรณีในหมวดนั้น' },
+  { n: 2, title: 'เลือกกรณี (กลาง)', desc: 'คลิกการ์ดของกรณีเฉพาะตรงกลาง เพื่อเปิดดูปัญหาและแนวทางปฏิบัติฉบับเต็ม' },
+  { n: 3, title: 'อ่านรายละเอียด (ขวา)', desc: 'ปัญหา/สถานการณ์ และขั้นตอนปฏิบัติทั้งหมดจะแสดงในแถบนี้ พร้อมอ้างอิงคู่มือ' },
 ];
 
 export default function Sop() {
   const t = useT();
   // A link can point straight at one item: ?case=12 or ?flow=AP-3. People quote
   // the manual at each other, and "ดูเคส AP-3" used to mean describing where to
-  // click. The parameter also decides which tab opens.
+  // click. The parameter also decides which view opens.
   const [sp, setSp] = useSearchParams();
   const sharedCase = sp.get('case');
   const sharedFlow = sp.get('flow');
@@ -35,12 +41,16 @@ export default function Sop() {
   const [boot, setBoot] = useState(null);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState(sharedFlow ? 'flows' : 'cases');
-  const [module, setModule] = useState(''); // '' = ทุกหมวด
+  // หน้าเริ่มต้นที่ผู้ใช้เลือกไว้ในการตั้งค่า — ลิงก์ตรงมีสิทธิ์เหนือกว่าเสมอ
+  const [module, setModule] = useState(() => (sharedCase || sharedFlow ? '' : readDefaultView()));
+  const [q, setQ] = useState('');          // ช่องค้นหาเดียว ใช้กับทุกมุมมอง
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Switching tabs by hand drops the deep link — it belongs to the item that was
+  // Switching view by hand drops the deep link — it belongs to the item that was
   // shared, and carrying it into another view would reopen it unasked.
-  const pickTab = (key) => {
+  const pick = (key, mod) => {
     setTab(key);
+    if (mod !== undefined) setModule(mod);
     if (sharedCase || sharedFlow) setSp({}, { replace: true });
   };
 
@@ -49,6 +59,14 @@ export default function Sop() {
     return sopApi.bootstrap().then((r) => setBoot(r.data)).catch((e) => setError(e.message));
   };
   useEffect(() => { load(); }, []);
+
+  // หมวดที่บันทึกไว้อาจถูกลบไปแล้ว หรือไม่มีกรณีเหลืออยู่ — อย่าเปิดหน้าว่างใส่หน้า
+  const checkedDefault = useRef(false);
+  useEffect(() => {
+    if (!boot || checkedDefault.current) return;
+    checkedDefault.current = true;
+    if (module && !boot.counts.scenarios[module]) setModule('');
+  }, [boot, module]);
 
   if (error) {
     return (
@@ -61,91 +79,65 @@ export default function Sop() {
   if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดคู่มือ…')} /></div>;
 
   const { modules, meta, counts, canEdit } = boot;
-  // the chips filter whatever tab is open, so they count that tab's content
-  const perModule = tab === 'flows' ? counts.flows : counts.scenarios;
-  const countFor = (code) => perModule[code] || 0;
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={meta?.title || 'คู่มือปฏิบัติงาน (SOP)'}
-        subtitle={meta ? `${meta.subtitle || ''} · ${meta.version || ''} · มีผล ${meta.effective || '—'}` : undefined}
-      />
+    <div className="space-y-4">
+      <SopHeader q={q} onQ={setQ} onSettings={() => setSettingsOpen(true)}
+        searchLabel={tab === 'reports' ? t('ค้นหารายงาน') : t('ค้นหากรณีเฉพาะ')} />
 
-      {meta?.purpose && (
-        <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-            {t('วัตถุประสงค์ · ขอบเขต · หมายเหตุ')}
-          </summary>
-          <div className="mt-3 space-y-3 text-sm text-slate-600">
-            <p className="whitespace-pre-line">{meta.purpose}</p>
-            {meta.scope && <p><b>{t('ขอบเขต:')}</b> {meta.scope}</p>}
-            {meta.manual && <p><b>{t('อ้างอิง:')}</b> {meta.manual}</p>}
-            {Array.isArray(meta.notes) && meta.notes.length > 0 && (
-              <ul className="list-disc space-y-1 pl-5">
-                {meta.notes.map((n, i) => <li key={i}>{n}</li>)}
-              </ul>
-            )}
-          </div>
-        </details>
-      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,250px)_minmax(0,1fr)]">
+        <SopSidebar modules={modules} counts={counts} meta={meta} tab={tab} module={module}
+          canEdit={canEdit} onPick={pick} />
 
-      {/* view switch */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200">
-        {TABS.filter((x) => !x.editorOnly || canEdit).map((it) => (
-          <button key={it.key} onClick={() => {
-            pickTab(it.key);
-            // don't carry a filter into a it where that module has nothing
-            if (it.key === 'versions') { setModule(''); return; }
-            const next = it.key === 'flows' ? counts.flows : counts.scenarios;
-            if (module && !next[module]) setModule('');
-          }}
-            className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-              tab === it.key ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}>
-            <Icon name={it.icon} className="h-4 w-4" /> {it.label}
-            {/* แท็บประวัติเวอร์ชันไม่มีจำนวนกำกับ — เลขจะเปลี่ยนทุกครั้งที่แก้คู่มือ
-                และไม่ได้บอกอะไรที่คนอ่านต้องรู้ก่อนกดเข้าไป */}
-            {it.key !== 'versions' && (
-              <span className="ml-1 text-xs text-slate-400">
-                {it.key === 'cases' ? Object.values(counts.scenarios).reduce((a, b) => a + b, 0)
-                  : it.key === 'flows' ? Object.values(counts.flows).reduce((a, b) => a + b, 0)
-                  : counts.reports}
-              </span>
-            )}
-          </button>
-        ))}
+        <div className="min-w-0 space-y-4">
+          {tab === 'cases' && (
+            <ScenariosView modules={modules} module={module} q={q} canEdit={canEdit} onChanged={load}
+              sharedNo={sharedCase} total={counts.scenarioTotal} onClearModule={() => setModule('')} />
+          )}
+          {tab === 'flows' && <FlowsView module={module} q={q} sharedId={sharedFlow} total={counts.flowTotal} />}
+          {tab === 'reports' && <ReportsView canEdit={canEdit} q={q} onChanged={load} />}
+          {tab === 'versions' && <VersionsView canEdit={canEdit} onRestored={load} />}
+
+          {/* วิธีใช้สามขั้น — ขึ้นเฉพาะหน้าแรกของกรณีเฉพาะ (ยังไม่เลือกหมวด ไม่ได้ค้นหา) */}
+          {tab === 'cases' && module === '' && !q && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {HOW_TO.map((h) => (
+                <div key={h.n} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">{h.n}</span>
+                  <div className="mt-2 text-sm font-semibold text-slate-800">{t(h.title)}</div>
+                  <p className="mt-1 text-[12px] leading-relaxed text-slate-500">{t(h.desc)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'cases' && meta?.purpose && (
+            <details className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+                {t('วัตถุประสงค์และขอบเขต · Purpose & Scope')}
+              </summary>
+              <div className="mt-3 space-y-3 text-sm text-slate-600">
+                <p className="whitespace-pre-line">{meta.purpose}</p>
+                {meta.scope && <p><b>{t('ขอบเขต:')}</b> {meta.scope}</p>}
+                {meta.manual && <p><b>{t('อ้างอิง (Reference)')}:</b> {meta.manual}</p>}
+                {Array.isArray(meta.notes) && meta.notes.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{t('หมายเหตุ · Notes')}</p>
+                    <ul className="list-disc space-y-1 pl-5">
+                      {meta.notes.map((n, i) => <li key={i}>{n}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+        </div>
       </div>
 
-      {/* module filter — shared by the case + flow views */}
-      {tab !== 'reports' && (
-        <div className="flex flex-wrap gap-1.5">
-          <button onClick={() => setModule('')}
-            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-              module === '' ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
-            }`}>
-            {t('ทุกหมวด')}
-          </button>
-          {modules.map((m) => {
-            const n = countFor(m.code);
-            return (
-              <button key={m.code} onClick={() => setModule(m.code)} disabled={n === 0}
-                title={m.name_th || m.name_th_short}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition disabled:opacity-40 ${
-                  module === m.code ? 'border-brand bg-brand text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
-                }`}>
-                {m.code} · {m.name_th_short}
-                <span className="ml-1 text-xs opacity-70">{n}</span>
-              </button>
-            );
-          })}
-        </div>
+      {settingsOpen && (
+        <SopSettings modules={modules} counts={counts.scenarios} onClose={() => setSettingsOpen(false)}
+          onDefaultView={(code) => { writeDefaultView(code); }} />
       )}
-
-      {tab === 'cases' && <ScenariosView modules={modules} module={module} canEdit={canEdit} onChanged={load} sharedNo={sharedCase} />}
-      {tab === 'flows' && <FlowsView module={module} sharedId={sharedFlow} />}
-      {tab === 'reports' && <ReportsView canEdit={canEdit} onChanged={load} />}
-      {tab === 'versions' && <VersionsView canEdit={canEdit} onRestored={load} />}
     </div>
   );
 }

@@ -9,11 +9,26 @@ export const portalApi = {
   createAnnouncement: (body) => api('/announcements', { method: 'POST', body }),
   updateAnnouncement: (id, body) => api(`/announcements/${id}`, { method: 'PATCH', body }),
   deleteAnnouncement: (id) => api(`/announcements/${id}`, { method: 'DELETE' }),
-  // ใครลาวันนี้ + วันเกิดที่ใกล้ถึง — กล่องข้างปฏิทินบนหน้าหลัก
+  // ลาวันนี้ + วันเกิดที่กำลังจะถึง — กล่องข้างปฏิทินบนหน้าหลัก
   today: () => api('/portal/today'),
   // help / report an issue → emails the admins
   sendSupport: ({ area, message }) => api('/support', { method: 'POST', body: { area, message } }),
 };
+
+/**
+ * วันเกิดที่ไม่ใช่วันนี้/พรุ่งนี้แสดงเป็นวันที่ย่อ — "ศ. 2 ต.ค." แบบเดียวกับ
+ * พอร์ทัลจริง (วันนี้/พรุ่งนี้ ฝั่งหน้าจอทำเป็นป้ายแทน) นับจากวันนี้บวก days
+ * เพื่อไม่ต้องส่งวันที่จริงของปีเกิดออกมาให้ทุกคนเห็น
+ */
+export function birthdayWhen(days, lang = 'th') {
+  const n = Number(days);
+  if (!Number.isFinite(n)) return '';
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH',
+    { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 // Fixed-date Thai public holidays (month/day repeat yearly). Ported from the
 // client's portal; deliberately EXCLUDES lunar/Buddhist holidays (Makha/Visakha/

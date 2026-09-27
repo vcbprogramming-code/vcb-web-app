@@ -5,7 +5,7 @@
  * แต่เราไม่มี ไม่ได้มาจากการเดาว่าน่าจะมีอะไร — จึงตั้งชื่อข้อตามสิ่งที่เห็น
  * บนหน้าจอเขา ไม่ใช่ตามชื่อฟังก์ชันของเรา
  */
-import { call, suite, happy, bad, report, U, warm, query } from './harness.mjs';
+import { call, suite, happy, bad, report, U, warm, query, TEST_PROJECT } from './harness.mjs';
 
 await warm();
 const A = U.admin;
@@ -19,7 +19,10 @@ const clean = async () => {
   await query(`delete from work_types where name like $1`, [`${MARK}%`]);
 };
 await clean();
-const project = (await query('select id, code from projects order by code limit 1')).rows[0];
+// โครงการทิ้งขว้างเท่านั้น — "order by code limit 1" เคยได้ BT1 ซึ่งตอนนี้ถือ
+// ข้อมูลวงเงินจริงของลูกค้า (นำเข้า 2026-09-27) ชุดนี้ทับงบหมวด 'เหล็ก' แล้วลบทิ้ง
+// ตอนเก็บกวาด = งบจริง ฿5,000,000 หายไปทั้งที่เทสต์ไม่ได้ทำอะไรผิดสักข้อ
+const project = (await query('select id, code from projects where code = $1', [TEST_PROJECT])).rows[0];
 
 // ── 1. คู่มือ SOP ─────────────────────────────────────────────────────────
 suite('1. เมนูเรียกรายงานครบ 24 รายการเท่าระบบจริง');

@@ -33,6 +33,7 @@ page.setDefaultTimeout(90000);
 const settle = (ms = 1800) => new Promise((r) => setTimeout(r, ms));
 const body = () => page.evaluate(() => document.body.innerText);
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png` });
+const countRows = () => page.evaluate(() => document.querySelectorAll('tbody tr').length);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e).split('\n')[0].slice(0, 160)));
 page.on('console', (m) => {
@@ -44,6 +45,10 @@ const as = async (user, path = '/sysmap') => {
   await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('hr_access_token', t); }, tok(user));
   await page.goto(`${APP}${path}`, { waitUntil: 'networkidle2' }).catch(() => {});
   await settle(3000);
+  // แผนผังโหลดข้อมูลก้อนเดียวทั้งผัง ทะเบียน และโอกาส AI — รอจนสปินเนอร์หาย
+  // แทนการนับเวลาตายตัว ไม่งั้นเครื่องช้าหน่อยก็อ่านเจอแต่คำว่า "กำลังโหลด"
+  await page.waitForFunction(() => !document.body.innerText.includes('กำลังโหลดแผนผัง'),
+    { timeout: 30000 }).catch(() => {});
 };
 const click = (label) => page.evaluate((l) => {
   const el = [...document.querySelectorAll('button, a')].find((x) => x.innerText.trim() === l)
@@ -63,12 +68,34 @@ suite('1. เปิดแผนผังระบบแล้วอ่านไ�
   await as(A);
   const t = await body();
   happy('หน้าไม่ล้ม', !t.includes('เกิดข้อผิดพลาดบางอย่าง'), t.slice(0, 80).replace(/\n/g, ' | '));
-  happy('เห็นหัวข้อแผนผังระบบ', t.includes('แผนผังระบบ'), '');
+  happy('เห็นหัวข้อแผนผังการทำงานของระบบ', t.includes('แผนผังการทำงานของระบบ'), '');
+  // หัวข้อและป้ายเวอร์ชันแบบระบบจริง — คนเปิดสองระบบเทียบกันต้องเห็นว่าเป็นผังเดียวกัน
+  happy('มีหัวข้ออังกฤษแบบระบบจริง', t.includes('System Operating Map'), '');
+  happy('มีป้ายเวอร์ชันชุดข้อมูล', t.includes('v8.86'), t.slice(0, 100).replace(/\n/g, ' '));
   happy('บอกจำนวนเลน ขั้นตอน และเส้นเชื่อม', /\d+ เลน · \d+ ขั้นตอน · \d+ เส้นเชื่อม/.test(t), t.slice(0, 120).replace(/\n/g, ' '));
   happy('มีครบทั้งสามแท็บ',
     ['ผังกระบวนการ', 'ทะเบียนฟังก์ชัน', 'โอกาสใช้ AI'].every((k) => t.includes(k)), '');
   happy('แท็บที่เปิดอยู่ถูกไฮไลต์', (await activeTab())?.startsWith('ผังกระบวนการ'), `${await activeTab()}`);
   happy('อธิบายวิธีอ่านผังให้ก่อน', t.includes('กดที่กล่องงาน'), '');
+  // คำของระบบจริง ไม่ใช่คำที่เราคิดขึ้นเอง
+  happy('สวิตช์เลเยอร์ใช้คำของระบบจริง',
+    t.includes('เลเยอร์') && t.includes('ERP เท่านั้น') && t.includes('Manual เท่านั้น'), '');
+  happy('มีสวิตช์เส้นตรงและเส้นมีเงื่อนไขแยกกัน',
+    t.includes('เส้นตรง') && t.includes('เส้นมีเงื่อนไข'), '');
+  happy('มีชิปกรองเฉพาะหน้างานบนผัง', t.includes('เฉพาะหน้างาน'), '');
+  happy('มีปุ่มคำอธิบายสัญลักษณ์', t.includes('คำอธิบายสัญลักษณ์'), '');
+  bad('คำอธิบายสัญลักษณ์พับเก็บอยู่ ไม่บังผัง', !t.includes('เส้นย้อนกลับ / วนกลับ'), '');
+  happy('กดเปิดคำอธิบายสัญลักษณ์ได้', await click('คำอธิบายสัญลักษณ์'), '');
+  await settle(900);
+  const k = await body();
+  happy('คำอธิบายสัญลักษณ์บอกความหมายของเส้นครบชุด',
+    k.includes('เส้นกระตุ้น') && k.includes('ป้อนข้อมูลเข้า') && k.includes('ความหมายของเส้น')
+      && k.includes('เส้นย้อนกลับ / วนกลับ'), '');
+  await shot('01b-คำอธิบายสัญลักษณ์');
+  await click('คำอธิบายสัญลักษณ์');
+  await settle(700);
+  bad('พับกลับเก็บได้', !(await body()).includes('เส้นย้อนกลับ / วนกลับ'), '');
+  happy('มีชั้นการไหลของเอกสารหน้างาน', t.includes('Document Control'), '');
   bad('ไม่มี error ตอนเปิดหน้า', errors.length === 0, errors.slice(0, 2).join(' / '));
   await shot('01-ผังกระบวนการ');
 }
@@ -100,8 +127,54 @@ suite('2. กดกล่องงานแล้วเห็นรายละ�
   happy('กดแสดงทุกเส้นเชื่อมได้', await click('แสดงทุกเส้นเชื่อม'), '');
   await settle(1400);
   happy('บอกว่ากำลังแสดงเส้นเชื่อมทั้งหมด', (await body()).includes('กำลังแสดงเส้นเชื่อมทั้งหมด'), '');
-  happy('มีคำอธิบายความหมายของเส้น', (await body()).includes('ความหมายของเส้น'), '');
+  const drawn = await page.evaluate(() => document.querySelectorAll('svg path[stroke]').length);
+  happy(`วาดเส้นเชื่อมลงผังจริง (${drawn} เส้น)`, drawn > 100, `${drawn}`);
   await shot('03-ทุกเส้นเชื่อม');
+}
+
+// ── 2b. ผืนผังเป็นพื้นเข้มแบบระบบจริง แต่ไม่ลามไปทั้งแอป ──────────────────
+suite('2b. ผืนผังเป็นพื้นเข้ม อ่านออก และไม่ลามไปทั้งแอป');
+{
+  await as(A);
+  const lum = (css) => {
+    const n = (css.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number);
+    if (n.length < 3) return null;
+    const [r, g, b] = n.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const probe = await page.evaluate(() => {
+    const frame = [...document.querySelectorAll('div')]
+      .find((d) => /linear-gradient/.test(getComputedStyle(d).backgroundImage) && d.querySelector('svg, button'));
+    // ปุ่มที่ระบายสีพื้นของตัวเอง = ชิปแผนก + กล่อง ERP บนผัง
+    const painted = [...(frame ? frame.querySelectorAll('button[style*="background"]') : [])]
+      .map((el) => {
+        const cs = getComputedStyle(el);
+        return { bg: cs.backgroundColor, fg: cs.color, text: el.innerText.trim().slice(0, 24) };
+      })
+      .filter((x) => x.bg && !/rgba\(0, 0, 0, 0\)/.test(x.bg));
+    return {
+      frameBg: frame ? getComputedStyle(frame).backgroundImage : '',
+      pageBg: getComputedStyle(document.body).backgroundColor,
+      painted,
+    };
+  });
+  happy('ผืนผังเป็นพื้นไล่เฉดสีเข้ม', /linear-gradient/.test(probe.frameBg) && /13, 27, 42|11, 18, 32/.test(probe.frameBg),
+    probe.frameBg.slice(0, 70));
+  const pageL = lum(probe.pageBg);
+  happy('พื้นหลังของแอปยังเป็นธีมสว่าง ไม่ได้เปลี่ยนทั้งระบบ', pageL === null || pageL > 0.6, probe.pageBg);
+
+  happy('มีกล่อง/ชิปที่ระบายสีประจำแผนกให้ตรวจ', probe.painted.length >= 10, `${probe.painted.length}`);
+  const worst = probe.painted
+    .map((x) => {
+      const a = lum(x.fg); const b = lum(x.bg);
+      if (a === null || b === null) return null;
+      return { ...x, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) };
+    })
+    .filter(Boolean)
+    .sort((x, y) => x.ratio - y.ratio)[0];
+  happy(`ตัวอักษรบนสีประจำแผนกคอนทราสต์ผ่านเกณฑ์ (ต่ำสุด ${worst ? worst.ratio.toFixed(2) : '?'}:1)`,
+    Boolean(worst) && worst.ratio >= 4.5, worst ? `${worst.text} — ${worst.fg} บน ${worst.bg}` : 'ไม่มีข้อมูล');
+  await shot('03b-พื้นเข้ม');
 }
 
 // ── 3. ทะเบียนฟังก์ชัน ────────────────────────────────────────────────────
@@ -112,11 +185,12 @@ suite('3. ทะเบียนฟังก์ชัน — ค้นหาแ�
   happy('แท็บที่เปิดอยู่เปลี่ยนไปไฮไลต์ที่ทะเบียนฟังก์ชัน',
     (await activeTab())?.startsWith('ทะเบียนฟังก์ชัน'), `${await activeTab()}`);
   const t = await body();
-  happy('เห็นตารางฟังก์ชัน', t.includes('งานที่ทำ') && t.includes('แผนก'), '');
+  happy('เห็นตารางฟังก์ชัน',
+    t.includes('ฟังก์ชัน') && t.includes('ประเภท') && t.includes('หมายเหตุ'), '');
+  happy('มีแท็บแผนกปฏิบัติการหน้างาน', t.includes('ปฏิบัติการหน้างาน'), '');
   happy('บอกว่ากำลังแสดงกี่รายการจากทั้งหมดเท่าไร', /แสดง \d+ จาก \d+ รายการ/.test(t), '');
   await shot('04-ทะเบียนฟังก์ชัน');
 
-  const countRows = () => page.evaluate(() => document.querySelectorAll('tbody tr').length);
   const before = await countRows();
   await page.evaluate(() => {
     const i = [...document.querySelectorAll('input')].find((x) => (x.placeholder || '').includes('ค้นหารหัส'));
@@ -133,6 +207,78 @@ suite('3. ทะเบียนฟังก์ชัน — ค้นหาแ�
   await settle(1500);
   happy('ตัวกรองทำงานร่วมกับคำค้นได้ ไม่ล้าง', (await body()).includes('แสดง'), '');
   await shot('06-กรองทำมือ');
+
+  // ล้างตัวกรองแล้วกดแท็บหน้างาน — 18 แถวตามทะเบียนของระบบจริง
+  happy('มีปุ่มล้างตัวกรอง', await click('ล้างตัวกรอง'), '');
+  await settle(1200);
+  happy('กดแท็บปฏิบัติการหน้างานได้', await click('ปฏิบัติการหน้างาน'), '');
+  await settle(1500);
+  const siteRows = await countRows();
+  happy(`แท็บหน้างานแสดง 18 แถว (ได้ ${siteRows})`, siteRows === 18, `${siteRows}`);
+  await shot('06b-แท็บหน้างาน');
+
+  happy('ล้างตัวกรองกลับมาครบ', await click('ล้างตัวกรอง'), '');
+  await settle(1200);
+  const allRows = await countRows();
+  happy(`ล้างแล้วเห็นครบ 158 แถว (ได้ ${allRows})`, allRows === 158, `${allRows}`);
+
+  // ชิปเครื่องมือ AI ระดับฟังก์ชัน — ของเขาติดไว้ที่แถวในทะเบียน
+  const withAi = await page.evaluate(() => document.body.innerText.split('โอกาส AI').length - 1);
+  happy(`แถวในทะเบียนติดชิปโอกาส AI ให้ (${withAi} แถว)`, withAi > 0, `${withAi}`);
+}
+
+// ── 3b. แผงกล่องงานเป็นแบบมีแท็บ และผูกโอกาส AI ───────────────────────────
+suite('3b. แผงรายละเอียดกล่องงาน — แท็บ และโอกาส AI ของกล่องนั้น');
+{
+  // n-gl (บัญชีแยกประเภท) มีข้อเสนอ AI ผูกไว้ในข้อมูลของระบบจริง
+  await as(A, '/sysmap?node=n-gl');
+  const t = await body();
+  happy('แผงกล่องงานมีแท็บขั้นตอนและการเชื่อมต่อ',
+    t.includes('ขั้นตอน') && t.includes('การเชื่อมต่อ'), '');
+  happy('กล่องที่มีข้อเสนอ AI มีแท็บโอกาส AI', t.includes('โอกาส AI'), '');
+  happy('มีปุ่มปิดที่มีคำว่าปิด', t.includes('ปิด'), '');
+
+  // สองบล็อกท้ายแผงที่ลูกค้าเห็นบนจอจริง — ชิปรหัสหน้าที่ และชิปแบบฟอร์ม
+  happy('แผงกล่องงานมีหน้าที่ที่เกี่ยวข้อง', t.includes('หน้าที่ที่เกี่ยวข้อง'), '');
+  happy('ชิปรหัสหน้าที่เป็นรหัสจริงในทะเบียน', /ACC-\d\d|FIN-\d\d/.test(t), '');
+  happy('แผงกล่องงานมีแบบฟอร์มที่เกี่ยวข้อง', t.includes('แบบฟอร์มที่เกี่ยวข้อง'), '');
+
+  // กดชิปรหัสแล้วต้องพาไปที่แถวนั้นในทะเบียน ไม่ใช่เปิดทะเบียนเปล่า
+  happy('กดชิปรหัสหน้าที่แล้วเปิดทะเบียนไปที่แถวนั้น', await click('ACC-10'), '');
+  await settle(1800);
+  const jumped = await body();
+  happy('ทะเบียนถูกกรองเหลือรหัสที่กด',
+    jumped.includes('ACC-10') && /แสดง [1-3] จาก/.test(jumped),
+    (jumped.match(/แสดง \d+ จาก \d+/) || [''])[0]);
+  await shot('06e-กระโดดเข้าทะเบียน');
+
+  await as(A, '/sysmap?node=n-gl');
+
+
+  happy('กดแท็บการเชื่อมต่อได้', await click('การเชื่อมต่อ'), '');
+  await settle(1200);
+  const c = await body();
+  happy('ใช้คำของระบบจริงในแท็บการเชื่อมต่อ',
+    c.includes('สิ่งที่ป้อนข้อมูลเข้าโหนดนี้') && c.includes('โหนดนี้เชื่อมไปยัง'), '');
+  happy('ป้ายทิศทางเข้า/ออกแบบระบบจริง', c.includes('เข้า') && c.includes('ออก'), '');
+  await shot('06c-แท็บการเชื่อมต่อ');
+
+  happy('กดแท็บโอกาส AI ได้', await click('โอกาส AI'), '');
+  await settle(1200);
+  const a = await body();
+  happy('แท็บ AI บอกผลกระทบและความยากด้วยคำเต็ม',
+    a.includes('ผลกระทบทางธุรกิจ') && a.includes('ความยากในการนำไปใช้'), '');
+  await shot('06d-แท็บโอกาสAI');
+
+  // กล่องที่ไม่มีข้อเสนอ AI ต้องไม่มีแท็บว่างให้กด
+  await as(A, '/sysmap?node=n-m-del');
+  const n2 = await body();
+  // "โอกาส AI" ต่างจากชื่อแท็บของโมดูล ("โอกาสใช้ AI") จึงเช็กตรง ๆ ได้
+  bad('กล่องที่ไม่มีข้อเสนอ AI ไม่มีแท็บ AI ว่างให้กด', !n2.includes('โอกาส AI'), '');
+
+  await as(A);
+  await click('ทะเบียนฟังก์ชัน');
+  await settle(1600);
 }
 
 // ── 4. โอกาสใช้ AI ────────────────────────────────────────────────────────
@@ -169,7 +315,7 @@ suite('6. ผู้บริหารเปิดอ่านได้เหม�
 {
   await as(C);
   const t = await body();
-  happy('ผู้บริหารเปิดแผนผังได้', t.includes('แผนผังระบบ') && !t.includes('เกิดข้อผิดพลาด'), t.slice(0, 70).replace(/\n/g, ' | '));
+  happy('ผู้บริหารเปิดแผนผังได้', t.includes('แผนผังการทำงานของระบบ') && !t.includes('เกิดข้อผิดพลาด'), t.slice(0, 70).replace(/\n/g, ' | '));
   happy('เห็นผังกระบวนการเหมือนกัน', t.includes('ผังกระบวนการ'), '');
   await shot('09-ผู้บริหาร');
 }
@@ -184,7 +330,17 @@ suite('7. สลับผังเป็นภาษาอังกฤษได�
   await settle(1600);
   const after = await body();
   happy('กด EN แล้วเนื้อหาบนผังเปลี่ยนไป', after !== before, '');
+  // เคยสลับแค่ข้อมูล คำรอบ ๆ ยังเป็นไทย — ปุ่มเดียวต้องเปลี่ยนทั้งสองอย่าง
+  // ป้ายแถวตัวกรองเป็นตัวพิมพ์ใหญ่ด้วย CSS อย่างระบบจริง (LAYER: / DEPT:)
+  // innerText จึงคืนค่าพิมพ์ใหญ่มา เทียบแบบไม่สนตัวพิมพ์
+  const afterLc = after.toLowerCase();
+  happy('คำรอบผังเปลี่ยนเป็นอังกฤษด้วย ไม่ใช่แค่ข้อมูล',
+    afterLc.includes('function registry') && afterLc.includes('layer'),
+    after.slice(0, 120).replace(/\n/g, ' '));
+  bad('ไม่มีคำไทยของแท็บค้างอยู่ตอนเป็นอังกฤษ', !after.includes('ทะเบียนฟังก์ชัน'), '');
   await shot('10-ภาษาอังกฤษ');
+  await click('ไทย');
+  await settle(1200);
 }
 
 // ── 8. ไม่มีข้อผิดพลาดซ่อนอยู่ ───────────────────────────────────────────

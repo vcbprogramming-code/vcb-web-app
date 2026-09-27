@@ -50,6 +50,8 @@ const FIELDS = {
   ],
   ai: [
     { k: 'key', label: 'รหัสรายการ', required: true, newOnly: true },
+    // ผูกกับกล่องงานบนผัง — กล่องนั้นจะมีแท็บ "โอกาส AI" ให้กดทันที เว้นว่างได้
+    { k: 'node_id', label: 'รหัสกล่องงานบนผัง', hint: 'เช่น n-gl · เว้นว่างได้ถ้าไม่ผูกกับกล่องใด' },
     { k: 'title_en', label: 'หัวข้อ (อังกฤษ)', required: true },
     { k: 'title_th', label: 'หัวข้อ (ไทย)' },
     { k: 'impact', label: 'ผลกระทบ', type: 'select', options: [['High', 'สูง'], ['Medium', 'ปานกลาง'], ['Low', 'ต่ำ']] },

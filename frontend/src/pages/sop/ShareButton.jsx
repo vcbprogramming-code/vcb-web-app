@@ -43,7 +43,8 @@ export default function ShareButton({ param, value, className = '' }) {
       } ${className}`}
     >
       <Icon name={state === 'ok' ? 'check' : 'link'} className={`h-4 w-4 ${state === 'busy' ? 'animate-pulse' : ''}`} />
-      {state === 'busy' ? 'กำลังคัดลอก…' : state === 'ok' ? 'คัดลอกแล้ว' : state === 'fail' ? 'คัดลอกไม่สำเร็จ' : 'แชร์'}
+      {/* คำยืนยันใช้ประโยคเดียวกับระบบจริง: "คัดลอกลิงก์แล้ว" */}
+      {state === 'busy' ? t('กำลังคัดลอก…') : state === 'ok' ? t('คัดลอกลิงก์แล้ว') : state === 'fail' ? t('คัดลอกไม่สำเร็จ') : t('แชร์')}
     </button>
   );
 }

@@ -8,81 +8,99 @@
      "range": "1-30",
      "eyebrow": "Accounting · Phase 1 (Day 1–30)",
      "title": "Foundation: Documentation & Recording Discipline",
+     "eyebrow_th": "บัญชี · ระยะที่ 1 (วันที่ 1–30)",
+     "title_th": "ระยะพื้นฐาน: วินัยด้านเอกสารและการบันทึกข้อมูล",
      "closing": null,
+     "closing_th": null,
      "next": "accounting-day-31-60",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "acct-p1-read-1",
          "text": "Chart of Accounts Structure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างผังบัญชี"
         },
         {
          "id": "acct-p1-read-2",
          "text": "PR → PO → AP Recording Flow (ERP Posting Rules)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการบันทึก PR → PO → AP (กฎการบันทึกรายการในระบบ ERP)"
         },
         {
          "id": "acct-p1-read-3",
          "text": "VAT & Withholding Tax Compliance",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การปฏิบัติตามภาษีมูลค่าเพิ่มและภาษีหัก ณ ที่จ่าย"
         },
         {
          "id": "acct-p1-read-4",
          "text": "AP Credit Note (ลดหนี้) Procedure",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ขั้นตอนใบลดหนี้ AP (ลดหนี้)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "acct-p1-know-1",
          "text": "Debit/credit logic and expense vs asset classification",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "หลักการเดบิต/เครดิต และการจำแนกค่าใช้จ่ายกับสินทรัพย์"
         },
         {
          "id": "acct-p1-know-2",
          "text": "VAT calculation and recording",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การคำนวณและบันทึกภาษีมูลค่าเพิ่ม"
         },
         {
          "id": "acct-p1-know-3",
          "text": "AP/AR posting and journal entries in Mango",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การบันทึกรายการ AP/AR และรายการบัญชีในระบบ Mango"
         },
         {
          "id": "acct-p1-know-4",
          "text": "Reversing a payable for returns, over-billing, or disputes",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การกลับรายการเจ้าหนี้กรณีคืนสินค้า เรียกเก็บเกิน หรือข้อพิพาท"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "acct-p1-out-1",
          "text": "15 accurate ERP postings",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการบันทึกในระบบ ERP ที่ถูกต้อง 15 รายการ"
         },
         {
          "id": "acct-p1-out-2",
          "text": "1 sample journal entry set",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ตัวอย่างชุดรายการบัญชี 1 ชุด"
         },
         {
          "id": "acct-p1-out-3",
          "text": "VAT reconciliation example",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ตัวอย่างการกระทบยอดภาษีมูลค่าเพิ่ม"
         },
         {
          "id": "acct-p1-out-4",
          "text": "1 reviewed AP credit note case",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "กรณีศึกษาใบลดหนี้ AP ที่ทบทวนแล้ว 1 กรณี"
         }
        ]
       }
@@ -93,81 +111,99 @@
      "range": "31-60",
      "eyebrow": "Accounting · Phase 2 (Day 31–60)",
      "title": "Control: Reconciliation & Compliance",
+     "eyebrow_th": "บัญชี · ระยะที่ 2 (วันที่ 31–60)",
+     "title_th": "ระยะควบคุม: การกระทบยอดและการปฏิบัติตามข้อกำหนด",
      "closing": null,
+     "closing_th": null,
      "next": "accounting-day-61-90",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "acct-p2-read-1",
          "text": "Bank Reconciliation Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการกระทบยอดธนาคาร"
         },
         {
          "id": "acct-p2-read-2",
          "text": "AP/AR Aging Review Standards",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "มาตรฐานการทบทวนอายุหนี้ AP/AR"
         },
         {
          "id": "acct-p2-read-3",
          "text": "Monthly Accrual & Depreciation Policy",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "นโยบายรายการค้างรับค้างจ่ายและค่าเสื่อมราคารายเดือน"
         },
         {
          "id": "acct-p2-read-4",
          "text": "IC Inventory Accounting Standard",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "มาตรฐานการบัญชีสินค้าคงคลัง IC"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "acct-p2-know-1",
          "text": "Bank reconciliation structure (complements GL Reconcile)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างการกระทบยอดธนาคาร (ประกอบการกระทบยอดบัญชีแยกประเภท)"
         },
         {
          "id": "acct-p2-know-2",
          "text": "AP/AR aging review",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การทบทวนอายุหนี้ AP/AR"
         },
         {
          "id": "acct-p2-know-3",
          "text": "Accrual entry logic & depreciation recording",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "หลักการบันทึกรายการค้างรับค้างจ่ายและค่าเสื่อมราคา"
         },
         {
          "id": "acct-p2-know-4",
          "text": "IC inventory accounting and cost-transfer postings to GL",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การบัญชีสินค้าคงคลัง IC และการบันทึกโอนต้นทุนเข้าบัญชีแยกประเภท"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "acct-p2-out-1",
          "text": "Bank reconciliation report",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายงานการกระทบยอดธนาคาร"
         },
         {
          "id": "acct-p2-out-2",
          "text": "Accrual journal summary",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "สรุปรายการค้างรับค้างจ่าย"
         },
         {
          "id": "acct-p2-out-3",
          "text": "AR/AP aging summary",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "สรุปอายุหนี้ AR/AP"
         },
         {
          "id": "acct-p2-out-4",
          "text": "1 IC inventory accounting review memo",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "บันทึกทบทวนการบัญชีสินค้าคงคลัง IC 1 ฉบับ"
         }
        ]
       }
@@ -178,81 +214,99 @@
      "range": "61-90",
      "eyebrow": "Accounting · Phase 3 (Day 61–90)",
      "title": "Ownership: Reporting Accuracy & Audit Readiness",
+     "eyebrow_th": "บัญชี · ระยะที่ 3 (วันที่ 61–90)",
+     "title_th": "ระยะรับผิดชอบ: ความถูกต้องของการรายงานและความพร้อมตรวจสอบ",
      "closing": "You have completed all three onboarding phases for this department.",
+     "closing_th": "คุณผ่านทั้งสามระยะของการปฐมนิเทศสำหรับแผนกนี้เรียบร้อยแล้ว",
      "next": null,
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "acct-p3-read-1",
          "text": "Financial Statement Structure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างงบการเงิน"
         },
         {
          "id": "acct-p3-read-2",
          "text": "Revenue Recognition Standards",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "มาตรฐานการรับรู้รายได้"
         },
         {
          "id": "acct-p3-read-3",
          "text": "Audit Documentation Requirements",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ข้อกำหนดเอกสารสำหรับการตรวจสอบ"
         },
         {
          "id": "acct-p3-read-4",
          "text": "External Audit Coordination Guidelines",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "แนวทางการประสานงานตรวจสอบภายนอก"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "acct-p3-know-1",
          "text": "Month-end GL closing procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการปิดบัญชีแยกประเภทสิ้นเดือน"
         },
         {
          "id": "acct-p3-know-2",
          "text": "Trial balance review",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การทบทวนงบทดลอง"
         },
         {
          "id": "acct-p3-know-3",
          "text": "VAT/WHT/CIT filing requirements",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ข้อกำหนดการยื่นภาษีมูลค่าเพิ่ม/ภาษีหัก ณ ที่จ่าย/ภาษีเงินได้นิติบุคคล"
         },
         {
          "id": "acct-p3-know-4",
          "text": "External audit coordination and management cost-per-project reporting",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การประสานงานตรวจสอบภายนอกและการรายงานต้นทุนต่อโครงการสำหรับผู้บริหาร"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "acct-p3-out-1",
          "text": "Trial balance review sheet",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผ่นทบทวนงบทดลอง"
         },
         {
          "id": "acct-p3-out-2",
          "text": "Financial statement draft",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ร่างงบการเงิน"
         },
         {
          "id": "acct-p3-out-3",
          "text": "Internal audit readiness checklist",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการตรวจสอบความพร้อมสำหรับการตรวจสอบภายใน"
         },
         {
          "id": "acct-p3-out-4",
          "text": "1 management cost-per-project report",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "รายงานต้นทุนต่อโครงการสำหรับผู้บริหาร 1 ฉบับ"
         }
        ]
       }
@@ -270,81 +324,99 @@
      "range": "1-30",
      "eyebrow": "Finance · Phase 1 (Day 1–30)",
      "title": "Foundation: Liquidity Awareness & Cashflow Discipline",
+     "eyebrow_th": "การเงิน · ระยะที่ 1 (วันที่ 1–30)",
+     "title_th": "ระยะพื้นฐาน: ความตระหนักด้านสภาพคล่องและวินัยกระแสเงินสด",
      "closing": null,
+     "closing_th": null,
      "next": "finance-day-31-60",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "fin-p1-read-1",
          "text": "Company Cash Cycle Structure — project-based cashflow model driven by certified progress payments from government projects.",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างวงจรเงินสดของบริษัท — แบบจำลองกระแสเงินสดตามโครงการ ซึ่งขับเคลื่อนด้วยเงินงวดที่ได้รับการรับรองจากโครงการภาครัฐ"
         },
         {
          "id": "fin-p1-read-2",
          "text": "Advance & Retention Mechanism — advance payments are progressively deducted from claims; retention is withheld until completion milestones.",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "กลไกเงินล่วงหน้าและเงินประกันผลงาน — เงินล่วงหน้าจะถูกหักออกจากการเบิกจ่ายตามลำดับ ส่วนเงินประกันผลงานจะถูกกักไว้จนกว่าจะถึงจุดสำคัญของความสำเร็จ"
         },
         {
          "id": "fin-p1-read-3",
          "text": "ERP Documentation Flow — all payments must follow PR → PO → AP → Approval → Payment.",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนเอกสารในระบบ ERP — การจ่ายเงินทุกรายการต้องเป็นไปตามลำดับ PR → PO → AP → การอนุมัติ → การจ่ายเงิน"
         },
         {
          "id": "fin-p1-read-4",
          "text": "Inter-JV Group Transfers Guide (VCB/CVE/VN JV)",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการโอนเงินระหว่างกลุ่มบริษัทร่วมทุน (VCB/CVE/VN JV)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "fin-p1-know-1",
          "text": "Operating vs financing cashflow",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "กระแสเงินสดจากการดำเนินงานเทียบกับการจัดหาเงินทุน"
         },
         {
          "id": "fin-p1-know-2",
          "text": "Retention’s impact on liquidity",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ผลกระทบของเงินประกันผลงานต่อสภาพคล่อง"
         },
         {
          "id": "fin-p1-know-3",
          "text": "Advance deduction process",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "กระบวนการหักเงินล่วงหน้า"
         },
         {
          "id": "fin-p1-know-4",
          "text": "Inter-JV fund transfers and AR-Without-Invoice postings",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การโอนเงินระหว่างกลุ่มบริษัทร่วมทุนและการบันทึกรายการ AR แบบไม่มีใบแจ้งหนี้"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "fin-p1-out-1",
          "text": "10 accurate PL postings",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการบันทึกกำไรขาดทุนที่ถูกต้อง 10 รายการ"
         },
         {
          "id": "fin-p1-out-2",
          "text": "1 complete bank reconciliation",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การกระทบยอดธนาคารที่สมบูรณ์ 1 รายการ"
         },
         {
          "id": "fin-p1-out-3",
          "text": "Identification of 3 liquidity risks",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การระบุความเสี่ยงด้านสภาพคล่อง 3 รายการ"
         },
         {
          "id": "fin-p1-out-4",
          "text": "1 reviewed inter-JV transfer entry",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "รายการโอนเงินระหว่างกลุ่มบริษัทที่ทบทวนแล้ว 1 รายการ"
         }
        ]
       }
@@ -355,81 +427,99 @@
      "range": "31-60",
      "eyebrow": "Finance · Phase 2 (Day 31–60)",
      "title": "Control: Forecasting Accuracy & Funding Risk Monitoring",
+     "eyebrow_th": "การเงิน · ระยะที่ 2 (วันที่ 31–60)",
+     "title_th": "ระยะควบคุม: ความแม่นยำในการพยากรณ์และการติดตามความเสี่ยงด้านเงินทุน",
      "closing": null,
+     "closing_th": null,
      "next": "finance-day-61-90",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "fin-p2-read-1",
          "text": "Loan Amortization Structure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างการผ่อนชำระเงินกู้"
         },
         {
          "id": "fin-p2-read-2",
          "text": "Promissory Note Interest Calculation",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การคำนวณดอกเบี้ยตั๋วสัญญาใช้เงิน"
         },
         {
          "id": "fin-p2-read-3",
          "text": "Retention Ledger Monitoring Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการติดตามบัญชีเงินประกันผลงาน"
         },
         {
          "id": "fin-p2-read-4",
          "text": "AVAL Discounting (B/E Sale) Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการขายลด AVAL (การขายตั๋วแลกเงิน)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "fin-p2-know-1",
          "text": "Project-level cashflow tracking",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การติดตามกระแสเงินสดระดับโครงการ"
         },
         {
          "id": "fin-p2-know-2",
          "text": "Liquidity forecasting method",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "วิธีการพยากรณ์สภาพคล่อง"
         },
         {
          "id": "fin-p2-know-3",
          "text": "Credit Facility register basics (P/N, AVAL, BG, LC)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "พื้นฐานทะเบียนวงเงินสินเชื่อ (ตั๋วสัญญาใช้เงิน, AVAL, หนังสือค้ำประกัน, L/C)"
         },
         {
          "id": "fin-p2-know-4",
          "text": "Shopping AVAL bills across banks for best discount rate",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การเปรียบเทียบอัตราขายลด AVAL ระหว่างธนาคารเพื่อหาอัตราที่ดีที่สุด"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "fin-p2-out-1",
          "text": "3-month cash projection",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การคาดการณ์เงินสด 3 เดือน"
         },
         {
          "id": "fin-p2-out-2",
          "text": "Retention tracking sheet",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผ่นติดตามเงินประกันผลงาน"
         },
         {
          "id": "fin-p2-out-3",
          "text": "Cost variance analysis",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การวิเคราะห์ผลต่างต้นทุน"
         },
         {
          "id": "fin-p2-out-4",
          "text": "1 AVAL discounting rate comparison",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การเปรียบเทียบอัตราขายลด AVAL 1 รายการ"
         }
        ]
       }
@@ -440,81 +530,99 @@
      "range": "61-90",
      "eyebrow": "Finance · Phase 3 (Day 61–90)",
      "title": "Ownership: Financial Stability & Strategic Liquidity Control",
+     "eyebrow_th": "การเงิน · ระยะที่ 3 (วันที่ 61–90)",
+     "title_th": "ระยะรับผิดชอบ: เสถียรภาพทางการเงินและการควบคุมสภาพคล่องเชิงกลยุทธ์",
      "closing": "You have completed all three onboarding phases for this department.",
+     "closing_th": "คุณผ่านทั้งสามระยะของการปฐมนิเทศสำหรับแผนกนี้เรียบร้อยแล้ว",
      "next": null,
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "fin-p3-read-1",
          "text": "Break-Even Analysis Method",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "วิธีการวิเคราะห์จุดคุ้มทุน"
         },
         {
          "id": "fin-p3-read-2",
          "text": "Debt Servicing Capacity Guidelines",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แนวทางความสามารถในการชำระหนี้"
         },
         {
          "id": "fin-p3-read-3",
          "text": "Liquidity Stress Testing Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการทดสอบภาวะวิกฤตสภาพคล่อง"
         },
         {
          "id": "fin-p3-read-4",
          "text": "Credit Facility Management & Bank Account Inquiry Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการบริหารวงเงินสินเชื่อและการตรวจสอบบัญชีธนาคาร"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "fin-p3-know-1",
          "text": "Debt servicing capacity",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ความสามารถในการชำระหนี้"
         },
         {
          "id": "fin-p3-know-2",
          "text": "Liquidity stress testing",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การทดสอบภาวะวิกฤตสภาพคล่อง"
         },
         {
          "id": "fin-p3-know-3",
          "text": "Margin sensitivity",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ความอ่อนไหวของอัตรากำไร"
         },
         {
          "id": "fin-p3-know-4",
          "text": "Selecting which facility to draw per payment batch",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การเลือกวงเงินที่จะเบิกใช้สำหรับแต่ละรอบการจ่ายเงิน"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "fin-p3-out-1",
          "text": "Independent monthly financial report",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายงานการเงินรายเดือนอย่างอิสระ"
         },
         {
          "id": "fin-p3-out-2",
          "text": "Liquidity stress scenario",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "สถานการณ์จำลองภาวะวิกฤตสภาพคล่อง"
         },
         {
          "id": "fin-p3-out-3",
          "text": "Financial risk memo",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "บันทึกความเสี่ยงทางการเงิน"
         },
         {
          "id": "fin-p3-out-4",
          "text": "1 credit facility utilisation review",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การทบทวนการใช้วงเงินสินเชื่อ 1 รายการ"
         }
        ]
       }
@@ -532,81 +640,99 @@
      "range": "1-30",
      "eyebrow": "Procurement · Phase 1 (Day 1–30)",
      "title": "Foundation: Process Control & Approval Discipline",
+     "eyebrow_th": "จัดซื้อ · ระยะที่ 1 (วันที่ 1–30)",
+     "title_th": "ระยะพื้นฐาน: การควบคุมกระบวนการและวินัยการอนุมัติ",
      "closing": null,
+     "closing_th": null,
      "next": "procurement-day-31-60",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "proc-p1-read-1",
          "text": "PR → PO → IC → AP Workflow",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการทำงาน PR → PO → IC → AP"
         },
         {
          "id": "proc-p1-read-2",
          "text": "Authority Matrix (two-level PR approval)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ตารางอำนาจอนุมัติ (การอนุมัติ PR สองระดับ)"
         },
         {
          "id": "proc-p1-read-3",
          "text": "Vendor Registration Process",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "กระบวนการขึ้นทะเบียนผู้ขาย"
         },
         {
          "id": "proc-p1-read-4",
          "text": "Vendor & Subcontractor Pre-qualification (AVL) Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการขึ้นทะเบียนผู้ขาย/ผู้รับเหมาช่วงที่ผ่านคุณสมบัติ (AVL)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "proc-p1-know-1",
          "text": "Approval hierarchy (site PM → HQ Engineer)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ลำดับชั้นการอนุมัติ (ผู้จัดการโครงการหน้างาน → วิศวกรสำนักงานใหญ่)"
         },
         {
          "id": "proc-p1-know-2",
          "text": "Compare Price process",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "กระบวนการเปรียบเทียบราคา"
         },
         {
          "id": "proc-p1-know-3",
          "text": "Budget validation vs BOQ",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การตรวจสอบงบประมาณเทียบกับ BOQ"
         },
         {
          "id": "proc-p1-know-4",
          "text": "AVL capability/financial/safety pre-qualification criteria",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "เกณฑ์คุณสมบัติด้านความสามารถ การเงิน และความปลอดภัยสำหรับทะเบียน AVL"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "proc-p1-out-1",
          "text": "5 compliant PR/PO cycles",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รอบ PR/PO ที่ถูกต้องตามข้อกำหนด 5 รอบ"
         },
         {
          "id": "proc-p1-out-2",
          "text": "Vendor comparison report",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายงานเปรียบเทียบผู้ขาย"
         },
         {
          "id": "proc-p1-out-3",
          "text": "Documentation compliance checklist",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการตรวจสอบความครบถ้วนของเอกสาร"
         },
         {
          "id": "proc-p1-out-4",
          "text": "1 draft vendor pre-qualification scorecard",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ร่างแบบให้คะแนนคุณสมบัติผู้ขาย 1 ชุด"
         }
        ]
       }
@@ -617,81 +743,99 @@
      "range": "31-60",
      "eyebrow": "Procurement · Phase 2 (Day 31–60)",
      "title": "Control: Cost Efficiency & Supplier Risk Management",
+     "eyebrow_th": "จัดซื้อ · ระยะที่ 2 (วันที่ 31–60)",
+     "title_th": "ระยะควบคุม: ประสิทธิภาพต้นทุนและการบริหารความเสี่ยงผู้ขาย",
      "closing": null,
+     "closing_th": null,
      "next": "procurement-day-61-90",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "proc-p2-read-1",
          "text": "Cost Benchmarking Guidelines",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แนวทางการเปรียบเทียบมาตรฐานต้นทุน"
         },
         {
          "id": "proc-p2-read-2",
          "text": "Delivery Schedule Alignment Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการจัดตารางการส่งมอบให้สอดคล้อง"
         },
         {
          "id": "proc-p2-read-3",
          "text": "Supplier Risk Assessment Criteria",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เกณฑ์การประเมินความเสี่ยงผู้ขาย"
         },
         {
          "id": "proc-p2-read-4",
          "text": "Supplier Tier Classification (Tier 1–4) Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการจัดระดับชั้นผู้ขาย (Tier 1–4)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "proc-p2-know-1",
          "text": "Cost benchmarking method",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "วิธีการเปรียบเทียบมาตรฐานต้นทุน"
         },
         {
          "id": "proc-p2-know-2",
          "text": "Delivery schedule alignment",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การจัดตารางการส่งมอบให้สอดคล้อง"
         },
         {
          "id": "proc-p2-know-3",
          "text": "Supplier risk assessment",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การประเมินความเสี่ยงผู้ขาย"
         },
         {
          "id": "proc-p2-know-4",
          "text": "Tier classification and market price database maintenance",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การจัดระดับชั้นผู้ขายและการดูแลฐานข้อมูลราคาตลาด"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "proc-p2-out-1",
          "text": "Cost saving analysis",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การวิเคราะห์การประหยัดต้นทุน"
         },
         {
          "id": "proc-p2-out-2",
          "text": "Supplier risk summary",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "สรุปความเสี่ยงผู้ขาย"
         },
         {
          "id": "proc-p2-out-3",
          "text": "Delivery alignment plan",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผนการจัดตารางการส่งมอบ"
         },
         {
          "id": "proc-p2-out-4",
          "text": "1 supplier tier classification review",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การทบทวนการจัดระดับชั้นผู้ขาย 1 รายการ"
         }
        ]
       }
@@ -702,81 +846,99 @@
      "range": "61-90",
      "eyebrow": "Procurement · Phase 3 (Day 61–90)",
      "title": "Ownership: Strategic Procurement Planning & Liquidity Alignment",
+     "eyebrow_th": "จัดซื้อ · ระยะที่ 3 (วันที่ 61–90)",
+     "title_th": "ระยะรับผิดชอบ: การวางแผนจัดซื้อเชิงกลยุทธ์และการสอดคล้องด้านสภาพคล่อง",
      "closing": "You have completed all three onboarding phases for this department.",
+     "closing_th": "คุณผ่านทั้งสามระยะของการปฐมนิเทศสำหรับแผนกนี้เรียบร้อยแล้ว",
      "next": null,
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "proc-p3-read-1",
          "text": "Procurement Liquidity Impact Guide",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "คู่มือผลกระทบของการจัดซื้อต่อสภาพคล่อง"
         },
         {
          "id": "proc-p3-read-2",
          "text": "Inventory Overstock Risk Policy",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "นโยบายความเสี่ยงจากสินค้าคงคลังส่วนเกิน"
         },
         {
          "id": "proc-p3-read-3",
          "text": "Supplier Concentration Exposure Standard",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "มาตรฐานความเสี่ยงจากการกระจุกตัวของผู้ขาย"
         },
         {
          "id": "proc-p3-read-4",
          "text": "Creditor Debt Restructuring & AVAL Offset Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการปรับโครงสร้างหนี้เจ้าหนี้และการหักกลบ AVAL"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "proc-p3-know-1",
          "text": "Procurement’s impact on liquidity",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ผลกระทบของการจัดซื้อต่อสภาพคล่อง"
         },
         {
          "id": "proc-p3-know-2",
          "text": "Inventory overstock risk",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ความเสี่ยงจากสินค้าคงคลังส่วนเกิน"
         },
         {
          "id": "proc-p3-know-3",
          "text": "Supplier concentration exposure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ความเสี่ยงจากการกระจุกตัวของผู้ขาย"
         },
         {
          "id": "proc-p3-know-4",
          "text": "Creditor debt restructuring and AVAL offset arrangements",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การปรับโครงสร้างหนี้เจ้าหนี้และการจัดการหักกลบ AVAL"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "proc-p3-out-1",
          "text": "Procurement phase forecast",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การพยากรณ์ช่วงการจัดซื้อ"
         },
         {
          "id": "proc-p3-out-2",
          "text": "Supplier concentration analysis",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การวิเคราะห์การกระจุกตัวของผู้ขาย"
         },
         {
          "id": "proc-p3-out-3",
          "text": "Over-purchase prevention memo",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "บันทึกการป้องกันการจัดซื้อเกินความจำเป็น"
         },
         {
          "id": "proc-p3-out-4",
          "text": "1 creditor debt restructuring proposal",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ข้อเสนอการปรับโครงสร้างหนี้เจ้าหนี้ 1 ฉบับ"
         }
        ]
       }
@@ -794,81 +956,99 @@
      "range": "1-30",
      "eyebrow": "Property & Asset Management · Phase 1 (Day 1–30)",
      "title": "Foundation: Asset Registration & Control Discipline",
+     "eyebrow_th": "บริหารทรัพย์สิน · ระยะที่ 1 (วันที่ 1–30)",
+     "title_th": "ระยะพื้นฐาน: การขึ้นทะเบียนทรัพย์สินและวินัยการควบคุม",
      "closing": null,
+     "closing_th": null,
      "next": "property-day-31-60",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "prop-p1-read-1",
          "text": "Asset Classification Policy",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "นโยบายการจำแนกประเภททรัพย์สิน"
         },
         {
          "id": "prop-p1-read-2",
          "text": "Warehouse Coding Standard",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "มาตรฐานการกำหนดรหัสคลังสินค้า"
         },
         {
          "id": "prop-p1-read-3",
          "text": "Tagging & Serialization Guide",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "คู่มือการติดป้ายและกำหนดหมายเลขทรัพย์สิน"
         },
         {
          "id": "prop-p1-read-4",
          "text": "Fleet Management & GPS Monitoring Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการบริหารยานพาหนะและการติดตาม GPS"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "prop-p1-know-1",
          "text": "Asset classification logic (FA masters: Type/Depreciation/Location/Rate)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "หลักการจำแนกประเภททรัพย์สิน (ข้อมูลหลัก FA: ประเภท/ค่าเสื่อมราคา/สถานที่/อัตรา)"
         },
         {
          "id": "prop-p1-know-2",
          "text": "Warehouse coding structure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "โครงสร้างรหัสคลังสินค้า"
         },
         {
          "id": "prop-p1-know-3",
          "text": "Transfer documentation requirements",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ข้อกำหนดเอกสารการโอนย้าย"
         },
         {
          "id": "prop-p1-know-4",
          "text": "Fleet/GPS monitoring and machine-hours utilisation tracking",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การติดตามยานพาหนะ/GPS และการติดตามชั่วโมงการใช้งานเครื่องจักร"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "prop-p1-out-1",
          "text": "10 registered assets",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ทรัพย์สินที่ขึ้นทะเบียนแล้ว 10 รายการ"
         },
         {
          "id": "prop-p1-out-2",
          "text": "Asset transfer documentation",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เอกสารการโอนย้ายทรัพย์สิน"
         },
         {
          "id": "prop-p1-out-3",
          "text": "Serial verification checklist",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการตรวจสอบหมายเลขเครื่อง"
         },
         {
          "id": "prop-p1-out-4",
          "text": "1 fleet utilisation summary",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "สรุปการใช้งานยานพาหนะ 1 ฉบับ"
         }
        ]
       }
@@ -879,81 +1059,99 @@
      "range": "31-60",
      "eyebrow": "Property & Asset Management · Phase 2 (Day 31–60)",
      "title": "Control: Inventory Reconciliation & Traceability Enforcement",
+     "eyebrow_th": "บริหารทรัพย์สิน · ระยะที่ 2 (วันที่ 31–60)",
+     "title_th": "ระยะควบคุม: การกระทบยอดสินค้าคงคลังและการบังคับใช้การตรวจสอบย้อนกลับ",
      "closing": null,
+     "closing_th": null,
      "next": "property-day-61-90",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "prop-p2-read-1",
          "text": "Physical vs ERP Reconciliation Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการกระทบยอดระหว่างของจริงกับระบบ ERP"
         },
         {
          "id": "prop-p2-read-2",
          "text": "Depreciation Basics",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "พื้นฐานค่าเสื่อมราคา"
         },
         {
          "id": "prop-p2-read-3",
          "text": "Site Allocation Control Policy",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "นโยบายการควบคุมการจัดสรรตามพื้นที่"
         },
         {
          "id": "prop-p2-read-4",
          "text": "Preventive Maintenance (PM) Scheduling Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการวางแผนบำรุงรักษาเชิงป้องกัน (PM)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "prop-p2-know-1",
          "text": "Physical vs ERP reconciliation (month-end Count Asset)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การกระทบยอดระหว่างของจริงกับระบบ ERP (การนับทรัพย์สินสิ้นเดือน)"
         },
         {
          "id": "prop-p2-know-2",
          "text": "Depreciation recording basics",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "พื้นฐานการบันทึกค่าเสื่อมราคา"
         },
         {
          "id": "prop-p2-know-3",
          "text": "Site allocation control (inter-project IC Transfer)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การควบคุมการจัดสรรตามพื้นที่ (การโอนย้ายสินค้าคงคลังระหว่างโครงการ)"
         },
         {
          "id": "prop-p2-know-4",
          "text": "Preventive maintenance scheduling and repair-cost recording",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การวางแผนบำรุงรักษาเชิงป้องกันและการบันทึกค่าใช้จ่ายซ่อมแซม"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "prop-p2-out-1",
          "text": "Inventory audit report",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายงานการตรวจสอบสินค้าคงคลัง"
         },
         {
          "id": "prop-p2-out-2",
          "text": "Reconciliation sheet",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผ่นกระทบยอด"
         },
         {
          "id": "prop-p2-out-3",
          "text": "Depreciation schedule review",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การทบทวนตารางค่าเสื่อมราคา"
         },
         {
          "id": "prop-p2-out-4",
          "text": "1 preventive maintenance schedule",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ตารางบำรุงรักษาเชิงป้องกัน 1 ฉบับ"
         }
        ]
       }
@@ -964,81 +1162,99 @@
      "range": "61-90",
      "eyebrow": "Property & Asset Management · Phase 3 (Day 61–90)",
      "title": "Ownership: Asset Integrity & Governance Assurance",
+     "eyebrow_th": "บริหารทรัพย์สิน · ระยะที่ 3 (วันที่ 61–90)",
+     "title_th": "ระยะรับผิดชอบ: ความถูกต้องของทรัพย์สินและการรับรองธรรมาภิบาล",
      "closing": "You have completed all three onboarding phases for this department.",
+     "closing_th": "คุณผ่านทั้งสามระยะของการปฐมนิเทศสำหรับแผนกนี้เรียบร้อยแล้ว",
      "next": null,
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "prop-p3-read-1",
          "text": "Asset Lifecycle Management Guide",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "คู่มือการบริหารวงจรชีวิตทรัพย์สิน"
         },
         {
          "id": "prop-p3-read-2",
          "text": "Disposal Procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการจำหน่ายทรัพย์สิน"
         },
         {
          "id": "prop-p3-read-3",
          "text": "Audit Preparation Checklist",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายการตรวจสอบการเตรียมการตรวจสอบ"
         },
         {
          "id": "prop-p3-read-4",
          "text": "Project Insurance (CAR) Management Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการบริหารประกันภัยโครงการ (CAR)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "prop-p3-know-1",
          "text": "Asset lifecycle stages (registration → transfer → write-off)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนวงจรชีวิตทรัพย์สิน (ขึ้นทะเบียน → โอนย้าย → ตัดจำหน่าย)"
         },
         {
          "id": "prop-p3-know-2",
          "text": "Disposal/scrap sale procedure",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการจำหน่าย/ขายเศษซาก"
         },
         {
          "id": "prop-p3-know-3",
          "text": "Audit preparation standards",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "มาตรฐานการเตรียมการตรวจสอบ"
         },
         {
          "id": "prop-p3-know-4",
          "text": "CAR insurance premium tracking, expiry/renewal, and claims handling",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การติดตามเบี้ยประกัน CAR วันหมดอายุ/การต่ออายุ และการจัดการเคลม"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "prop-p3-out-1",
          "text": "Warehouse audit report",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "รายงานการตรวจสอบคลังสินค้า"
         },
         {
          "id": "prop-p3-out-2",
          "text": "Asset risk assessment memo",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "บันทึกการประเมินความเสี่ยงทรัพย์สิน"
         },
         {
          "id": "prop-p3-out-3",
          "text": "Surplus/scrap disposal summary",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "สรุปการจำหน่ายส่วนเกิน/เศษซาก"
         },
         {
          "id": "prop-p3-out-4",
          "text": "1 project insurance renewal review",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การทบทวนการต่ออายุประกันภัยโครงการ 1 รายการ"
         }
        ]
       }
@@ -1056,81 +1272,99 @@
      "range": "1-30",
      "eyebrow": "Engineering · Phase 1 (Day 1–30)",
      "title": "Foundation: Measurement Accuracy & Site Reporting Discipline",
+     "eyebrow_th": "วิศวกรรม · ระยะที่ 1 (วันที่ 1–30)",
+     "title_th": "ระยะพื้นฐาน: ความแม่นยำในการวัดผลและวินัยการรายงานหน้างาน",
      "closing": null,
+     "closing_th": null,
      "next": "engineering-day-31-60",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "eng-p1-read-1",
          "text": "Engineering Operations Manual with document examples",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "คู่มือปฏิบัติงานวิศวกรรมพร้อมตัวอย่างเอกสาร"
         },
         {
          "id": "eng-p1-read-2",
          "text": "Mango Module Study — BD/PM modules relevant to role",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ศึกษาโมดูล Mango — โมดูล BD/PM ที่เกี่ยวข้องกับหน้าที่"
         },
         {
          "id": "eng-p1-read-3",
          "text": "Company Organization Chart, Departments & Projects",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ผังองค์กร แผนก และโครงการของบริษัท"
         },
         {
          "id": "eng-p1-read-4",
          "text": "BD Tender Pipeline & e-Bidding Overview",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ภาพรวมกระบวนการประมูลงานและ e-Bidding (BD)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "eng-p1-know-1",
          "text": "Position responsibilities and Engineering department overview",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "หน้าที่ความรับผิดชอบของตำแหน่งและภาพรวมของฝ่ายวิศวกรรม"
         },
         {
          "id": "eng-p1-know-2",
          "text": "Standard software operation (Microsoft suite, PDF, email)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การใช้งานซอฟต์แวร์มาตรฐาน (ชุดโปรแกรม Microsoft, PDF, อีเมล)"
         },
         {
          "id": "eng-p1-know-3",
          "text": "Mango module use within responsibility area (New Project Registration, Budget Control)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การใช้งานโมดูล Mango ภายในขอบเขตหน้าที่ (การขึ้นทะเบียนโครงการใหม่, การควบคุมงบประมาณ)"
         },
         {
          "id": "eng-p1-know-4",
          "text": "e-GP tender screening and bid/no-bid decision criteria",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การคัดกรองงานประมูล e-GP และเกณฑ์การตัดสินใจเข้าร่วม/ไม่เข้าร่วมประมูล"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "eng-p1-out-1",
          "text": "Execute Doc 02/03 flow within job scope",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ดำเนินการตามขั้นตอนเอกสาร 02/03 ภายในขอบเขตงาน"
         },
         {
          "id": "eng-p1-out-2",
          "text": "Enter data into Mango system",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "บันทึกข้อมูลเข้าสู่ระบบ Mango"
         },
         {
          "id": "eng-p1-out-3",
          "text": "Answer master plan questions across departments",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ตอบคำถามเกี่ยวกับแผนแม่บทจากแผนกต่างๆ"
         },
         {
          "id": "eng-p1-out-4",
          "text": "1 draft e-GP tender screening note",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "ร่างบันทึกการคัดกรองงานประมูล e-GP 1 ฉบับ"
         }
        ]
       }
@@ -1141,81 +1375,99 @@
      "range": "31-60",
      "eyebrow": "Engineering · Phase 2 (Day 31–60)",
      "title": "Control: Productivity Monitoring & Revenue Documentation",
+     "eyebrow_th": "วิศวกรรม · ระยะที่ 2 (วันที่ 31–60)",
+     "title_th": "ระยะควบคุม: การติดตามผลิตภาพและเอกสารรายได้",
      "closing": null,
+     "closing_th": null,
      "next": "engineering-day-61-90",
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "eng-p2-read-1",
          "text": "Mango Manual — relevant module complete",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "คู่มือ Mango — โมดูลที่เกี่ยวข้องเรียนจบแล้ว"
         },
         {
          "id": "eng-p2-read-2",
          "text": "Master Plans of various projects (progress to 80%)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผนแม่บทของโครงการต่างๆ (คืบหน้าถึง 80%)"
         },
         {
          "id": "eng-p2-read-3",
          "text": "Branch-submission documents",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เอกสารยื่นสำนักงานสาขา"
         },
         {
          "id": "eng-p2-read-4",
          "text": "Additional Work (Variation Order · BD) Processing Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือการดำเนินการงานเพิ่มเติม (คำสั่งเปลี่ยนแปลงงาน · BD)"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "eng-p2-know-1",
          "text": "Project bidding submission documents",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เอกสารยื่นประกวดราคาโครงการ"
         },
         {
          "id": "eng-p2-know-2",
          "text": "Branch-submission document study",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "การศึกษาเอกสารยื่นสำนักงานสาขา"
         },
         {
          "id": "eng-p2-know-3",
          "text": "Variation Order (VO) processing basics",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "พื้นฐานการดำเนินการคำสั่งเปลี่ยนแปลงงาน (VO)"
         },
         {
          "id": "eng-p2-know-4",
          "text": "Linking a VO to the main BOQ and merging cost codes",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การเชื่อมโยงคำสั่งเปลี่ยนแปลงงานกับ BOQ หลักและการรวมรหัสต้นทุน"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "eng-p2-out-1",
          "text": "Perform Phase 1 tasks at 80% accuracy",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ปฏิบัติงานตามระยะที่ 1 ได้ด้วยความถูกต้อง 80%"
         },
         {
          "id": "eng-p2-out-2",
          "text": "Draft one bidding submission package",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "จัดทำร่างชุดเอกสารยื่นประกวดราคา 1 ชุด"
         },
         {
          "id": "eng-p2-out-3",
          "text": "Track one Variation Order end to end",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ติดตามคำสั่งเปลี่ยนแปลงงาน 1 รายการตั้งแต่ต้นจนจบ"
         },
         {
          "id": "eng-p2-out-4",
          "text": "1 VO cost-code merge processed end to end",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การรวมรหัสต้นทุนของคำสั่งเปลี่ยนแปลงงาน 1 รายการตั้งแต่ต้นจนจบ"
         }
        ]
       }
@@ -1226,81 +1478,99 @@
      "range": "61-90",
      "eyebrow": "Engineering · Phase 3 (Day 61–90)",
      "title": "Ownership: Section Performance & Cost Variance Control",
+     "eyebrow_th": "วิศวกรรม · ระยะที่ 3 (วันที่ 61–90)",
+     "title_th": "ระยะรับผิดชอบ: ผลการดำเนินงานของหน่วยงานและการควบคุมผลต่างต้นทุน",
      "closing": "You have completed all three onboarding phases for this department.",
+     "closing_th": "คุณผ่านทั้งสามระยะของการปฐมนิเทศสำหรับแผนกนี้เรียบร้อยแล้ว",
      "next": null,
      "blocks": [
       {
        "heading": "Required Reading",
+       "heading_th": "เอกสารที่ต้องศึกษา",
        "items": [
         {
          "id": "eng-p3-read-1",
          "text": "Master Plans of various projects (complete 100%)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "แผนแม่บทของโครงการต่างๆ (เรียนจบ 100%)"
         },
         {
          "id": "eng-p3-read-2",
          "text": "Project bidding documents (complete study)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เอกสารประกวดราคาโครงการ (ศึกษาจบสมบูรณ์)"
         },
         {
          "id": "eng-p3-read-3",
          "text": "Project Closure requirements (final budget revision, reports)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ข้อกำหนดการปิดโครงการ (การปรับปรุงงบประมาณครั้งสุดท้าย, รายงาน)"
         },
         {
          "id": "eng-p3-read-4",
          "text": "PM Module Dashboard — Project Status Overview Guide",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "คู่มือแดชบอร์ดโมดูล PM — ภาพรวมสถานะโครงการ"
         }
        ]
       },
       {
        "heading": "Knowledge Requirements",
+       "heading_th": "ความรู้ที่จำเป็น",
        "items": [
         {
          "id": "eng-p3-know-1",
          "text": "Project bidding documents — full command",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "เอกสารประกวดราคาโครงการ — ความเชี่ยวชาญเต็มรูปแบบ"
         },
         {
          "id": "eng-p3-know-2",
          "text": "Contractor grade/PQ renewal evidence requirements",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ข้อกำหนดหลักฐานการต่ออายุชั้นผู้รับเหมา/คุณสมบัติ (PQ)"
         },
         {
          "id": "eng-p3-know-3",
          "text": "Project Closure process",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ขั้นตอนการปิดโครงการ"
         },
         {
          "id": "eng-p3-know-4",
          "text": "Reading the PM Dashboard across BD/PO/OF/AR/AP/GL/IC convergence",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "การอ่านแดชบอร์ด PM ที่รวมข้อมูลจากโมดูล BD/PO/OF/AR/AP/GL/IC"
         }
        ]
       },
       {
        "heading": "Required Outputs",
+       "heading_th": "ผลงานที่ต้องส่งมอบ",
        "items": [
         {
          "id": "eng-p3-out-1",
          "text": "Perform Phase 1 tasks at 100% accuracy (minor errors acceptable)",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ปฏิบัติงานตามระยะที่ 1 ได้ด้วยความถูกต้อง 100% (ยอมรับข้อผิดพลาดเล็กน้อยได้)"
         },
         {
          "id": "eng-p3-out-2",
          "text": "Complete one Project Status Overview review",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "ทบทวนภาพรวมสถานะโครงการ 1 ครั้งจนเสร็จสมบูรณ์"
         },
         {
          "id": "eng-p3-out-3",
          "text": "Prepare one Project Closure documentation set",
-         "level": "junior"
+         "level": "junior",
+         "text_th": "จัดเตรียมชุดเอกสารปิดโครงการ 1 ชุด"
         },
         {
          "id": "eng-p3-out-4",
          "text": "1 independent PM Dashboard health summary",
-         "level": "senior"
+         "level": "senior",
+         "text_th": "สรุปสถานะแดชบอร์ด PM แบบอิสระ 1 ฉบับ"
         }
        ]
       }
@@ -1318,7 +1588,9 @@
    "action": "View Application Form",
    "desc": "Your personal, education, and work-history details on record before the contract is drawn up.",
    "viewUrl": "https://drive.google.com/file/d/1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1rBiYCcQowvAsDxCDdidLHVpEbVCmsP8C",
+   "title_th": "ใบสมัครงาน",
+   "desc_th": "ข้อมูลส่วนตัว การศึกษา และประวัติการทำงานของคุณที่บันทึกไว้ก่อนจัดทำสัญญาจ้าง"
   },
   {
    "id": "employment-contract",
@@ -1326,7 +1598,9 @@
    "action": "View Employment Contract",
    "desc": "The formal agreement covering your role, compensation, and terms of employment with VCB.",
    "viewUrl": "https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/edit",
-   "downloadUrl": "https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/export?format=docx"
+   "downloadUrl": "https://docs.google.com/document/d/1-rGE5UXrP1sf891fIiD2TDHE-3XYkLrU/export?format=docx",
+   "title_th": "สัญญาจ้างงาน",
+   "desc_th": "ข้อตกลงอย่างเป็นทางการที่ครอบคลุมตำแหน่งงาน ค่าตอบแทน และเงื่อนไขการจ้างงานกับ VCB"
   },
   {
    "id": "nda",
@@ -1334,7 +1608,9 @@
    "action": "View NDA Form",
    "desc": "Your commitment to keep company, project, and client information confidential.",
    "viewUrl": "https://drive.google.com/file/d/1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1h6wtUT2WT2QZvJltZRG-vaE3gCLhFTf3",
+   "title_th": "ข้อตกลงการรักษาความลับ",
+   "desc_th": "ข้อผูกพันของคุณในการรักษาความลับข้อมูลของบริษัท โครงการ และลูกค้า"
   },
   {
    "id": "pdpa-consent",
@@ -1342,7 +1618,9 @@
    "action": "View PDPA Consent Form",
    "desc": "Your consent for VCB to collect, use, and store your personal data as an employee.",
    "viewUrl": "https://drive.google.com/file/d/1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1b9rxQkdv-u1GddC5s4dNiLj0DGdUaPWK",
+   "title_th": "แบบฟอร์มยินยอมข้อมูลส่วนบุคคล (PDPA)",
+   "desc_th": "ความยินยอมของคุณให้ VCB เก็บรวบรวม ใช้ และจัดเก็บข้อมูลส่วนบุคคลในฐานะพนักงาน"
   },
   {
    "id": "pdpa-policy",
@@ -1350,7 +1628,9 @@
    "action": "View PDPA Policy",
    "desc": "Acknowledgement that you have read the company’s policy on how personal data is protected.",
    "viewUrl": "https://drive.google.com/file/d/1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1S2De-qUCccdpJeam1lc_4Ob4VIk6_6dw",
+   "title_th": "นโยบายคุ้มครองข้อมูลส่วนบุคคล PDPA (เอกสารอ้างอิง)",
+   "desc_th": "การรับทราบว่าคุณได้อ่านนโยบายของบริษัทเกี่ยวกับการคุ้มครองข้อมูลส่วนบุคคลแล้ว"
   },
   {
    "id": "anti-corruption",
@@ -1358,7 +1638,9 @@
    "action": "View Anti-Corruption Form",
    "desc": "Acknowledgement of VCB’s zero-tolerance policy on bribery and corruption.",
    "viewUrl": "https://drive.google.com/file/d/1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=1uNT9bFy0Hrj7OyaXSTUQvjm1gke7xnXF",
+   "title_th": "การรับทราบนโยบายต่อต้านการทุจริต",
+   "desc_th": "การรับทราบนโยบายไม่ยอมรับการติดสินบนและการทุจริตของ VCB"
   },
   {
    "id": "reporting-form",
@@ -1366,13 +1648,17 @@
    "action": "View Reporting Form",
    "desc": "Confirms your official start date and reports you as active to HR on day one.",
    "viewUrl": "https://drive.google.com/file/d/10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA/view",
-   "downloadUrl": "https://drive.google.com/uc?export=download&id=10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA"
+   "downloadUrl": "https://drive.google.com/uc?export=download&id=10Q1geYqL7DO-3hJYHtpnKAVJqDQ5OXKA",
+   "title_th": "แบบฟอร์มรายงานพนักงานใหม่",
+   "desc_th": "ยืนยันวันเริ่มงานอย่างเป็นทางการและรายงานสถานะของคุณต่อฝ่ายบุคคลในวันแรก"
   },
   {
    "id": "tax-form",
    "title": "Tax Registration Form",
    "action": "View Tax Form",
-   "desc": "Your tax ID and withholding details for payroll registration."
+   "desc": "Your tax ID and withholding details for payroll registration.",
+   "title_th": "แบบฟอร์มขึ้นทะเบียนภาษี",
+   "desc_th": "เลขประจำตัวผู้เสียภาษีและรายละเอียดการหักภาษีสำหรับการขึ้นทะเบียนเงินเดือน"
   }
  ],
  "nav": [

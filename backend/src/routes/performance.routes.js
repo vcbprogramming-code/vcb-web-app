@@ -110,6 +110,31 @@ const workFields = (r) => ({
 });
 const cellFilled = (c) => Boolean(c && ((c.team && c.team.trim()) || (c.detail && c.detail.trim()) || (c.pm && c.pm.trim())));
 
+// ── ชื่อและรหัสพนักงานที่ "แสดง" ให้คนอ่าน ────────────────────────────────
+// สองอย่างนี้เป็นการแสดงผลล้วน ๆ ไม่มีการเขียนค่าที่คำนวณได้นี้กลับลงฐานข้อมูล
+// และไม่ใช่กุญแจของอะไรเลย (กุญแจภายในยังเป็น employees.id · การจับคู่ตอนนำเข้า
+// ยังเป็น (live_site_key, live_eid) · การนำเข้าจาก Excel ยังเทียบ employee_code)
+//
+// รหัส: ทะเบียนของลูกค้ามีรหัสพนักงานซ้ำกันจริง 35 รหัส (70 แถว) แต่คอลัมน์
+// employees.employee_code ของเราบังคับไม่ซ้ำ แถวที่สองของแต่ละกลุ่มจึงถูกเก็บ
+// เป็น "<รหัส>#<eid>" (scripts/import-live-worklog.mjs) รหัสที่ขึ้นบนหน้าจอและ
+// ในไฟล์ Excel ต้องเป็นรหัสจริงของเขา ไม่ใช่รหัสที่มีตัวแยกต่อท้าย — คนที่ถือ
+// ทะเบียนของเขาอยู่ในมือต้องหาแถวเดียวกันเจอ จึงอ่าน live_emp_code ก่อนเสมอ
+//
+// ชื่อ: ทะเบียนของเขามีสองแถวที่ไม่มีชื่อ (บ้านแพ้ว รหัส 5311003 และ 5511446)
+// ถ้าส่งค่าว่างออกไปตรง ๆ จะกลายเป็นแถวเปล่าบนตารางที่ไม่มีใครรู้ว่าเป็นใคร
+// จึงแสดงรหัสพนักงานแทนชื่อ พร้อมบอกสาเหตุสั้น ๆ ว่าต้นทางไม่มีชื่อ —
+// ข้อมูลใน full_name ยังเป็นค่าว่างตามต้นทางเหมือนเดิม รอลูกค้าแก้ที่ต้นทาง
+const SQL_EMP_CODE = (a = 'e') =>
+  `coalesce(nullif(btrim(${a}.live_emp_code), ''), nullif(btrim(${a}.employee_code), ''))`;
+// full_name เป็น not null ในตาราง ดังนั้น null ที่นี่หมายถึง "ไม่มีแถวพนักงาน"
+// (left join ที่ไม่เจอ เช่นแถวบันทึกตรวจสอบของการเปิด/ปิดโครงการ) ต้องคืน null
+// ต่อไปเหมือนเดิม ไม่ใช่คืนข้อความว่าไม่มีชื่อ — หน้าจอเหล่านั้นแสดง "—" อยู่แล้ว
+const SQL_EMP_NAME = (a = 'e') =>
+  `case when ${a}.full_name is null then null
+        when btrim(${a}.full_name) <> '' then ${a}.full_name
+        else coalesce(${SQL_EMP_CODE(a)} || ' · ', '') || 'ไม่มีชื่อในทะเบียนต้นทาง' end`;
+
 const siteOut = (u) => ({ key: u.code, name: u.name, company: u.company, color: u.color, lockDays: u.lock_days ?? 3 });
 // allowed_cost คือรายการรหัสหมวดงานที่รหัสงานนี้ใช้ได้ ระบบจริงใช้มันกรอง
 // ตัวเลือกขั้นที่สอง — ส่งออกไปด้วย ไม่งั้นหน้าจอต้องเดาเอง
@@ -184,14 +209,51 @@ const activitySchema = z.object({
   category: z.string().min(1), mapping: z.enum(['one-to-one', 'one-to-many']).optional(),
   fixedCost: z.string().optional().nullable(), sortOrder: z.number().int().optional(),
 });
+
+/**
+ * รหัสกิจกรรมถัดไปเมื่อผู้ใช้เว้นช่องรหัสว่าง — ระบบจริงออกเลขให้เอง
+ *
+ * ทะเบียนของเราใช้รูปแบบ <ตัวอักษร>-<เลข> ตัวอักษรผูกกับหมวดหมู่ (A คืองานเหล็ก
+ * ฯลฯ) จึงหาอักษรจากหมวดหมู่เดิมก่อน ถ้าหมวดหมู่นี้ยังไม่มีรหัสเลย ค่อยหยิบ
+ * อักษรตัวถัดไปที่ยังไม่มีใครใช้ — ออกเลขที่ฝั่งเซิร์ฟเวอร์เพื่อไม่ให้สองคนกด
+ * เพิ่มพร้อมกันแล้วได้รหัสเดียวกัน
+ */
+async function nextActivityCode(category) {
+  const { rows } = await query("select code, category from work_types where code ~ '^[A-Z]-[0-9]+$'");
+  const letters = new Set();
+  let letter = '';
+  for (const r of rows) {
+    const L = r.code.slice(0, 1);
+    letters.add(L);
+    if (!letter && String(r.category || '').trim() === String(category || '').trim()) letter = L;
+  }
+  if (!letter) {
+    for (let i = 0; i < 26; i += 1) {
+      const L = String.fromCharCode(65 + i);
+      if (!letters.has(L)) { letter = L; break; }
+    }
+  }
+  if (!letter) letter = 'Z';
+  const used = rows.filter((r) => r.code.slice(0, 1) === letter).map((r) => Number(r.code.slice(2)) || 0);
+  return `${letter}-${(used.length ? Math.max(...used) : 0) + 1}`;
+}
+/** หมวดงานถัดไป = เลขที่มากที่สุด + 1 (ระบบจริงออกเลขให้เหมือนกัน) */
+async function nextCategoryCode() {
+  const { rows } = await query("select code from cost_categories where code ~ '^[0-9]+$'");
+  const used = rows.map((r) => Number(r.code) || 0);
+  return String((used.length ? Math.max(...used) : 0) + 1);
+}
+
 router.post('/activities', requireRole('admin'), asyncHandler(async (req, res) => {
-  const p = activitySchema.safeParse(req.body);
+  // ช่องรหัสเว้นว่างได้ = ให้ระบบออกเลขให้ ตามระบบที่ลูกค้าใช้อยู่
+  const p = activitySchema.partial({ code: true }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
+  const code = String(d.code || '').trim() || (await nextActivityCode(d.category));
   const row = await queryOne(
     `insert into work_types (code, name, description, category, mapping, fixed_cost, sort_order)
      values ($1,$2,$3,$4,$5,$6,$7) returning *`,
-    [d.code, d.name, d.description || null, d.category, d.mapping || 'one-to-many', d.fixedCost || null, d.sortOrder ?? 0]
+    [code, d.name, d.description || null, d.category, d.mapping || 'one-to-many', d.fixedCost || null, d.sortOrder ?? 0]
   ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสกิจกรรมนี้มีอยู่แล้ว'); throw e; });
   res.status(201).json({ data: activityOut(row) });
 }));
@@ -210,12 +272,13 @@ router.patch('/activities/:code', requireRole('admin'), asyncHandler(async (req,
 
 const categorySchema = z.object({ code: z.string().min(1), name: z.string().min(1), nameEn: z.string().optional().nullable(), sortOrder: z.number().int().optional() });
 router.post('/cost-categories', requireRole('admin'), asyncHandler(async (req, res) => {
-  const p = categorySchema.safeParse(req.body);
+  const p = categorySchema.partial({ code: true }).safeParse(req.body);
   if (!p.success) throw new ApiError(400, 'Invalid input', p.error.flatten());
   const d = p.data;
+  const code = String(d.code || '').trim() || (await nextCategoryCode());
   const row = await queryOne(
     `insert into cost_categories (code, name, name_en, sort_order) values ($1,$2,$3,$4) returning *`,
-    [d.code, d.name, d.nameEn || null, d.sortOrder ?? 0]
+    [code, d.name, d.nameEn || null, d.sortOrder ?? 0]
   ).catch((e) => { if (e.code === '23505') throw new ApiError(409, 'รหัสหมวดงานนี้มีอยู่แล้ว'); throw e; });
   res.status(201).json({ data: categoryOut(row) });
 }));
@@ -230,6 +293,57 @@ router.patch('/cost-categories/:code', requireRole('admin'), asyncHandler(async 
   const row = await queryOne(`update cost_categories set ${sets.join(', ')} where code = $${vals.length} returning *`, vals);
   if (!row) throw new ApiError(404, 'ไม่พบหมวดงาน');
   res.json({ data: categoryOut(row) });
+}));
+
+/**
+ * ลบรายการออกจากดัชนีงาน — แต่ไม่ลบทิ้งถ้ามีบันทึกงานอ้างอิงอยู่
+ *
+ * ค่าในช่องเก็บเป็นข้อความคู่ "A-1 / 5" ลบรหัสที่คนลงงานไว้แล้วจริง ๆ จะทำให้
+ * บันทึกเก่าชี้ไปยังรหัสที่ไม่มีในทะเบียน แล้วหลุดจากกราฟและรายงานทันที
+ * (ระบบจริงลบทิ้งได้เพราะชีตไม่มีใครตรวจ — เราปิดใช้งานแทนแล้วบอกผู้ใช้ตรง ๆ)
+ * split_part กันรหัสซ้อนกัน: 'A-1' ต้องไม่ไปจับ 'A-10'
+ */
+const SLOT_HEAD = (n) => `split_part(coalesce(${n}, ''), ' / ', 1) = $1`;
+const SLOT_TAIL = (n) => `split_part(coalesce(${n}, ''), ' / ', 2) = $1`;
+
+router.delete('/activities/:code', requireRole('admin'), asyncHandler(async (req, res) => {
+  const code = String(req.params.code || '').trim();
+  const row = await queryOne('select code, name from work_types where code = $1', [code]);
+  if (!row) throw new ApiError(404, 'ไม่พบกิจกรรม');
+  const used = (await queryOne(
+    `select count(*)::int n from work_logs
+      where deleted_at is null and (${SLOT_HEAD('team')} or ${SLOT_HEAD('pm')} or ${SLOT_HEAD('detail')})`,
+    [code])).n;
+  if (used > 0) {
+    await query('update work_types set is_active = false, updated_at = now() where code = $1', [code]);
+    return res.json({ data: { code, deleted: false, deactivated: true, used,
+      message: `มีบันทึกงานอ้างอิง "${row.name}" อยู่ ${used} รายการ จึงปิดใช้งานแทนการลบ — ประวัติเดิมยังอยู่ครบ` } });
+  }
+  await query('delete from work_types where code = $1', [code]);
+  res.json({ data: { code, deleted: true, deactivated: false, used: 0 } });
+}));
+
+router.delete('/cost-categories/:code', requireRole('admin'), asyncHandler(async (req, res) => {
+  const code = String(req.params.code || '').trim();
+  const row = await queryOne('select code, name from cost_categories where code = $1', [code]);
+  if (!row) throw new ApiError(404, 'ไม่พบหมวดงาน');
+  const inLogs = (await queryOne(
+    `select count(*)::int n from work_logs
+      where deleted_at is null and (${SLOT_TAIL('team')} or ${SLOT_TAIL('pm')} or ${SLOT_TAIL('detail')})`,
+    [code])).n;
+  // ทะเบียนกิจกรรมก็อ้างหมวดงานด้วย (หมวดตายตัว / หมวดที่อนุญาต) ลบทิ้งแล้ว
+  // ตัวเลือกขั้นที่สองของกิจกรรมนั้นจะว่างเปล่าโดยไม่มีใครรู้
+  const inIndex = (await queryOne(
+    `select count(*)::int n from work_types
+      where fixed_cost = $1 or ($1 = any(string_to_array(coalesce(allowed_cost, ''), ',')))`, [code])).n;
+  const used = inLogs + inIndex;
+  if (used > 0) {
+    await query('update cost_categories set is_active = false, updated_at = now() where code = $1', [code]);
+    return res.json({ data: { code, deleted: false, deactivated: true, used, inLogs, inIndex,
+      message: `มีบันทึกงาน ${inLogs} รายการ และกิจกรรม ${inIndex} รหัส อ้างถึง "${row.name}" อยู่ จึงปิดใช้งานแทนการลบ` } });
+  }
+  await query('delete from cost_categories where code = $1', [code]);
+  res.json({ data: { code, deleted: true, deactivated: false, used: 0 } });
 }));
 
 // ── จัดการโครงการ (admin) — ตามระบบจริง: เพิ่มโครงการ เปิด/ปิดโครงการ ─────────
@@ -313,7 +427,8 @@ async function employeesForUnit(unitId, month) {
   // คนที่อยู่ไซต์นี้ตอนนี้ และคนที่เคยย้ายเข้า/ออกจากไซต์นี้ — คนหลังจะขึ้นเฉพาะ
   // เดือนที่มีวันใดวันหนึ่งสังกัดไซต์นี้ วันที่ไปอยู่ที่อื่นถูกทำเป็นวันที่ไม่อยู่
   const emps = (await query(
-    `select e.*, d.name as department_name, p.name as position_name
+    `select e.*, d.name as department_name, p.name as position_name,
+            ${SQL_EMP_NAME('e')} as display_name, ${SQL_EMP_CODE('e')} as display_code
        from employees e
        left join departments d on d.id = e.department_id
        left join positions p on p.id = e.position_id
@@ -373,7 +488,10 @@ async function employeesForUnit(unitId, month) {
     }
   }
   return emps.filter((e) => keep.has(e.id)).map((e) => ({
-    eid: e.id, name: e.full_name, emp_id: e.employee_code || '',
+    // eid ยังเป็น uuid ภายในเหมือนเดิม — หน้าจอใช้มันเป็นกุญแจของแถวและของช่อง
+    eid: e.id, name: e.display_name, emp_id: e.display_code || '',
+    // ให้หน้าจอบอกได้ว่าแถวนี้ไม่มีชื่อเพราะต้นทางไม่มี ไม่ใช่เพราะโหลดไม่ขึ้น
+    name_missing: String(e.full_name || '').trim() === '' || undefined,
     department: e.department_name || '', position: e.position_name || '',
     kind: e.kind, team: e.team || '', away: [...new Set(awayBy[e.id] || [])].sort(),
     leave: leaveBy[e.id] || {},
@@ -803,7 +921,7 @@ const LEAVE_TYPES_DEF = [
 const leaveSelect = `
   select r.id, r.employee_id, r.unit_id, r.leave_type, r.from_date, r.to_date,
          r.reason, r.status, r.requested_at, r.decided_at, r.decide_note,
-         e.full_name as employee_name, e.employee_code,
+         ${SQL_EMP_NAME('e')} as employee_name, ${SQL_EMP_CODE('e')} as employee_code,
          pos.name as position, dept.name as department,
          u.code as site_key, u.name as site_name,
          rp.full_name as requested_by_name, dp.full_name as decided_by_name,
@@ -875,11 +993,14 @@ router.get('/leave/decided', asyncHandler(async (req, res) => {
   const where = ids === null
     ? `r.status <> 'pending'`
     : `r.status <> 'pending' and r.employee_id = any($1)`;
+  const params = ids === null ? [] : [ids];
   const { rows } = await query(
-    `${leaveSelect} where ${where} order by r.decided_at desc nulls last, r.requested_at desc limit 200`,
-    ids === null ? [] : [ids]
-  );
-  res.json({ ok: true, rows: rows.map(leaveOut) });
+    `${leaveSelect} where ${where} order by r.decided_at desc nulls last, r.requested_at desc limit 200`, params);
+  // ยอดจริงมาด้วย เพื่อให้หน้าจอบอกได้ว่า "แสดง 200/431" — ประวัติที่ถูกตัด
+  // แล้วไม่บอกจะอ่านเหมือนว่านั่นคือทั้งหมด
+  const total = (await queryOne(
+    `select count(*)::int n from leave_requests r where ${where}`, params)).n;
+  res.json({ ok: true, rows: rows.map(leaveOut), total });
 }));
 
 const leaveSchema = z.object({
@@ -1089,7 +1210,8 @@ router.get('/leave/approvers', requireRole('admin'), asyncHandler(async (req, re
   const [pairs, people, emps] = await Promise.all([
     query('select approver_id, employee_id from leave_approvers'),
     query(`select id, full_name, email, role from profiles where is_active = true order by full_name`),
-    query(`select e.id, e.full_name, e.employee_code, u.code as site_key, u.name as site_name
+    query(`select e.id, ${SQL_EMP_NAME('e')} as full_name, ${SQL_EMP_CODE('e')} as employee_code,
+                  u.code as site_key, u.name as site_name
              from employees e left join units u on u.id = e.unit_id
             where e.is_active = true order by u.name nulls last, e.full_name`),
   ]);
@@ -1308,10 +1430,19 @@ router.get('/audit', asyncHandler(async (req, res) => {
     const scoped = scopedUnitIds(req.profile);
     if (scoped) { params.push(scoped); where.push(`unit_id = any($${params.length}::uuid[])`); }
   }
-  if (req.query.employeeId) { params.push(req.query.employeeId); where.push(`employee_id = $${params.length}`); }
-  if (req.query.from) { params.push(req.query.from); where.push(`ymd >= $${params.length}`); }
-  if (req.query.to) { params.push(req.query.to); where.push(`ymd <= $${params.length}`); }
-  const sql = `select * from work_log_audit ${where.length ? 'where ' + where.join(' and ') : ''} order by created_at desc limit 500`;
+  if (req.query.employeeId) { params.push(req.query.employeeId); where.push(`a.employee_id = $${params.length}`); }
+  if (req.query.from) { params.push(req.query.from); where.push(`a.ymd >= $${params.length}`); }
+  if (req.query.to) { params.push(req.query.to); where.push(`a.ymd <= $${params.length}`); }
+  // หน้าประวัติการแก้ไขต้องอ่านออกเอง: ชื่อหน่วยงานและชื่อพนักงานมาด้วย ไม่ใช่ uuid
+  // (limit ปรับได้ — หน้าตั้งค่าขอ 1000 แถวเหมือนระบบจริง)
+  const limit = Math.min(2000, Math.max(1, Number(req.query.limit) || 500));
+  const sql = `select a.*, u.code site, u.name site_name,
+                      ${SQL_EMP_NAME('e')} emp_name, ${SQL_EMP_CODE('e')} emp_code
+                 from work_log_audit a
+                 left join units u on u.id = a.unit_id
+                 left join employees e on e.id = a.employee_id
+                ${where.length ? 'where ' + where.map((w) => (w.startsWith('a.') ? w : `a.${w}`)).join(' and ') : ''}
+                order by a.created_at desc limit ${limit}`;
   const { rows } = await query(sql, params);
   res.json({ data: rows });
 }));
@@ -1438,7 +1569,9 @@ async function mandayReport(profile, from, to, groupBy) {
                       count(distinct s.employee_id)::int people
                  from worklog_slots s join units u on u.id = s.unit_id ${W}
                 group by 1,2 order by 3 desc`,
-    employee: `select e.employee_code key, e.full_name label, sum(s.manday)::numeric manday,
+    // key เป็นรหัสที่แสดงบนรายงาน จึงเป็นรหัสจริงของลูกค้า ไม่ใช่รหัสที่มีตัวแยก
+    // ต่อท้าย · คนที่ใช้รหัสซ้ำกันยังแยกเป็นคนละแถวเพราะ group by รวม label ด้วย
+    employee: `select ${SQL_EMP_CODE('e')} key, ${SQL_EMP_NAME('e')} label, sum(s.manday)::numeric manday,
                       count(distinct s.ymd)::int people
                  from worklog_slots s join employees e on e.id = s.employee_id ${W}
                 group by 1,2 order by 3 desc`,
@@ -1548,7 +1681,8 @@ router.get('/report/monthly.xlsx', asyncHandler(async (req, res) => {
   const slot1 = `(case when e.kind = 'operation' then w.team else w.detail end)`;
   const md = `(case when coalesce(${slot1}, '') <> '' or coalesce(w.pm,'') <> '' then 1 else 0 end)`;
   const { rows } = await query(
-    `select u.code site, u.name site_name, e.employee_code, e.full_name,
+    `select u.code site, u.name site_name,
+            ${SQL_EMP_CODE('e')} as employee_code, ${SQL_EMP_NAME('e')} as full_name,
             w.ymd, ${md}::numeric manday,
             coalesce(${slot1},'') as slot1, coalesce(w.pm,'') as slot2,
             coalesce(a1.name,'') as slot1_name, coalesce(c1.name,'') as slot1_cost,
@@ -1742,10 +1876,15 @@ router.post('/import/activities', requirePermission('performance', 'edit'), impo
         allowed_cost: allowed.length ? allowed.join(',') : null,
       });
     }
-    if (dryRun || bad.length) {
+    if (dryRun) {
       return res.json({ data: { dryRun: true, willImport: ok.length, rejected: bad, imported: 0 } });
     }
+    // ระบบจริงรายงานผลเป็น "+เพิ่ม / อัปเดต / ข้าม" แถวที่เสียถูกข้าม ไม่ล้มไฟล์
+    // ทั้งใบ — คนแก้ทะเบียน 44 แถวจะได้ไม่ต้องเริ่มใหม่เพราะพิมพ์ผิดหนึ่งช่อง
+    const have = new Set((await query('select code from work_types')).rows.map((r) => String(r.code)));
+    let added = 0; let updated = 0;
     for (const a of ok) {
+      if (have.has(a.code)) updated += 1; else added += 1;
       await query(
         `insert into work_types (code, name, name_en, description, category, mapping, fixed_cost, allowed_cost, is_active)
          values ($1,$2,$3,$4,$5,$6,$7,$8,true)
@@ -1755,8 +1894,74 @@ router.post('/import/activities', requirePermission('performance', 'edit'), impo
            allowed_cost = excluded.allowed_cost, is_active = true, updated_at = now()`,
         [a.code, a.name, a.name_en, a.description, a.category, a.mapping, a.fixed_cost, a.allowed_cost]);
     }
-    res.json({ data: { dryRun: false, imported: ok.length, rejected: bad } });
+    res.json({ data: { dryRun: false, imported: ok.length, added, updated, skipped: bad.length, rejected: bad } });
   }));
+
+/**
+ * นำเข้าหมวดงาน (ชั้นที่ 2) — ระบบจริงนำเข้าได้ทั้งสองแท็บ ของเราเคยมีแต่แท็บ
+ * กิจกรรม ทำให้หมวดงาน 20 แถวต้องพิมพ์ทีละช่องบนหน้าจอ
+ * คอลัมน์ตามเทมเพลตของเขา: รหัส · ชื่อ-ไทย · ชื่อ-อังกฤษ
+ */
+router.post('/import/cost-categories', requireRole('admin'), importUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) throw new ApiError(400, 'ยังไม่ได้เลือกไฟล์');
+    const dryRun = String(req.query.dryRun || req.body?.dryRun || '') === 'true';
+    const wb = new ExcelJS.Workbook();
+    try { await wb.xlsx.load(req.file.buffer); }
+    catch { throw new ApiError(400, 'อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ Excel (.xlsx)'); }
+    const ws = wb.worksheets[0];
+    if (!ws) throw new ApiError(400, 'ไฟล์นี้ไม่มีชีตข้อมูล');
+    const rows = sheetRows(ws);
+    if (!rows.length) throw new ApiError(400, 'ไฟล์นี้ไม่มีข้อมูลใต้หัวตาราง');
+
+    const ok = []; const bad = []; const seen = new Set();
+    for (const r of rows) {
+      const code = String(pick(r, 'รหัส', 'code', 'รหัสหมวดงาน') || '').trim();
+      const name = pick(r, 'ชื่อหมวดงาน', 'ชื่อ-ไทย', 'ชื่อ (ไทย)', 'หมวดงาน (ไทย)', 'ชื่อ', 'name');
+      if (!code) { bad.push({ row: r._row, reason: 'ไม่มีรหัสหมวดงาน' }); continue; }
+      if (!/^\d+$/.test(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ต้องเป็นตัวเลข` }); continue; }
+      if (!name) { bad.push({ row: r._row, reason: 'ไม่มีชื่อหมวดงาน' }); continue; }
+      if (seen.has(code)) { bad.push({ row: r._row, reason: `รหัส "${code}" ซ้ำในไฟล์เดียวกัน` }); continue; }
+      seen.add(code);
+      ok.push({ code, name, name_en: pick(r, 'ชื่อภาษาอังกฤษ', 'ชื่อ-อังกฤษ', 'ชื่อ (อังกฤษ)', 'Work Category (English)', 'name_en') || null });
+    }
+    if (dryRun) return res.json({ data: { dryRun: true, willImport: ok.length, rejected: bad, imported: 0 } });
+
+    const have = new Set((await query('select code from cost_categories')).rows.map((r) => String(r.code)));
+    let added = 0; let updated = 0;
+    for (const c of ok) {
+      if (have.has(c.code)) updated += 1; else added += 1;
+      await query(
+        `insert into cost_categories (code, name, name_en, is_active) values ($1,$2,$3,true)
+         on conflict (code) do update set
+           name = excluded.name, name_en = excluded.name_en, is_active = true, updated_at = now()`,
+        [c.code, c.name, c.name_en]);
+    }
+    res.json({ data: { dryRun: false, imported: ok.length, added, updated, skipped: bad.length, rejected: bad } });
+  }));
+
+/**
+ * เทมเพลตเปล่าของทั้งสองทะเบียน — ลำดับคอลัมน์ตรงกับที่หน้าจอบอกไว้ พร้อมแถว
+ * ตัวอย่างหนึ่งแถวให้เขียนทับ (ระบบจริงทำแบบเดียวกัน)
+ */
+router.get('/import/activities/template.xlsx', asyncHandler(async (req, res) => {
+  const wb = sheetToWorkbook('ดัชนีงาน', [
+    { header: 'ชื่อ', key: 'name', width: 40 },
+    { header: 'คำอธิบาย', key: 'description', width: 52 },
+    { header: 'หมวดหมู่', key: 'category', width: 26 },
+    { header: 'รหัสงาน', key: 'code', width: 12 },
+  ], [{ name: 'ตัวอย่าง งานผูก-ตัด-ดัดเหล็ก', description: 'คำอธิบายงาน (ใส่หรือไม่ก็ได้)', category: 'งานโครงสร้าง', code: 'A-1' }]);
+  await sendXlsx(res, wb, 'เทมเพลตดัชนีงาน.xlsx');
+}));
+
+router.get('/import/cost-categories/template.xlsx', asyncHandler(async (req, res) => {
+  const wb = sheetToWorkbook('หมวดงาน', [
+    { header: 'รหัส', key: 'code', width: 10 },
+    { header: 'ชื่อหมวดงาน', key: 'name', width: 44 },
+    { header: 'ชื่อภาษาอังกฤษ', key: 'name_en', width: 34 },
+  ], [{ code: '21', name: 'ตัวอย่าง งานรื้อย้ายโครงสร้างเดิม', name_en: 'Demolition' }]);
+  await sendXlsx(res, wb, 'เทมเพลตหมวดงาน.xlsx');
+}));
 
 /** ส่งออกตารางลงบันทึกของไซต์+เดือนที่กำลังดูอยู่ */
 router.get('/export/entries.xlsx', asyncHandler(async (req, res) => {
@@ -1769,7 +1974,7 @@ router.get('/export/entries.xlsx', asyncHandler(async (req, res) => {
   const [Y, M] = ym.split('-').map(Number);
   const from = ymd(Y, M, 1), to = ymd(Y, M, daysInMonthN(Y, M));
   const { rows } = await query(
-    `select e.employee_code, e.full_name, e.kind, w.ymd,
+    `select ${SQL_EMP_CODE('e')} as employee_code, ${SQL_EMP_NAME('e')} as full_name, e.kind, w.ymd,
             coalesce(case when e.kind = 'operation' then w.team else w.detail end, '') slot1,
             coalesce(w.pm, '') slot2, coalesce(w.note, '') note
        from work_logs w join employees e on e.id = w.employee_id
@@ -1849,7 +2054,8 @@ router.post('/employees/:id/move', requirePermission('performance', 'edit'), asy
 router.get('/moves', asyncHandler(async (req, res) => {
   const scoped = scopedUnitIds(req.profile);
   const { rows } = await query(
-    `select m.id, m.effective_date, m.note, m.created_at, e.full_name, e.employee_code,
+    `select m.id, m.effective_date, m.note, m.created_at,
+            ${SQL_EMP_NAME('e')} as full_name, ${SQL_EMP_CODE('e')} as employee_code,
             f.name from_name, t.name to_name, pr.full_name by_name
        from employee_moves m
        join employees e on e.id = m.employee_id

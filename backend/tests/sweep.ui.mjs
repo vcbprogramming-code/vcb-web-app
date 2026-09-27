@@ -24,7 +24,7 @@ const PAGES = [
   { path: '/credit', name: 'วงเงินสินเชื่อ', must: [] },
   { path: '/onboarding', name: 'ปฐมนิเทศ (ฝั่ง HR)', must: [] },
   { path: '/onboarding/program', name: 'โปรแกรมปฐมนิเทศ 90 วัน', must: [] },
-  { path: '/sop', name: 'คู่มือ SOP', must: ['คู่มือ'] },
+  { path: '/sop', name: 'มาตรฐานการปฏิบัติงาน', must: ['มาตรฐานการปฏิบัติงาน'] },
   { path: '/sysmap', name: 'แผนผังระบบ', must: ['แผนผัง'] },
   { path: '/meetings', name: 'รายงานการประชุม', must: ['รายงานการประชุม'] },
   { path: '/settings', name: 'ตั้งค่า', must: [] },

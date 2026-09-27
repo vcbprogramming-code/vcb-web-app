@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useTheme } from '../theme/ThemeContext.jsx';
-import { apps, roleLabels } from '../config/nav.js';
-import { formatThaiLongDate, ememoApi } from '../lib/ememo.js';
-import { portalApi } from '../lib/portal.js';
+import { apps, portalRoleLabel, shortcuts } from '../config/nav.js';
+import { ememoApi } from '../lib/ememo.js';
+import { portalApi, birthdayWhen } from '../lib/portal.js';
 import Icon from '../components/Icon.jsx';
 import LangToggle from '../components/LangToggle.jsx';
-import { useT } from '../lib/i18n.jsx';
+import { useLang, useT } from '../lib/i18n.jsx';
 import GlobeMark from '../components/GlobeMark.jsx';
 import HolidayCalendar from '../components/HolidayCalendar.jsx';
 import HelpModal from '../components/HelpModal.jsx';
@@ -18,6 +18,7 @@ const greeting = (h) => (h < 12 ? 'สวัสดีตอนเช้า' : h 
  *  re-renders each second — the Portal (nav, app cards, calendar) does not. */
 function WelcomeCard({ name }) {
   const t = useT();
+  const { lang } = useLang();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -26,6 +27,13 @@ function WelcomeCard({ name }) {
   // A wall-clock the size of the greeting competed with it for attention and made
   // the card read like a screensaver. The status pill carries the "system is up"
   // message; the time rides quietly alongside the date.
+  //
+  // รูปแบบเดียวกับพอร์ทัลที่บริษัทใช้อยู่: "วันอาทิตย์ที่ 27 ก.ย. · 11:51" —
+  // ชื่อวันนำหน้า เดือนแบบย่อ ไม่มีปี และเวลาไม่มีวินาที (วินาทีที่วิ่งตลอด
+  // ดึงสายตาออกจากคำทักทาย)
+  const locale = lang === 'en' ? 'en-US' : 'th-TH';
+  const stamp = `${now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}`
+    + ` · ${now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#132a54] to-[#0d1b36] p-6 text-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -37,9 +45,7 @@ function WelcomeCard({ name }) {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold text-emerald-300 ring-1 ring-inset ring-emerald-400/30">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> {t('ระบบออนไลน์')}
           </span>
-          <div className="text-xs text-white/70">
-            {formatThaiLongDate(now)} · <span className="tabular-nums">{now.toLocaleTimeString('th-TH', { hour12: false })}</span>
-          </div>
+          <div className="text-xs tabular-nums text-white/70">{stamp}</div>
         </div>
       </div>
     </div>
@@ -55,6 +61,10 @@ function AppCard({ app, soon, awaiting, onOpen }) {
     <button
       type="button"
       onClick={soon ? undefined : onOpen}
+      // คำบรรยายยาว (preview) ของระบบจริงโผล่เป็น tooltip ตอนชี้ค้าง — ของเขา
+      // เขียน tooltip เองเพื่อคุมจังหวะ fade เราใช้ title ของเบราว์เซอร์แทน
+      // เพราะได้ข้อความเดียวกันโดยไม่ต้องเพิ่มโครงสร้างใหม่ทั้งชุด
+      title={app.preview ? t(app.preview) : undefined}
       // aria-disabled (not `disabled`) keeps the card reachable by keyboard so the
       // "เร็วๆ นี้" state is actually announced instead of being skipped over
       aria-disabled={soon || undefined}
@@ -100,27 +110,38 @@ function NavLink({ icon, label, href, title }) {
   );
 }
 
+/** วงกลมตัวอักษรแรกของชื่อ — แบบเดียวกับแถวรายชื่อวันเกิดของระบบจริง */
+function Initials({ name }) {
+  const first = String(name || '').trim().slice(0, 1).toUpperCase() || '?';
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
+      {first}
+    </span>
+  );
+}
+
 /**
- * ใครลาวันนี้ · วันเกิดที่ใกล้ถึง
+ * ลาวันนี้ · วันเกิดที่กำลังจะถึง
  *
- * กล่องเดียวกับที่พอร์ทัลเดิมมี — กล่องวันเกิดจะไม่ขึ้นเลยถ้ายังไม่มีใครกรอก
- * วันเกิดไว้ ดีกว่าโชว์กรอบว่าง ๆ ให้คนสงสัยว่าระบบเสียหรือเปล่า
+ * สองกล่องเดียวกับที่พอร์ทัลของบริษัทมีข้างปฏิทินวันหยุด ทั้งคู่ขึ้นเสมอแม้ยัง
+ * ไม่มีข้อมูล แล้วบอกตรง ๆ ว่าไม่มี — ระบบจริงทำแบบนี้ และกล่องที่หายไปเงียบ ๆ
+ * ทำให้คนเข้าใจว่าหน้าโหลดไม่ครบ
  */
 function TodayPanel() {
   const t = useT();
+  const { lang } = useLang();
   const [data, setData] = useState(null);
   useEffect(() => { portalApi.today().then((r) => setData(r.data)).catch(() => setData({ onLeave: [], birthdays: [] })); }, []);
-  if (!data) return null;
-  const { onLeave = [], birthdays = [] } = data;
+  const { onLeave = [], birthdays = [] } = data || {};
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
-          <Icon name="userClock" className="h-4 w-4 text-brand" /> {t('ใครลาวันนี้')}
+          <Icon name="userClock" className="h-4 w-4 text-brand" /> {t('ลาวันนี้')}
         </h3>
         {onLeave.length === 0 ? (
-          <p className="text-xs text-slate-400">{t('วันนี้ไม่มีใครลา')}</p>
+          <p className="text-xs text-slate-400">{t('วันนี้ไม่มีพนักงานลา')}</p>
         ) : (
           <ul className="space-y-1.5">
             {onLeave.map((p) => (
@@ -135,33 +156,44 @@ function TodayPanel() {
         )}
       </div>
 
-      {birthdays.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
-            <Icon name="cap" className="h-4 w-4 text-brand" /> {t('วันเกิดที่ใกล้ถึง')}
-          </h3>
-          <ul className="space-y-1.5">
-            {birthdays.map((p) => (
-              <li key={p.employee_code} className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="min-w-0 truncate text-slate-700">{p.full_name}</span>
-                <span className="shrink-0 text-[11px] text-slate-400">
-                  {p.days === 0 ? t('วันนี้') : t('อีก {n} วัน', { n: p.days })}
-                </span>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
+          <Icon name="calendar" className="h-4 w-4 text-brand" /> {t('วันเกิดที่กำลังจะถึง')}
+        </h3>
+        {birthdays.length === 0 ? (
+          <p className="text-xs text-slate-400">{t('ยังไม่มีวันเกิดที่กำลังจะถึง')}</p>
+        ) : (
+          <ul className="space-y-2">
+            {birthdays.map((p) => ({ ...p, days: Number(p.days) })).map((p) => (
+              <li key={p.employee_code || p.full_name} className="flex items-center gap-2.5">
+                <Initials name={p.full_name} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-slate-700">{p.full_name}</div>
+                  {p.dept && <div className="truncate text-[11px] text-slate-400">{p.dept}</div>}
+                </div>
+                {/* วันนี้/พรุ่งนี้ เป็นป้าย ส่วนวันอื่นเป็นวันที่ย่อ — เหมือนระบบจริง */}
+                {p.days <= 1 ? (
+                  <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
+                    {p.days === 0 ? t('วันนี้') : t('พรุ่งนี้')}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-slate-400">{birthdayWhen(p.days, lang)}</span>
+                )}
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function NavRow({ icon, label, onClick, badge = 0, opens = false }) {
+function NavRow({ icon, label, onClick, badge = 0, opens = false, tip }) {
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} title={tip || label}
       className="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white">
       <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-slate-400 transition group-hover:text-white" />
-      <span className="flex-1 truncate text-left" title={label}>{label}</span>
+      <span className="flex-1 truncate text-left">{label}</span>
       {badge > 0 && <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-[#0f172a]">{badge}</span>}
       {opens && badge === 0 && (
         <Icon name="arrowUpRight" className="h-3.5 w-3.5 shrink-0 text-slate-500 opacity-0 transition group-hover:opacity-100" />
@@ -188,6 +220,10 @@ export default function Portal() {
   const liveApps = apps.filter((a) => a.enabled !== false && !a.comingSoon && allowed(a));
   // a coming-soon entry is never "live" — guard both sides so one can't render twice
   const soonApps = apps.filter((a) => a.comingSoon && a.enabled === false && allowed(a));
+  // ระบบจริงแยก "แอปพลิเคชัน" (หกแอปหลัก) ออกจาก "เพิ่มเติม" — ตัวนับบนหัวข้อ
+  // จึงนับแอปหลักเท่านั้น เหมือนที่เขานับ apps.length
+  const mainApps = liveApps.filter((a) => a.group !== 'more');
+  const moreApps = liveApps.filter((a) => a.group === 'more');
 
   // greeting should use a person's first name, not their whole email address
   const displayName = profile?.full_name || user?.email || t('ผู้ใช้งาน');
@@ -244,8 +280,10 @@ export default function Portal() {
 
   const term = q.trim().toLowerCase();
   const match = (a) => !term || `${t(a.title)} ${t(a.desc)}`.toLowerCase().includes(term);
-  const shownLive = liveApps.filter(match);
+  const shownMain = mainApps.filter(match);
+  const shownMore = moreApps.filter(match);
   const shownSoon = soonApps.filter(match); // searchable too — "แผนผัง" must find System Map
+  const shownCount = shownMain.length + shownMore.length + shownSoon.length;
 
   function handleLogout() { logout(); navigate('/login', { replace: true }); }
   // sign out and come back here — see ModuleShell.handleSwitchAccount
@@ -276,7 +314,7 @@ export default function Portal() {
             </div>
             <div className="leading-tight">
               <div className="text-sm font-extrabold tracking-tight text-white">VCB CONNECT</div>
-              <div className="text-[10px] text-slate-400">{t('ระบบงานภายใน')}</div>
+              <div className="text-[10px] text-slate-400">{t('พอร์ทัลอินทราเน็ตภายในองค์กร')}</div>
             </div>
           </div>
 
@@ -284,21 +322,32 @@ export default function Portal() {
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{initial}</div>
             <div className="min-w-0 leading-tight">
               <div className="truncate text-sm font-semibold text-white">{displayName}</div>
-              <div className="text-[11px] text-slate-400">{t(roleLabels[role] || role)}</div>
+              {/* ctx 'portal': "พนักงาน" ที่อื่นในระบบแปลว่า Employees แต่ป้าย
+                  บทบาทบนหน้านี้คือ Staff ตามระบบจริง */}
+              <div className="text-[11px] text-slate-400">{t(portalRoleLabel(role), null, 'portal')}</div>
             </div>
           </div>
 
+          {/* เมนูข้างจัดสามกลุ่มเหมือนพอร์ทัลจริง: แอปพลิเคชัน · ทางลัด · เพิ่มเติม */}
           <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label={t('แอปพลิเคชัน')}>
             <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('แอปพลิเคชัน')}</div>
-            {liveApps.map((a) => <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />)}
+            {/* เมนูของหกแอปหลักได้ tooltip เป็นคำบรรยายยาว (preview) เหมือน
+                applyAppTooltips ของเขา ส่วนกลุ่มเพิ่มเติมได้คำสั้น (tt_*_desc) */}
+            {mainApps.map((a) => (
+              <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} tip={t(a.preview || a.desc)}
+                onClick={() => go(a.to)} badge={a.to === '/memos' ? awaiting : 0} opens />
+            ))}
             {/* ทางลัดออกไประบบอื่นที่พนักงานใช้คู่กันทุกวัน — เปิดแท็บใหม่
                 เพราะไม่ใช่ส่วนหนึ่งของ VCB Connect */}
             <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ทางลัด')}</div>
-            <NavLink icon="building" label="ERP"
-              title={t('ไปที่ Mango ERP — ใบขอซื้อ ขอเบิกเงิน และรายการตัวเลขอื่น ๆ')}
-              href="https://www.vcbcon.com/newproduction.anywhere/page/authentication/login/" />
-            <NavLink icon="people" label="Zoom" title={t('เข้าห้องประชุม Zoom')} href="https://zoom.us/join" />
-            <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('ช่วยเหลือ')}</div>
+            {shortcuts.map((s) => (
+              <NavLink key={s.key} icon={s.icon} label={s.label} title={t(s.tip)} href={s.href} />
+            ))}
+            <div className="mt-3 px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('เพิ่มเติม')}</div>
+            {moreApps.map((a) => (
+              <NavRow key={a.to} icon={a.icon} label={t(a.navTitle || a.title)} tip={t(a.desc)}
+                onClick={() => go(a.to)} opens />
+            ))}
             <NavRow icon="help" label={t('ช่วยเหลือ / แจ้งปัญหา')} onClick={() => { setNavOpen(false); setHelp(true); }} />
           </nav>
 
@@ -361,15 +410,23 @@ export default function Portal() {
                   </div>
                 )}
 
-                {/* announcements — a failed fetch is shown, not silently hidden */}
-                {(panelAnnouncements.length > 0 || annErr) && (
+                {/* ประกาศ — พอร์ทัลจริงโชว์แผงนี้เสมอแม้ยังไม่มีประกาศ แล้วบอก
+                    ตรง ๆ ว่าไม่มี (แผงที่หายไปเงียบ ๆ ทำให้คนเข้าใจว่าหน้าโหลด
+                    ไม่ครบ) ข้อยกเว้นเดียว: ถ้าประกาศทั้งหมดกำลังขึ้นเป็นแถบเด่น
+                    อยู่ด้านบนแล้ว แผงนี้จะไม่ขึ้น — เพราะจะกลายเป็นบอกว่า
+                    "ยังไม่มีประกาศ" ทั้งที่ประกาศอยู่เหนือหัวพอดี */}
+                {(annErr || announcements.length === 0 || panelAnnouncements.length > 0) && (
                   <div className="space-y-2">
-                    <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700"><Icon name="bell" className="h-4 w-4 text-brand" /> ประกาศ</h2>
+                    <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700"><Icon name="bell" className="h-4 w-4 text-brand" /> {t('ประกาศ')}</h2>
                     {annErr ? (
                       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
                         {t('โหลดประกาศไม่สำเร็จ')}
                         <button onClick={() => { setAnnErr(false); portalApi.announcements().then((r) => setAnnouncements(r.data || [])).catch(() => setAnnErr(true)); }}
                           className="ml-2 font-semibold text-brand hover:underline">{t('ลองใหม่')}</button>
+                      </div>
+                    ) : announcements.length === 0 ? (
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
+                        {t('ยังไม่มีประกาศในขณะนี้')}
                       </div>
                     ) : panelAnnouncements.map((a) => (
                       <div key={a.id} className={`rounded-xl border px-4 py-3 ${ANNOUNCE_STYLE[a.level] || ANNOUNCE_STYLE.info}`}>
@@ -382,21 +439,32 @@ export default function Portal() {
                   </div>
                 )}
 
-                {/* apps grid */}
+                {/* apps grid — หกแอปหลักก่อน แล้วค่อยกลุ่ม "เพิ่มเติม" ตามลำดับ
+                    ของระบบจริง ตัวนับข้างหัวข้อนับแอปหลักเท่านั้น */}
                 <div>
                   <div className="mb-3 flex items-center justify-between">
                     <h2 className="text-sm font-bold text-slate-700">{t('แอปพลิเคชัน')}</h2>
-                    <span className="text-xs text-slate-500" aria-live="polite">{shownLive.length + shownSoon.length} {t('รายการ')}</span>
+                    <span className="text-xs text-slate-500" aria-live="polite">{shownMain.length} {t('รายการ')}</span>
                   </div>
                   {/* a third column once the window is wide enough to carry it */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-                    {shownLive.map((a) => (
+                    {shownMain.map((a) => (
                       <AppCard key={a.to} app={a} awaiting={a.to === '/memos' ? awaiting : 0} onOpen={() => go(a.to)} />
                     ))}
                     {shownSoon.map((a) => <AppCard key={a.to} app={a} soon />)}
                   </div>
-                  {shownLive.length + shownSoon.length === 0 && term && (
-                    <p className="py-8 text-center text-sm text-slate-500" aria-live="polite">{t('ไม่พบแอปที่ตรงกับ “{q}”', { q: q.trim() })}</p>
+
+                  {shownMore.length > 0 && (
+                    <>
+                      <h2 className="mb-3 mt-6 text-sm font-bold text-slate-700">{t('เพิ่มเติม')}</h2>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                        {shownMore.map((a) => <AppCard key={a.to} app={a} onOpen={() => go(a.to)} />)}
+                      </div>
+                    </>
+                  )}
+
+                  {shownCount === 0 && term && (
+                    <p className="py-8 text-center text-sm text-slate-500" aria-live="polite">{t('ไม่พบแอปพลิเคชันที่ค้นหา')}</p>
                   )}
                 </div>
               </div>

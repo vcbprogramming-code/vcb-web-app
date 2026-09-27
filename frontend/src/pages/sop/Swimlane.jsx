@@ -212,16 +212,22 @@ export default function Swimlane({ flow }) {
 
       {Array.isArray(flow.narrative) && flow.narrative.length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Icon name="document" className="h-4 w-4" /> {t('คำอธิบายขั้นตอน')}
+          <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <Icon name="document" className="h-4 w-4" /> {t('รายละเอียดขั้นตอน · Process')}
           </h4>
+          {/* เครื่องหมายนำหน้า » (ขั้นย่อย) และ ! (ข้อควรระวัง) เป็นวิธีเก็บระดับของ
+              บรรทัดในข้อมูล ไม่ใช่ตัวอักษรที่คนต้องอ่าน — ระบบจริงก็ตัดออกแล้วเยื้อง
+              บรรทัดแทน ก่อนหน้านี้เราพิมพ์มันออกมาตรง ๆ ทั้ง 33 ผัง */}
           <ul className="space-y-1.5">
             {flow.narrative.map((line, i) => {
-              const sub = line.trim().startsWith('»');
-              const warn = line.trim().startsWith('!');
+              const raw = String(line);
+              const sub = raw.trimStart().startsWith('»');
+              const warn = raw.trimStart().startsWith('!');
+              const text = sub || warn ? raw.trimStart().slice(1).trim() : raw;
               return (
-                <li key={i} className={`text-sm leading-relaxed ${sub ? 'ml-6 text-slate-600' : warn ? 'rounded-lg bg-amber-50 px-3 py-2 text-amber-800' : 'text-slate-700'}`}>
-                  {line}
+                <li key={i} className={`text-sm leading-relaxed ${sub ? 'ml-6 text-slate-600' : warn ? 'flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-800' : 'text-slate-700'}`}>
+                  {warn && <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />}
+                  <span className="whitespace-pre-line">{text}</span>
                 </li>
               );
             })}

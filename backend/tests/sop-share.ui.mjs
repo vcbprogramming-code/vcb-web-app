@@ -49,20 +49,20 @@ const as = async (path) => {
   await settle(3500);
 };
 
-// ── 1. ลิงก์ตรงถึงกรณีศึกษา ────────────────────────────────────────────────
-suite('1. ลิงก์ตรงถึงกรณีศึกษา');
+// ── 1. ลิงก์ตรงถึงกรณีเฉพาะ ────────────────────────────────────────────────
+suite('1. ลิงก์ตรงถึงกรณีเฉพาะ');
 {
   await as(`/sop?case=${scenario.no}`);
   const t = await body();
-  happy(`เปิดลิงก์แล้วมาที่กรณีศึกษานั้นเลย (เคส ${scenario.no})`, t.includes(scenario.title_th), scenario.title_th);
-  bad('ไม่ขึ้นข้อความว่าให้เลือกจากทางซ้าย', !t.includes('เลือกกรณีศึกษาทางซ้าย'), '');
-  happy('เปิดมาที่แท็บกรณีศึกษา', t.includes('กรณีศึกษา'), '');
+  happy(`เปิดลิงก์แล้วมาที่กรณีเฉพาะนั้นเลย (เคส ${scenario.no})`, t.includes(scenario.title_th), scenario.title_th);
+  bad('ไม่ขึ้นข้อความว่าให้เลือกจากทางซ้าย', !t.includes('เลือกกรณีเฉพาะทางซ้าย'), '');
+  happy('เปิดมาที่แท็บกรณีเฉพาะ', t.includes('กรณีเฉพาะ'), '');
   await shot('01-ลิงก์กรณีศึกษา');
 
   // a number that is not a real case must not strand the reader on a blank pane
   await as('/sop?case=999999');
   const bogus = await body();
-  happy('เลขที่ไม่มีอยู่จริง ยังใช้งานหน้าต่อได้', bogus.includes('กรณีศึกษา') && bogus.length > 200, '');
+  happy('เลขที่ไม่มีอยู่จริง ยังใช้งานหน้าต่อได้', bogus.includes('กรณีเฉพาะ') && bogus.length > 200, '');
 }
 
 // ── 2. ลิงก์ตรงถึงผังกระบวนการ ─────────────────────────────────────────────
@@ -105,10 +105,10 @@ suite('3. ปุ่มแชร์');
       const b = [...document.querySelectorAll('button')].find((x) => /แชร์|คัดลอก/.test(x.innerText));
       return b ? b.innerText.trim() : '';
     });
-    if (label.includes('คัดลอกแล้ว') || label.includes('ไม่สำเร็จ')) verdict = label;
+    if (label.includes('คัดลอกลิงก์แล้ว') || label.includes('ไม่สำเร็จ')) verdict = label;
     else await settle(200);
   }
-  happy('ปุ่มบอกผู้ใช้ว่าคัดลอกแล้ว', verdict.includes('คัดลอกแล้ว'), verdict || '(ปุ่มไม่เปลี่ยนสถานะเลย)');
+  happy('ปุ่มบอกผู้ใช้ว่าคัดลอกลิงก์แล้ว', verdict.includes('คัดลอกลิงก์แล้ว'), verdict || '(ปุ่มไม่เปลี่ยนสถานะเลย)');
   // Reading the clipboard needs the window to hold focus, and a browser started
   // by another suite can take it away — retry rather than report a defect that
   // is really the test environment. The button's own verdict above is the check
@@ -136,9 +136,9 @@ suite('4. บนจอมือถือ ปุ่มยังกดถึงไ
   await page.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 });
   await as(`/sop?case=${scenario.no}`);
   const bar = await page.evaluate(() => {
-    const back = [...document.querySelectorAll('button')].find((b) => b.innerText.includes('กลับไปที่รายการ'));
+    const back = [...document.querySelectorAll('button')].find((b) => b.innerText.includes('รายการ · List'));
     if (!back) return null;
-    const row = back.parentElement;
+    const row = back.closest('div.sticky') || back.parentElement;
     const s = getComputedStyle(row);
     const share = [...row.querySelectorAll('button')].some((b) => b.innerText.trim() === 'แชร์');
     const hdr = document.querySelector('header.sticky');
@@ -149,7 +149,7 @@ suite('4. บนจอมือถือ ปุ่มยังกดถึงไ
       headerBottom: hdr ? hdr.getBoundingClientRect().bottom : 0,
     };
   });
-  happy('มีแถบกลับไปที่รายการบนมือถือ', Boolean(bar), '');
+  happy('มีแถบกลับไปที่รายการบนมือถือ (รายการ · List)', Boolean(bar), '');
   happy('ปุ่มแชร์อยู่บนแถบนั้นด้วย', bar?.share === true, JSON.stringify(bar));
   happy('แถบติดหน้าจอไม่เลื่อนหาย', bar?.sticky === true, JSON.stringify(bar));
   happy('แถบอยู่ใต้หัวเว็บ ไม่โดนบัง', bar != null && bar.top >= bar.headerBottom - 2, JSON.stringify(bar));
@@ -158,10 +158,10 @@ suite('4. บนจอมือถือ ปุ่มยังกดถึงไ
   await page.evaluate(() => window.scrollBy(0, 1200));
   await settle(900);
   const after = await page.evaluate(() => {
-    const back = [...document.querySelectorAll('button')].find((b) => b.innerText.includes('กลับไปที่รายการ'));
+    const back = [...document.querySelectorAll('button')].find((b) => b.innerText.includes('รายการ · List'));
     const hdr = document.querySelector('header.sticky');
     if (!back) return null;
-    const row = back.parentElement.getBoundingClientRect();
+    const row = (back.closest('div.sticky') || back.parentElement).getBoundingClientRect();
     return { top: row.top, headerBottom: hdr ? hdr.getBoundingClientRect().bottom : 0 };
   });
   // "on screen" is not enough — parked under the sticky header it is invisible

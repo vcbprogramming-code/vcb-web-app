@@ -48,7 +48,7 @@ const text = (max = 4000) => z.string().trim().max(max);
  *  One round trip on purpose: the diagram is meaningless in pieces, and every
  *  part of it is small (10 lanes, 79 nodes, 129 edges). */
 router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
-  const [depts, modules, lanes, nodes, conns] = await Promise.all([
+  const [depts, modules, lanes, nodes, conns, fnAi, docs, nodeFns] = await Promise.all([
     query('select key, name_en, name_th, short, color, icon from sysmap_depts order by sort_order, key'),
     query('select code, name, purpose from sysmap_modules order by sort_order, code'),
     query('select id, label_en, label_th, sort_order from sysmap_lanes order by sort_order, id'),
@@ -57,6 +57,14 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
                   items_en, items_th, sort_order
              from sysmap_nodes order by sort_order, id`),
     query('select id, from_node, to_node, conn_type, label, feedback from sysmap_conns order by id'),
+    // ข้อเสนอ AI ระดับฟังก์ชัน — ติดเป็นชิปที่แถวในทะเบียน ไม่ได้เรียกแยกเพราะ
+    // มีแค่ร้อยกว่าแถวและทะเบียนกับผังอ่านพร้อมกันอยู่แล้ว
+    query('select code, desc_en, desc_th, tool, in_registry from sysmap_function_ai order by code'),
+    query(`select id, code, dept, label_en, label_th, sub_en, sub_th, desc_en, desc_th,
+                  erp_style, erp_label_en, erp_label_th, items_en, items_th, sort_order
+             from sysmap_doc_nodes order by sort_order, id`),
+    // "หน้าที่ที่เกี่ยวข้อง" — กล่องงานหนึ่งอ้างถึงหลายรหัสฟังก์ชันในทะเบียน
+    query('select node_id, code, sort_order from sysmap_node_fns order by node_id, sort_order'),
   ]);
   res.json({
     data: {
@@ -65,9 +73,17 @@ router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
       lanes: lanes.rows,
       nodes: nodes.rows,
       conns: conns.rows,
+      functionAi: fnAi.rows,
+      docNodes: docs.rows,
+      nodeFns: nodeFns.rows,
       // via the resolver: a right granted by the role is not in the override map
       canEdit: EDITABLE && hasPermission(req.profile, 'sysmap', 'edit'),
-      counts: { lanes: lanes.rows.length, nodes: nodes.rows.length, conns: conns.rows.length },
+      counts: {
+        lanes: lanes.rows.length,
+        nodes: nodes.rows.length,
+        conns: conns.rows.length,
+        docNodes: docs.rows.length,
+      },
     },
   });
 }));
@@ -85,7 +101,9 @@ router.get('/functions', canView, asyncHandler(async (req, res) => {
 /** GET /api/sysmap/ai — where automation was judged to pay off. */
 router.get('/ai', canView, asyncHandler(async (req, res) => {
   const { rows } = await query(
-    `select key, title_en, title_th, impact, effort, desc_en, desc_th, tool
+    // node_id ผูกข้อเสนอกับกล่องงานบนผัง — แผงรายละเอียดกล่องงานใช้ค่านี้
+    // ตัดสินว่าจะมีแท็บ "โอกาส AI" ให้กดหรือไม่
+    `select key, node_id, title_en, title_th, impact, effort, desc_en, desc_th, tool
        from sysmap_ai_opps order by sort_order, key`
   );
   res.json({ data: rows });
@@ -296,6 +314,8 @@ router.delete('/functions/:code', canEdit, asyncHandler(async (req, res) => {
 
 const aiSchema = z.object({
   key: idField,
+  // ว่างได้: ข้อเสนอบางข้อพูดถึงงานที่ไม่มีกล่องของตัวเองบนผัง
+  node_id: z.union([idField, z.literal('')]).nullish().transform((v) => v || null),
   title_en: text(300),
   title_th: text(300).optional().default(''),
   impact: z.enum(['High', 'Medium', 'Low']).default('Medium'),
@@ -305,7 +325,7 @@ const aiSchema = z.object({
   tool: text(200).optional().default(''),
   sort_order: z.number().int().optional(),
 });
-const AI_COLS = ['title_en', 'title_th', 'impact', 'effort', 'desc_en', 'desc_th', 'tool', 'sort_order'];
+const AI_COLS = ['node_id', 'title_en', 'title_th', 'impact', 'effort', 'desc_en', 'desc_th', 'tool', 'sort_order'];
 
 router.post('/ai', canEdit, asyncHandler(async (req, res) => {
   const p = aiSchema.safeParse(req.body);

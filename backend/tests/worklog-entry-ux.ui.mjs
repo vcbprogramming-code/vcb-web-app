@@ -48,15 +48,24 @@ const open = async () => {
   await page.goto(APP, { waitUntil: 'domcontentloaded' });
   await page.evaluate((tk) => { localStorage.clear(); localStorage.setItem('hr_access_token', tk); }, tok(A));
   await page.goto(`${APP}/performance?tab=entry`, { waitUntil: 'networkidle2' });
-  await new Promise((r) => setTimeout(r, 2500));
-  // เลือกไซต์ทดสอบ แล้วเข้ามุมมองรายอาทิตย์
-  await page.select('select[aria-label="เลือกไซต์งาน"]', site.key).catch(() => {});
-  await new Promise((r) => setTimeout(r, 2500));
+  // หน้าบันทึกงานไม่เลือกหน่วยงานให้อัตโนมัติแล้ว (ตามระบบจริง) การเลือกไซต์
+  // ทดสอบจึงเป็นขั้นที่ขาดไม่ได้ — รอให้ตัวเลือกขึ้นจริงก่อนแล้วรอตารางจริง
+  // ไม่ใช่หน่วงเวลาคงที่แล้วกลืน error ด้วย .catch() ซึ่งทำให้ทุกข้อถัดไปล้มตาม
+  // โดยไม่มีอะไรบอกว่าสาเหตุคือ "ยังไม่ได้เลือกไซต์"
+  await page.waitForFunction((k) => {
+    const s = document.querySelector('select[aria-label="เลือกไซต์งาน"]');
+    return Boolean(s && [...s.options].some((o) => o.value === k));
+  }, { timeout: 60000 }, site.key);
+  await page.select('select[aria-label="เลือกไซต์งาน"]', site.key);
+  await page.waitForFunction(() => [...document.querySelectorAll('button')]
+    .some((x) => x.innerText.trim() === 'รายอาทิตย์'), { timeout: 60000 });
   await page.evaluate(() => {
     const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'รายอาทิตย์');
     if (b) b.click();
   });
-  await new Promise((r) => setTimeout(r, 2000));
+  await page.waitForFunction(() => document.querySelectorAll('td[data-cell] [data-slot]').length > 0,
+    { timeout: 60000 });
+  await new Promise((r) => setTimeout(r, 600));
 };
 const bodyText = () => page.evaluate(() => document.body.innerText);
 /** พิกัดของกล่องเลือกกิจกรรม (null = ไม่ได้เปิดอยู่) */

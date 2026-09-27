@@ -29,9 +29,15 @@ let id = null;
 {
   const b = await call('/meetings/bootstrap', { user: A });
   happy('เปิดโมดูลได้ และมีกลุ่มตั้งต้นให้แล้ว', b.status === 200 && b.data.groups.length >= 9, `${b.data?.groups?.length}`);
-  // the two inboxes are queues, not projects, so they carry no project link
-  happy('กลุ่มตั้งต้นผูกกับโครงการที่มีอยู่',
-    b.data.groups.filter((g) => !g.is_inbox).every((g) => g.project_id), '');
+  // เดิมข้อนี้ยืนยันว่าทุกกลุ่มผูกกับโครงการใน E-Memo ซึ่งจริงเฉพาะช่วงที่กลุ่ม
+  // ยังถูกหว่านมาจากตาราง projects (0045) ตอนนี้กลุ่มคือรายการโครงการของลูกค้า
+  // ที่นำเข้ามาจริง (scripts/import-live-meetings.mjs) และมีกลุ่มที่ไม่ใช่ไซต์งาน
+  // อยู่ด้วย — "งบการเงินทุกโครงการ", "Business Development", "ERP Implementation"
+  // บังคับให้ผูกโครงการก็คือบังคับให้ผูกมั่ว แล้วขอบเขตการมองเห็นรายบุคคลจะตัด
+  // กลุ่มตามโครงการที่ไม่เกี่ยวกัน สิ่งที่ต้องจริงคือทุกกลุ่มมีรหัสและชื่อของตัวเอง
+  happy('ทุกกลุ่มมีรหัสและชื่อกำกับไว้',
+    b.data.groups.every((g) => g.code && g.name),
+    b.data.groups.filter((g) => !g.code || !g.name).map((g) => g.name || g.id).join(' / '));
 
   const r = await add(A, {
     title: `${MARK} ประชุมความก้าวหน้า ครั้งที่ 1`,
@@ -236,6 +242,136 @@ suite('9. กล่องรอจัดเก็บ และการจัด
   bad('เอาออกจากกลุ่มที่ไม่ได้จัดเก็บไว้ → 404',
     (await call(`/meetings/${rec.data.id}/tags/${dest.id}`, { method: 'DELETE', user: A })).status === 404, '');
 }
+
+// ── 10. วันที่ที่คนพิมพ์เอง ────────────────────────────────────────────────
+// ระบบจริงของลูกค้าไม่มีช่อง type="date" ช่องวันที่เป็นข้อความอิสระและเซิร์ฟเวอร์
+// แปลงให้ (parseDateLabel_) เพราะแต่ละคนเขียนวันที่ไม่เหมือนกัน
+suite('10. รับวันที่เป็นข้อความอิสระ แล้วแปลงเป็นวันที่จริง');
+{
+  const cases = [
+    ['21/05/2569', '2026-05-21', 'วัน/เดือน/ปี พ.ศ.'],
+    ['21 พ.ค. 69', '2026-05-21', 'เดือนไทยย่อ ปีสองหลัก'],
+    ['21 May 2569', '2026-05-21', 'เดือนอังกฤษ ปี พ.ศ.'],
+    ['2026-05-21', '2026-05-21', 'รูปแบบเดิม yyyy-mm-dd ต้องยังใช้ได้'],
+    ['2569-05-21', '2026-05-21', 'ISO ที่ปีเป็น พ.ศ.'],
+    ['21/05/2569 10:00น', '2026-05-21', 'มีเวลาติดมาด้วย ต้องไม่ถูกอ่านเป็นวันที่'],
+  ];
+  for (const [typed, want, why] of cases) {
+    const r = await add(A, { title: `${MARK} วันที่ ${typed}`, meetingDate: typed });
+    const d = await call(`/meetings/${r.data.id}`, { user: A });
+    happy(`${why} → ${want}`, String(d.data.meeting_date || '').slice(0, 10) === want,
+      `${typed} → ${String(d.data.meeting_date).slice(0, 10)}`);
+  }
+  // ข้อความที่พิมพ์เก็บไว้ตามที่พิมพ์ แต่ ISO ล้วนไม่ต้องเก็บ เพราะแสดงกลับเป็น
+  // วันที่แบบไทยได้สวยกว่าตัวเลขที่เครื่องเป็นคนเขียน
+  const thai = await add(A, { title: `${MARK} เก็บข้อความวันที่`, meetingDate: '21/05/2569' });
+  const td = await call(`/meetings/${thai.data.id}`, { user: A });
+  happy('เก็บข้อความวันที่ตามที่ผู้ใช้พิมพ์', td.data.date_label === '21/05/2569', td.data.date_label);
+  const iso = await add(A, { title: `${MARK} ไม่เก็บ ISO ล้วน`, meetingDate: '2026-05-21' });
+  const idd = await call(`/meetings/${iso.data.id}`, { user: A });
+  bad('ISO ล้วนไม่ถูกเก็บเป็นข้อความวันที่', idd.data.date_label === '', `"${idd.data.date_label}"`);
+
+  const junk = await add(A, { title: `${MARK} วันที่อ่านไม่ออก`, meetingDate: 'ประชุมครั้งที่ 12' });
+  const jd = await call(`/meetings/${junk.data.id}`, { user: A });
+  bad('ข้อความที่ไม่ใช่วันที่ ไม่กลายเป็นวันที่มั่ว', jd.data.meeting_date === null, String(jd.data.meeting_date));
+  happy('แต่ยังเก็บสิ่งที่พิมพ์ไว้ให้แสดงได้', jd.data.date_label === 'ประชุมครั้งที่ 12', jd.data.date_label);
+
+  // แก้ไขโดยส่งข้อความเดิมกลับมา ต้องไม่นับเป็นการเปลี่ยนแปลง ไม่อย่างนั้นเวอร์ชัน
+  // เปล่างอกขึ้นทุกครั้งที่กดบันทึก
+  await call(`/meetings/${thai.data.id}`, { method: 'PATCH', user: A, body: { content: '<p>ก</p>' } });
+  const n1 = (await call(`/meetings/${thai.data.id}`, { user: A })).data.versions.length;
+  await call(`/meetings/${thai.data.id}`, { method: 'PATCH', user: A, body: { meetingDate: '21/05/2569' } });
+  const n2 = (await call(`/meetings/${thai.data.id}`, { user: A })).data.versions.length;
+  bad('ส่งวันที่เดิมกลับมาไม่สร้างเวอร์ชันเปล่า', n1 === n2, `${n1} → ${n2}`);
+}
+
+// ── 11. ภาพรวมโครงการ และการย้ายโครงการ ───────────────────────────────────
+suite('11. แถวภาพรวมอยู่ท้ายรายการ และย้ายโครงการตอนแก้ไขได้');
+{
+  const b = await call('/meetings/bootstrap', { user: A });
+  const g1 = b.data.groups.filter((g) => !g.is_inbox)[0];
+  const g2 = b.data.groups.filter((g) => !g.is_inbox)[1];
+
+  const ov = await call('/meetings', { method: 'POST', user: A, body: {
+    groupId: g1.id, kind: 'overview', title: `${MARK} ภาพรวมโครงการ` } });
+  made.push(ov.data.id);
+  await call('/meetings', { method: 'POST', user: A, body: {
+    groupId: g1.id, title: `${MARK} ประชุมไม่มีวันที่` } }).then((r) => made.push(r.data.id));
+  const list = await call(`/meetings?groupId=${g1.id}`, { user: A });
+  const rows = list.data || [];
+  const iOv = rows.findIndex((r) => r.id === ov.data.id);
+  happy('แถวภาพรวมถูกส่งมาพร้อมชนิด', rows[iOv]?.kind === 'overview', rows[iOv]?.kind);
+  happy('แถวภาพรวมอยู่ท้ายรายการเสมอ แม้แถวอื่นก็ไม่มีวันที่',
+    iOv === rows.length - 1, `${iOv + 1}/${rows.length}`);
+
+  // ของเขาย้ายโครงการได้ ของเราเคยล็อกไว้ ทางออกเดียวคือลบแล้วพิมพ์ใหม่ทั้งฉบับ
+  const mv = await call(`/meetings/${ov.data.id}`, { method: 'PATCH', user: A, body: { groupId: g2.id } });
+  happy('ย้ายโครงการตอนแก้ไขได้', mv.status === 200 && mv.data.group_id === g2.id, `${mv.status}`);
+  const after = await call(`/meetings/${ov.data.id}`, { user: A });
+  happy('ย้ายแล้วอยู่ในโครงการใหม่จริง', after.data.group_id === g2.id, '');
+  happy('การย้ายถูกบันทึกลงประวัติการทำงาน',
+    (after.data.audit || []).some((a) => a.action === 'move'),
+    (after.data.audit || []).map((a) => a.action).join(','));
+  bad('ย้ายไปกลุ่มที่ไม่มีอยู่จริง → 400',
+    (await call(`/meetings/${ov.data.id}`, { method: 'PATCH', user: A,
+      body: { groupId: '00000000-0000-0000-0000-000000000000' } })).status === 400, '');
+}
+
+// ── 12. ประวัติการทำงาน ───────────────────────────────────────────────────
+suite('12. สิ่งที่เกิดกับเอกสารโดยไม่แก้เนื้อหา ต้องมีร่องรอย');
+{
+  const r = await add(A, { title: `${MARK} รอยประวัติ`, content: '<p>ก</p>' });
+  const mid = r.data.id;
+  await call(`/meetings/${mid}/pin`, { method: 'POST', user: A });
+  await call(`/meetings/${mid}/pin`, { method: 'POST', user: A });
+  await call(`/meetings/${mid}`, { method: 'PATCH', user: A, body: { visible: false } });
+  const b = await call('/meetings/bootstrap', { user: A });
+  const dest = b.data.groups.filter((g) => !g.is_inbox).find((g) => g.id !== group.id);
+  await call(`/meetings/${mid}/tags`, { method: 'POST', user: A, body: { groupId: dest.id } });
+  await call(`/meetings/${mid}/tags/${dest.id}`, { method: 'DELETE', user: A });
+
+  const d = await call(`/meetings/${mid}`, { user: A });
+  const acts = (d.data.audit || []).map((a) => a.action);
+  happy('ปักหมุดและเอาหมุดออกมีร่องรอยทั้งคู่',
+    acts.includes('pin') && acts.includes('unpin'), acts.join(','));
+  happy('การเก็บเป็นฉบับร่างมีร่องรอย', acts.includes('unpublish'), acts.join(','));
+  happy('การจัดเก็บและเอาออกจากโครงการมีร่องรอย',
+    acts.includes('tag') && acts.includes('untag'), acts.join(','));
+  happy('ร่องรอยบอกว่าใครทำ', (d.data.audit || []).every((a) => a.actor_name), '');
+  happy('ร่องรอยเรียงตามเวลาจากเก่าไปใหม่',
+    (d.data.audit || []).every((a, i, arr) => i === 0 || new Date(arr[i - 1].created_at) <= new Date(a.created_at)), '');
+  happy('ร่องรอยการจัดเก็บบอกชื่อโครงการปลายทาง',
+    (d.data.audit || []).some((a) => a.action === 'tag' && a.details?.group === dest.name),
+    JSON.stringify((d.data.audit || []).find((a) => a.action === 'tag')?.details));
+}
+
+// ── 13. "ทุกการประชุม" กับกล่องรอจัดเก็บ ──────────────────────────────────
+suite('13. กล่องรอจัดเก็บเป็นคิว ไม่ใช่ส่วนหนึ่งของ "ทุกการประชุม"');
+{
+  const b = await call('/meetings/bootstrap', { user: A });
+  const inbox = b.data.groups.find((g) => g.is_inbox);
+  const dest = b.data.groups.find((g) => !g.is_inbox);
+  const rec = await call('/meetings', { method: 'POST', user: A, body: {
+    groupId: inbox.id, title: `${MARK} บันทึกเสียงยังไม่จัดเก็บ`, visible: true } });
+  made.push(rec.data.id);
+
+  const all = await call('/meetings', { user: A });
+  bad('บันทึกที่ยังไม่จัดเก็บไม่โผล่ในทุกการประชุม',
+    !(all.data || []).some((x) => x.id === rec.data.id), '');
+  happy('แต่ยังเห็นได้ในกล่องของมันเอง',
+    ((await call(`/meetings?groupId=${inbox.id}`, { user: A })).data || []).some((x) => x.id === rec.data.id), '');
+
+  // จัดเก็บแล้วต้องหาเจอในรายการรวม — การจัดเก็บคือการเพิ่มที่ให้หาเจอ ถ้ายังหาย
+  // อยู่ก็เท่ากับจัดเก็บไปแล้วไม่มีผล
+  await call(`/meetings/${rec.data.id}/tags`, { method: 'POST', user: A, body: { groupId: dest.id } });
+  const all2 = await call('/meetings', { user: A });
+  happy('จัดเก็บแล้วโผล่ในทุกการประชุม', (all2.data || []).some((x) => x.id === rec.data.id), '');
+
+  happy('จำนวนของแถว "ทุกการประชุม" เท่ากับจำนวนแถวที่รายการแสดงจริง',
+    b2AllTotal(await call('/meetings/bootstrap', { user: A })) === (all2.data || []).length,
+    `${b2AllTotal(await call('/meetings/bootstrap', { user: A }))} vs ${(all2.data || []).length}`);
+}
+function b2AllTotal(b) { return b.data?.allTotal; }
 
 // ── เก็บกวาด ───────────────────────────────────────────────────────────────
 await query('delete from mtg_meetings where title like $1', [`%${MARK}%`]);

@@ -6,7 +6,7 @@
  * Apps Script ที่เขาใช้อยู่ — ชื่อข้อจึงบอกพฤติกรรมของระบบเขา ไม่ใช่ชื่อฟังก์ชันเรา
  */
 import ExcelJS from 'exceljs';
-import { call, suite, happy, bad, report, U, warm, query } from './harness.mjs';
+import { call, suite, happy, bad, report, U, warm, query, TEST_PROJECT } from './harness.mjs';
 
 await warm();
 const A = U.admin;
@@ -192,7 +192,10 @@ suite('10. ไซต์ตรงกับระบบจริง');
 }
 
 // ── วงเงินสินเชื่อ ─────────────────────────────────────────────────────────
-const project = (await query('select id, code from projects order by code limit 1')).rows[0];
+// โครงการทิ้งขว้างเท่านั้น — "order by code limit 1" เคยได้ BT1 ซึ่งตอนนี้ถือ
+// ข้อมูลวงเงินจริงของลูกค้า (นำเข้า 2026-09-27) ข้อ 14 ล้างงบหมวด 'หิน' ด้วย cap 0
+// ซึ่งเป็นการ "ลบแถว" ตามกฎของเรา ไม่ใช่การลบตาม marker — งบจริงของลูกค้าหายได้
+const project = (await query('select id, code from projects where code = $1', [TEST_PROJECT])).rows[0];
 const fac = async (body) => (await call('/credit/facilities', { method: 'POST', user: A,
   body: { projectId: project.id, notes: `${MARK} ทดสอบ`, ...body } })).data;
 const view = async (id) => ((await call(`/credit/facilities?projectId=${project.id}`, { user: A })).data || []).find((x) => x.id === id);
@@ -267,17 +270,64 @@ suite('15. หมวดค่าใช้จ่ายชุดเดียวก
 // ── คู่มือ SOP ──────────────────────────────────────────────────────────────
 suite('16. คู่มือ SOP ฉบับเดียวกับหน้าเว็บที่ลูกค้าใช้อยู่');
 {
-  const n = (await query('select count(*)::int n from sop_scenarios')).rows[0].n;
-  happy('มี 32 กรณีศึกษา', n >= 32, `${n}`);
+  const n = (await query(`select count(*)::int n from sop_scenarios where title_th not like $1`, [`${MARK}%`])).rows[0].n;
+  happy('มี 33 กรณีเฉพาะ', n === 33, `${n}`);
   const reps = (await call('/sop/reports', { user: A })).data || [];
   happy('มี 24 รายการเรียกรายงาน', reps.length >= 24, `${reps.length}`);
   happy('รายการที่ 24 คือ AP Voucher Tracking', /AP -> Report -> 2\.3/.test(reps.find((r) => r.case_no === 24)?.report_path || ''), '');
   const c32 = (await call('/sop/scenarios/32', { user: A })).data;
-  happy('กรณีที่ 32 (เพิ่มเมื่อ 18 ก.ย. 2569) มีครบ', /จ่ายเช็ค/.test(c32?.title_th || '') && c32?.attachments?.length > 0, c32?.title_th);
+  happy('กรณีที่ 32 (AP-6 จ่ายเช็ค) มีครบ', /จ่ายเช็ค/.test(c32?.title_th || '') && c32?.attachments?.length > 0, c32?.title_th);
+
+  // ── รหัสแสดงผลรายหมวด (PO-1 …) ที่คนของเขาใช้เรียกกรณีกันในที่ทำงาน ──────
+  happy('กรณีที่ 32 มีรหัสแสดงผล AP-6', c32?.display_no === 'AP-6', `${c32?.display_no}`);
+  const dn = (await query(`select no, module, display_no from sop_scenarios where title_th not like $1
+                            order by module, sort_order, no`, [`${MARK}%`])).rows;
+  const seen = new Map();
+  const badDn = dn.filter((r) => {
+    const i = (seen.get(r.module) || 0) + 1;
+    seen.set(r.module, i);
+    return r.display_no !== `${r.module}-${i}`;
+  });
+  happy('ทุกกรณีมีรหัสแสดงผลตรงกับหมวดและลำดับในหมวด', badDn.length === 0, JSON.stringify(badDn.slice(0, 3)));
+  const listed = (await call('/sop/scenarios', { user: A })).data || [];
+  happy('API ส่งรหัสแสดงผลมาให้หน้าจอทุกแถว', listed.every((r) => /^[A-Z]{2,3}-\d+$/.test(r.display_no || '')), '');
+
+  // ── จำนวนกรณีต่อหมวดต้องนับหมวดเสริม ตัวเลขชุดนี้อ่านจากหน้าเว็บของเขา ───
+  const WANT = { PO: 12, IC: 8, AP: 16, FA: 7, PM: 6, OF: 10, GL: 11, AR: 10, BD: 2, FIN: 1, SE: 8 };
+  const boot = (await call('/sop/bootstrap', { user: A })).data;
+  const wrong = Object.entries(WANT).filter(([k, v]) => boot?.counts?.scenarios?.[k] !== v);
+  happy('จำนวนกรณีต่อหมวดตรงกับของเขาทั้ง 11 หมวด', wrong.length === 0,
+    `${JSON.stringify(boot?.counts?.scenarios)} ต่างที่ ${JSON.stringify(wrong)}`);
+  happy('ยอดรวมแยกจากผลบวกของหมวด (33 กรณี · 33 ผัง)',
+    boot?.counts?.scenarioTotal === 33 && boot?.counts?.flowTotal === 33,
+    `${boot?.counts?.scenarioTotal} / ${boot?.counts?.flowTotal}`);
+  // หมวดที่ไม่มีกรณีหลักเลยแต่ถูกแท็กเข้ามา ต้องกดเข้าไปอ่านได้ (AR 10 · FIN 1)
+  const ar = (await call('/sop/scenarios?module=AR', { user: A })).data || [];
+  happy('หมวด AR ไม่มีกรณีหลักแต่เปิดอ่านได้ 10 กรณี', ar.length === 10, `${ar.length}`);
+  const ap = (await call('/sop/scenarios?module=AP', { user: A })).data || [];
+  happy('ในหมวดหนึ่ง กรณีหลักขึ้นก่อนแล้วจึงกรณีที่ถูกแท็กมา',
+    ap.slice(0, 6).every((r, i) => r.display_no === `AP-${i + 1}`) && ap.slice(6).every((r) => r.module !== 'AP'),
+    ap.map((r) => r.display_no).join(' '));
+
+  // ── คำบรรยายขั้นตอนของผังกระบวนการ (ของเราเคยว่างทั้ง 33 ผัง) ────────────
+  const flows = (await call('/sop/flows', { user: A })).data || [];
+  happy('ผัง 33 ผังมีคำบรรยายครบทุกผัง',
+    flows.length === 33 && flows.every((f) => Array.isArray(f.narrative) && f.narrative.length > 0),
+    `${flows.filter((f) => !f.narrative?.length).length} ผังไม่มีคำบรรยาย`);
+  const subs = flows.reduce((a, f) => a + (f.narrative || []).filter((l) => l.startsWith('» ')).length, 0);
+  const warns = flows.reduce((a, f) => a + (f.narrative || []).filter((l) => l.startsWith('! ')).length, 0);
+  happy('คำบรรยายมีระดับย่อย 95 บรรทัด และข้อควรระวัง 24 บรรทัด', subs === 95 && warns === 24, `${subs} / ${warns}`);
+  const atts = (await query('select count(*)::int n from sop_scenario_attachments')).rows[0].n;
+  happy('เอกสารแนบ 34 รายการ', atts >= 34, `${atts}`);
   const styles = (await query('select style, count(*)::int n from sop_scenario_steps group by style')).rows;
   happy('ขั้นตอนมีสี่ระดับ (ลำดับ · จุด · ย่อย · ย่อยชั้นสอง)', ['num', 'bullet', 'sub', 'sub2'].every((s) => styles.some((x) => x.style === s)), JSON.stringify(styles));
-  const noAtt = (await query('select count(*)::int n from sop_scenarios s where not exists (select 1 from sop_scenario_attachments a where a.scenario_no = s.no) and s.title_th not like $1', [`${MARK}%`])).rows[0].n;
-  happy('ทุกกรณีมีไฟล์ SOP แนบ', noAtt === 0, `${noAtt} กรณีไม่มี`);
+  // ของเขามี 34 ไฟล์กับ 33 กรณี และ FA-1 เป็นกรณีเดียวที่ไม่มีไฟล์แนบจริง ๆ
+  // (เดิมชุดนี้เช็กว่าทุกกรณีต้องมีไฟล์ ซึ่งไม่ตรงกับฉบับที่เขาใช้อยู่)
+  const noAtt = (await query(`select coalesce(string_agg(s.display_no, ' ' order by s.display_no), '') v
+                                from sop_scenarios s
+                               where not exists (select 1 from sop_scenario_attachments a where a.scenario_no = s.no)
+                                 and s.title_th not like $1`, [`${MARK}%`])).rows[0].v;
+  happy('ไฟล์ SOP แนบตรงกับของเขา — ขาดเฉพาะ FA-1', noAtt === 'FA-1', `ไม่มีไฟล์แนบ: ${noAtt || '(ไม่มี)'}`);
   const v = (await query(`select count(*)::int n from sop_versions where note like 'ฉบับก่อนนำเข้า%'`)).rows[0].n;
   happy('ฉบับเดิมเก็บไว้ในประวัติเวอร์ชัน กู้คืนได้', v >= 1, `${v}`);
 
@@ -287,11 +337,16 @@ suite('16. คู่มือ SOP ฉบับเดียวกับหน้�
     attachments: [{ label: 'คู่มือ', url: 'https://drive.google.com/file/d/test/view' }],
   } });
   const got = (await call(`/sop/scenarios/${mk.data?.no}`, { user: A })).data;
+  happy('กรณีที่เพิ่มใหม่ในหมวด PO ได้รหัสถัดไป (PO-4)', got?.display_no === 'PO-4', `${got?.display_no}`);
   happy('บันทึกและอ่านระดับขั้นตอนได้ครบสี่แบบ', got?.steps?.map((s) => s.style).join(',') === 'num,bullet,sub,sub2', JSON.stringify(got?.steps));
   happy('บันทึกและอ่านไฟล์แนบได้', got?.attachments?.[0]?.label === 'คู่มือ', JSON.stringify(got?.attachments));
   bad('ลิงก์ไฟล์แนบต้องเป็น URL', (await call(`/sop/scenarios/${mk.data?.no}`, { method: 'PATCH', user: A,
     body: { attachments: [{ label: 'x', url: 'ไม่ใช่ลิงก์' }] } })).status === 400, '');
   await call(`/sop/scenarios/${mk.data?.no}`, { method: 'DELETE', user: A });
+  // ลบแล้วรหัสของหมวดต้องเรียงกลับมาชิด ไม่เว้นเลขที่หายไป
+  const poBack = ((await call('/sop/scenarios?module=PO', { user: A })).data || []).filter((r) => r.module === 'PO');
+  happy('ลบกรณีที่เพิ่มแล้ว รหัสในหมวด PO เรียงชิดกลับเป็น PO-1..PO-3',
+    poBack.map((r) => r.display_no).join(' ') === 'PO-1 PO-2 PO-3', poBack.map((r) => r.display_no).join(' '));
 }
 
 suite('17. ไม่ทิ้งข้อมูลทดสอบไว้');

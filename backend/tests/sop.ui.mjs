@@ -30,6 +30,11 @@ const clean = async () => {
   await query('delete from sop_versions where id > $1', [startMaxId]);
 };
 
+// เก็บกวาดก่อนเริ่ม ไม่ใช่แค่ตอนจบ — รอบก่อนถ้าตายกลางคัน (เช่น API รีสตาร์ต)
+// กรณีทดสอบที่ค้างไว้จะไปบวกกับจำนวนกรณีต่อหมวด แล้วรอบนี้จะฟ้องว่าตัวเลขไม่ตรง
+// ทั้งที่ระบบถูก
+await clean();
+
 fs.rmSync(`${ROOT}/chrome-sop`, { recursive: true, force: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -65,8 +70,8 @@ suite('1. เปิดคู่มือแล้วอ่านได้');
   await as(A);
   const t = await body();
   happy('เปิดหน้าคู่มือได้', t.includes('คู่มือ') || t.includes('SOP'), t.slice(0, 70));
-  happy('เห็นแท็บกรณีศึกษา ผังกระบวนการ เมนูรายงาน',
-    t.includes('กรณีศึกษา') && t.includes('ผังกระบวนการ') && t.includes('เมนูรายงาน'), '');
+  happy('เห็นแท็บกรณีเฉพาะ ผังกระบวนการ วิธีเรียก Report',
+    t.includes('กรณีเฉพาะ') && t.includes('ผังกระบวนการ') && t.includes('วิธีเรียก Report'), '');
   happy('ผู้ดูแลเห็นแท็บประวัติเวอร์ชัน', t.includes('ประวัติเวอร์ชัน'), '');
   await shot('01-หน้าคู่มือ');
 }
@@ -99,18 +104,83 @@ suite('2. ค้นหาและกรองตามหมวดงาน');
   await settle(1400);
 }
 
-// ── 3. ผู้ที่ไม่มีสิทธิ์แก้ไขไม่เห็นแท็บประวัติ ───────────────────────────
-suite('3. ประวัติเวอร์ชันเปิดให้เฉพาะผู้แก้ไข');
+// ── 3. คำและตัวเลขเดียวกับหน้าเว็บที่ลูกค้าใช้อยู่ ────────────────────────
+// ตัวเลขในชุดนี้คัดจากหน้าเว็บของเขาวันที่ 27 กันยายน 2569 — ถ้าหน้าจอเราเพี้ยน
+// จากนี้ คนของเขาที่อ่านคู่มือสองที่พร้อมกันจะเห็นเลขไม่ตรง
+suite('3. คำและตัวเลขเดียวกับระบบที่ลูกค้าใช้จริง');
+{
+  await as(A);
+  const t = await body();
+  happy('แถบหัวโมดูลเป็นคำและโครงของเขา',
+    /STANDARD OPERATING PROCEDURE/i.test(t) && t.includes('VCB Group')
+      && t.includes('กลุ่มวิจิตรภัณฑ์ก่อสร้าง · ระเบียบปฏิบัติงานมาตรฐาน'),
+    t.slice(0, 110).replace(/\n/g, ' | '));
+  happy('บอกเวอร์ชันและวันที่มีผล', t.includes('เวอร์ชัน:') && t.includes('มีผล:'), '');
+  happy('บรรทัดนับผลลัพธ์เป็นรูปแบบของเขา (แสดง n จาก N กรณี)', /แสดง\s*33\s*จาก\s*33\s*กรณี/.test(t), '');
+  happy('เมนูซ้ายมีสามกลุ่มของเขา',
+    t.includes('กรณีเฉพาะ') && t.includes('Case Studies · ตามหมวด')
+      && t.includes('Process Flow ทุกขั้นตอน') && t.includes('เมนูเรียกรายงานสำคัญ'), '');
+  happy('มีวิธีใช้สามขั้นบนหน้าแรก',
+    t.includes('เลือกหมวด (ซ้าย)') && t.includes('เลือกกรณี (กลาง)') && t.includes('อ่านรายละเอียด (ขวา)'), '');
+  happy('หัวข้อวัตถุประสงค์ใช้คำของเขา', t.includes('วัตถุประสงค์และขอบเขต · Purpose & Scope'), '');
+  happy('ช่องค้นหาใช้ตัวอย่างชุดเดียวกับเขา',
+    await page.evaluate(() => [...document.querySelectorAll('input')]
+      .some((i) => (i.placeholder || '').includes('น้ำมัน, Advance, PO, เช็ค, โอนเงิน'))), '');
+
+  // ชิปหมวดของเขานับกรณีที่ถูกแท็กเข้าหมวดนั้นด้วย ไม่ใช่เฉพาะหมวดหลัก
+  const WANT = { PO: 12, IC: 8, AP: 16, FA: 7, PM: 6, OF: 10, GL: 11, AR: 10, BD: 2, FIN: 1, SE: 8 };
+  const chips = await page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('[data-mod]')].map((el) => [el.dataset.mod, Number(el.dataset.count)])));
+  const wrongChips = Object.entries(WANT).filter(([k, v]) => chips[k] !== v);
+  happy('จำนวนกรณีต่อหมวดในเมนูซ้ายตรงกับของเขาทั้ง 11 หมวด', wrongChips.length === 0,
+    `${JSON.stringify(chips)} ต่างที่ ${JSON.stringify(wrongChips)}`);
+  await shot('03-หน้าแรกและชิปหมวด');
+
+  // เปิดกรณี PO-1 จากรหัสแสดงผล — คนของเขาเรียกกรณีกันด้วยรหัสนี้
+  const opened = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')]
+      .find((x) => x.querySelector('.chip') && x.querySelector('.chip').textContent.trim() === 'PO-1');
+    if (b) { b.click(); return true; } return false;
+  });
+  happy('การ์ดกรณีขึ้นรหัสแสดงผลรายหมวด (PO-1)', opened, '');
+  await settle(2600);
+  const d = await body();
+  happy('คำบนหน้ารายละเอียดเป็นคำของเขา',
+    d.includes('ปัญหา / สถานการณ์ · PROBLEM') && d.includes('แนวทางปฏิบัติ · SOLUTION (SOP)'), '');
+  happy('มีหัวข้อเอกสารที่เกี่ยวข้อง และบอกวันที่เพิ่ม/อ้างอิง',
+    d.includes('เอกสารที่เกี่ยวข้อง') && d.includes('วันที่เพิ่ม:') && d.includes('อ้างอิง (Reference)'), '');
+  happy('ปุ่มบนหน้ารายละเอียดใช้คำของเขา', d.includes('แก้ไข · Edit') && d.includes('ลบ · Delete'), '');
+  await shot('04-รายละเอียดกรณี');
+
+  happy('เปิดแท็บวิธีเรียก Report ได้', await clickText('วิธีเรียก Report'), '');
+  await settle(2400);
+  const r = await body();
+  happy('หัวคอลัมน์ตารางรายงานเป็นคำของเขา',
+    r.includes('ต้องการตรวจสอบอะไร') && r.includes('เมนูที่ใช้ · Menu Path'), '');
+  await shot('05-วิธีเรียก Report');
+
+  happy('เปิดแท็บผังกระบวนการได้', await clickText('ผังกระบวนการ'), '');
+  await settle(3000);
+  const f = await body();
+  happy('หัวข้อผังใช้คำของเขา', f.includes('ผังกระบวนการ · Process Flows'), '');
+  happy('ผังมีคำบรรยายขั้นตอน (เพิ่งนำเข้าครบ 33 ผัง)', f.includes('รายละเอียดขั้นตอน · PROCESS'), '');
+  // » และ ! เป็นวิธีเก็บระดับของบรรทัด ไม่ใช่ตัวอักษรที่คนต้องอ่าน
+  bad('คำบรรยายไม่โชว์เครื่องหมาย » ให้คนอ่าน', !/(^|\n)\s*»/.test(f), '');
+  await shot('06-ผังกระบวนการ');
+}
+
+// ── 4. ผู้ที่ไม่มีสิทธิ์แก้ไขไม่เห็นแท็บประวัติ ───────────────────────────
+suite('4. ประวัติเวอร์ชันเปิดให้เฉพาะผู้แก้ไข');
 {
   await as(H);
   const t = await body();
   bad('ผู้ที่ไม่มีสิทธิ์แก้ไขไม่เห็นแท็บประวัติเวอร์ชัน', !t.includes('ประวัติเวอร์ชัน'), '');
-  happy('แต่ยังอ่านคู่มือได้ตามปกติ', t.includes('กรณีศึกษา'), '');
+  happy('แต่ยังอ่านคู่มือได้ตามปกติ', t.includes('กรณีเฉพาะ'), '');
   await shot('03-ไม่มีสิทธิ์แก้');
 }
 
-// ── 4. แก้ไขคู่มือแล้วเกิดเวอร์ชัน ────────────────────────────────────────
-suite('4. แก้ไขคู่มือแล้วประวัติบันทึกให้เอง');
+// ── 5. แก้ไขคู่มือแล้วเกิดเวอร์ชัน ────────────────────────────────────────
+suite('5. แก้ไขคู่มือแล้วประวัติบันทึกให้เอง');
 {
   // สร้างผ่าน API เพราะฟอร์มสร้างเคสมีหลายขั้น — ที่ต้องพิสูจน์คือหน้าประวัติ
   const mods = (await call('/sop/bootstrap', { user: A })).data.modules;
@@ -130,8 +200,8 @@ suite('4. แก้ไขคู่มือแล้วประวัติบ�
   await shot('04-ประวัติเวอร์ชัน');
 }
 
-// ── 5. ลบแล้วกู้คืนจากหน้าจอ ──────────────────────────────────────────────
-suite('5. ลบกรณีศึกษาแล้วกู้คืนกลับได้จากหน้าจอ');
+// ── 6. ลบแล้วกู้คืนจากหน้าจอ ──────────────────────────────────────────────
+suite('6. ลบกรณีเฉพาะแล้วกู้คืนกลับได้จากหน้าจอ');
 {
   const list = (await call('/sop/scenarios', { user: A })).data || [];
   const mine = list.find((x) => String(x.title_th).startsWith(MARK));
@@ -142,16 +212,24 @@ suite('5. ลบกรณีศึกษาแล้วกู้คืนกล�
 
   await as(A);
   await clickText('ประวัติเวอร์ชัน');
-  await settle(2600);
-  // กู้คืนเวอร์ชันที่เก็บไว้ "ก่อนลบ" — แถวที่โน้ตว่าลบกรณีศึกษาออก
-  const clicked = await page.evaluate(() => {
-    const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes('ลบกรณีศึกษาออก'));
-    const b = row && [...row.querySelectorAll('button')].find((x) => x.innerText.trim() === 'กู้คืน');
-    if (b) { b.click(); return true; } return false;
-  });
+  // รอให้ตารางประวัติมาจริง แทนการนับวินาที — ตารางดึงเวอร์ชัน 50 ชุดมาวาด
+  // ช้าเร็วไม่เท่ากันตามโหลดของเซิร์ฟเวอร์
+  let clicked = false;
+  for (let i = 0; i < 30 && !clicked; i += 1) {
+    // กู้คืนเวอร์ชันที่เก็บไว้ "ก่อนลบ" — แถวที่โน้ตว่าลบกรณีศึกษาออก
+    clicked = await page.evaluate(() => {
+      const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes('ลบกรณีศึกษาออก'));
+      const b = row && [...row.querySelectorAll('button')].find((x) => x.innerText.trim() === 'กู้คืน');
+      if (b) { b.click(); return true; } return false;
+    });
+    if (!clicked) await settle(400);
+  }
   happy('พบแถวที่เก็บไว้ก่อนลบ และกดกู้คืนได้', clicked, '');
-  await settle(1600);
-  const dlg = await body();
+  let dlg = '';
+  for (let i = 0; i < 20 && !dlg.includes('กู้คืนคู่มือกลับไปเป็นเวอร์ชันนี้'); i += 1) {
+    await settle(300);
+    dlg = await body();
+  }
   happy('ถามยืนยันก่อนกู้คืน', dlg.includes('กู้คืนคู่มือกลับไปเป็นเวอร์ชันนี้'), '');
   happy('บอกด้วยว่ากู้ผิดเวอร์ชันก็ย้อนกลับได้', dlg.includes('ย้อนกลับได้อีก'), '');
   await shot('05-ยืนยันกู้คืน');
@@ -169,18 +247,29 @@ suite('5. ลบกรณีศึกษาแล้วกู้คืนกล�
   await shot('06-กู้คืนแล้ว');
 }
 
-// ── 6. ปุ่มยืนยันสีถูกต้อง ────────────────────────────────────────────────
-suite('6. กล่องยืนยันการกู้คืนไม่ใช่สีแดง');
+// ── 7. ปุ่มยืนยันสีถูกต้อง ────────────────────────────────────────────────
+suite('7. กล่องยืนยันการกู้คืนไม่ใช่สีแดง');
 {
   await as(A);
   await clickText('ประวัติเวอร์ชัน');
-  await settle(2400);
+  // รอให้ตารางเวอร์ชันมาจริงแล้วค่อยกด แทนการนับวินาที — ตารางโหลดช้าเร็วไม่เท่ากัน
+  // และถ้ากดตอนยังไม่มีปุ่ม ชุดนี้จะฟ้องว่าสีปุ่มผิดทั้งที่ยังไม่มีกล่องให้ดูสี
+  let hasRestore = false;
+  for (let i = 0; i < 25 && !hasRestore; i += 1) {
+    hasRestore = await page.evaluate(() =>
+      [...document.querySelectorAll('button')].some((x) => x.innerText.trim() === 'กู้คืน'));
+    if (!hasRestore) await settle(400);
+  }
+  happy('หน้าประวัติเวอร์ชันโหลดปุ่มกู้คืนมาแล้ว', hasRestore, '');
   await page.evaluate(() => {
     const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'กู้คืน');
     if (b) b.click();
   });
-  await settle(1500);
-  const colors = await dialogButtons(page);
+  let colors = [];
+  for (let i = 0; i < 20 && !colors.some((c) => c.text === 'กู้คืน'); i += 1) {
+    colors = await dialogButtons(page);
+    if (!colors.some((c) => c.text === 'กู้คืน')) await settle(300);
+  }
   const go = colors.find((c) => c.text === 'กู้คืน');
   // กู้คืนไม่ใช่การทำลาย ปุ่มเดินหน้าจึงต้องเป็นสีเขียว ไม่ใช่แดง
   happy('ปุ่มกู้คืนเป็นสีเขียว ไม่ใช่แดง',
@@ -189,10 +278,10 @@ suite('6. กล่องยืนยันการกู้คืนไม่�
   await settle(1200);
 }
 
-suite('7. ไม่มีข้อผิดพลาดซ่อนอยู่');
+suite('8. ไม่มีข้อผิดพลาดซ่อนอยู่');
 bad('ไม่มี error บนหน้าจอตลอดการทดสอบ', errors.length === 0, errors.slice(0, 3).join(' | '));
 
-suite('8. ไม่ทิ้งข้อมูลทดสอบไว้');
+suite('9. ไม่ทิ้งข้อมูลทดสอบไว้');
 {
   await clean();
   const left = ((await call('/sop/scenarios', { user: A })).data || [])

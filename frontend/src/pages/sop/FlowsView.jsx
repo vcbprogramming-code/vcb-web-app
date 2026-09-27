@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { sopApi, toneOf } from '../../lib/sop.js';
 import Spinner from '../../components/Spinner.jsx';
+import Icon from '../../components/Icon.jsx';
 import Swimlane from './Swimlane.jsx';
 import ShareButton from './ShareButton.jsx';
 import { useT } from '../../lib/i18n.jsx';
 
-/** Process flows: pick a document on the left, read its swimlane on the right. */
-export default function FlowsView({ module, sharedId }) {
+/** ผังกระบวนการ: เลือกผังทางซ้าย อ่านผังทางขวา — ค้นหาจากแถบหัวโมดูลอันเดียว */
+export default function FlowsView({ module, q = '', sharedId, total }) {
   const t = useT();
   const [list, setList] = useState(null);
   const [err, setErr] = useState(null);
@@ -27,6 +28,17 @@ export default function FlowsView({ module, sharedId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [module]);
 
+  // ค้นหาในผังทำฝั่งหน้าจอ — ข้อมูลทั้ง 33 ผังโหลดมาแล้วทั้งก้อน
+  const shown = useMemo(() => {
+    if (!list) return null;
+    const needle = q.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter((f) => [
+      f.id, f.title_th, f.title_en, (f.narrative || []).join(' '),
+      (f.nodes || []).map((n) => n.label).join(' '),
+    ].join(' ').toLowerCase().includes(needle));
+  }, [list, q]);
+
   if (err) {
     return (
       <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -34,45 +46,62 @@ export default function FlowsView({ module, sharedId }) {
       </div>
     );
   }
-  if (!list) return <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดผังกระบวนการ…')} /></div>;
-  if (list.length === 0) {
-    return <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">{t('ยังไม่มีผังกระบวนการในหมวดนี้')}</p>;
-  }
+  if (!shown) return <div className="flex justify-center py-12"><Spinner label={t('กำลังโหลดผังกระบวนการ…')} /></div>;
 
-  const flow = list.find((f) => f.id === openId) || list[0];
+  const flow = shown.find((f) => f.id === openId) || shown[0];
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,300px)_1fr]">
-      {/* below xl the sidebar of 33 flows would bury the diagram — pick from a
-          dropdown instead */}
-      <select value={flow.id} onChange={(e) => setOpenId(e.target.value)} aria-label={t('เลือกผังกระบวนการ')} className="field xl:hidden">
-        {list.map((f) => <option key={f.id} value={f.id}>{f.id} · {f.title_th}</option>)}
-      </select>
-
-      <div className="hidden max-h-[70vh] space-y-1.5 overflow-y-auto pr-1 xl:block">
-        {list.map((f) => (
-          <button key={f.id} onClick={() => setOpenId(f.id)}
-            className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
-              flow.id === f.id ? 'border-brand bg-brand-tint' : 'border-slate-200 bg-white hover:border-slate-300'
-            }`}>
-            <span className={`chip ${toneOf(f.module)}`}>{f.id}</span>
-            <div className="mt-1 text-sm font-medium text-slate-800">{f.title_th}</div>
-            {f.title_en && <div className="truncate text-[11px] text-slate-500">{f.title_en}</div>}
-          </button>
-        ))}
+    <div className="space-y-3">
+      <div>
+        <h3 className="flex items-center gap-1.5 text-lg font-bold text-slate-800">
+          <Icon name="flow" className="h-5 w-5 text-slate-400" /> {t('ผังกระบวนการ · Process Flows')}
+          <span className="text-sm font-normal text-slate-500">
+            · {t('แสดง {n} จาก {total} ผัง', { n: shown.length, total: total ?? shown.length })}
+          </span>
+        </h3>
+        <p className="mt-0.5 text-sm text-slate-500">
+          {t('แผนผังขั้นตอนการทำงานในระบบ ERP แยกตามโมดูล เลือกผังจากรายการเพื่อดูลำดับขั้นตอนและผู้รับผิดชอบในแต่ละขั้น')}
+        </p>
       </div>
 
-      <div className="min-w-0 space-y-3">
-        <header className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <span className={`chip ${toneOf(flow.module)}`}>{flow.id}</span>
-            <h3 className="mt-2 text-lg font-bold text-slate-800">{flow.title_th}</h3>
-            {flow.title_en && <p className="text-sm text-slate-500">{flow.title_en}</p>}
+      {shown.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-500">
+          {t('ไม่พบรายการที่ค้นหา')}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+          {/* below xl the sidebar of 33 flows would bury the diagram — pick from a
+              dropdown instead */}
+          <select value={flow.id} onChange={(e) => setOpenId(e.target.value)} aria-label={t('เลือกผังกระบวนการ')} className="field xl:hidden">
+            {shown.map((f) => <option key={f.id} value={f.id}>{f.id} · {f.title_th}</option>)}
+          </select>
+
+          <div className="hidden max-h-[74vh] space-y-1.5 overflow-y-auto pr-1 xl:block">
+            {shown.map((f) => (
+              <button key={f.id} onClick={() => setOpenId(f.id)}
+                className={`w-full rounded-xl border px-3 py-2.5 text-left transition ${
+                  flow.id === f.id ? 'border-navy ring-1 ring-navy/30' : 'border-slate-200 hover:border-slate-300'
+                } bg-white`}>
+                <span className={`chip font-semibold ${toneOf(f.module)}`}>{f.id}</span>
+                <div className="mt-1 text-sm font-bold leading-snug text-slate-800">{f.title_th}</div>
+                {f.title_en && <div className="truncate text-[11px] text-slate-500">{f.title_en}</div>}
+              </button>
+            ))}
           </div>
-          <ShareButton param="flow" value={flow.id} className="shrink-0" />
-        </header>
-        <Swimlane key={flow.id} flow={flow} />
-      </div>
+
+          <div className="min-w-0 space-y-3">
+            <header className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className={`chip font-semibold ${toneOf(flow.module)}`}>{flow.id}</span>
+                <h3 className="mt-2 text-lg font-bold text-slate-800">{flow.title_th}</h3>
+                {flow.title_en && <p className="text-sm text-slate-500">{flow.title_en}</p>}
+              </div>
+              <ShareButton param="flow" value={flow.id} className="shrink-0" />
+            </header>
+            <Swimlane key={flow.id} flow={flow} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

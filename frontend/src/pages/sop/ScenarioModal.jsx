@@ -51,7 +51,7 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
 
   const save = async (e) => {
     e?.preventDefault();
-    if (!form.titleTh.trim()) { toast.error(t('กรุณากรอกชื่อกรณีศึกษา')); return; }
+    if (!form.titleTh.trim()) { toast.error(t('กรุณากรอกชื่อกรณีเฉพาะ')); return; }
     if (!form.module) { toast.error(t('กรุณาเลือกหมวดงาน')); return; }
     setBusy(true);
     try {
@@ -69,7 +69,7 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
       let created = null;
       if (editing) await sopApi.updateScenario(item.no, body);
       else created = (await sopApi.createScenario(body)).data?.no ?? null;
-      toast.success(editing ? 'บันทึกกรณีศึกษาแล้ว' : 'เพิ่มกรณีศึกษาแล้ว');
+      toast.success(editing ? t('บันทึกกรณีเฉพาะแล้ว') : t('เพิ่มกรณีเฉพาะแล้ว'));
       onSaved(created);
       return;
     } catch (err) { toast.error(err.message); }
@@ -77,7 +77,7 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
   };
 
   return (
-    <Modal title={editing ? `แก้ไขกรณีศึกษา ${item.display_no || ''}` : 'เพิ่มกรณีศึกษา'} onClose={onClose} size="2xl"
+    <Modal title={editing ? `${t('แก้ไขกรณีเฉพาะ')} ${item.display_no || ''}` : t('เพิ่มกรณีใหม่')} onClose={onClose} size="2xl"
       footer={<>
         <button onClick={onClose} className="btn-outline">{t('ยกเลิก')}</button>
         <button onClick={save} disabled={busy} className="btn-primary"><BusyLabel busy={busy} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel></button>
@@ -91,7 +91,7 @@ export default function ScenarioModal({ item, modules, onClose, onSaved }) {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อกรณีศึกษา (ไทย) *')}</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('ชื่อกรณีเฉพาะ (ไทย) *')}</label>
             <input value={form.titleTh} onChange={(e) => set('titleTh', e.target.value)} placeholder={t('เช่น กรณีการทำใบลดยอด PO…')} className="field" />
           </div>
         </div>

@@ -16,26 +16,57 @@ router.use(requireAuth);
 const canView = requirePermission('sop', 'view');
 const canEdit = requirePermission('sop', 'edit');
 
-/** 'PO-3' — derived per module from sort_order, so deleting/reordering can't
- *  leave stale numbers behind. Recomputed on every read, like the source app. */
+/**
+ * 'PO-3' — รหัสแสดงผลรายหมวดที่ระบบจริงของลูกค้าใช้เรียกกรณีกันในที่ทำงาน
+ *
+ * ค่าจริงเก็บไว้ในคอลัมน์ display_no (นำเข้าตรงจากระบบเขา) ตรงนี้เป็นตัวสำรอง
+ * เผื่อแถวไหนยังไม่มีค่า — คำนวณจากตำแหน่งในหมวดแบบเดียวกับที่ renumberModule
+ * เขียนลงฐานข้อมูล ทั้งสองทางจึงได้เลขเดียวกันเสมอ
+ */
 function withDisplayNo(rows) {
   const seen = new Map();
   return rows.map((r) => {
     const n = (seen.get(r.module) || 0) + 1;
     seen.set(r.module, n);
-    return { ...r, display_no: `${r.module}-${n}` };
+    return { ...r, display_no: r.display_no || `${r.module}-${n}` };
   });
+}
+
+/**
+ * เขียนรหัสแสดงผลของทั้งหมวดใหม่ตามตำแหน่งปัจจุบัน
+ *
+ * รหัสเป็นป้ายบอกตำแหน่ง ลบ PO-2 ออกแล้ว PO-3 ต้องเลื่อนขึ้นมาเป็น PO-2
+ * ระบบของเขาคำนวณใหม่ทุกครั้งที่อ่าน ของเราเก็บเป็นคอลัมน์ (หน้าจอและชุดทดสอบ
+ * อ่านจากคอลัมน์ได้ตรง ๆ) จึงต้องเขียนใหม่ทุกครั้งที่ลำดับในหมวดขยับ
+ */
+async function renumberModule(runner, module) {
+  if (!module) return;
+  await runner.query(
+    `update sop_scenarios s
+        set display_no = $1::text || '-' || x.rn::text
+       from (select no, row_number() over (order by sort_order, no) as rn
+               from sop_scenarios where module = $1) x
+      where s.no = x.no
+        and coalesce(s.display_no, '') <> $1::text || '-' || x.rn::text`,
+    [module]
+  );
 }
 
 /** Scenarios ordered the way display numbers are assigned (module, then position). */
 async function allScenariosOrdered() {
   const { rows } = await query(
-    `select no, module, sort_order, title_th, title_en, problem, ref, note, date_added
+    `select no, module, display_no, sort_order, title_th, title_en, problem, ref, note, date_added
        from sop_scenarios
       order by module, sort_order, no`
   );
   return withDisplayNo(rows);
 }
+
+/** เลขท้ายของรหัสแสดงผล ('PO-12' → 12) ใช้เรียงกรณีในหมวดให้เหมือนของเขา */
+const displayIndex = (r) => {
+  const m = /-(\d+)$/.exec(r.display_no || '');
+  return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+};
 
 // ── ประวัติเวอร์ชัน ─────────────────────────────────────────────────────────
 
@@ -98,19 +129,32 @@ async function insertMany(client, table, cols, rows, tail = '') {
 
 /** GET /api/sop/bootstrap — modules, doc meta and per-module counts. */
 router.get('/bootstrap', canView, asyncHandler(async (req, res) => {
-  const [mods, meta, sc, fl, rp] = await Promise.all([
+  const [mods, meta, sc, fl, rp, tot] = await Promise.all([
     query('select code, name_th_short, name_en_short, name_th, name_en, desc_th, desc_en from sop_modules order by sort_order, code'),
     queryOne('select title, subtitle, manual, version, effective, scope, purpose, notes, updated_at from sop_meta where id = true'),
-    query('select module, count(*)::int as n from sop_scenarios group by module'),
+    // จำนวนกรณีต่อหมวดต้องนับหมวดเสริมด้วย เพราะรายการของหมวดนั้นก็แสดงกรณีที่ถูก
+    // แท็กมา (เช่น AP มีกรณีหลัก 6 แต่ถูกแท็กเข้ามาอีก 10 → ชิปต้องขึ้น 16
+    // เหมือนระบบจริง) ก่อนหน้านี้นับเฉพาะหมวดหลัก ตัวเลขบนชิปจึงน้อยกว่าจำนวน
+    // แถวที่กดเข้าไปแล้วเห็น และ AR/FIN ที่ไม่มีกรณีหลักเลยขึ้นเป็น 0 ทั้งที่กดได้
+    query(`select module, count(distinct no)::int as n from (
+             select no, module from sop_scenarios
+             union
+             select scenario_no as no, module from sop_scenario_modules
+           ) x group by module`),
     query('select module, count(*)::int as n from sop_flows group by module'),
     query('select count(*)::int as n from sop_reports'),
+    query('select (select count(*) from sop_scenarios)::int as sc, (select count(*) from sop_flows)::int as fl'),
   ]);
   const byMod = (rows) => Object.fromEntries(rows.rows.map((r) => [r.module, r.n]));
   res.json({
     data: {
       modules: mods.rows,
       meta: meta || null,
-      counts: { scenarios: byMod(sc), flows: byMod(fl), reports: rp.rows[0]?.n || 0 },
+      // scenarioTotal แยกส่งมาเพราะบวกชิปต่อหมวดไม่ได้ — กรณีที่แท็กหลายหมวดถูกนับซ้ำ
+      counts: {
+        scenarios: byMod(sc), flows: byMod(fl), reports: rp.rows[0]?.n || 0,
+        scenarioTotal: tot.rows[0]?.sc || 0, flowTotal: tot.rows[0]?.fl || 0,
+      },
       canEdit: req.profile.role === 'admin' || req.profile.permissions?.sop?.edit === true,
     },
   });
@@ -128,7 +172,16 @@ router.get('/scenarios', canView, asyncHandler(async (req, res) => {
   for (const t of tags) extraBy.set(t.scenario_no, [...(extraBy.get(t.scenario_no) || []), t.module]);
   rows = rows.map((r) => ({ ...r, extra_modules: extraBy.get(r.no) || [] }));
 
-  if (mod) rows = rows.filter((r) => r.module === mod || r.extra_modules.includes(mod));
+  // รหัสแสดงผลคิดจากลำดับในหมวด แต่รายการ "ทั้งหมด" ของเขาเรียงตามเลขกรณี
+  // (เปิดมาเจอ PO-1 เป็นใบแรก ไม่ใช่ AP-1 ที่มาก่อนเพราะเรียงตามตัวอักษรของหมวด)
+  rows.sort((a, b) => a.no - b.no);
+  if (mod) {
+    rows = rows.filter((r) => r.module === mod || r.extra_modules.includes(mod));
+    // ในหมวดหนึ่ง กรณีที่หมวดนี้เป็นหมวดหลักขึ้นก่อนเรียงตามรหัสแสดงผล (PO-1, PO-2…)
+    // แล้วจึงกรณีที่ถูกแท็กมาจากหมวดอื่น — ลำดับเดียวกับระบบจริง
+    const primaries = rows.filter((r) => r.module === mod).sort((a, b) => displayIndex(a) - displayIndex(b));
+    rows = [...primaries, ...rows.filter((r) => r.module !== mod)];
+  }
   if (q) {
     const { rows: hits } = await query(
       `select distinct s.no from sop_scenarios s
@@ -274,6 +327,7 @@ router.post('/scenarios', canEdit, asyncHandler(async (req, res) => {
       [no, f.module, so[0].s, f.titleTh, f.titleEn || null, f.problem, f.ref || null, f.note || null, f.dateAdded || null]
     );
     await writeChildren(client, no, f.steps || [], f.extraModules || [], f.module, f.attachments || []);
+    await renumberModule(client, f.module);   // กรณีใหม่ได้รหัสถัดไปของหมวด เช่น PO-4
     await client.query('commit');
     res.status(201).json({ data: { no } });
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
@@ -303,6 +357,17 @@ router.patch('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
       await client.query(`update sop_scenarios set ${sets.join(', ')} where no = $${vals.length}`, vals);
     }
     await writeChildren(client, no, f.steps, f.extraModules, f.module || cur.module, f.attachments);
+    // ย้ายหมวด = รหัสแสดงผลต้องเปลี่ยนทั้งหมวดที่ออกและหมวดที่เข้า
+    if (f.module && f.module !== cur.module) {
+      await client.query(
+        `update sop_scenarios set sort_order =
+           coalesce((select max(sort_order) from sop_scenarios where module = $1 and no <> $2), 0) + 1
+          where no = $2`,
+        [f.module, no]
+      );
+      await renumberModule(client, cur.module);
+    }
+    await renumberModule(client, f.module || cur.module);
     await client.query('commit');
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
   res.json({ data: { no } });
@@ -313,8 +378,9 @@ router.delete('/scenarios/:no', canEdit, asyncHandler(async (req, res) => {
   const no = Number(req.params.no);
   if (!Number.isInteger(no)) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
   // steps/tags cascade; reports keep their row but lose the link (set null)
-  const row = await queryOne('delete from sop_scenarios where no = $1 returning no', [no]);
+  const row = await queryOne('delete from sop_scenarios where no = $1 returning no, module', [no]);
   if (!row) throw new ApiError(404, 'ไม่พบกรณีศึกษา');
+  await renumberModule({ query }, row.module);  // ลบ PO-2 แล้ว PO-3 เลื่อนขึ้นเป็น PO-2
   res.json({ data: { deleted: true } });
 }));
 
@@ -340,6 +406,7 @@ router.post('/scenarios/:no/move', canEdit, asyncHandler(async (req, res) => {
     await client.query('begin');
     await client.query('update sop_scenarios set sort_order = $1 where no = $2', [neighbour.sort_order, me.no]);
     await client.query('update sop_scenarios set sort_order = $1 where no = $2', [me.sort_order, neighbour.no]);
+    await renumberModule(client, me.module);   // รหัสแสดงผลเป็นป้ายบอกตำแหน่ง จึงสลับตามไปด้วย
     await client.query('commit');
   } catch (e) { await client.query('rollback'); throw e; } finally { client.release(); }
   res.json({ data: { moved: true } });
@@ -441,9 +508,16 @@ router.post('/versions/:id/restore', canEdit, asyncHandler(async (req, res) => {
       await client.query(`delete from ${t}`);
     }
     await insertMany(client, 'sop_scenarios',
-      ['no', 'module', 'sort_order', 'title_th', 'title_en', 'problem', 'ref', 'note', 'date_added'],
-      (d.scenarios || []).map((r) => [r.no, r.module, r.sort_order, r.title_th, r.title_en,
+      ['no', 'module', 'display_no', 'sort_order', 'title_th', 'title_en', 'problem', 'ref', 'note', 'date_added'],
+      (d.scenarios || []).map((r) => [r.no, r.module, r.display_no ?? null, r.sort_order, r.title_th, r.title_en,
         r.problem, r.ref, r.note, r.date_added]));
+    // เวอร์ชันที่เก็บไว้ก่อนมีคอลัมน์รหัสแสดงผลจะไม่มีค่ามาด้วย — เติมจากตำแหน่งใน
+    // หมวด เฉพาะแถวที่ว่าง ส่วนแถวที่เวอร์ชันนั้นมีค่าอยู่แล้วให้คืนค่าเดิมตามที่เก็บไว้
+    await client.query(
+      `update sop_scenarios s set display_no = s.module || '-' || x.rn::text
+         from (select no, row_number() over (partition by module order by sort_order, no) as rn
+                 from sop_scenarios) x
+        where s.no = x.no and s.display_no is null`);
     // เวอร์ชันที่เก็บก่อนมีระดับขั้นตอนไม่มี style — เดาจาก is_substep แบบเดียวกับตอนย้ายข้อมูล
     await insertMany(client, 'sop_scenario_steps',
       ['scenario_no', 'step_order', 'is_substep', 'style', 'text'],
@@ -455,10 +529,14 @@ router.post('/versions/:id/restore', canEdit, asyncHandler(async (req, res) => {
     await insertMany(client, 'sop_reports',
       ['id', 'case_no', 'scenario_text', 'report_path', 'sort_order'],
       (d.reports || []).map((r) => [r.id, r.case_no, r.scenario_text, r.report_path, r.sort_order]));
+    // narrative ต้องอยู่ในรายการคอลัมน์ด้วย — เคยตกไป การกู้คืนครั้งเดียวจึงลบคำ
+    // บรรยายขั้นตอนของทั้ง 33 ผังทิ้ง (คอลัมน์มีค่าเริ่มต้นเป็นอาเรย์ว่าง จึงไม่มี
+    // error ให้เห็น) เวอร์ชันที่เก็บไว้เก็บ narrative มาด้วยอยู่แล้วเพราะอ่านด้วย select *
     await insertMany(client, 'sop_flows',
-      ['id', 'module', 'title_th', 'title_en', 'sort_order', 'lanes', 'nodes', 'edges'],
+      ['id', 'module', 'title_th', 'title_en', 'sort_order', 'lanes', 'nodes', 'edges', 'narrative'],
       (d.flows || []).map((r) => [r.id, r.module, r.title_th, r.title_en, r.sort_order,
-        JSON.stringify(r.lanes ?? []), JSON.stringify(r.nodes ?? []), JSON.stringify(r.edges ?? [])]));
+        JSON.stringify(r.lanes ?? []), JSON.stringify(r.nodes ?? []), JSON.stringify(r.edges ?? []),
+        Array.isArray(r.narrative) ? r.narrative : []]));
     // ลำดับ id ของ sop_reports เป็น serial — ดันให้พ้นค่าที่เพิ่งเขียนกลับไป
     // ไม่งั้นการเพิ่มรายงานถัดไปจะชนกับ id ที่กู้คืนมา
     await client.query(

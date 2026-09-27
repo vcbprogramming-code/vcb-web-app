@@ -47,6 +47,55 @@ suite('1. ข้อมูลแผนผังที่นำเข้ามา'
   happy('มีฟังก์ชันที่ทำที่หน้างานติดธงไว้', f.data.some((r) => r.at_site), '');
   const ai = await call('/sysmap/ai', { user: A });
   happy('รายการโอกาสใช้ AI ครบ', ai.status === 200 && ai.data.length >= 35, `${ai.data?.length}`);
+
+  // ── เทียบกับระบบจริง (Index.html v8.86) ────────────────────────────────
+  // ทะเบียนของเขามี 8 กลุ่ม กลุ่มที่แปดคือ site ซึ่งไม่ใช่แผนก จึงไม่ได้อยู่ใน
+  // ตารางแผนก (ยังต้องเป็น 7 แผนกเท่าเดิม) แต่ต้องกรองและแสดงชื่อไทยได้
+  const site = f.data.filter((r) => r.dept === 'site');
+  happy('มีกลุ่มฟังก์ชันหน้างานครบ 18 แถว', site.length === 18, `${site.length}`);
+  happy('จำนวนแผนกไม่เปลี่ยน (หน้างานไม่ใช่แผนก)', b.data.depts.length === 7, `${b.data.depts.length}`);
+  happy('กลุ่มฟังก์ชันในทะเบียนมี 8 กลุ่ม',
+    new Set(f.data.map((r) => r.dept)).size === 8,
+    [...new Set(f.data.map((r) => r.dept))].join(','));
+
+  // โอกาส AI ต้องผูกกับกล่องงานได้ ไม่ใช่ลอยอยู่เฉย ๆ — แผงกล่องงานใช้ค่านี้
+  // ตัดสินว่าจะมีแท็บ "โอกาส AI" ให้กด
+  const ids = new Set(b.data.nodes.map((n) => n.id));
+  const bound = ai.data.filter((r) => r.node_id);
+  happy('โอกาสใช้ AI ผูกกับกล่องงานครบทุกรายการ', bound.length === ai.data.length, `${bound.length}/${ai.data.length}`);
+  bad('ไม่มีโอกาส AI ที่ผูกกับกล่องงานที่ไม่มีจริง',
+    bound.every((r) => ids.has(r.node_id)),
+    bound.filter((r) => !ids.has(r.node_id)).map((r) => r.key).slice(0, 3).join(', '));
+
+  // AI ระดับฟังก์ชัน: FUNCTION_AI + AI_REGISTRY_FNS ของเขา
+  const fa = b.data.functionAi || [];
+  const codes = new Set(f.data.map((r) => r.code));
+  happy('นำเข้า AI ระดับฟังก์ชันแล้ว', fa.length >= 108, `${fa.length}`);
+  happy('มีรหัสที่ทะเบียนต้องติดชิป AI ให้', fa.filter((r) => r.in_registry).length >= 59,
+    `${fa.filter((r) => r.in_registry).length}`);
+  bad('ไม่มี AI ระดับฟังก์ชันที่ชี้ไปรหัสที่ไม่มีในทะเบียน',
+    fa.every((r) => codes.has(r.code)),
+    fa.filter((r) => !codes.has(r.code)).map((r) => r.code).slice(0, 3).join(', '));
+
+  // หน้าที่ที่เกี่ยวข้อง — ชิปรหัสฟังก์ชันใต้แผงกล่องงาน (NODE_FN ของเขา)
+  const nf = b.data.nodeFns || [];
+  happy('ผูกหน้าที่เข้ากับกล่องงานแล้ว', nf.length >= 177, `${nf.length}`);
+  happy('ทุกกล่องงานมีหน้าที่ที่เกี่ยวข้องอย่างน้อยหนึ่งรหัส',
+    new Set(nf.map((r) => r.node_id)).size === b.data.nodes.length,
+    `${new Set(nf.map((r) => r.node_id)).size}/${b.data.nodes.length}`);
+  bad('ไม่มีการผูกหน้าที่ไปยังกล่องงานที่ไม่มีจริง',
+    nf.every((r) => ids.has(r.node_id)),
+    nf.filter((r) => !ids.has(r.node_id)).map((r) => r.node_id).slice(0, 3).join(', '));
+  bad('ไม่มีการผูกหน้าที่ไปยังรหัสที่ไม่มีในทะเบียน',
+    nf.every((r) => codes.has(r.code)),
+    nf.filter((r) => !codes.has(r.code)).map((r) => r.code).slice(0, 3).join(', '));
+
+  // ชั้นการไหลของเอกสารหน้างาน — 7 ใบ อยู่คนละชั้น ไม่ปนกับ 79 กล่องงาน
+  const docs = b.data.docNodes || [];
+  happy('มีเอกสารหน้างานครบ 7 ใบ', docs.length === 7, `${docs.length}`);
+  happy('เอกสารหน้างานมีรหัสและบอกการส่งต่อ ERP',
+    docs.every((d) => d.code && d.erp_style), docs.filter((d) => !d.code).map((d) => d.id).join(', '));
+  bad('เอกสารหน้างานไม่ถูกนับรวมเป็นกล่องงาน', b.data.counts.nodes === 79, `${b.data.counts.nodes}`);
 }
 
 // ── 2. ใครเห็นได้ ใครแก้ได้ ────────────────────────────────────────────────

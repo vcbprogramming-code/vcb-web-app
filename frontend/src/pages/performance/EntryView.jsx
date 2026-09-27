@@ -57,7 +57,16 @@ export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, 
   // effect ที่ผูก listener ในตัวเลือกจะถอดแล้วติดใหม่ไม่หยุด และมีจังหวะที่กลืนคลิก
   // ที่ควรพาไปขั้นที่สอง — ข้อกำหนดฟังก์ชัน §3.2.3 ระบุจุดนี้ไว้ตรง ๆ
   const closePicker = useCallback(() => setPicker(null), []);
-  const [saveState, setSaveState] = useState('idle');   // idle | saving | saved | error
+  /**
+   * สถานะการบันทึก: idle | saving | saved | error
+   *
+   * ระบบจริงมีสถานะที่หกคือ "แก้ไขที่ยังไม่บันทึก" (dirty) เพราะของเขาเก็บการแก้
+   * ลงคิวแล้วค่อย flush ทีเดียว จึงมีช่วงที่ค่าอยู่บนจอแต่ยังไม่ได้ส่ง ของเรายิง
+   * คำขอทันทีที่เลือก ช่วงนั้นจึงไม่มีจริง — ใส่ป้ายไว้ก็ไม่มีทางได้แสดง (ลองแล้ว
+   * ด้วยการหน่วงคำขอ 3 วินาที ยังไม่โผล่ เพราะ React รวบ state ชุดเดียวกันก่อนวาด)
+   * เก็บการยิงทันทีไว้ดีกว่า เพราะปิดจอกลางทางแล้วไม่มีงานค้างหาย
+   */
+  const [saveState, setSaveState] = useState('idle');
   // ผู้ดูแลระบบต้องเปิดโหมดก่อนถึงจะแก้วันที่ล็อกแล้วได้ — กันแก้โดนโดยไม่ตั้งใจ
   const [unlocked, setUnlocked] = useState(false);
   const [showEmp, setShowEmp] = useState(false);
@@ -138,6 +147,8 @@ export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, 
       return next;
     };
     const prevValue = entries[eid]?.[date]?.[field] || null;
+    // ยิงคำขอทันที ไม่มีคิวรอ flush เหมือนระบบจริง จึงไม่มีช่วง "ค้างบนจอแต่ยัง
+    // ไม่ได้ส่ง" ให้รายงาน — ดูเหตุผลที่ไม่มีสถานะ dirty ได้ที่ useState ด้านบน
     setSaveState('saving');
     setEntries((prev) => applyField(prev, value));
     perfApi.saveCell({ site: siteKey, eid, date, field, value, adminUnlock: unlock })
@@ -155,7 +166,19 @@ export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, 
 
   if (loading) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลดข้อมูลไซต์งาน…')} /></div>;
   if (error) return <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>;
-  if (!siteKey) return <div className="card text-center text-sm text-slate-400">{t('เลือกไซต์งานด้านบนเพื่อเริ่มบันทึก')}</div>;
+  // ไม่มีหน่วยงานที่เลือกไว้ = หน้าว่างที่บอกทางออกสองทาง (เหมือนระบบจริง)
+  // หน้าว่างที่ไม่บอกอะไรอ่านเหมือนระบบเสีย
+  if (!siteKey) {
+    return (
+      <div className="card flex flex-col items-center gap-2 py-12 text-center">
+        <Icon name="card" className="h-8 w-8 text-slate-300" />
+        <h3 className="font-bold text-slate-700">{t('เลือกหน่วยงานเพื่อเริ่มบันทึก')}</h3>
+        <p className="max-w-lg text-sm text-slate-500">
+          {t('เลือกจากดรอปดาวน์ หน่วยงาน ด้านบน หรือกลับไปยัง แดชบอร์ด แล้วกด «เปิดบันทึก →» ในการ์ดของโครงการที่ต้องการ')}
+        </p>
+      </div>
+    );
+  }
   if (!base) return null;
 
   const { today, lockDays, days } = base;
@@ -170,28 +193,27 @@ export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, 
       {/* แถบสีประจำหน่วยงาน — เปิดสลับหลายหน่วยงานทั้งวันแล้วต้องรู้ได้ทันทีว่าอยู่ที่ไหน */}
       {siteColor && <div className="h-1 rounded-full" style={{ background: siteColor }} />}
       {/* sub-view toggle + manage employees + save state */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {/* ชื่อมุมมองตรงกับระบบจริง: ภาพรวม / รายอาทิตย์ — ไม่ชนกับแท็บใหญ่แล้ว
-              เพราะแท็บใหญ่เปลี่ยนไปใช้คำว่า "แดชบอร์ด" ตามระบบจริงเช่นกัน */}
-          {[['coverage', 'ภาพรวม'], ['week', 'รายอาทิตย์']].map(([k, label]) => (
-            <button key={k} onClick={() => setMode(k)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-              {t(label)}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <div className="mb-0.5 text-[11px] font-medium text-slate-400">{t('มุมมอง')}</div>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {/* ชื่อมุมมองตรงกับระบบจริง: ภาพรวม / รายอาทิตย์ — ไม่ชนกับแท็บใหญ่แล้ว
+                เพราะแท็บใหญ่เปลี่ยนไปใช้คำว่า "แดชบอร์ด" ตามระบบจริงเช่นกัน */}
+            {[['coverage', 'ภาพรวม'], ['week', 'รายอาทิตย์']].map(([k, label]) => (
+              <button key={k} onClick={() => setMode(k)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${mode === k ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {t(label)}
+              </button>
+            ))}
+          </div>
         </div>
         {canEdit && (
           <button onClick={() => setShowEmp(true)} className="btn-outline !py-1.5 !text-sm">
             <Icon name="people" className="h-4 w-4" /> {t('จัดการพนักงาน')}
           </button>
         )}
-        {/* ส่งออกตารางของไซต์และเดือนที่กำลังดูอยู่ — คนเอาไปทำสรุปต่อใน Excel */}
-        <a href={perfApi.entriesXlsxUrl({ site: siteKey, month: `${cur.y}-${String(cur.m).padStart(2, '0')}` })}
-          className="btn-outline !py-1.5 !text-sm"
-          title={t('ดาวน์โหลดตารางเดือนนี้เป็นไฟล์ Excel')}>
-          <Icon name="download" className="h-4 w-4" /> Excel
-        </a>
+        {/* ปุ่มส่งออก Excel อยู่ที่แถบด้านบนเพียงปุ่มเดียว — เดิมมีสองปุ่มที่เรียก
+            คนละเส้นทางและได้ไฟล์หน้าตาไม่เหมือนกัน คนจึงส่งไฟล์ผิดแบบให้ลูกค้า */}
         {/* โหมดแก้ย้อนหลังของผู้ดูแลระบบ — ปิดไว้เป็นค่าเริ่มต้น ต้องกดเปิดก่อนถึงแก้วันที่ล็อกแล้วได้ */}
         {isAdmin && canEdit && (
           <button onClick={() => setUnlocked((v) => !v)}

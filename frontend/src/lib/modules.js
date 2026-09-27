@@ -50,6 +50,8 @@ export const creditApi = {
   cashPlanVariance: (filters) => api(`/credit/cash-plan/variance${qs(filters)}`),
   costCategories: () => api('/credit/cost-categories'),
   addCostCategory: (name) => api('/credit/cost-categories', { method: 'POST', body: { name } }),
+  // เขียนทะเบียนหมวดทั้งชุดครั้งเดียว (ชื่อ + ลำดับ) — จอตั้งค่าแก้ทั้งรายการแล้วกดบันทึก
+  setCostCategories: (list) => api('/credit/cost-categories', { method: 'PUT', body: { list } }),
   categoryCaps: () => api('/credit/category-caps'),
   setCategoryCap: (body) => api('/credit/category-caps', { method: 'PUT', body }),
   costSummary: (filters) => api(`/credit/cost-summary${qs(filters)}`),

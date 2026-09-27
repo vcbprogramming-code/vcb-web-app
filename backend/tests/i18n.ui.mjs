@@ -65,8 +65,9 @@ suite('2. สลับเป็นอังกฤษ');
   await open('/', 'en');
   const en = await body();
   happy('หัวข้อเปลี่ยนเป็นอังกฤษ', en.includes('Applications'), '');
-  happy('ชื่อโมดูลเปลี่ยนเป็นอังกฤษ', en.includes('HR work log'), '');
-  happy('คำอธิบายโมดูลเปลี่ยนด้วย', en.includes('by site') || en.includes('each day'), '');
+  // ชื่อ/คำบรรยายการ์ดยกมาจากพจนานุกรมของระบบจริงแล้ว (I18N.en ของเขา)
+  happy('ชื่อโมดูลเปลี่ยนเป็นอังกฤษ', en.includes('HR Work Log'), '');
+  happy('คำอธิบายโมดูลเปลี่ยนด้วย', en.includes('timesheet') || en.includes('Attendance'), '');
   bad('ไม่เหลือคำที่แปลแล้วเป็นไทยค้าง', !en.includes('แอปพลิเคชัน'), '');
   await page.screenshot({ path: `${SHOTS}/2-อังกฤษ.png` });
 }

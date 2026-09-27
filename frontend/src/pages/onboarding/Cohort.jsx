@@ -43,10 +43,10 @@ export default function Cohort() {
                 <div className="text-xs text-slate-400">{r.email}</div>
               </td>
               <td className="tbl-td text-slate-600">{r.department || '—'}</td>
-              <td className="tbl-td text-slate-600">{r.track === 'senior' ? t('อาวุโส') : t('ต้น')}</td>
+              <td className="tbl-td text-slate-600">{r.track === 'senior' ? t('ซีเนียร์') : t('จูเนียร์')}</td>
               <td className="tbl-td">
                 <span className={`chip ${r.docsComplete ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                  {r.docsComplete ? t('ครบ') : t('ยังไม่ครบ')}
+                  {r.docsComplete ? t('เสร็จสมบูรณ์') : t('ยังไม่ครบ')}
                 </span>
               </td>
               <td className="tbl-td">

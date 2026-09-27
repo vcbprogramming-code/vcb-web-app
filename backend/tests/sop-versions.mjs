@@ -85,11 +85,23 @@ suite('3. กู้คืนได้ และการกู้คืนก็
     .some((x) => String(x.title_th).startsWith(`${MARK} กรณีทดสอบ`));
   happy('เนื้อหาที่กู้คืนเป็นของเดิมจริง', back, '');
 
+  // การกู้คืนเขียนคืนทั้งเอกสาร ทุกคอลัมน์ต้องกลับมาครบ — คำบรรยายขั้นตอนของผัง
+  // เคยหายทั้ง 33 ผังเพราะรายการคอลัมน์ตอนเขียนคืนตก narrative ไป และคอลัมน์มีค่า
+  // เริ่มต้นเป็นอาเรย์ว่าง จึงไม่มี error ให้เห็นเลย
+  const narr = (await call('/sop/flows', { user: A })).data || [];
+  happy('กู้คืนแล้วคำบรรยายขั้นตอนของผังยังอยู่ครบทุกผัง',
+    narr.length > 0 && narr.every((f) => Array.isArray(f.narrative) && f.narrative.length > 0),
+    `${narr.filter((f) => !f.narrative?.length).length} จาก ${narr.length} ผังคำบรรยายหาย`);
+
   // การกู้คืนเองก็ถูกเก็บภาพไว้ จึงย้อนกลับไปสถานะ "หลังลบ" ได้อีก
   const undo = (await call('/sop/versions', { user: A })).data.find((v) => String(v.note).startsWith('ก่อนกู้คืนเวอร์ชัน'));
   happy('การกู้คืนถูกเก็บเป็นเวอร์ชันด้วย', Boolean(undo), '');
   await call(`/sop/versions/${undo.id}/restore`, { method: 'POST', user: A });
   happy('ย้อนการกู้คืนกลับได้', (await scenarios()) === afterDelete, `${await scenarios()}`);
+  const narr2 = (await call('/sop/flows', { user: A })).data || [];
+  happy('ย้อนกลับอีกครั้งคำบรรยายก็ยังอยู่',
+    narr2.length > 0 && narr2.every((f) => Array.isArray(f.narrative) && f.narrative.length > 0),
+    `${narr2.filter((f) => !f.narrative?.length).length} จาก ${narr2.length} ผังคำบรรยายหาย`);
 }
 
 suite('4. สิทธิ์');

@@ -91,7 +91,9 @@ export default function Performance() {
   if (!boot) return <div className="flex justify-center py-16"><Spinner label={t('กำลังโหลด…')} /></div>;
 
   // ลิงก์เก่าที่ชี้ไปแท็บที่ปิดแล้วต้องไม่พาไปหน้าว่าง
-  const view = (rawView === 'manday' && !boot.features?.mandayEntry) ? 'dashboard' : rawView;
+  const hiddenView = (rawView === 'manday' && !boot.features?.mandayEntry)
+    || (rawView === 'reports' && !boot.features?.reportsTab);
+  const view = hiddenView ? 'dashboard' : rawView;
 
   // หน้าจอชุดเดียวกับระบบที่ลูกค้าใช้จริง — แดชบอร์ด · บันทึกงาน · ดัชนีงาน
   // · การลา · ตั้งค่า ส่วนหน้าแรงงาน-วัน (กรอกตัวเลข) เป็นส่วนเสริมที่มาจาก
@@ -103,7 +105,7 @@ export default function Performance() {
     { key: 'dashboard', label: t('แดชบอร์ด'), show: true },
     { key: 'entry', label: t('บันทึกงาน'), show: boot.canEntry },
     { key: 'manday', label: t('แรงงาน-วัน'), show: Boolean(f.mandayEntry) },
-    { key: 'reports', label: t('รายงาน'), show: true },
+    { key: 'reports', label: t('รายงาน'), show: Boolean(f.reportsTab) },
     { key: 'leave', label: t('คำขอ'), show: true, badge: pendingLeave },
     { key: 'index', label: t('ดัชนีงาน'), show: boot.isAdmin },
     { key: 'settings', label: t('ตั้งค่า'), show: boot.isAdmin },

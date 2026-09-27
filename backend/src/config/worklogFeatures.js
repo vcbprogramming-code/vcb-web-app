@@ -23,6 +23,7 @@ export const WORKLOG_FEATURES = [
   'employeeImport',   // นำเข้าพนักงานจาก Excel
   'leaveHalfDay',     // ลาครึ่งวัน (0.5 วัน)
   'leaveAttachment',  // แนบใบรับรองแพทย์กับใบลา
+  'reportsTab',       // แท็บ "รายงาน" (ระบบจริงไม่มีหน้ารายงานแยก มีแต่ปุ่มดาวน์โหลด)
 ];
 
 const raw = (process.env.WORKLOG_FEATURES ?? '').trim();

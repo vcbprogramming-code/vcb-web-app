@@ -1452,6 +1452,10 @@ async function mandayReport(profile, from, to, groupBy) {
   };
 }
 
+// หน้ารายงานบนจอมาจากเอกสารตรวจรับ ไม่ใช่ระบบที่ลูกค้าใช้อยู่ (ของเขามีแต่ปุ่ม
+// ดาวน์โหลดไฟล์) — แท็บและไฟล์ PDF จึงปิดไว้เป็นค่าเริ่มต้น ส่วนตัวเลขแรงงาน-วัน
+// ชุดนี้ยังเปิดอยู่ เพราะเป็นข้อมูลชุดเดียวกับไฟล์รายงานรายเดือนที่ปุ่มบนแดชบอร์ด
+// ดาวน์โหลด และชุดทดสอบใช้ตรวจว่าทุกมุมมองรวมแล้วได้แรงงาน-วันเท่ากัน
 router.get('/report/manday', asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
@@ -2054,7 +2058,7 @@ router.post('/bulk', requireFeature('mandayEntry'), requirePermission('performan
 
 // ── §8 รายงานเป็น PDF ─────────────────────────────────────────────────────
 const GROUP_TH = { cost: 'รายหมวดงาน', worktype: 'รายประเภทงาน', project: 'รายโครงการ', employee: 'รายพนักงาน' };
-router.get('/report/manday.pdf', asyncHandler(async (req, res) => {
+router.get('/report/manday.pdf', requireFeature('reportsTab'), asyncHandler(async (req, res) => {
   const from = req.query.from, to = req.query.to;
   if (!from || !to) throw new ApiError(400, 'ต้องระบุช่วงวันที่ (from, to)');
   const groupBy = MANDAY_GROUPS.includes(req.query.groupBy) ? req.query.groupBy : 'cost';

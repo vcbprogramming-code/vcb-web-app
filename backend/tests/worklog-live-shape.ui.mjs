@@ -104,11 +104,13 @@ suite('เส้นทางของส่วนเสริมปิดอย�
 {
   const boot = await call('/performance/bootstrap', { user: A });
   const off = Object.entries(boot.features || {}).filter(([, v]) => !v).map(([k]) => k);
-  happy(`ส่วนเสริมปิดอยู่ ${off.length} รายการ`, off.length === 10, off.join(', '));
+  happy(`ส่วนเสริมปิดอยู่ ${off.length} รายการ`, off.length === 11, off.join(', '));
   for (const [m, p] of [['GET', '/performance/alerts'], ['GET', '/performance/manpower?from=2026-01-01&to=2026-12-31'],
     ['GET', '/performance/departments'], ['GET', '/performance/positions'],
     ['GET', '/performance/period-closes?site=' + site.code], ['GET', '/performance/attachments?site=' + site.code],
-    ['GET', '/performance/import/employees/template.xlsx']]) {
+    ['GET', '/performance/import/employees/template.xlsx'],
+    // ระบบจริงไม่มีหน้ารายงานแยก มีแต่ปุ่มดาวน์โหลด — ไฟล์ PDF ของหน้ารายงานจึงปิดด้วย
+    ['GET', '/performance/report/manday.pdf?from=2026-01-01&to=2026-12-31']]) {
     const r = await call(p, { method: m, user: A });
     bad(`${p.split('?')[0]} ตอบ 404`, r.status === 404, `${r.status}`);
   }
@@ -161,8 +163,10 @@ suite('หน้าจอเหลือห้าหน้าเท่าระ�
     // แท็บการลามีตัวเลขคำขอที่รออนุมัติต่อท้าย ("การลา 3") — ตัดตัวเลขก่อนเทียบชื่อ
     .map((b) => b.innerText.trim().replace(/\s*\d+\+?$/, ''))
     .filter((x) => ['แดชบอร์ด', 'บันทึกงาน', 'แรงงาน-วัน', 'รายงาน', 'คำขอ', 'ดัชนีงาน', 'ตั้งค่า'].includes(x)));
-  happy(`เห็นแท็บ ${tabs.length} แท็บ`, tabs.length === 6, tabs.join(' · ')); // 5 + ดัชนีงาน (admin)
+  // เมนูเท่าระบบจริง: แดชบอร์ด · บันทึกงาน · คำขอ · ดัชนีงาน · ตั้งค่า
+  happy(`เห็นแท็บ ${tabs.length} แท็บ`, tabs.length === 5, tabs.join(' · '));
   bad('ไม่มีแท็บ "แรงงาน-วัน" แล้ว', !tabs.includes('แรงงาน-วัน'), tabs.join(' · '));
+  bad('ไม่มีแท็บ "รายงาน" แล้ว (ระบบจริงไม่มีหน้ารายงานแยก)', !tabs.includes('รายงาน'), tabs.join(' · '));
   await shot('01-แท็บ');
 
   await as(A, '/performance?tab=manday');

@@ -168,7 +168,10 @@ function TodayPanel() {
               <li key={p.employee_code || p.full_name} className="flex items-center gap-2.5">
                 <Initials name={p.full_name} />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-slate-700">{p.full_name}</div>
+                  {/* ชื่อเล่นต่อท้ายในวงเล็บ แบบเดียวกับทะเบียนวันเกิดของระบบจริง */}
+                  <div className="truncate text-sm text-slate-700">
+                    {p.full_name}{p.nickname ? ` (${p.nickname})` : ''}
+                  </div>
                   {p.dept && <div className="truncate text-[11px] text-slate-400">{p.dept}</div>}
                 </div>
                 {/* วันนี้/พรุ่งนี้ เป็นป้าย ส่วนวันอื่นเป็นวันที่ย่อ — เหมือนระบบจริง */}

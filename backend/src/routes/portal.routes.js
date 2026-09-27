@@ -39,17 +39,27 @@ router.get('/today', asyncHandler(async (req, res) => {
   //
   // ส่งออกแค่ชื่อ แผนก และจำนวนวันที่เหลือ — ไม่ส่ง birth_date ออกไป เพราะปีเกิด
   // (= อายุ) ไม่ใช่สิ่งที่กล่องนี้ต้องใช้
+  // สองแหล่ง: ทะเบียนวันเกิดของพอร์ทัล (ชุดเดียวกับที่ระบบจริงของลูกค้าเขียนไว้
+  // ในซอร์ส — พนักงานสำนักงานพร้อมชื่อเล่น) และวันเกิดที่กรอกไว้ในทะเบียนพนักงาน
+  // ถ้ามี · วันครบรอบคิดจากวัน/เดือน โดยให้ Postgres ถอยวันที่ 29 ก.พ. ของปีที่
+  // ไม่ใช่อธิกสุรทินให้เอง แทนการ make_date ซึ่งจะพังทั้งคำสั่ง
   const birthdays = (await query(
     `with b as (
-       select coalesce(nullif(btrim(e.full_name), ''), e.employee_code, '') as full_name,
-              e.employee_code, d.name dept,
+       select p.full_name, p.nickname, p.dept, null::text as employee_code,
+              (make_date(extract(year from current_date)::int, 1, 1)
+                 + make_interval(months => p.birth_month - 1, days => p.birth_day - 1))::date anniv
+         from portal_birthdays p
+        where p.is_active
+       union all
+       select coalesce(nullif(btrim(e.full_name), ''), e.employee_code, ''),
+              null, d.name, e.employee_code,
               (e.birth_date + make_interval(years => (extract(year from current_date)::int
-                                                      - extract(year from e.birth_date)::int)))::date anniv
+                                                      - extract(year from e.birth_date)::int)))::date
          from employees e
          left join departments d on d.id = e.department_id
         where e.birth_date is not null and e.is_active
      )
-     select full_name, employee_code, dept,
+     select full_name, nickname, employee_code, dept,
             ((case when anniv >= current_date then anniv
                    else (anniv + interval '1 year')::date end) - current_date)::int days
        from b

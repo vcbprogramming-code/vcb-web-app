@@ -78,7 +78,7 @@ export default function FocusTrace({
   return (
     <div
       data-trace-layer="1"
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+      data-surface="dark" className="fixed inset-0 z-50 flex flex-col overflow-hidden"
       style={{ background: '#0a0f1e', color: CANVAS.text }}
     >
       {/* หัวแถบ — ชื่อกล่องที่กำลังไล่ แล้วปุ่มทางขวา บนจอแคบให้ห่อลงบรรทัดใหม่ได้

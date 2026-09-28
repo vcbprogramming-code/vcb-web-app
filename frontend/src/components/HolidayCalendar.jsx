@@ -81,12 +81,12 @@ export default function HolidayCalendar() {
         </h3>
         <div className="flex items-center gap-1">
           <button type="button" aria-label={t('เดือนก่อนหน้า')} onClick={() => setView(new Date(year, month - 1, 1))}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
+            className="tap flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
             <Icon name="arrowLeft" className="h-4 w-4" />
           </button>
           <span className="min-w-[92px] text-center text-xs font-medium text-slate-500">{monthLabel}</span>
           <button type="button" aria-label={t('เดือนถัดไป')} onClick={() => setView(new Date(year, month + 1, 1))}
-            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
+            className="tap flex h-6 w-6 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
             <Icon name="arrowRight" className="h-4 w-4" />
           </button>
         </div>

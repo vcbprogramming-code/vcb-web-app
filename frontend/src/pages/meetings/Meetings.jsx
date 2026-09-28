@@ -239,7 +239,7 @@ export default function Meetings() {
       {renameable && (
         <button type="button" title={t('เปลี่ยนชื่อโครงการ')} aria-label={t('เปลี่ยนชื่อโครงการ')}
           onClick={(e) => { e.stopPropagation(); setGroupForm(groupsById.get(id)); }}
-          className="shrink-0 rounded-md p-1 text-slate-300 opacity-0 transition hover:bg-white hover:text-brand group-hover:opacity-100 focus:opacity-100">
+          className="tap shrink-0 rounded-md p-1 text-slate-300 opacity-0 transition hover:bg-white hover:text-brand group-hover:opacity-100 focus:opacity-100">
           <Icon name="edit" className="h-3.5 w-3.5" />
         </button>
       )}

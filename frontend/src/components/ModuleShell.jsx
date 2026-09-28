@@ -55,6 +55,10 @@ export default function ModuleShell() {
   const navyHeader = location.pathname.startsWith('/memos')
     || location.pathname.startsWith('/dashboard')
     || location.pathname.startsWith('/settings');
+  // หน้าที่เป็นของโมดูล E-Memo — ใช้ตัดสินว่าจะคงสีข้อความรองแบบเดิมไว้ไหม
+  const isEmemo = location.pathname.startsWith('/memos')
+    || location.pathname.startsWith('/dashboard')
+    || location.pathname.startsWith('/documents');
 
   function handleLogout() {
     logout();
@@ -73,7 +77,9 @@ export default function ModuleShell() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    /* .ememo-legacy คงสีข้อความรองแบบเดิมไว้เฉพาะหน้าของ E-Memo — โมดูลนั้นตรวจรับ
+       ไปแล้ว จึงไม่เปลี่ยนหน้าตาให้โดยไม่ได้สั่ง (ดูบล็อกท้าย index.css) */
+    <div className={`flex min-h-screen flex-col bg-slate-50 ${isEmemo ? 'ememo-legacy' : ''}`}>
       {/* `bg-white/80` is an opacity variant, so the global .dark remap (which
           matches the exact class `bg-white`) never touches it — in dark mode the
           bar stayed white while its text was remapped to near-white. Give the

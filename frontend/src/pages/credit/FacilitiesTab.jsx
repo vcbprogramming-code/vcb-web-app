@@ -262,11 +262,14 @@ export default function FacilitiesTab({ projects, filters, types = [], costCateg
    *
    * ตารางรายการสินเชื่อที่อยู่แท็บถัดไปบอกตัวเลขนี้อยู่แล้ว แต่ตารางวงเงินเงียบ
    * ทั้งที่ใช้แถบตัวกรองชุดเดียวกัน กรองแล้วตารางสั้นลงโดยไม่รู้ว่าจากทั้งหมดเท่าไร
+   *
+   * จำไว้จากรอบที่ยังไม่ได้กรอง ไม่ยิงถามเพิ่ม — เปิดแท็บมาครั้งแรกยังไม่มีตัวกรอง
+   * อยู่แล้ว เลขจึงมีตั้งแต่วินาทีแรก · เคยยิง /facilities อีกครั้งเพื่อนับ ซึ่ง
+   * ทำให้หน้านี้โหลดสองเท่าโดยไม่จำเป็น และแย่งคิวกับการโหลดทะเบียนประเภทวงเงิน
+   * จนฟอร์ม "เพิ่มวงเงิน" เปิดมาโดยที่ช่องประเภทยังว่าง
    */
   const [total, setTotal] = useState(0);
-  useEffect(() => {
-    creditApi.facilities({}).then((r) => setTotal((r.data || []).length)).catch(() => setTotal(0));
-  }, [onChanged]);
+  const unfiltered = !projectId && !company && !search && !type;
 
   const projById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const projName = (id) => (projById[id] ? (projById[id].name || projById[id].code) : '—');
@@ -293,6 +296,8 @@ export default function FacilitiesTab({ projects, filters, types = [], costCateg
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilities, sort, projById]);
+
+  useEffect(() => { if (unfiltered) setTotal(rows.length); }, [unfiltered, rows.length]);
 
   return (
     <div className="space-y-4">
@@ -362,12 +367,12 @@ export default function FacilitiesTab({ projects, filters, types = [], costCateg
                   </div>
                 </td>
                 <td className="tbl-td text-right whitespace-nowrap">
-                  <button onClick={() => setDrawdown(f)} className="mr-2 text-sm text-brand hover:underline">{t('เบิกใช้')}</button>
-                  <button onClick={() => setAdjust(f)} className="mr-1 text-slate-400 hover:text-slate-700"
+                  <button onClick={() => setDrawdown(f)} className="tap mr-2 text-sm text-brand hover:underline">{t('เบิกใช้')}</button>
+                  <button onClick={() => setAdjust(f)} className="tap mr-1 text-slate-400 hover:text-slate-700"
                     title={t('ปรับวงเงิน / ใช้ไป')} aria-label={t('ปรับวงเงิน / ใช้ไป')}><Icon name="edit" className="inline h-4 w-4" /></button>
                   {/* ทะเบียนวงเงินทั้งใบ (ธนาคาร · เลขที่สัญญา · ดอกเบี้ย) แก้ไม่บ่อย
                       แต่ต้องแก้ได้ — แยกปุ่มไว้ ไม่ปนกับงานกระทบยอดรายเดือน */}
-                  <button onClick={() => setEdit(f)} className="text-slate-400 hover:text-slate-700"
+                  <button onClick={() => setEdit(f)} className="tap text-slate-400 hover:text-slate-700"
                     title={t('แก้ไขวงเงิน')} aria-label={t('แก้ไขวงเงิน')}><Icon name="card" className="inline h-4 w-4" /></button>
                 </td>
               </tr>

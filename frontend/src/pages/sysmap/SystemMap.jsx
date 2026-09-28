@@ -188,7 +188,7 @@ export default function SystemMap() {
       {tab === 'map' && (
         /* ผืนผังเป็นพื้นเข้มทั้งผืน — แถบตัวกรอง ผัง และแผงรายละเอียดอยู่ในกรอบ
            เดียวกัน อย่างระบบจริง ส่วนที่เหลือของแอปยังเป็นธีมสว่างตามเดิม */
-        <div className="overflow-hidden rounded-2xl shadow-sm" style={{ background: CANVAS.bg }}>
+        <div data-surface="dark" className="overflow-hidden rounded-2xl shadow-sm" style={{ background: CANVAS.bg }}>
           <div className="space-y-2 border-b px-3 py-3" style={{ borderColor: CANVAS.border }}>
           {/* เลเยอร์ — ทั้งหมด / ERP / Manual แล้วต่อด้วยสวิตช์ชนิดเส้น */}
           <div className="flex flex-wrap items-center gap-1.5">

@@ -5,7 +5,8 @@ import { useLang } from '../lib/i18n.jsx';
  *  switch. */
 export default function LangToggle({ dark = false }) {
   const { lang, setLang } = useLang();
-  const base = 'rounded-md px-2 py-0.5 text-xs font-semibold transition';
+  // tap = พื้นที่กดขั้นต่ำบนจอสัมผัส (ดู index.css) — ปุ่มคู่นี้สูงเพียง 20px
+  const base = 'tap rounded-md px-2 py-0.5 text-xs font-semibold transition';
   const on = dark ? 'bg-white/20 text-white' : 'bg-brand text-white';
   const off = dark ? 'text-white/60 hover:text-white' : 'text-slate-500 hover:text-slate-800';
   return (

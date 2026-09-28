@@ -36,7 +36,7 @@ function WelcomeCard({ name }) {
   const stamp = `${now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}`
     + ` · ${now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#132a54] to-[#0d1b36] p-6 text-white shadow-sm">
+    <div data-surface="dark" className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#132a54] to-[#0d1b36] p-6 text-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-extrabold leading-tight">{t(greeting(now.getHours()))}, {name}</h1>
@@ -319,7 +319,7 @@ export default function Portal() {
         {/* The sidebar is navy in BOTH themes — it's the app's spine, and a white
             rail against a white page gave the launcher no shape. Fixed colours,
             not `dark:` variants, so it looks the same either way. */}
-        <aside id="portal-sidebar" aria-label={t('เมนูหลัก')}
+        <aside id="portal-sidebar" data-surface="dark" aria-label={t('เมนูหลัก')}
           className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0d1b36] transition-transform lg:static lg:z-auto lg:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="flex items-center gap-3 px-5 py-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
@@ -385,7 +385,7 @@ export default function Portal() {
           {/* topbar */}
           <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
             <button onClick={() => setNavOpen((v) => !v)} aria-label={t('เมนู')} aria-expanded={navOpen} aria-controls="portal-sidebar"
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden">
+              className="tap rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden">
               <Icon name="menu" className="h-5 w-5" />
             </button>
             <div className="relative max-w-md flex-1">

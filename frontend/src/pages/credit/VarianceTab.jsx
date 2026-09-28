@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { creditApi } from '../../lib/modules.js';
+import { creditApi, formatAmount } from '../../lib/modules.js';
 import { useToast } from '../../components/Toast.jsx';
 import Spinner from '../../components/Spinner.jsx';
 import { useT } from '../../lib/i18n.jsx';
@@ -18,7 +18,8 @@ import { monthOptions, thisMonth } from './tbar.js';
  * รวม P/N ของทุกส่วน — ดู backend/src/services/creditTbar.js (varianceTotals)
  */
 
-const money = (n) => `฿${Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+// ช่องว่างในตารางผลต่างคือศูนย์จริง (ยังไม่มีแผนหรือยังไม่มีของจริง = 0)
+const money = (n) => `฿${formatAmount(n)}`;
 
 /** สามช่อง แผน / จริง / ผลต่าง ของหนึ่งกลุ่ม */
 function Group({ v }) {

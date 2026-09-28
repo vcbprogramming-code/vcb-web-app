@@ -257,6 +257,17 @@ export default function FacilitiesTab({ projects, filters, types = [], costCateg
     return () => clearTimeout(timer);
   }, [load, search]);
 
+  /**
+   * จำนวนวงเงินทั้งทะเบียน ไม่ขึ้นกับตัวกรอง — ใช้เทียบในบรรทัด "แสดง N / M"
+   *
+   * ตารางรายการสินเชื่อที่อยู่แท็บถัดไปบอกตัวเลขนี้อยู่แล้ว แต่ตารางวงเงินเงียบ
+   * ทั้งที่ใช้แถบตัวกรองชุดเดียวกัน กรองแล้วตารางสั้นลงโดยไม่รู้ว่าจากทั้งหมดเท่าไร
+   */
+  const [total, setTotal] = useState(0);
+  useEffect(() => {
+    creditApi.facilities({}).then((r) => setTotal((r.data || []).length)).catch(() => setTotal(0));
+  }, [onChanged]);
+
   const projById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const projName = (id) => (projById[id] ? (projById[id].name || projById[id].code) : '—');
   const projCode = (id) => projById[id]?.code || '';
@@ -286,6 +297,12 @@ export default function FacilitiesTab({ projects, filters, types = [], costCateg
   return (
     <div className="space-y-4">
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+
+      {/* ถ้อยคำและตำแหน่งเดียวกับตารางรายการสินเชื่อ — สองตารางนี้อยู่ใต้แถบตัวกรอง
+          ชุดเดียวกัน จะบอกผลคนละแบบไม่ได้ */}
+      <div className="text-xs text-slate-400">
+        {t('แสดง')} {rows.length} / {total || rows.length} {t('รายการ')}
+      </div>
 
       <div className="card !p-0 overflow-x-auto">
         <table className="tbl">

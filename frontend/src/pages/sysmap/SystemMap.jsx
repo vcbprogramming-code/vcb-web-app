@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { sysmapApi, pick, SYSMAP_VERSION, SITE_DEPT, CANVAS, onColor } from '../../lib/sysmap.js';
+import { sysmapApi, pick, SYSMAP_VERSION, SITE_DEPT, CANVAS, onColor, matchesFilters } from '../../lib/sysmap.js';
 import { PageHeader } from '../../components/ui/index.js';
 import Spinner from '../../components/Spinner.jsx';
 import Icon from '../../components/Icon.jsx';
@@ -153,6 +153,14 @@ export default function SystemMap() {
 
   const rowLabel = 'shrink-0 text-[11px] font-semibold uppercase tracking-wider';
 
+  // ตัวกรองที่เปิดอยู่ตรงกับกี่กล่อง — นับด้วยกฎเดียวกับที่ผังใช้หรี่กล่อง
+  const anyFilter = Boolean(dept) || onlySite || layer !== 'all';
+  const shown = anyFilter ? nodes.filter((n) => matchesFilters(n, { dept, layer, onlySite })).length : nodes.length;
+  const clearFilters = () => {
+    setDept(''); setOnlySite(false); setLayer('all');
+    setShowDirect(true); setShowIndirect(true);
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -236,10 +244,7 @@ export default function SystemMap() {
             {(dept || onlySite || layer !== 'all' || !showDirect || !showIndirect) && (
               /* ล้างทุกอย่างที่ผู้อ่านตั้งไว้ รวมสวิตช์ชนิดเส้นด้วย อย่างปุ่ม ✕ ของเขา —
                  ปิดเส้นไว้แล้วกดล้างตัวกรองแต่เส้นยังไม่กลับมา คือกดแล้วเหมือนไม่ครบ */
-              <button onClick={() => {
-                setDept(''); setOnlySite(false); setLayer('all');
-                setShowDirect(true); setShowIndirect(true);
-              }}
+              <button onClick={clearFilters}
                 title={t('ล้างตัวกรอง')}
                 className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-300 transition hover:border-white/50 hover:text-white">
                 <Icon name="x" className="h-3.5 w-3.5" /> {t('ล้างตัวกรอง')}
@@ -252,6 +257,22 @@ export default function SystemMap() {
             </span>
           </div>
           </div>
+
+          {/* ผลของตัวกรองเป็นตัวเลข — ผังบอกด้วยความจาง ซึ่งอ่านไม่ออกว่ากรองติดแล้ว
+              หรือยัง โดยเฉพาะตอนเลือกกล่องไว้ (ผังจางอยู่ก่อนแล้ว) และถ้ากรองจน
+              ไม่เหลือสักกล่อง ผังจะจางทั้งหน้าโดยไม่มีอะไรบอกว่าเกิดอะไรขึ้น */}
+          {anyFilter && (
+            <p className={`px-4 pt-3 text-xs font-medium ${shown ? '' : 'text-amber-300'}`}
+              style={shown ? { color: CANVAS.text } : undefined}>
+              {shown
+                ? <>{t('ตัวกรองที่เลือกไว้ตรงกับ')} {shown} {t('จาก')} {nodes.length} {t('ขั้นตอน', null, 'sysmap')}</>
+                : <>{t('ไม่มีขั้นตอนไหนตรงกับตัวกรองที่เลือกไว้')}{' '}
+                  <button onClick={clearFilters} className="underline underline-offset-2 hover:text-white">
+                    {t('ล้างตัวกรอง')}
+                  </button>
+                </>}
+            </p>
+          )}
 
           <p className="px-4 pt-3 text-xs" style={{ color: CANVAS.muted }}>
             {showAll

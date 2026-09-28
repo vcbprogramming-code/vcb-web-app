@@ -21,6 +21,15 @@
   .card-sm {
     @apply rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900;
   }
+  /* การ์ดที่กดได้ — ใช้คู่กับ .card หรือ .card-sm เมื่อการ์ดนั้นเป็น <button>
+     เบราว์เซอร์จัดเนื้อหาในปุ่มไว้กลางแนวตั้งให้เอง การ์ดที่เตี้ยกว่าเพื่อนในแถว
+     เดียวกันจึงลอยลงมาอยู่กลางกล่อง หัวข้อของการ์ดข้าง ๆ เลยไม่ตรงแนว (การ์ด T/L
+     เคยต่ำกว่าการ์ด BG อยู่ 36px) · ต้องเป็น flex ไม่ใช่ block — display:block
+     ไม่ได้ปิดการจัดกลางของปุ่ม และห้ามใส่ items-start เพราะแถบความคืบหน้า
+     กับบรรทัดที่ต้องตัดคำจะหดเหลือเท่าเนื้อหา */
+  .card-btn {
+    @apply flex flex-col text-left;
+  }
 
   /* form field — the BTS rounded input, used across forms/filters */
   .field {

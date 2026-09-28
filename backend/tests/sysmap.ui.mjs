@@ -352,6 +352,109 @@ suite('7. สลับผังเป็นภาษาอังกฤษได�
   await settle(1200);
 }
 
+/**
+ * ── 9. ตัวกรองต้องเห็นผลเสมอ แม้ตอนเลือกกล่องไว้แล้ว ─────────────────────
+ *
+ * ผู้ใช้รายงานว่า "คลิกตัวกรองแผนกแล้วไม่เห็นเกิดอะไรขึ้นเลย" — ตอนนั้นความจาง
+ * มีระดับเดียว (opacity-20) ใช้ทั้งกับกล่องที่ถูกตัวกรองคัดออกและกล่องที่ไม่ได้
+ * อยู่บนเส้นทางของกล่องที่เลือก พอเลือกกล่องไว้ ผังจึงจางอยู่ก่อนแล้ว กดกรองก็
+ * ไม่มีอะไรเปลี่ยน · ข้อนี้ล็อกไว้ว่าต้องมีสามระดับ กล่องที่เปิดแผงอยู่ต้องไม่จาง
+ * และต้องมีตัวเลขบอกผลของตัวกรอง
+ */
+suite('9. ตัวกรองแผนกเห็นผลชัด และบอกจำนวนที่ตรง');
+{
+  await as(A);
+  const levels = () => page.evaluate(() => {
+    const out = { lit: 0, path: 0, filtered: 0, clickable: 0 };
+    for (const b of document.querySelectorAll('[id^="sysmap-node-"]')) {
+      const cs = getComputedStyle(b);
+      const o = Number(cs.opacity);
+      if (o > 0.9) out.lit += 1; else if (o > 0.15) out.path += 1; else out.filtered += 1;
+      if (cs.pointerEvents !== 'none') out.clickable += 1;
+    }
+    return out;
+  });
+  const chipClick = (label) => page.evaluate((l) => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === l);
+    if (!b) return false; b.click(); return true;
+  }, label);
+
+  happy('ยังไม่กรอง กล่องทุกใบสว่างเต็ม', (await levels()).lit === 79, JSON.stringify(await levels()));
+
+  await chipClick('ผู้จัดการโครงการ');
+  await settle(900);
+  const onlyFilter = await levels();
+  happy('กรองแผนกแล้วกล่องที่ไม่ตรงจางลึกและกดไม่ได้',
+    onlyFilter.filtered > 50 && onlyFilter.clickable === onlyFilter.lit, JSON.stringify(onlyFilter));
+  happy('มีบรรทัดบอกจำนวนที่ตรงกับตัวกรอง',
+    /ตัวกรองที่เลือกไว้ตรงกับ \d+ จาก 79/.test(await body()),
+    ((await body()).match(/ตัวกรองที่เลือกไว้ตรงกับ[^\n]*/) || [''])[0]);
+
+  await chipClick('ทุกแผนก');
+  await settle(700);
+  await page.evaluate(() => document.querySelector('[id^="sysmap-node-"]')?.click());
+  await settle(900);
+  const picked = await levels();
+  happy('เลือกกล่องแล้วกล่องนอกเส้นทางจางแบบอ่อน (ยังกดได้)',
+    picked.path > 50 && picked.clickable === 79, JSON.stringify(picked));
+
+  await chipClick('ผู้จัดการโครงการ');
+  await settle(900);
+  const both = await levels();
+  happy('กรองทับตอนเลือกกล่องไว้ ผังเปลี่ยนให้เห็นจริง (มีครบสามระดับ)',
+    both.filtered > 50 && both.path > 0 && both.lit > 0, JSON.stringify(both));
+  happy('กล่องที่เปิดแผงรายละเอียดอยู่ไม่ถูกทำให้จาง',
+    await page.evaluate(() => {
+      const b = document.querySelector('[aria-pressed="true"][id^="sysmap-node-"]');
+      return b ? Number(getComputedStyle(b).opacity) > 0.9 : false;
+    }), '');
+
+  // กรองจนไม่เหลือสักกล่อง — ต้องบอก ไม่ใช่ปล่อยให้ผังจางทั้งหน้าเงียบ ๆ
+  await chipClick('ผู้จัดการโครงการ');
+  await settle(500);
+  await chipClick('ทรัพยากรบุคคล');
+  await settle(500);
+  await chipClick('เฉพาะหน้างาน');
+  await settle(900);
+  happy('กรองจนไม่เหลือผลลัพธ์แล้วมีข้อความบอก',
+    (await body()).includes('ไม่มีขั้นตอนไหนตรงกับตัวกรองที่เลือกไว้'), '');
+  happy('และกดล้างตัวกรองจากข้อความนั้นได้', await page.evaluate(() => {
+    const p = [...document.querySelectorAll('p')].find((x) => x.innerText.includes('ไม่มีขั้นตอนไหนตรงกับ'));
+    const b = p?.querySelector('button');
+    if (!b) return false; b.click(); return true;
+  }), '');
+  await settle(900);
+  happy('ล้างแล้วกล่องกลับมาสว่างทั้งผัง', (await levels()).filtered === 0, JSON.stringify(await levels()));
+  await shot('11-ตัวกรองเห็นผล');
+}
+
+/**
+ * ── 10. กล่องงานในแถวเดียวกันต้องเริ่มที่ระดับเดียวกัน ───────────────────
+ *
+ * กล่องเป็น <button> ซึ่งเบราว์เซอร์จัดเนื้อหาไว้กลางแนวตั้งให้เอง กล่องที่เตี้ย
+ * กว่าเพื่อนในแถวจึงลอยลงมาอยู่กลาง ชื่อกล่องเลยไม่ตรงแนวกันทั้งผัง (คลาส
+ * .card-btn เป็นตัวแก้ — ข้อนี้กันไม่ให้หลุดอีก)
+ */
+suite('10. ชื่อกล่องงานอยู่ระดับเดียวกันทั้งแถว');
+{
+  await as(A);
+  const drift = await page.evaluate(() => {
+    const rows = new Map();
+    for (const b of document.querySelectorAll('[id^="sysmap-node-"]')) {
+      const box = b.getBoundingClientRect();
+      const first = b.children[0]?.getBoundingClientRect();
+      if (!first) continue;
+      const key = Math.round(box.top / 8);
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key).push(Math.round(first.top - box.top));
+    }
+    let worst = 0;
+    for (const offs of rows.values()) if (offs.length > 1) worst = Math.max(worst, Math.max(...offs) - Math.min(...offs));
+    return worst;
+  });
+  happy('หัวกล่องในแถวเดียวกันเริ่มที่ระดับเดียวกัน', drift <= 1, `ต่างกัน ${drift}px`);
+}
+
 // ── 8. ไม่มีข้อผิดพลาดซ่อนอยู่ ───────────────────────────────────────────
 suite('8. ไม่มีข้อผิดพลาดซ่อนอยู่');
 {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { creditApi } from '../../lib/modules.js';
+import { creditApi, formatAmount } from '../../lib/modules.js';
 import { Modal } from '../../components/ui/index.js';
 import Icon from '../../components/Icon.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -32,8 +32,10 @@ import {
  * โครงสร้าง (เพิ่ม/ลบ/ย้าย) บันทึกทันทีไม่รอ
  */
 
-const money = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-const baht = (n) => `฿${money(n)}`;
+// ตัวเลขทั้งผังนี้ถือว่าช่องว่าง = ศูนย์จริง (แผนที่ยังไม่ลงเงิน) จึงใช้ formatAmount
+// ไม่ใช่ formatMoney ที่คืนขีดเมื่อไม่มีค่า — กฎการคั่นหลักพันอยู่ที่เดียวใน lib
+const money = formatAmount;
+const baht = (n) => `฿${formatAmount(n)}`;
 
 /** แถบ รับ · จ่าย · สุทธิ ที่หัวการ์ดและในการ์ดตัวอย่าง */
 function Band() {

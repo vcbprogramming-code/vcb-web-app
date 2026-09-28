@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
+import { formatAmount } from '../../lib/modules.js';
 import { formatThaiDate } from '../../lib/ememo.js';
 import { TYPE_CHIP } from './shared.jsx';
 import {
@@ -18,8 +19,10 @@ import {
  * ทุกยอดคิดที่ tbar.js ไม่คิดในไฟล์นี้ เพื่อให้ตรงกับที่เซิร์ฟเวอร์บันทึกไว้
  */
 
-const money = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-const baht = (n) => `฿${money(n)}`;
+// ตัวเลขทั้งผังนี้ถือว่าช่องว่าง = ศูนย์จริง (แผนที่ยังไม่ลงเงิน) จึงใช้ formatAmount
+// ไม่ใช่ formatMoney ที่คืนขีดเมื่อไม่มีค่า — กฎการคั่นหลักพันอยู่ที่เดียวใน lib
+const money = formatAmount;
+const baht = (n) => `฿${formatAmount(n)}`;
 
 /**
  * ช่องกรอกเงินที่ใส่ลูกน้ำให้ระหว่างพิมพ์

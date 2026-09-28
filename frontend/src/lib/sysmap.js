@@ -153,3 +153,16 @@ export const DOC_ROUTE = {
   manual:      { label: 'คงเป็นแบบฟอร์มมือ',     color: '#475569', arrow: '✎' },
 };
 export const docRoute = (s) => DOC_ROUTE[s] || DOC_ROUTE.manual;
+
+/**
+ * กล่องงานนี้ผ่านตัวกรองที่เปิดอยู่หรือไม่ — ตัวกรองทุกช่องเป็น "และ" อย่างระบบจริง
+ *
+ * อยู่ที่เดียวเพราะสองที่ต้องตอบเหมือนกันเสมอ: ผังใช้ตัดสินว่ากล่องไหนหรี่ และแถบ
+ * ตัวกรองใช้นับว่าเหลือกี่กล่อง ถ้าแยกกันเขียน ตัวเลขที่บอกผู้ใช้จะเพี้ยนจากภาพที่เห็น
+ */
+export function matchesFilters(n, { dept, layer, onlySite } = {}) {
+  if (dept && n.dept !== dept && n.dept2 !== dept) return false;
+  if (layer && layer !== 'all' && n.node_type !== layer) return false;
+  if (onlySite && !n.at_site) return false;
+  return true;
+}

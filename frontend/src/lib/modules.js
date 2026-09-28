@@ -93,10 +93,25 @@ export const onboardingApi = {
   saveReview: (id, body) => api(`/onboarding/journeys/${id}/review`, { method: 'PUT', body }),
 };
 
-/** Format a number as Thai baht (no decimals). */
+/**
+ * ตัวเลขเงินคั่นหลักพัน ไม่ใส่สัญลักษณ์ — สำหรับช่องที่ ฿ อยู่ที่หัวคอลัมน์แล้ว
+ *
+ * ค่าว่างคืน "0" ไม่ใช่ขีด เพราะที่ที่เรียกใช้คือตารางวางแผนซึ่งช่องว่างแปลว่า
+ * ศูนย์จริง — ถ้าต้องการให้ "ยังไม่มีค่า" ต่างจาก "ศูนย์" ให้ใช้ formatMoney
+ */
+export function formatAmount(n) {
+  return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+/**
+ * จำนวนเงินพร้อมสัญลักษณ์บาท (ไม่มีทศนิยม)
+ *
+ * ไม่มีค่าเลยคืนขีด ไม่ใช่ ฿0 — บนการ์ดสรุป "฿0" แปลว่ายอดเป็นศูนย์จริง ส่วนขีด
+ * แปลว่ายังไม่ได้บันทึก คนละเรื่องกันในหน้าจอการเงิน
+ */
 export function formatMoney(n) {
   if (n == null || Number.isNaN(Number(n))) return '—';
-  return '฿' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return '฿' + formatAmount(n);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Children, useEffect, useState, useCallback, useMemo } from 'react';
 import { creditApi, formatMoney } from '../../lib/modules.js';
 import { ememoApi } from '../../lib/ememo.js';
 import Icon from '../../components/Icon.jsx';
@@ -53,7 +53,7 @@ function FacilityStat({ label, item, accent, tip, onOpen }) {
   const empty = !item || (!item.limit && !item.used);
   return (
     <button type="button" onClick={onOpen} title={tip}
-      className="card-sm border-t-[3px] text-left transition hover:border-brand/40"
+      className="card-sm card-btn border-t-[3px] transition hover:border-brand/40"
       style={{ borderTopColor: accent }}>
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold text-slate-500">{label}</div>
@@ -103,7 +103,7 @@ function BucketStat({ label, bucket, accent, tip, onOpen, extra }) {
   const t = useT();
   return (
     <button type="button" onClick={onOpen} title={tip}
-      className="card-sm border-t-[3px] text-left transition hover:border-brand/40" style={{ borderTopColor: accent }}>
+      className="card-sm card-btn border-t-[3px] transition hover:border-brand/40" style={{ borderTopColor: accent }}>
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className="mt-1 text-xl font-bold text-slate-900">{formatMoney(bucket?.amount || 0)}</div>
       <div className="mt-1 text-[11px] text-slate-400">
@@ -121,7 +121,7 @@ function StatusStat({ label, count, amount, accent, tip, onOpen, countClass }) {
   const t = useT();
   return (
     <button type="button" onClick={onOpen} title={tip}
-      className="card-sm border-t-[3px] text-left transition hover:border-brand/40" style={{ borderTopColor: accent }}>
+      className="card-sm card-btn border-t-[3px] transition hover:border-brand/40" style={{ borderTopColor: accent }}>
       <div className="text-xs font-semibold text-slate-500">{label}</div>
       <div className={`mt-1 text-xl font-bold ${countClass || 'text-slate-900'}`}>{count || 0} {t('รายการ')}</div>
       <div className="mt-1 text-[11px] text-slate-400">{formatMoney(amount || 0)}</div>
@@ -132,13 +132,28 @@ function StatusStat({ label, count, amount, accent, tip, onOpen, countClass }) {
   );
 }
 
+/**
+ * จำนวนคอลัมน์ของกลุ่มการ์ด — เดินตามการ์ดที่แสดงจริง ไม่ใช่จำนวนที่เผื่อไว้
+ *
+ * กลุ่มวงเงินกู้ระยะยาวเผื่อช่องไว้สามใบ (T/L · BG · M/L) แต่ถ้าในการตั้งค่าปิด M/L
+ * ไว้ กริดจะเหลือคอลัมน์ว่างทั้งคอลัมน์ (213px บนจอ 1440) และการ์ดถูกบีบให้แคบกว่า
+ * การ์ดของกลุ่มที่อยู่ข้างกัน 107px ทั้งที่อยู่ในแถวเดียวกัน — บรรทัดย่อยในการ์ด BG
+ * จึงถูกตัดคำ ("ค้ำ Advance 1…") บนจอ 1280–1440px · การ์ดครบกำหนดกับการ์ดสถานะ
+ * ปิดรายใบได้เหมือนกัน จึงใช้กฎเดียวกันทั้งสามกลุ่ม
+ *
+ * ชื่อคลาสต้องเขียนเต็ม ไม่ใช่ต่อสตริงเอา เพราะ Tailwind อ่านชื่อคลาสจากซอร์สตรง ๆ
+ */
+const COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-2 sm:grid-cols-3' };
+const colsFor = (n, max = 3) => COLS[Math.min(max, Math.max(1, n))];
+
 /** หัวข้อกลุ่มการ์ด — หายทั้งกลุ่มเมื่อพาเนลข้างในถูกปิดหมด */
 function CardGroup({ title, cols = 2, children, show }) {
   if (!show) return null;
+  const shown = Children.toArray(children).filter(Boolean).length;
   return (
     <div className="card">
       <h3 className="mb-3 font-bold text-slate-800">{title}</h3>
-      <div className={`grid gap-3 ${cols === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>{children}</div>
+      <div className={`grid gap-3 ${colsFor(shown, cols)}`}>{children}</div>
     </div>
   );
 }
@@ -316,7 +331,7 @@ export default function CreditFacility() {
         {showDue && (
           <div className="card">
             <h3 className="mb-3 font-bold text-slate-800">{t('ครบกำหนด')}</h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className={`grid gap-3 ${colsFor([prefs.due.week, prefs.due.this, prefs.due.next].filter(Boolean).length)}`}>
               {/* "ครบใน 7 วัน" เป็นกลุ่มซ้อน ไม่ได้แย่งรายการกับเดือนนี้ */}
               {prefs.due.week && (
                 <BucketStat label={t('ครบกำหนด — ภายใน 1 สัปดาห์')} bucket={overview?.buckets?.due7} accent="#E89A3C"
@@ -353,7 +368,7 @@ export default function CreditFacility() {
         {showStatusCards && (
           <div className="card">
             <h3 className="mb-3 font-bold text-slate-800">{t('สถานะ')}</h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className={`grid gap-3 ${colsFor([prefs.status.new, prefs.status.proposed, prefs.status.approved].filter(Boolean).length)}`}>
               {/* นับจำนวน + ยอดเงินตามสถานะของรายการ เหมือนการ์ดสถานะของระบบจริง */}
               {prefs.status.new && (
                 <StatusStat label={t('คำขอใหม่')} count={overview?.newCount} amount={overview?.newAmount} accent="#6CA0F0"

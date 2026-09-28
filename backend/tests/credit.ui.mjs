@@ -433,6 +433,37 @@ suite('4ข. เปิดสิทธิ์ให้รายบุคคลไ�
 }
 
 // ── 5. จอเล็ก ──────────────────────────────────────────────────────────────
+/**
+ * การ์ดสรุปบนหน้าภาพรวมเป็น <button> ซึ่งเบราว์เซอร์จัดเนื้อหาไว้กลางแนวตั้งให้เอง
+ * การ์ดที่เตี้ยกว่าเพื่อนในแถว (T/L ไม่มีบรรทัดย่อย ส่วน BG มีสามบรรทัด) จึงลอยลงมา
+ * อยู่กลางกล่อง หัวข้อสองใบเลยไม่ตรงแนวกัน — ลูกค้าทักมาจากภาพหน้าจอ · คลาส
+ * .card-btn เป็นตัวแก้ ข้อนี้กันไม่ให้หลุดอีก
+ */
+suite('4ค. หัวการ์ดสรุปอยู่ระดับเดียวกันทั้งแถว');
+{
+  await as(A, '/credit');
+  const drift = await page.evaluate(() => {
+    const rows = new Map();
+    for (const b of document.querySelectorAll('button.card-btn')) {
+      const box = b.getBoundingClientRect();
+      const first = b.children[0]?.getBoundingClientRect();
+      if (!first || box.height === 0) continue;
+      const key = Math.round(box.top / 8);
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key).push(Math.round(first.top - box.top));
+    }
+    let worst = 0; let n = 0;
+    for (const offs of rows.values()) {
+      if (offs.length < 2) continue;
+      n += offs.length;
+      worst = Math.max(worst, Math.max(...offs) - Math.min(...offs));
+    }
+    return { worst, n };
+  });
+  happy('มีการ์ดสรุปให้ตรวจ', drift.n >= 2, JSON.stringify(drift));
+  happy('หัวการ์ดในแถวเดียวกันเริ่มที่ระดับเดียวกัน', drift.worst <= 1, `ต่างกัน ${drift.worst}px`);
+}
+
 suite('5. เปิดบนจอเล็กแล้วยังอ่านได้');
 {
   await page.setViewport({ width: 390, height: 844, isMobile: true });

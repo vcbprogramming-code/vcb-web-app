@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   pick, connMeta, CONN_META, FEEDBACK_COLOR, DIRECT_COLOR, INDIRECT_COLOR,
-  NODE_KIND, deptOf, CANVAS, onColor,
+  NODE_KIND, deptOf, CANVAS, onColor, matchesFilters,
 } from '../../lib/sysmap.js';
 import Icon from '../../components/Icon.jsx';
 import { useT } from '../../lib/i18n.jsx';
@@ -43,9 +43,7 @@ export default function LaneMap({
     return m;
   }, [lanes, nodes]);
 
-  const dimmed = (n) => (filterDept && n.dept !== filterDept && n.dept2 !== filterDept)
-    || (layer !== 'all' && n.node_type !== layer)
-    || (onlySite && !n.at_site);
+  const dimmed = (n) => !matchesFilters(n, { dept: filterDept, layer, onlySite });
 
   /** เส้นที่ผู้อ่านปิดไว้ ไม่ต้องวาด */
   const wanted = (c) => {
@@ -89,7 +87,15 @@ export default function LaneMap({
       const made = [];
       // เส้นที่จะวาด: ทั้งหมด หรือเฉพาะของกล่องที่เลือก
       const list = (showAll ? conns : [...related.inn, ...related.out]).filter(wanted);
+      // เส้นที่ปลายทางถูกตัวกรองคัดออกไม่ต้องวาด — ระบบจริงข้ามเส้นพวกนี้เหมือนกัน
+      // ไม่งั้นลูกศรจะชี้ไปยังกล่องที่จางจนมองไม่เห็น อ่านเหมือนผังขาด
+      const nodeById = new Map(nodes.map((n) => [n.id, n]));
+      const kept = (id) => {
+        const n = nodeById.get(id);
+        return !n || id === selected || !dimmed(n);
+      };
       for (const c of list) {
+        if (!kept(c.from_node) || !kept(c.to_node)) continue;
         const from = at(c.from_node);
         const to = at(c.to_node);
         if (!from || !to) continue;
@@ -172,8 +178,21 @@ export default function LaneMap({
                   )}
                   {list.map((n) => {
                     const d = deptMap.get(n.dept);
-                    const off = dimmed(n) || (related && !related.ids.has(n.id));
                     const isSel = selected === n.id;
+                    /**
+                     * ความจางสองระดับ ไม่ใช่ระดับเดียว
+                     *
+                     * "ถูกตัวกรองคัดออก" จางลึกและกดไม่ได้ (เท่าระบบจริงของเขา
+                     * opacity .08 + pointer-events:none) ส่วน "ไม่ได้อยู่บนเส้นทาง
+                     * ของกล่องที่เลือก" จางกว่าเดิมเล็กน้อยและยังกดได้ เพราะเป็นคน
+                     * ละความหมาย — เดิมใช้ opacity-20 เหมือนกันทั้งคู่ พอเลือกกล่อง
+                     * ไว้แล้วกดตัวกรองแผนก ผังจึงไม่เปลี่ยนอะไรให้เห็นเลย
+                     *
+                     * กล่องที่เปิดแผงรายละเอียดอยู่ไม่จางไม่ว่ากรณีใด — เคยจางจนอ่าน
+                     * รายละเอียดของกล่องที่มองแทบไม่เห็น
+                     */
+                    const filteredOut = !isSel && dimmed(n);
+                    const offPath = !isSel && !filteredOut && related && !related.ids.has(n.id);
                     const erp = n.node_type === 'erp';
                     const color = d?.color || '#475569';
                     // ERP = กล่องทึบสีประจำแผนก · งานด้วยมือ = กรอบเส้นประสีเดียวกัน
@@ -201,9 +220,9 @@ export default function LaneMap({
                         ref={(el) => { if (el) boxRefs.current.set(n.id, el); else boxRefs.current.delete(n.id); }}
                         onClick={() => onSelect(isSel ? null : n.id)}
                         aria-pressed={isSel}
-                        className={`relative w-[176px] shrink-0 rounded-xl border-2 p-2.5 text-left transition ${
+                        className={`card-btn relative w-[176px] shrink-0 rounded-xl border-2 p-2.5 transition ${
                           isSel ? 'ring-2 ring-white/70' : 'hover:brightness-110'
-                        } ${off ? 'opacity-20' : ''}`}
+                        } ${filteredOut ? 'pointer-events-none opacity-[0.08] grayscale' : offPath ? 'opacity-30' : ''}`}
                         style={skin}
                       >
                         <div className="flex items-start gap-1.5">

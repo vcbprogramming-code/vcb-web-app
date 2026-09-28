@@ -6,10 +6,15 @@
 > `เอกสารสรุปฟังก์ชันระบบ.md`) describe **that other system**, not this one. Do not conflate them.
 
 **Live app URL:**
-`https://script.google.com/macros/s/AKfycbzEg5Sn0tNnciRkWmwnsEM9cmq0NVmy6weblTLPqlAOccsDKkh9m6dmLMRVBpqspBblUA/exec`
+`https://script.google.com/macros/s/AKfycbz4q_xAlsKRM-fXys7-JMKcDhsrz6qw-FECzZvcRDFc3anzHiXxu8cJJ7kvooS4IwcI/exec`
 
-**Apps Script project (standalone, script ID):** `13GL834YDPhar_j-IZTT_f4mDYPUDMJELPIh2XzWHJr4VfZIybZ0gxVzu`
-Editor: `https://script.google.com/d/13GL834YDPhar_j-IZTT_f4mDYPUDMJELPIh2XzWHJr4VfZIybZ0gxVzu/edit`
+**Apps Script project (standalone, script ID):** `16IoKsjXJwrRI5GnmjZ7G0Xjp2v2Gtyk3Jb22X0nEz2Rf6F91Ezd6tMJR`
+Editor: `https://script.google.com/d/16IoKsjXJwrRI5GnmjZ7G0Xjp2v2Gtyk3Jb22X0nEz2Rf6F91Ezd6tMJR/edit`
+
+> Ids corrected 2026-09-28. This file previously named script `13GL834Y…`
+> and deployment `AKfycbzEg5Sn…`, which belong to a DIFFERENT project —
+> `clasp deploy -i` returns "Requested entity was not found" for that id here.
+> `.clasp.json` is the authority; the ids above match it.
 
 **Live deployment status as of this session's last push:** version `@54` (2026-08-20).
 
@@ -573,7 +578,7 @@ provenance badge on the schedule.
 **Deploy workflow** (from this folder):
 ```
 clasp push
-clasp deploy -i AKfycbzEg5Sn0tNnciRkWmwnsEM9cmq0NVmy6weblTLPqlAOccsDKkh9m6dmLMRVBpqspBblUA -d "description"
+clasp deploy -i AKfycbz4q_xAlsKRM-fXys7-JMKcDhsrz6qw-FECzZvcRDFc3anzHiXxu8cJJ7kvooS4IwcI -d "description"
 ```
 Always target `-i` with that exact deployment ID — it's what keeps the live `/exec` URL stable
 across redeploys. `clasp deploy` without `-i` creates a **new** deployment (new URL) — avoid

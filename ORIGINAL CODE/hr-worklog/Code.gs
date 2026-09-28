@@ -69,14 +69,14 @@ body{margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1
   font-family:"Sarabun","Segoe UI",Tahoma,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:var(--blue);text-decoration:none}
 .topbar{background:linear-gradient(135deg,#1F3864 0%,#2E75B6 100%);color:#fff;
-  padding:16px 30px;display:flex;gap:1.1rem;flex-wrap:wrap;
+  padding:16px 28px;display:flex;gap:1.1rem;flex-wrap:wrap;
   align-items:center;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px rgba(31,56,100,.25)}
-.topbar .brand{font-weight:800;font-size:1.55rem;letter-spacing:.3px;color:#fff;line-height:1;text-decoration:none;cursor:pointer;transition:opacity .15s}
+.topbar .brand{font-weight:800;font-size:24px;letter-spacing:.3px;color:#fff;line-height:1;text-decoration:none;cursor:pointer;transition:opacity .15s}
 .topbar a.brand:hover{opacity:.8;text-decoration:none}
-.topbar .brand-div{width:1px;align-self:center;height:38px;background:rgba(255,255,255,.28)}
-.topbar .brand-titles{display:flex;flex-direction:column;justify-content:center;gap:2px}
-.topbar .brand-t1{text-transform:uppercase;letter-spacing:1.6px;font-weight:700;font-size:.82rem;color:#fff;line-height:1.15}
-.topbar .brand-t2{font-size:.8rem;color:#a9c6e6;line-height:1.15}
+.topbar .brand-div{width:1px;align-self:center;height:40px;background:rgba(255,255,255,.45)}
+.topbar .brand-titles{display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:40px}
+.topbar .brand-t1{text-transform:uppercase;letter-spacing:2.5px;font-weight:700;font-size:12.5px;color:#fff;line-height:1.35}
+.topbar .brand-t2{font-size:13px;font-weight:500;letter-spacing:.5px;color:#fff;line-height:1.35}
 .topbar nav{margin-left:auto;display:flex;gap:.45rem;flex-wrap:wrap;align-items:center}
 .topbar nav .nav-div{width:1px;align-self:stretch;margin:0 .15rem;background:rgba(255,255,255,.24)}
 .topbar nav .nav-badge{position:absolute;top:-6px;right:-6px;background:#e0533a;color:#fff;
@@ -91,7 +91,7 @@ a{color:var(--blue);text-decoration:none}
 .topbar nav a.on{background:#fff;color:var(--blue);font-weight:800;border-color:#fff;
   box-shadow:0 3px 10px rgba(0,0,0,.22),inset 0 -2px 0 rgba(29,78,137,.25)}
 .topbar nav a.on:hover{background:#fff;color:var(--blue);box-shadow:0 4px 14px rgba(0,0,0,.26),inset 0 -2px 0 rgba(29,78,137,.25)}
-.topbar .who{color:#cdddee;font-size:.83rem;padding-left:.3rem}
+.topbar .who{color:#dbe0f1;font-size:13px;font-weight:500;padding-left:.3rem}
 .wrap{max-width:none;margin:1rem auto;padding:0 1.1rem}
 @media(min-width:1600px){.wrap{padding:0 1.8rem}}
 .wrap.narrow{max-width:1120px}
@@ -2099,6 +2099,18 @@ function onBootError(r){
 // self-service submission and admin approval are two views of one workflow,
 // and it scales cleanly if more request types (OT, expense, etc.) get added
 // later without cluttering the main nav further.
+// The settings gear, as inline SVG — the same glyph every other module
+// uses. It was a text ⚙ (U+2699), which renders in whatever symbol font
+// the OS supplies and so looked different on every machine.
+//
+// Every closing tag is split ("</"+"svg>"). This whole file is served inside
+// one <script> block, and the HTML parser ends that block at the first "</"
+// it meets — it does not know about JavaScript string quotes. A literal
+// closing svg tag here therefore ended the script early, so everything below
+// (including the DOMContentLoaded binding that calls boot) never parsed and
+// the app sat on "กำลังโหลด…" forever. Same reason print HTML below builds
+// its closing tag as '</'+'script'. The runtime string is unchanged.
+var GEAR_SVG = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"></"+"circle><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"></"+"path></"+"svg>";
 function buildNav(){
   var n=$('nav'); var items=[];
   items.push(['dashboard', t('แดชบอร์ด')]);
@@ -2109,12 +2121,14 @@ function buildNav(){
   // Use the text-style gear (U+2699) — not the emoji ⚙️ (U+2699 U+FE0F) —
   // so it renders monochrome and follows the surrounding white nav color
   // instead of as a multicolor emoji glyph.
-  if(BOOT.isAdmin)  items.push(['settings', '⚙']);
+  if(BOOT.isAdmin)  items.push(['settings', GEAR_SVG]);
   n.innerHTML=items.map(function(it){
-    var isIcon = it[1] === '⚙';
+    var isIcon = it[1] === GEAR_SVG;
     var badge = (it[0]==='requests' && BOOT.canEntry && NAV_PENDING_LEAVE>0)
       ? '<span class="nav-badge">'+(NAV_PENDING_LEAVE>99?'99+':NAV_PENDING_LEAVE)+'</span>' : '';
-    var style = isIcon ? 'position:relative;font-size:1.15rem;padding:.45rem .8rem' : 'position:relative';
+    // The gear is sized to the same 40x40 chip as every other module's,
+    // rather than inheriting the text padding of the nav links beside it.
+    var style = isIcon ? 'position:relative;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center' : 'position:relative';
     return '<a data-go="'+it[0]+'" style="'+style+'"' + (isIcon ? ' class="gear" title="'+esc(t('ตั้งค่า'))+'"' : '') + '>'+it[1]+badge+'</a>';
   }).join('')
     +'<span class="who">'+esc(BOOT.email)+(BOOT.role?(' · '+BOOT.role):'')+'</span>';
@@ -3505,7 +3519,7 @@ function siteCard(r, today, lockDays){
     : '<div class="s-ringwrap" title="'+esc(t('ความสมบูรณ์ของการบันทึก (เฉพาะวันทำงานที่ผ่านมา) ใน')+monthLbl)+'">'
       +'<div class="s-ring">'
         +'<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="none" stroke="#e6ecf3" stroke-width="7"/>'
-        +'<circle class="ring-fill" cx="32" cy="32" r="27" fill="none" stroke="var(--site)" stroke-width="7" stroke-dasharray="169.65" stroke-dashoffset="169.65" style="--ring-end:'+(169.65 - pct*1.6965).toFixed(2)+'" transform="rotate(-90 32 32)" stroke-linecap="round"/></svg>'
+        +'<circle class="ring-fill" cx="32" cy="32" r="27" fill="none" stroke="var(--site)" stroke-width="7" stroke-dasharray="169.65" stroke-dashoffset="169.65" style="--ring-end:'+(169.65 - pct*1.6965).toFixed(2)+'" transform="rotate(-90 32 32)" stroke-linecap="round"/></'+'svg>'
         +'<span class="s-ring-pct" style="color:var(--site)">'+pct+'%</span>'
       +'</div>'
       +'<div class="s-ring-lbl">'+t('บันทึกครบ')+'<br><b>'+r.entries+' / '+(r.fillRateDenom||0)+'</b> '+t('ช่อง')+'</div>'

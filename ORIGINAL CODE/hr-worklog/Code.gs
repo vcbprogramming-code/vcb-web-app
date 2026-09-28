@@ -2103,14 +2103,19 @@ function onBootError(r){
 // uses. It was a text ⚙ (U+2699), which renders in whatever symbol font
 // the OS supplies and so looked different on every machine.
 //
-// Every closing tag is split ("</"+"svg>"). This whole file is served inside
-// one <script> block, and the HTML parser ends that block at the first "</"
-// it meets — it does not know about JavaScript string quotes. A literal
-// closing svg tag here therefore ended the script early, so everything below
-// (including the DOMContentLoaded binding that calls boot) never parsed and
-// the app sat on "กำลังโหลด…" forever. Same reason print HTML below builds
-// its closing tag as '</'+'script'. The runtime string is unchanged.
-var GEAR_SVG = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"></"+"circle><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"></"+"path></"+"svg>";
+// This whole app is one big template literal (backticks), so a backslash
+// written here survives into the page the browser receives - inside a
+// template literal, backslash-quote is NOT an escape for a quote. Writing the
+// attributes with escaped double quotes therefore shipped literal backslashes
+// to the browser, which ended the JS string early and threw "Unexpected
+// number", leaving the app on its loading spinner. Single quotes need no
+// escaping, so the markup passes through untouched. The closing tags are
+// split only so the HTML tokeniser cannot mistake them for the end of this
+// script element.
+var GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true">'
+  + '<circle cx="12" cy="12" r="3"></' + 'circle>'
+  + '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></' + 'path>'
+  + '</' + 'svg>';
 function buildNav(){
   var n=$('nav'); var items=[];
   items.push(['dashboard', t('แดชบอร์ด')]);
@@ -4070,7 +4075,7 @@ function printLeaveSlip(id){
       +'<span>'+esc(t('เอกสารนี้พิมพ์จากระบบบันทึกการทำงานรายวัน'))+'</span>'
       +'<span>'+docNo+'</span>'
     +'</div>'
-    +'<script>window.onload=function(){setTimeout(function(){window.print();},250);};</'+'script>'
+    +'<'+'script>window.onload=function(){setTimeout(function(){window.print();},250);};</'+'script>'
     +'</body></html>';
   w.document.open(); w.document.write(html); w.document.close();
 }

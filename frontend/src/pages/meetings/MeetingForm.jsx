@@ -170,9 +170,10 @@ export default function MeetingForm({ row, groups, defaultGroupId, onClose, onSa
               placeholder={t('เช่น ประชุมความก้าวหน้าโครงการ ครั้งที่ 12')} className="field" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">
-              {t('วันที่ประชุม')} <span className="font-normal text-slate-400">{t('(เช่น 21/05/2569 หรือ 21 พ.ค. 2569)')}</span>
-            </label>
+            {/* คำอธิบายรูปแบบวันที่ย้ายลงไปเป็นบรรทัดช่วยใต้ช่อง เหมือนช่องอื่นในฟอร์มนี้
+                — เดิมต่อท้ายป้ายชื่อ ป้ายจึงตกบรรทัดในคอลัมน์แคบ และช่อง "วันที่ประชุม"
+                กับ "เวลา" ที่อยู่ข้างกันเริ่มไม่ตรงแถวกัน 20px */}
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('วันที่ประชุม')}</label>
             <div className="relative flex gap-1">
               <input value={form.meetingDate} onChange={(e) => set('meetingDate', e.target.value)}
                 placeholder="21/05/2569" className="field" />
@@ -186,6 +187,7 @@ export default function MeetingForm({ row, groups, defaultGroupId, onClose, onSa
                   onPick={(v) => set('meetingDate', v)} onClose={() => setCal(false)} />
               )}
             </div>
+            <p className="mt-1 text-xs text-slate-400">{t('(เช่น 21/05/2569 หรือ 21 พ.ค. 2569)')}</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">{t('เวลา')}</label>

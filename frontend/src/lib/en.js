@@ -2629,6 +2629,7 @@ export const EN = {
   'เลือกหน่วยงานเพื่อเริ่มบันทึก': 'Choose a site to start logging',
   'เลือกจากดรอปดาวน์ หน่วยงาน ด้านบน หรือกลับไปยัง แดชบอร์ด แล้วกด «เปิดบันทึก →» ในการ์ดของโครงการที่ต้องการ':
     'Pick one from the Site dropdown above, or go back to the Dashboard and press «Open log →» on the project’s card',
+  'เลือกหน่วยงานด้านล่าง หรือใช้ดรอปดาวน์ หน่วยงาน ด้านบนก็ได้': 'Pick a unit below, or use the Unit dropdown above.',
   'ส่งออกบันทึกทั้งหมดของหน่วยงานนี้เป็นไฟล์ Excel (.xlsx) โดยคงรูปแบบเดิมไว้':
     'Export every entry for this site as Excel (.xlsx) with the original formatting preserved',
   // ชื่อเดือนย่อในตารางเลือกเดือน — ไม่แปลแล้วตารางจะเป็นไทยทั้งกริดในโหมด EN

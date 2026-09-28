@@ -124,11 +124,36 @@ suite('2. กดกล่องงานแล้วเห็นรายละ�
   happy('เปิดจากลิงก์ตรงถึงกล่องงานได้', (await body()).includes(first), '');
   await shot('02b-ลิงก์ตรง');
 
-  happy('กดแสดงทุกเส้นเชื่อมได้', await click('แสดงทุกเส้นเชื่อม'), '');
-  await settle(1400);
-  happy('บอกว่ากำลังแสดงเส้นเชื่อมทั้งหมด', (await body()).includes('กำลังแสดงเส้นเชื่อมทั้งหมด'), '');
+  /**
+   * เปิดหน้ามาต้องเห็นเส้นทั้งผังเลย ไม่ใช่รอให้กดเลือกกล่องก่อน
+   *
+   * ระบบจริงวาด CROSS_CONNS ทุกเส้นทุกครั้งใน drawArrows() การเลือกกล่องเป็นแค่
+   * การเน้นกับหรี่ · ของเราเคยเริ่มที่ "ยังไม่วาดอะไรเลย" สวิตช์ชนิดเส้นบนแถบ
+   * ตัวกรองจึงกดแล้วเงียบ เพราะไม่มีเส้นให้ซ่อนหรือแสดง (เจ้าของงานทักมา)
+   */
+  await as(A);
   const drawn = await page.evaluate(() => document.querySelectorAll('svg path[stroke]').length);
-  happy(`วาดเส้นเชื่อมลงผังจริง (${drawn} เส้น)`, drawn > 100, `${drawn}`);
+  happy(`เปิดหน้ามาก็วาดเส้นทั้งผังแล้ว (${drawn} เส้น)`, drawn > 100, `${drawn}`);
+  happy('บอกว่ากำลังแสดงเส้นเชื่อมทั้งหมด', (await body()).includes('กำลังแสดงเส้นเชื่อมทั้งหมด'), '');
+  // สวิตช์ชนิดเส้นต้องเห็นผลทันที — จำนวนเส้นบนผังต้องลดลงจริงเมื่อปิดชนิดหนึ่ง
+  // ชิปชนิดเส้นขึ้นต้นด้วยสัญลักษณ์เส้น (— / ╌) click() ของชุดนี้จึงหาไม่เจอ
+  // ด้วยชื่อล้วน ต้องค้นแบบ "มีคำนี้อยู่ข้างใน"
+  const clickChip = (label) => page.evaluate((l) => {
+    const el = [...document.querySelectorAll('button')].find((x) => x.innerText.includes(l));
+    if (el) { el.click(); return true; } return false;
+  }, label);
+  happy('ปิด "เส้นมีเงื่อนไข" แล้วเส้นบนผังลดลงจริง', await (async () => {
+    if (!await clickChip('เส้นมีเงื่อนไข')) return false;
+    await settle(1200);
+    const after = await page.evaluate(() => document.querySelectorAll('svg path[stroke]').length);
+    await clickChip('เส้นมีเงื่อนไข');
+    await settle(900);
+    return after < drawn && after > 0;
+  })(), '');
+  happy('กดสวิตช์แสดงทุกเส้นเชื่อมเพื่อพับเส้นเก็บได้', await click('แสดงทุกเส้นเชื่อม'), '');
+  await settle(1400);
+  const folded = await page.evaluate(() => document.querySelectorAll('svg path[stroke]').length);
+  happy(`พับแล้วเหลือเฉพาะเส้นของกล่องที่เลือก (${folded} เส้น)`, folded < drawn, `${folded}`);
   await shot('03-ทุกเส้นเชื่อม');
 }
 

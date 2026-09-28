@@ -295,9 +295,15 @@ suite('MAP-UI 1. ตัวกรองผสมกัน และปุ่ม�
   await settle(1200);
   happy('กรองแผนกพร้อมกันได้', await click('บัญชี'), '');
   await settle(1200);
+  // วัดค่าความจางที่เบราว์เซอร์คำนวณจริง ไม่ใช่เทียบชื่อคลาส — ความจางมีหลายระดับ
+  // แล้ว (ถูกกรองออก 0.08 · นอกเส้นทางที่เลือก 0.30) การผูกกับชื่อคลาสเดียวทำให้
+  // ข้อตรวจนี้ตกทุกครั้งที่ปรับดีไซน์ ทั้งที่พฤติกรรมยังถูก
   const both = await page.evaluate(() => {
-    const boxes = [...document.querySelectorAll('button[aria-pressed]')];
-    return { total: boxes.length, dim: boxes.filter((b) => /opacity-20/.test(b.className)).length };
+    const boxes = [...document.querySelectorAll('[id^="sysmap-node-"]')];
+    return {
+      total: boxes.length,
+      dim: boxes.filter((b) => Number(getComputedStyle(b).opacity) < 0.9).length,
+    };
   });
   happy('ตัวกรองสองตัวทำงานร่วมกันแบบ "และ" (กล่องที่ไม่ผ่านถูกหรี่ ไม่ได้หายไป)',
     both.total > 0 && both.dim > 0 && both.dim < both.total, JSON.stringify(both));

@@ -48,7 +48,7 @@ const PART_SHORT = {
  * ตัวเลขใหญ่คือวงเงินคงเหลือ เหมือนการ์ดของระบบจริง — คำถามแรกของคนเปิดหน้านี้
  * คือยังเบิกได้อีกเท่าไร ไม่ใช่ใช้ไปแล้วเท่าไร
  */
-function FacilityStat({ label, item, accent, tip, onOpen }) {
+function FacilityStat({ label, item, accent, tip, onOpen, showParts = false }) {
   const t = useT();
   const empty = !item || (!item.limit && !item.used);
   return (
@@ -73,9 +73,22 @@ function FacilityStat({ label, item, accent, tip, onOpen }) {
             />
           </div>
           <div className="mt-1 text-[11px] text-slate-400">{t('ใช้ไปแล้ว')} {item.pct}%</div>
-          {/* กล่องนี้อาจรวมวงเงินหลายประเภทที่ธนาคารให้เป็นก้อนเดียว — บอกว่ามาจากอะไรบ้าง
-              ไม่งั้นยอดที่เห็นจะกระทบยอดกับเอกสารธนาคารไม่ได้ */}
-          {(item.parts || []).length > 1 && (
+          {/**
+           * ธนาคารให้วงเงินบางก้อนเป็นก้อนเดียวแต่มีหลายเส้น — ระบบจริงของเขาแยก
+           * สองแบบ ไม่ได้ทำเหมือนกันทั้งสองกล่อง:
+           *
+           *  BG (หนังสือค้ำประกันสามใบ) มีครบสามเส้นเสมอ ถ้าพิมพ์ลงบนการ์ดก็จะสูง
+           *  กว่าเพื่อนสามบรรทัดทุกครั้ง เขาจึงให้ "ดูตอนเอาเมาส์ชี้" แทน
+           *  (คอมเมนต์ในโค้ดเขา: "hover shows each line separately")
+           *
+           *  B/E ที่รวม L/G วัสดุ · DLC · PN-post ส่วนใหญ่มีเส้นเดียวที่มียอดใช้จริง
+           *  จึงพิมพ์บนการ์ดได้โดยไม่ดันความสูง และเขาพิมพ์เฉพาะเส้นที่มียอด
+           *  ("Only components with usage appear, so it stays compact")
+           *
+           * ของเราเคยพิมพ์ทั้งสองกล่อง การ์ด BG เลยสูงกว่าเพื่อน ดันให้กลุ่มซ้าย
+           * สูงกว่ากลุ่มขวาและเหลือที่ว่างค้างไว้ทั้งแถบ
+           */}
+          {showParts && (item.parts || []).length > 1 && (
             <ul className="mt-1.5 space-y-0.5 border-t border-dashed border-slate-200 pt-1.5">
               {item.parts.map((p) => (
                 <li key={p.no ?? p.name} className="flex items-baseline justify-between gap-2 text-[11px] text-slate-400">
@@ -319,7 +332,7 @@ export default function CreditFacility() {
         </CardGroup>
         <CardGroup title={t('วงเงินสินเชื่อ (วงเงินหมุนเวียน)')} show={showLines('rev')}>
           {prefs.lines.be && (
-            <FacilityStat label="B/E" item={byType['B/E']} accent="#F0A95F"
+            <FacilityStat label="B/E" item={byType['B/E']} accent="#F0A95F" showParts
               tip={t('ดูรายละเอียดวงเงิน B/E (รวม L/G วัสดุ/สาธารณูปโภค + DLC + PN-post)')}
               onOpen={() => openFacilities(GROUP_BE)} />
           )}
@@ -350,19 +363,6 @@ export default function CreditFacility() {
                   tip={t('ดูรายการครบกำหนดเดือนหน้า')} onOpen={() => openLedger({ due: 'nextMonth' })} />
               )}
             </div>
-            {overview?.buckets?.overdue?.count ? (
-              <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-                {t('เกินกำหนด')} {overview.buckets.overdue.count} {t('รายการ')} · {formatMoney(overview.buckets.overdue.amount)}
-                {overview.overdueInterest ? ` · ${t('ดอกเบี้ยเกินกำหนด')} ${formatMoney(overview.overdueInterest)}` : ''}
-                {/* วงเงินที่หนังสือธนาคารเขียนว่า MLR ไม่มีตัวเลขให้คูณ — ปัดเป็น ฿0
-                    จะอ่านเหมือนไม่มีดอกเบี้ยค้าง ซึ่งเป็นเงินจริงที่หายไปจากสายตา */}
-                {overview.overdueRateUnknown ? (
-                  <span title={t('อัตราดอกเบี้ยของวงเงินนี้ไม่ได้ระบุเป็นตัวเลข (เช่น MLR)')}>
-                    {' · '}{overview.overdueRateUnknown} {t('รายการ')}{' '}{t('ระบุอัตราไม่ได้')}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         )}
         {showStatusCards && (
@@ -390,6 +390,30 @@ export default function CreditFacility() {
             </div>
           </div>
         )}
+        {/**
+         * แถบเตือนยอดเกินกำหนด — พาดเต็มความกว้างใต้ทั้งสองกล่อง ไม่ได้อยู่ในกล่อง
+         * "ครบกำหนด" เหมือนเดิม
+         *
+         * ของเดิมอยู่ในกล่องซ้าย กล่องนั้นจึงสูงกว่ากล่อง "สถานะ" ที่อยู่ข้างกัน 44px
+         * และกล่องขวาเหลือที่ว่างค้างไว้เท่ากัน (กริดยืดให้สูงเท่ากันทั้งแถว) — เป็นจุด
+         * ที่เจ้าของงานทักว่าไม่สมดุลเมื่อเทียบกับระบบจริงของลูกค้า
+         *
+         * ข้อมูลนี้เป็นของทั้งหน้า ไม่ใช่ของกล่องใดกล่องหนึ่ง (ระบบจริงของเขาไม่มีแถบนี้
+         * เลย เราเพิ่มเองเพราะดอกเบี้ยเกินกำหนดเป็นเงินจริงที่ไม่ควรหายไปจากสายตา)
+         */}
+        {overview?.buckets?.overdue?.count ? (
+          <div className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 lg:col-span-2">
+            {t('เกินกำหนด')} {overview.buckets.overdue.count} {t('รายการ')} · {formatMoney(overview.buckets.overdue.amount)}
+            {overview.overdueInterest ? ` · ${t('ดอกเบี้ยเกินกำหนด')} ${formatMoney(overview.overdueInterest)}` : ''}
+            {/* วงเงินที่หนังสือธนาคารเขียนว่า MLR ไม่มีตัวเลขให้คูณ — ปัดเป็น ฿0
+                จะอ่านเหมือนไม่มีดอกเบี้ยค้าง ซึ่งเป็นเงินจริงที่หายไปจากสายตา */}
+            {overview.overdueRateUnknown ? (
+              <span title={t('อัตราดอกเบี้ยของวงเงินนี้ไม่ได้ระบุเป็นตัวเลข (เช่น MLR)')}>
+                {' · '}{overview.overdueRateUnknown} {t('รายการ')}{' '}{t('ระบุอัตราไม่ได้')}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* tabs */}

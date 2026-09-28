@@ -183,6 +183,7 @@ export default function Performance() {
           ? <NoSites />
           : <EntryView siteKey={siteKey} siteName={boot.sites.find((s) => s.key === siteKey)?.name}
               siteColor={boot.sites.find((s) => s.key === siteKey)?.color} cur={cur}
+              sites={boot.sites.filter((s) => s.active !== false)} onPickSite={setSiteKey}
               canEdit={boot.canEntry && boot.sites.find((s) => s.key === siteKey)?.active !== false} isAdmin={boot.isAdmin} />
       )}
 

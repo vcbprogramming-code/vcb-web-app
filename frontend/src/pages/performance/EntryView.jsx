@@ -42,7 +42,7 @@ const leaveNote = (note) => {
 };
 
 
-export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, isAdmin }) {
+export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, isAdmin, sites = [], onPickSite }) {
   const t = useT();
   const toast = useToast();
   const [base, setBase] = useState(null);   // SiteMonth from server
@@ -169,13 +169,34 @@ export default function EntryView({ siteKey, siteName, siteColor, cur, canEdit, 
   // ไม่มีหน่วยงานที่เลือกไว้ = หน้าว่างที่บอกทางออกสองทาง (เหมือนระบบจริง)
   // หน้าว่างที่ไม่บอกอะไรอ่านเหมือนระบบเสีย
   if (!siteKey) {
+    /**
+     * เลือกหน่วยงานได้จากตรงนี้เลย ไม่ใช่บอกให้ไปกดที่อื่น
+     *
+     * เดิมเป็นการ์ดเต็มความกว้าง (1,376px) ที่มีข้อความอยู่ตรงกลาง 512px เหลือที่ว่าง
+     * ข้าง ๆ 864px และทางออกที่บอกไว้อยู่คนละที่กับสายตา (ดรอปดาวน์ด้านบน หรือกลับ
+     * ไปหน้าแดชบอร์ด) — คนเปิดแท็บนี้มาเพื่อจะบันทึกงาน ปุ่มที่ต้องกดจึงควรอยู่ตรงนี้
+     */
     return (
-      <div className="card flex flex-col items-center gap-2 py-12 text-center">
-        <Icon name="card" className="h-8 w-8 text-slate-300" />
-        <h3 className="font-bold text-slate-700">{t('เลือกหน่วยงานเพื่อเริ่มบันทึก')}</h3>
-        <p className="max-w-lg text-sm text-slate-500">
-          {t('เลือกจากดรอปดาวน์ หน่วยงาน ด้านบน หรือกลับไปยัง แดชบอร์ด แล้วกด «เปิดบันทึก →» ในการ์ดของโครงการที่ต้องการ')}
-        </p>
+      <div className="card">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <Icon name="card" className="h-8 w-8 text-slate-300" />
+          <h3 className="font-bold text-slate-700">{t('เลือกหน่วยงานเพื่อเริ่มบันทึก')}</h3>
+          <p className="max-w-lg text-sm text-slate-500">
+            {t('เลือกหน่วยงานด้านล่าง หรือใช้ดรอปดาวน์ หน่วยงาน ด้านบนก็ได้')}
+          </p>
+        </div>
+        {sites.length > 0 && (
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {sites.map((s) => (
+              <button key={s.key} type="button" onClick={() => onPickSite?.(s.key)}
+                className="card-sm card-btn border-l-4 text-left transition hover:border-brand/60 hover:shadow-sm"
+                style={{ borderLeftColor: s.color || '#cbd5e1' }}>
+                <span className="truncate text-sm font-semibold text-slate-800">{s.name}</span>
+                {s.company && <span className="mt-0.5 truncate text-[11px] text-slate-400">{s.company}</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

@@ -83,7 +83,16 @@ export default function SettingsView({ sites, onSitesChange, onSiteAdded, onOpen
           — ระบบเดิมแก้รายชื่อในชีตโดยตรง และเอกสารของเขาระบุว่าไม่ทำตัวนำเข้า */}
       {features.orgRegistry && <OrgRegistry sites={sites} />}
       {features.employeeImport && <ImportEmployees onOpenSite={onOpenSite} />}
-      <div className="max-w-2xl space-y-5">
+      {/**
+       * สองคอลัมน์บนจอกว้าง — เดิมเป็นคอลัมน์เดียวกว้าง 672px วางชิดซ้ายบนจอ 1440
+       * เหลือพื้นที่ว่างทางขวา 704px และหน้ายาว 3,821px ต้องเลื่อนสี่จอกว่าจะครบ
+       *
+       * ซ้ายคือค่าที่เก็บในเครื่องของแต่ละคน (สั้น ๆ ทั้งนั้น) ขวาคือทะเบียนที่ใช้
+       * ร่วมกันทั้งบริษัทซึ่งเป็นรายการยาว — แยกตามความหมาย ไม่ได้แบ่งครึ่งตามจำนวน
+       * และ items-start กันไม่ให้การ์ดฝั่งสั้นถูกยืดตามฝั่งยาว
+       */}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+      <div className="space-y-5">
 
       {/* หัวเรื่องของหน้า — สองภาษาเหมือนหัวป็อปอัปตั้งค่าของเขา */}
       <div className="card">
@@ -113,34 +122,6 @@ export default function SettingsView({ sites, onSitesChange, onSiteAdded, onOpen
       <Section title={t('มุมมองเริ่มต้นของแดชบอร์ด')} desc={t('เลือกว่าจะเปิดแดชบอร์ดด้วยมุมมองไหนเป็นค่าเริ่มต้น')}>
         <Pills value={prefs.dashView} onChange={(v) => savePref({ dashView: v })}
           options={[['progress', 'ความคืบหน้า'], ['topact', 'กิจกรรมหลัก'], ['topcost', 'หมวดงานหลัก']]} />
-      </Section>
-
-      {/* เพิ่ม/เปิด/ปิดโครงการ — เหมือน "โครงการ / หน่วยงาน" ในหน้าตั้งค่าของระบบจริง */}
-      <ProjectsAdmin onChanged={onSitesChange} onAdded={onSiteAdded} />
-
-      {/* per-site lock window — ของเขาเป็นค่าเดียวทั้งระบบ ของเราละเอียดกว่าจึงคงไว้ */}
-      <Section title={t('ล็อกการแก้ไขย้อนหลัง (ต่อไซต์)')}
-        desc={t('จำนวนวันที่ยังแก้ไขข้อมูลย้อนหลังได้ · เกินกว่านี้จะล็อกอัตโนมัติ (ผู้ดูแลระบบปลดล็อกได้)')}>
-        <div className="divide-y divide-slate-100">
-          {sites.map((s) => (
-            <div key={s.key} className="flex flex-wrap items-center gap-3 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-slate-700">{s.name}</div>
-                {s.company && <div className="truncate text-[11px] text-slate-400">{s.company}</div>}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <input type="number" min={0} max={60} value={lockDraft[s.key]}
-                  aria-label={`${t('ระยะเวลาแก้ย้อนหลัง')} ${s.name}`}
-                  onChange={(e) => setLockDraft((p) => ({ ...p, [s.key]: e.target.value }))}
-                  className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
-                <span className="text-xs text-slate-400">{t('วัน')}</span>
-                <button onClick={() => saveLock(s.key)} disabled={savingLock === s.key} className="btn-outline !py-1.5 !text-sm disabled:opacity-50">
-                  <BusyLabel busy={savingLock === s.key} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
       </Section>
 
       {/* หน่วยงานที่แสดง (เฉพาะเครื่องนี้) */}
@@ -186,6 +167,39 @@ export default function SettingsView({ sites, onSitesChange, onSiteAdded, onOpen
 
       <div className="mt-6 border-t border-slate-200 pt-6">
         <LeaveApprovers />
+      </div>
+      </div>
+
+      {/* คอลัมน์ขวา — ทะเบียนที่ทุกคนในบริษัทใช้ร่วมกัน ไม่ใช่ค่าเฉพาะเครื่องนี้
+          สองใบนี้เป็นรายการยาว (รวมกันเกือบ 2,000px) จึงกินคอลัมน์ของตัวเอง */}
+      <div className="space-y-5">
+      {/* เพิ่ม/เปิด/ปิดโครงการ — เหมือน "โครงการ / หน่วยงาน" ในหน้าตั้งค่าของระบบจริง */}
+      <ProjectsAdmin onChanged={onSitesChange} onAdded={onSiteAdded} />
+
+      {/* per-site lock window — ของเขาเป็นค่าเดียวทั้งระบบ ของเราละเอียดกว่าจึงคงไว้ */}
+      <Section title={t('ล็อกการแก้ไขย้อนหลัง (ต่อไซต์)')}
+        desc={t('จำนวนวันที่ยังแก้ไขข้อมูลย้อนหลังได้ · เกินกว่านี้จะล็อกอัตโนมัติ (ผู้ดูแลระบบปลดล็อกได้)')}>
+        <div className="divide-y divide-slate-100">
+          {sites.map((s) => (
+            <div key={s.key} className="flex flex-wrap items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-slate-700">{s.name}</div>
+                {s.company && <div className="truncate text-[11px] text-slate-400">{s.company}</div>}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input type="number" min={0} max={60} value={lockDraft[s.key]}
+                  aria-label={`${t('ระยะเวลาแก้ย้อนหลัง')} ${s.name}`}
+                  onChange={(e) => setLockDraft((p) => ({ ...p, [s.key]: e.target.value }))}
+                  className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+                <span className="text-xs text-slate-400">{t('วัน')}</span>
+                <button onClick={() => saveLock(s.key)} disabled={savingLock === s.key} className="btn-outline !py-1.5 !text-sm disabled:opacity-50">
+                  <BusyLabel busy={savingLock === s.key} busyText="กำลังบันทึก…">{t('บันทึก')}</BusyLabel>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
       </div>
       </div>
 

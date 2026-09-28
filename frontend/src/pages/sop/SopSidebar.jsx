@@ -98,7 +98,25 @@ export default function SopSidebar({
 
   return (
     <aside className="space-y-2">
-      {/* ลำดับกลุ่มตามของเขา: ผังกระบวนการมาก่อน เพราะเป็นสาขาหลักที่คนเปิดคู่มือมาดู */}
+      {/* ลำดับกลุ่มตามระบบจริงของลูกค้า (build 34 · 2026-08-29): กรณีเฉพาะมาก่อน
+          แล้วจึงผังกระบวนการ — สแนปช็อตโค้ดเก่าในรีโปเรียงกลับกัน ของจริงที่เขาใช้
+          อยู่ตอนนี้เรียงแบบนี้ ยึดของจริงเป็นหลัก */}
+      <GroupRow icon="book" title={t('กรณีเฉพาะ')} desc={t('Case Studies · ตามหมวด')}
+        count={counts.scenarioTotal} attr={{ 'data-group': 'cases' }}
+        active={tab === 'cases' && module === ''} open={casesOpen} hasChildren
+        onClick={() => groupClick('cases')} />
+
+      {casesOpen && (
+        <div className={kids}>
+          {modules.map((m) => (
+            <ModuleRow key={m.code} mod={m} count={counts.scenarios[m.code] || 0}
+              attr={{ 'data-mod': m.code }}
+              active={tab === 'cases' && module === m.code}
+              onClick={() => pickMod('cases', m.code)} />
+          ))}
+        </div>
+      )}
+
       <GroupRow icon="flow" title={t('ผังกระบวนการ')} desc={t('Process Flow ทุกขั้นตอน')}
         count={counts.flowTotal} attr={{ 'data-group': 'flows' }}
         active={tab === 'flows' && module === ''} open={flowsOpen} hasChildren
@@ -112,22 +130,6 @@ export default function SopSidebar({
               attr={{ 'data-flowmod': m.code }}
               active={tab === 'flows' && module === m.code}
               onClick={() => pickMod('flows', m.code)} />
-          ))}
-        </div>
-      )}
-
-      <GroupRow icon="book" title={t('กรณีเฉพาะ')} desc={t('Case Studies · ตามหมวด')}
-        count={counts.scenarioTotal} attr={{ 'data-group': 'cases' }}
-        active={tab === 'cases' && module === ''} open={casesOpen} hasChildren
-        onClick={() => groupClick('cases')} />
-
-      {casesOpen && (
-        <div className={kids}>
-          {modules.map((m) => (
-            <ModuleRow key={m.code} mod={m} count={counts.scenarios[m.code] || 0}
-              attr={{ 'data-mod': m.code }}
-              active={tab === 'cases' && module === m.code}
-              onClick={() => pickMod('cases', m.code)} />
           ))}
         </div>
       )}
